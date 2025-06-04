@@ -96,39 +96,59 @@ def create_client_drive_folder(client_name: str) -> tuple[str, str]:
     return local_path, web_link
 
 
-def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
-    logger.debug(">>> [open_local_or_web] folder_link:", folder_link)
+def open_local_or_web(folder_link: str, folder_name: str | None = None, parent=None) -> bool:
+    """Open a local folder if present or fallback to a web link.
+
+    Parameters
+    ----------
+    folder_link: str
+        Web link to the folder on Drive.
+    folder_name: str | None
+        Expected name of the local folder.
+    parent: Any
+        Kept for backward compatibility; not used.
+
+    Returns
+    -------
+    bool
+        ``True`` if a folder or link was opened.
+
+    Raises
+    ------
+    ValueError
+        If both ``folder_link`` and ``folder_name`` are missing.
+    FileNotFoundError
+        If no local folder found and ``folder_link`` is empty.
+    """
+
+    logger.debug("[open_local_or_web] link=%s name=%s", folder_link, folder_name)
 
     if not folder_link and not folder_name:
-        QMessageBox.warning(parent, "Ошибка", "Нет ссылки и нет имени папки.")
-        return
+        raise ValueError("No folder link or folder name provided")
 
-    if not folder_name:
-        folder_name = "???"  # fallback имя
+    folder_name = folder_name or "???"
 
     client_path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, folder_name)
-    print(">>> [search] checking client path:", client_path)
+    logger.debug("[search] checking client path: %s", client_path)
 
     if os.path.isdir(client_path):
-        # Если есть локальная папка клиента
         for sub in os.listdir(client_path):
             sub_path = os.path.join(client_path, sub)
             if os.path.isdir(sub_path) and (sub == folder_name or sub.endswith(folder_name)):
-                print(">>> [match] found subfolder:", sub_path)
+                logger.debug("[match] found subfolder: %s", sub_path)
                 os.startfile(sub_path)
-                return
+                return True
 
-        # Или просто открыть саму папку клиента
-        print(">>> [fallback] opening client root folder:", client_path)
+        logger.debug("[fallback] opening client root folder: %s", client_path)
         os.startfile(client_path)
-        return
+        return True
 
-    # Если локальной папки нет, но есть web-ссылка
     if folder_link:
-        print(">>> [fallback] opening web link:", folder_link)
+        logger.debug("[fallback] opening web link: %s", folder_link)
         webbrowser.open(folder_link)
-    else:
-        QMessageBox.warning(parent, "Ошибка", f"Не удалось найти папку клиента: {folder_name}")
+        return True
+
+    raise FileNotFoundError(f"Не удалось найти папку клиента: {folder_name}")
 
 
 
@@ -208,10 +228,10 @@ def upload_to_drive(local_path: str, drive_folder_id: str) -> str:
     uploaded = service.files().create(
         body=file_metadata,
         media_body=media,
-        fields="id, webViewLink"
+        fields="id, webViewLink",
     ).execute()
 
-    print(f"☁️ Загружен: {uploaded['webViewLink']}")
+    logger.info("☁️ Загружен: %s", uploaded["webViewLink"])
     return uploaded["webViewLink"]
 
 def open_folder(path_or_url: str, *, parent: Optional["QWidget"] = None) -> None:  # noqa: N802 (keep API)
