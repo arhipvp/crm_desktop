@@ -13,9 +13,9 @@ from ui.forms.client_form import ClientForm
 def test_main_window_tabs(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
-    assert window.tab_widget.count() == 5
-    titles = [window.tab_widget.tabText(i) for i in range(5)]
-    assert titles == ["Клиенты", "Сделки", "Полисы", "Финансы", "Задачи"]
+    assert window.tab_widget.count() == 6
+    titles = [window.tab_widget.tabText(i) for i in range(6)]
+    assert titles == ["Главная", "Клиенты", "Сделки", "Полисы", "Финансы", "Задачи"]
 
 
 def test_menu_refresh_trigger(qtbot):
