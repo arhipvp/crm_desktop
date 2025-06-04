@@ -23,6 +23,13 @@ class ExpenseTableModel(BaseTableModel):
     def columnCount(self, parent=None):
         return len(self.headers)
 
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role != Qt.DisplayRole or orientation != Qt.Horizontal:
+            return None
+        if 0 <= section < len(self.headers):
+            return self.headers[section]
+        return super().headerData(section, orientation, role)
+
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or role != Qt.DisplayRole:
