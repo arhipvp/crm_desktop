@@ -50,11 +50,3 @@ class MainWindow(QMainWindow):
             dlg = ImportPolicyJsonForm(self)
             if dlg.exec() != QDialog.Accepted:
                 break
-
-
-
-
-
-
-
-
