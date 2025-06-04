@@ -1,0 +1,62 @@
+/* 📌 Общий стиль таблиц */
+QHeaderView::section {
+    font-weight: bold;
+    padding: 4px;
+    background-color: #f2f2f2;
+    border: 1px solid #ddd;
+}
+
+QTableView {
+    gridline-color: #ddd;
+    alternate-background-color: #fafafa;
+    selection-background-color: #d0eaff;
+    selection-color: black;
+}
+
+/* 📌 Подсветка строки под курсором */
+QTableView::item:hover {
+    background-color: #edf6ff;
+}
+
+/* 📌 Кнопки */
+QPushButton {
+    min-height: 28px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background-color: #f5f5f5;
+}
+
+QPushButton:hover {
+    background-color: #e6e6e6;
+}
+
+QPushButton:pressed {
+    background-color: #dcdcdc;
+}
+
+/* ✅ Основные действия: Сохранить, Добавить */
+QPushButton[role="primary"] {
+    background-color: #3ba55d;
+    color: white;
+    border: none;
+}
+
+QPushButton[role="primary"]:hover {
+    background-color: #2e874b;
+}
+
+/* ❌ Опасные действия: Удалить */
+QPushButton[role="danger"] {
+    background-color: #d9534f;
+    color: white;
+    border: none;
+}
+
+QPushButton[role="danger"]:hover {
+    background-color: #c9302c;
+}
+
+QTableView::item:hover {
+    background-color: #edf6ff;
+}

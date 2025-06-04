@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+*.sqlite3
+*.db
+.env
+
+# Virtualenv / Poetry
+venv/
+.venv/
+
+# PyInstaller
+*.spec
+dist/
+build/
+
+# Qt
+*.qrc.py
+*.pyc
+
+# VSCode / PyCharm / IDE
+.vscode/
+.idea/
+
+# Jupyter / IPython
+.ipynb_checkpoints/
+
+# Dumps / logs / backups
+*.sql
+*.xlsx
+logs/
+backups/
+
+# Secrets
+credentials.json
+
+# Your dump script output
+project_dump_part*.txt
+sum_all.py

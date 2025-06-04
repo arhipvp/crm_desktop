@@ -1,0 +1,31 @@
+services:
+  
+  db:
+    image: postgres:15
+    container_name: crm_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  telegram_bot:
+      # ▸ Весь репозиторий как build-context, но используем конкретный Dockerfile
+      build:
+        context: .
+        dockerfile: telegram_bot/Dockerfile
+      container_name: crm_telegram_bot
+      env_file:
+        - telegram_bot/.env   # ← вот он
+      volumes:
+        - "G:/Мой диск/Клиенты:/data/clients"
+        - ./logs:/app/logs             # если ведёте логи
+      restart: unless-stopped
+
+
+volumes:
+  db_data:

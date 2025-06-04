@@ -1,0 +1,34 @@
+# utils/logging_config.py
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+
+
+def setup_logging():
+    logs_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
+    os.makedirs(logs_dir, exist_ok=True)
+
+    fmt = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(name)s │ %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    file_h = RotatingFileHandler(
+        os.path.join(logs_dir, "crm.log"),
+        maxBytes=2_000_000,  # 2 MB
+        backupCount=3,
+        encoding="utf-8",
+    )
+    file_h.setFormatter(fmt)
+
+    console_h = logging.StreamHandler()
+    console_h.setFormatter(fmt)
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        handlers=[file_h, console_h],
+        force=True,        # перезаписываем базовую конфигурацию
+        format="%(asctime)s | %(levelname)-8s | %(name)20s │ %(message)s",
+    )
+
+    logging.getLogger().setLevel(logging.DEBUG)

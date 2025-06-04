@@ -1,0 +1,25 @@
+# ui/common/ru_headers.py
+
+RU_HEADERS = {
+    "payment_date": "Дата платежа",
+    "actual_payment_date": "Оплачено фактически",
+    "amount": "Сумма",
+    "status": "Статус",
+    "title": "Заголовок",
+    "description": "Описание",
+    "due_date": "Срок",
+    "is_done": "Выполнено",
+    "client": "Клиент",
+    "deal": "Сделка",
+    "policy": "Полис",
+    "created_at": "Создано",
+    "updated_at": "Обновлено",
+    "income": "Поступление",
+    "expense": "Расход",
+    "type": "Тип",
+    "category": "Категория",
+    "company": "Компания",
+    "actual_date": "Факт. дата",
+    "commission_source": "Источник комиссии",
+    "note": "Комментарий",
+}
