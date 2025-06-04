@@ -1,9 +1,15 @@
 # ui/views/client_table_view.py
 
 from database.models import Client
-from services.client_service import build_client_query, get_clients_page, mark_client_deleted
+from services.client_service import (
+    build_client_query,
+    get_clients_page,
+    mark_client_deleted,
+)
+from services.folder_utils import open_folder
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
+from ui.common.styled_widgets import styled_button
 from ui.forms.client_form import ClientForm
 from ui.views.client_detail_view import ClientDetailView
 
@@ -15,6 +21,10 @@ class ClientTableView(BaseTableView):
         self.form_class = ClientForm        # соответствующая форма
         self.form_class = ClientForm
         self.row_double_clicked.connect(self.open_detail)
+        folder_btn = styled_button("📂 Папка", tooltip="Открыть папку клиента")
+        folder_btn.clicked.connect(self.open_selected_folder)
+        # Добавляем перед растягивающим элементом
+        self.button_row.insertWidget(self.button_row.count() - 1, folder_btn)
         self.load_data()  # загрузка данных при инициализации
 
     def get_filters(self) -> dict:
@@ -63,4 +73,11 @@ class ClientTableView(BaseTableView):
         else:
             dlg = ClientDetailView(client, parent=self)
             dlg.exec()
+
+    def open_selected_folder(self):
+        client = self.get_selected()
+        if not client:
+            return
+        path = client.drive_folder_path or client.drive_folder_link
+        open_folder(path, parent=self)
 
