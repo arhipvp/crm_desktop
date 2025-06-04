@@ -1,16 +1,55 @@
 # CRM Desktop
 
-Простое учебное CRM‑приложение на Python с использованием Peewee и PySide6.
+Простое учебное CRM‑приложение на Python с использованием Peewee и PySide6. Позволяет вести базу клиентов, сделок, полисов и задач. Для работы с задачами есть отдельный Telegram‑бот. Файлы клиентов и сделок могут храниться в Google Drive.
 
-## Запуск
+## Структура каталогов
+
+- `database/` – модели и инициализация БД.
+- `services/` – бизнес‑логика и утилиты.
+- `ui/` – Qt‑интерфейс приложения.
+- `telegram_bot/` – код Telegram‑бота и Dockerfile.
+- `tests/` – автотесты `pytest`.
+- `resources/` – стили и статические файлы.
+- `utils/` – вспомогательные модули.
+
+## Пример `.env`
+
+```env
+DATABASE_URL=sqlite:///crm.db
+TG_BOT_TOKEN=000000:telegram-bot-token
+GOOGLE_DRIVE_LOCAL_ROOT=/path/to/drive
+GOOGLE_CREDENTIALS=credentials.json
+```
+
+## Запуск приложения
 
 1. Установите зависимости: `pip install -r requirements.txt`.
-2. Создайте файл `.env` на основе `.env.example` и укажите строку подключения `DATABASE_URL`.
-3. Запустите приложение `python main.py`.
+2. Скопируйте `.env.example` в `.env` и укажите свои значения.
+3. Запустите интерфейс командой `python main.py`.
 
-Для Telegram‑бота см. каталог `telegram_bot`.
+## Запуск Telegram‑бота
+
+Для работы бота необходимы переменные `DATABASE_URL` и `TG_BOT_TOKEN`.
+Бот можно запустить локально:
+
+```bash
+python telegram_bot/bot.py
+```
+
+или через Docker Compose сервис `telegram_bot`.
 
 ## Тесты
 
-Тесты запускаются командой `pytest`.
+Запуск тестов выполняется командой:
 
+```bash
+pytest
+```
+
+## Работа с Google Drive
+
+Функции загрузки и создания папок используют сервисный аккаунт Google.
+Укажите путь к JSON‑файлу в переменной `GOOGLE_CREDENTIALS` и локальный
+каталог синхронизации в `GOOGLE_DRIVE_LOCAL_ROOT`. Для корректной работы
+необходимы библиотеки `google-api-python-client`, `google-auth` и
+`google-auth-oauthlib` (уже перечислены в `requirements.txt`).
