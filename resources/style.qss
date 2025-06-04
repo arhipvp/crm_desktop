@@ -18,6 +18,20 @@ QTableView::item:hover {
     background-color: #edf6ff;
 }
 
+/* Вкладки */
+QTabBar::tab {
+    padding: 6px 12px;
+}
+QTabBar::tab:selected {
+    background: #e6e6e6;
+}
+
+/* Строка состояния */
+QStatusBar {
+    background: #f2f2f2;
+    padding-left: 10px;
+}
+
 /* 📌 Кнопки */
 QPushButton {
     min-height: 28px;

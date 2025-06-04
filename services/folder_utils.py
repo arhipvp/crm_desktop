@@ -20,8 +20,9 @@ except Exception:  # noqa: BLE001
     MediaFileUpload = None  # type: ignore[assignment]
 
 try:
-    from PySide6.QtWidgets import QMessageBox
+    from PySide6.QtWidgets import QApplication, QMessageBox
 except Exception:  # PySide6 может отсутствовать в тестах
+    QApplication = None  # type: ignore[assignment]
     QMessageBox = None
 
 logger = logging.getLogger(__name__)
@@ -248,7 +249,7 @@ def open_folder(path_or_url: str, *, parent: Optional["QWidget"] = None) -> None
 
 def _msg(text: str, parent: Optional["QWidget"]) -> None:
     """Показывает информационное QMessageBox, если Qt доступен."""
-    if QMessageBox is None:
+    if QMessageBox is None or QApplication is None or QApplication.instance() is None:
         logger.info("MSG: %s", text)
         return
     QMessageBox.information(parent, "Информация", text)
