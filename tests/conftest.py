@@ -10,6 +10,9 @@ from playhouse.sqlite_ext import SqliteExtDatabase
 from database.db import db as main_db
 from database.models import Client, Deal, Income, Payment, Policy, Task, Expense
 
+# ---------------------------------------------------------------------------
+# Test database setup
+
 TEST_DB = SqliteExtDatabase(":memory:")
 
 @pytest.fixture(autouse=True)
@@ -29,4 +32,17 @@ def drive_root(tmp_path, monkeypatch):
     path = tmp_path / "drive"
     monkeypatch.setenv("GOOGLE_DRIVE_LOCAL_ROOT", str(path))
     return path
+
+
+@pytest.fixture(autouse=True)
+def _patch_open_folder(monkeypatch):
+    """Disable opening folders and showing message boxes during tests."""
+    monkeypatch.setattr(
+        "services.folder_utils.open_folder",
+        lambda *a, **kw: None,
+    )
+    monkeypatch.setattr(
+        "services.folder_utils._msg",
+        lambda *a, **kw: None,
+    )
 
