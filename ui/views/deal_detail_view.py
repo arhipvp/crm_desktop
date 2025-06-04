@@ -92,10 +92,11 @@ class DealDetailView(QDialog):
             lbl = QLabel(text)
             lbl.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
             lbl.setMinimumHeight(1)
+            lbl.setTextFormat(Qt.RichText)
             return lbl
 
         form.addRow("ID:", tight_label(str(self.instance.id)))
-        form.addRow("Клиент:", tight_label(self.instance.client.name))
+        form.addRow("Клиент:", tight_label(f"<b>{self.instance.client.name}</b>"))
         form.addRow("Телефон:", tight_label(self.instance.client.phone or "—"))
 
         start_label = tight_label(format_date(self.instance.start_date))
@@ -106,9 +107,10 @@ class DealDetailView(QDialog):
         self.status_edit.setFixedHeight(40)
         form.addRow("Статус:", self.status_edit)
 
-        # Описание — редактируемое текстовое поле (небольшое)
+        # Описание — только для чтения
         self.desc_edit = QTextEdit(self.instance.description)
         self.desc_edit.setFixedHeight(60)
+        self.desc_edit.setReadOnly(True)
         form.addRow("Описание:", self.desc_edit)
 
         # Добавить в расчеты — строка
@@ -339,7 +341,6 @@ class DealDetailView(QDialog):
         from services.deal_service import update_deal
 
         status = self.status_edit.toPlainText().strip()
-        description = self.desc_edit.toPlainText().strip()
         reminder = self.reminder_date.date().toPython() if self.reminder_date.date().isValid() else None
         new_calc_part = self.calc_append.text().strip()
         if reminder:
@@ -352,9 +353,8 @@ class DealDetailView(QDialog):
             update_deal(
                 self.instance,
                 status=status or None,
-                description=description or None,
                 reminder_date=reminder,
-                calculations=new_calc_part or None
+                calculations=new_calc_part or None,
             )
             self.calc_append.clear()
             self.calc_view.setText(self.instance.calculations or "—")
