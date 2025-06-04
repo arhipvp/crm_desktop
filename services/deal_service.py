@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from peewee import fn  # если ещё не импортирован
+from peewee import ModelSelect, fn  # если ещё не импортирован
 
 from database.db import db
 from database.models import Client  # обязательно!
@@ -206,7 +206,8 @@ def get_deals_page(
     order_by: str = "reminder_date",
     order_dir: str = "asc",
     **filters
-):
+) -> ModelSelect:
+    """Вернуть страницу сделок с указанными фильтрами."""
     query = build_deal_query(**filters)
 
     query = apply_deal_filters(query, search_text, show_deleted)
@@ -231,7 +232,8 @@ def get_deals_page(
 
 
 
-def get_open_deals_page(page: int = 1, per_page: int = 50):
+def get_open_deals_page(page: int = 1, per_page: int = 50) -> ModelSelect:
+    """Возвращает открытые сделки постранично."""
     return (
         Deal.select()
         .where((Deal.is_closed == False) & (Deal.is_deleted == False))
@@ -242,16 +244,19 @@ def get_open_deals_page(page: int = 1, per_page: int = 50):
 
 # ──────────────────────────── Связанные сущности ─────────────────────────────
 
-def get_policies_by_deal_id(deal_id: int):
+def get_policies_by_deal_id(deal_id: int) -> ModelSelect:
+    """Вернуть полисы, привязанные к сделке."""
     return Policy.select().where((Policy.deal == deal_id) & (Policy.is_deleted == False))
 
 
-def get_tasks_by_deal_id(deal_id: int):
+def get_tasks_by_deal_id(deal_id: int) -> ModelSelect:
+    """Вернуть задачи, связанные со сделкой."""
     return Task.select().where((Task.deal == deal_id) & (Task.is_deleted == False))
 
 
 
-def build_deal_query(search_text: str = "", show_deleted: bool = False, show_closed: bool = False):
+def build_deal_query(search_text: str = "", show_deleted: bool = False, show_closed: bool = False) -> ModelSelect:
+    """Базовый запрос сделок с фильтрами по статусам."""
     query = Deal.select().join(Client)
 
     query = apply_deal_filters(query, search_text, show_deleted)
@@ -264,7 +269,8 @@ def build_deal_query(search_text: str = "", show_deleted: bool = False, show_clo
 
 
 
-def get_next_deal(current_deal):
+def get_next_deal(current_deal: Deal) -> Deal | None:
+    """Найти следующую сделку по дате напоминания."""
     if current_deal.reminder_date is None:
         return None
 
@@ -279,7 +285,8 @@ def get_next_deal(current_deal):
     )
 
 
-def get_prev_deal(current_deal):
+def get_prev_deal(current_deal: Deal) -> Deal | None:
+    """Найти предыдущую сделку по дате напоминания."""
     if current_deal.reminder_date is None:
         return None
 
