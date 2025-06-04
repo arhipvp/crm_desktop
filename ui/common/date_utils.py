@@ -30,7 +30,14 @@ def set_optional_date(widget, d):
     ...
 
 def format_date(d):
-    ...
+    """Возвращает дату в формате dd.MM.yyyy или "—"."""
+    if not d:
+        return "—"
+    if isinstance(d, QDate):
+        return d.toString("dd.MM.yyyy") if d.isValid() else "—"
+    if isinstance(d, (date, datetime)):
+        return d.strftime("%d.%m.%Y")
+    return str(d)
 
 class DateLineEdit(QLineEdit):
     ...

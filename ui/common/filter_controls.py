@@ -34,6 +34,8 @@ class FilterControls(QWidget):
         Универсальная функция, вызываемая при изменении фильтров (дата/чекбоксы).
     parent : QWidget, optional
         Родительский виджет.
+    show_date_range : bool, optional
+        Отображать ли фильтр диапазона дат «С/По», по умолчанию True.
     """
     def __init__(
         self,
@@ -45,6 +47,8 @@ class FilterControls(QWidget):
         date_filter_field: str | None = None,
         on_filter=None,
         parent=None,
+        *,
+        show_date_range: bool = True,
     ):
         super().__init__(parent)
         extra_widgets = extra_widgets or []
@@ -56,16 +60,22 @@ class FilterControls(QWidget):
         # Поиск
         self._search = SearchBox(search_callback)
         self._search.search_input.setPlaceholderText(search_placeholder)
-        self._date_from = OptionalDateEdit()
-        self._date_to = OptionalDateEdit()
-        if on_filter:
-            self._date_from.dateChanged.connect(on_filter)
-            self._date_to.dateChanged.connect(on_filter)
 
-        layout.addWidget(QLabel("С:"))
-        layout.addWidget(self._date_from)
-        layout.addWidget(QLabel("По:"))
-        layout.addWidget(self._date_to)
+        if show_date_range:
+            self._date_from = OptionalDateEdit()
+            self._date_to = OptionalDateEdit()
+            if on_filter:
+                self._date_from.dateChanged.connect(on_filter)
+                self._date_to.dateChanged.connect(on_filter)
+
+            layout.addWidget(QLabel("С:"))
+            layout.addWidget(self._date_from)
+            layout.addWidget(QLabel("По:"))
+            layout.addWidget(self._date_to)
+        else:
+            self._date_from = None
+            self._date_to = None
+
         layout.addWidget(self._search)
 
         # Чекбоксы
@@ -112,7 +122,7 @@ class FilterControls(QWidget):
         Возвращает словарь {<имя_поля>: date} если дата указана, иначе None.
         Пример: {'due_date': datetime.date(2025, 5, 10)}
         """
-        if self._date_filter_field:
+        if self._date_filter_field and self._date_from and self._date_to:
             d1 = self._date_from.date_or_none()
             d2 = self._date_to.date_or_none()
             if d1 or d2:
