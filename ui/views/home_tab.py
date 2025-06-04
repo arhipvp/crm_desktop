@@ -1,7 +1,13 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PySide6.QtCore import Qt
 
-from database.models import Client, Deal, Policy, Task
+from services.dashboard_service import (
+    get_basic_stats,
+    count_assistant_tasks,
+    get_upcoming_tasks,
+    get_expiring_policies,
+    get_upcoming_deal_reminders,
+)
 
 
 class HomeTab(QWidget):
@@ -37,78 +43,70 @@ class HomeTab(QWidget):
         self.update_stats()
 
     def update_stats(self):
-        client_count = Client.select().where(Client.is_deleted == False).count()
-        deal_count = Deal.select().where(Deal.is_deleted == False).count()
-        policy_count = Policy.select().where(Policy.is_deleted == False).count()
-        task_count = Task.select().where(Task.is_deleted == False).count()
+        stats = get_basic_stats()
         html = (
-            f"Клиентов: <b>{client_count}</b><br>"
-            f"Сделок: <b>{deal_count}</b><br>"
-            f"Полисов: <b>{policy_count}</b><br>"
-            f"Задач: <b>{task_count}</b>"
+            f"Клиентов: <b>{stats['clients']}</b><br>"
+            f"Сделок: <b>{stats['deals']}</b><br>"
+            f"Полисов: <b>{stats['policies']}</b><br>"
+            f"Задач: <b>{stats['tasks']}</b>"
         )
         self.info_label.setText(html)
 
-        tg_count = (
-            Task
-            .select()
-            .where(
-                (Task.dispatch_state == "sent") &
-                (Task.is_deleted == False) &
-                (Task.is_done == False)
-            )
-            .count()
-        )
+        tg_count = count_assistant_tasks()
         self.tg_tasks_label.setText(
             f"Задач в работе у помощника: <b>{tg_count}</b>"
         )
 
-        tasks = (
-            Task
-            .select()
-            .where((Task.is_done == False) & (Task.is_deleted == False))
-            .order_by(Task.due_date.asc())
-            .limit(10)
-        )
-        task_lines = [
-            f"{t.due_date.strftime('%d.%m.%Y')} — {t.title}" for t in tasks
-        ]
+        task_lines = []
+        for t in get_upcoming_tasks():
+            note = (t.note or "").strip()
+            short_note = note[:30] + ("…" if len(note) > 30 else "") if note else ""
+            parts = [
+                t.due_date.strftime('%d.%m.%Y'),
+                t.title,
+                short_note,
+            ]
+            if t.policy_id:
+                parts.append(f"№{t.policy.policy_number}")
+                if t.policy.client_id:
+                    parts.append(t.policy.client.name)
+            elif t.deal_id and t.deal.client_id:
+                parts.append(t.deal.client.name)
+            if t.deal_id:
+                parts.append(t.deal.description)
+            task_lines.append(" — ".join([p for p in parts if p]))
         self.upcoming_tasks_label.setText(
             "<b>Ближайшие 10 задач</b><br>" + ("<br>".join(task_lines) or "—")
         )
 
-        policies = (
-            Policy
-            .select()
-            .where(
-                (Policy.is_deleted == False) &
-                (Policy.end_date.is_null(False))
-            )
-            .order_by(Policy.end_date.asc())
-            .limit(10)
-        )
-        policy_lines = [
-            f"{p.end_date.strftime('%d.%m.%Y')} — {p.policy_number}" for p in policies
-        ]
+        policy_lines = []
+        for p in get_expiring_policies():
+            note = (p.note or "").strip()
+            short_note = note[:30] + ("…" if len(note) > 30 else "") if note else ""
+            parts = [
+                p.end_date.strftime('%d.%m.%Y') if p.end_date else '',
+                p.policy_number,
+                short_note,
+            ]
+            if p.client_id:
+                parts.append(p.client.name)
+            if p.deal_id:
+                parts.append(p.deal.description)
+            policy_lines.append(" — ".join([part for part in parts if part]))
         self.expiring_policies_label.setText(
             "<b>Ближайшие 10 заканчивающихся полисов</b><br>" +
             ("<br>".join(policy_lines) or "—")
         )
 
-        deals = (
-            Deal
-            .select()
-            .where(
-                (Deal.is_deleted == False) &
-                (Deal.is_closed == False) &
-                (Deal.reminder_date.is_null(False))
-            )
-            .order_by(Deal.reminder_date.asc())
-            .limit(10)
-        )
-        deal_lines = [
-            f"{d.reminder_date.strftime('%d.%m.%Y')} — {d.description}" for d in deals
-        ]
+        deal_lines = []
+        for d in get_upcoming_deal_reminders():
+            parts = [
+                d.reminder_date.strftime('%d.%m.%Y') if d.reminder_date else '',
+                d.description,
+            ]
+            if d.client_id:
+                parts.append(d.client.name)
+            deal_lines.append(" — ".join([part for part in parts if part]))
         self.deal_reminders_label.setText(
             "<b>Ближайшие 10 напоминаний по сделкам</b><br>" +
             ("<br>".join(deal_lines) or "—")
