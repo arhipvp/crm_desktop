@@ -9,7 +9,7 @@ from peewee import ModelSelect
 from database.models import Client, db
 from services.folder_utils import (create_client_drive_folder,
                                    rename_client_folder)
-from ui.common.validators import normalize_phone
+from services.validators import normalize_phone
 
 logger = logging.getLogger(__name__)
 

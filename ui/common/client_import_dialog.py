@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QPushButton, QVBoxLayout)
 
 from database.models import Client
-from ui.common.validators import normalize_phone
+from services.validators import normalize_phone
 
 
 class ClientImportDialog(QDialog):
