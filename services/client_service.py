@@ -1,7 +1,10 @@
+"""Сервисные функции для работы с сущностью :class:`~database.models.Client`."""
+
 import logging
 import re
 import urllib.parse
 import webbrowser
+from peewee import ModelSelect
 
 from database.models import Client, db
 from services.folder_utils import (create_client_drive_folder,
@@ -19,14 +22,22 @@ CLIENT_ALLOWED_FIELDS = {"name", "phone", "email", "is_company", "note"}
 # ──────────────────────────── Получение ─────────────────────────────
 
 def get_all_clients():
+    """Возвращает выборку всех не удалённых клиентов."""
     return Client.select().where(Client.is_deleted == False)
 
 
-def get_client_by_id(client_id: int):
+def get_client_by_id(client_id: int) -> Client | None:
+    """Получить клиента по ``id`` или ``None`` если не найден."""
     return Client.get_or_none((Client.id == client_id) & (Client.is_deleted == False))
 
 
-def get_clients_page(page: int, per_page: int, search_text: str = "", show_deleted: bool = False):
+def get_clients_page(
+    page: int,
+    per_page: int,
+    search_text: str = "",
+    show_deleted: bool = False,
+) -> ModelSelect:
+    """Возвращает страницу клиентов с учётом фильтров."""
     query = Client.select()
     query = apply_client_filters(query, search_text, show_deleted)
 
@@ -39,7 +50,9 @@ def get_clients_page(page: int, per_page: int, search_text: str = "", show_delet
 
 # ──────────────────────────── Добавление ─────────────────────────────
 
-def add_client(**kwargs):
+def add_client(**kwargs) -> Client:
+    """Создаёт и возвращает нового клиента."""
+
     allowed_fields = CLIENT_ALLOWED_FIELDS
 
 
@@ -67,7 +80,7 @@ def add_client(**kwargs):
     clean_data["is_deleted"] = False
 
     with db.atomic():
-        client, created = Client.get_or_create(name=name, defaults=clean_data)
+        client, _ = Client.get_or_create(name=name, defaults=clean_data)
 
         try:
             folder_path, folder_link = create_client_drive_folder(name)
@@ -131,7 +144,10 @@ def update_client(client: Client, **kwargs) -> Client:
         client.save(update_fields=["drive_folder_path", "drive_folder_link"])
 
     return client
-def apply_client_filters(query, search_text, show_deleted):
+
+
+def apply_client_filters(query: ModelSelect, search_text: str, show_deleted: bool) -> ModelSelect:
+    """Применяет фильтры поиска и удаления к выборке клиентов."""
     if not show_deleted:
         query = query.where(Client.is_deleted == False)
     if search_text:
@@ -147,6 +163,7 @@ def apply_client_filters(query, search_text, show_deleted):
 # ──────────────────────────── Удаление ─────────────────────────────
 
 def mark_client_deleted(client_id: int):
+    """Помечает клиента как удалённого."""
     client = Client.get_or_none(Client.id == client_id)
     if client:
         client.is_deleted = True
@@ -158,11 +175,13 @@ def mark_client_deleted(client_id: int):
 # ─────────────────────── WhatsApp интеграция ─────────────────────────
 
 def format_phone_for_whatsapp(phone: str) -> str:
+    """Возвращает номер телефона в формате, пригодном для WhatsApp."""
     return normalize_phone(phone)
 
 
 
 def open_whatsapp(phone: str, message: str | None = None) -> None:
+    """Открывает чат WhatsApp в браузере с необязательным сообщением."""
     digits = re.sub(r"\D", "", phone or "")
     if not digits:
         raise ValueError("Некорректный номер телефона")
@@ -175,6 +194,7 @@ def open_whatsapp(phone: str, message: str | None = None) -> None:
 
 
 def build_client_query(search_text: str = "", show_deleted: bool = False):
+    """Создаёт выборку клиентов с учётом фильтров."""
     query = Client.select()
     query = apply_client_filters(query, search_text, show_deleted)
 

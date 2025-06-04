@@ -2,7 +2,7 @@
 import logging
 from datetime import date
 
-from peewee import JOIN  # обязательно
+from peewee import JOIN, ModelSelect  # обязательно
 from peewee import SQL, Case, fn
 
 from database.models import Client, Expense, Income, Payment, Policy
@@ -13,21 +13,25 @@ logger = logging.getLogger(__name__)
 
 # ───────────────────────── базовые CRUD ─────────────────────────
 
-def get_all_payments():
+def get_all_payments() -> ModelSelect:
+    """Вернуть все платежи без удалённых."""
     return Payment.select().where(Payment.is_deleted == False)
 
 
-def get_payments_by_policy_id(policy_id: int):
+def get_payments_by_policy_id(policy_id: int) -> ModelSelect:
+    """Получить платежи по полису."""
     return Payment.select().where(
         (Payment.policy_id == policy_id) & (Payment.is_deleted == False)
     )
 
 
-def get_payment_by_id(payment_id: int):
+def get_payment_by_id(payment_id: int) -> Payment | None:
+    """Получить платёж по ``id``."""
     return Payment.get_or_none(Payment.id == payment_id)
 
 
-def get_payments_by_client_id(client_id: int):
+def get_payments_by_client_id(client_id: int) -> ModelSelect:
+    """Платежи клиента через связанные полисы."""
     return (Payment
             .select()
             .join(Policy)
@@ -35,7 +39,16 @@ def get_payments_by_client_id(client_id: int):
 
 
 
-def get_payments_page(page, per_page, search_text="", show_deleted=False, deal_id=None, only_paid=False, **filters):
+def get_payments_page(
+    page: int,
+    per_page: int,
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    only_paid: bool = False,
+    **filters,
+) -> ModelSelect:
+    """Получить страницу платежей по заданным фильтрам."""
     query = build_payment_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -51,6 +64,7 @@ def get_payments_page(page, per_page, search_text="", show_deleted=False, deal_i
 
 
 def mark_payment_deleted(payment_id: int):
+    """Пометить платёж удалённым."""
     payment = Payment.get_or_none(Payment.id == payment_id)
     if payment:
         payment.is_deleted = True
@@ -62,6 +76,7 @@ def mark_payment_deleted(payment_id: int):
 # ─────────────────────────── Добавление ───────────────────────────
 
 def add_payment(**kwargs):
+    """Создать платёж и связанные записи дохода и расхода."""
     from services.income_service import add_income
     policy = kwargs.get("policy") or Policy.get_or_none(Policy.id == kwargs.get("policy_id"))
     if not policy:
@@ -124,7 +139,8 @@ def add_payment(**kwargs):
 
 # ─────────────────────────── Обновление ───────────────────────────
 
-def update_payment(payment: Payment, **kwargs):
+def update_payment(payment: Payment, **kwargs) -> Payment:
+    """Обновить поля платежа."""
     allowed_fields = {"amount", "payment_date", "actual_payment_date", "policy", "policy_id"}
 
     updates = {}
@@ -147,7 +163,8 @@ def update_payment(payment: Payment, **kwargs):
 
 
 
-def apply_payment_filters(query, search_text="", show_deleted=False, deal_id=None, only_paid=False):
+def apply_payment_filters(query: ModelSelect, search_text: str = "", show_deleted: bool = False, deal_id: int | None = None, only_paid: bool = False) -> ModelSelect:
+    """Фильтры для выборки платежей."""
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
     if not show_deleted:
@@ -165,7 +182,14 @@ def apply_payment_filters(query, search_text="", show_deleted=False, deal_id=Non
 
 
 
-def build_payment_query(search_text="", show_deleted=False, deal_id=None,  only_paid=False, **filters):
+def build_payment_query(
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    only_paid: bool = False,
+    **filters,
+) -> ModelSelect:
+    """Сконструировать базовый запрос платежей с агрегатами."""
     income_subq = (Income
         .select(fn.COUNT(Income.id))
         .where(Income.payment == Payment.id)
@@ -201,7 +225,8 @@ def build_payment_query(search_text="", show_deleted=False, deal_id=None,  only_
 
     return query
 
-def get_payments_by_deal_id(deal_id: int):
+def get_payments_by_deal_id(deal_id: int) -> ModelSelect:
+    """Платежи, относящиеся к сделке."""
     return (
         Payment
         .select()
