@@ -103,8 +103,8 @@ def add_deal(**kwargs):
         deal.save()
         # базовые задачи по умолчанию
         
-        #add_task(title="расчеты", due_date=deal.start_date, deal_id=deal.id)
-        #add_task(title="собрать документы", due_date=deal.start_date, deal_id=deal.id)
+        add_task(title="расчеты", due_date=deal.start_date, deal_id=deal.id)
+        add_task(title="собрать документы", due_date=deal.start_date, deal_id=deal.id)
 
         return deal
 

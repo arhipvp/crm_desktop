@@ -1,3 +1,4 @@
+from datetime import date
 from services.client_service import add_client
 from services.deal_service import add_deal
 from services.policy_service import add_policy
@@ -7,7 +8,7 @@ def test_add_policy_creates_everything():
     client = add_client(name="Тестовый клиент")
     deal = add_deal(
         client_id=client.id,
-        start_date="2025-01-01",
+        start_date=date(2025, 1, 1),
         description="ОСАГО для VW"
     )
 
@@ -17,8 +18,8 @@ def test_add_policy_creates_everything():
         policy_number="ABC123456",
         insurance_company="Тестовая страховая",
         insurance_type="ОСАГО",
-        start_date="2025-01-01",
-        end_date="2025-12-31"
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
     )
 
     assert policy.id is not None
@@ -42,5 +43,7 @@ def test_add_policy_creates_everything():
     income = Income.get_or_none(Income.payment == payment)
     assert income is not None
     assert income.amount == 0
+
+
 
 

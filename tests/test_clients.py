@@ -16,3 +16,4 @@ def test_add_client_without_name_raises():
         assert "Поле 'name'" in str(e)
     else:
         assert False, "Expected ValueError"
+

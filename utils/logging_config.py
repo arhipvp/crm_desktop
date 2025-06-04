@@ -1,10 +1,11 @@
-# utils/logging_config.py
+"""Простая конфигурация логирования для приложений CRM."""
 import logging
 import os
 from logging.handlers import RotatingFileHandler
 
 
-def setup_logging():
+def setup_logging() -> None:
+    """Настраивает вывод логов в консоль и файл ``logs/crm.log``."""
     logs_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
     os.makedirs(logs_dir, exist_ok=True)
 
@@ -27,8 +28,9 @@ def setup_logging():
     logging.basicConfig(
         level=logging.DEBUG,
         handlers=[file_h, console_h],
-        force=True,        # перезаписываем базовую конфигурацию
+        force=True,  # перезаписываем базовую конфигурацию
         format="%(asctime)s | %(levelname)-8s | %(name)20s │ %(message)s",
     )
 
     logging.getLogger().setLevel(logging.DEBUG)
+

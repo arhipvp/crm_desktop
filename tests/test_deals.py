@@ -27,3 +27,4 @@ def test_add_deal_creates_deal_and_tasks():
     # 5. проверяем, что можно получить через `get_deals_by_client_id`
     deals = get_deals_by_client_id(client.id)
     assert len(deals) == 1
+

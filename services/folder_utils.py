@@ -10,10 +10,19 @@ import webbrowser
 from functools import lru_cache
 from typing import Optional, Tuple
 
-from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-from PySide6.QtWidgets import QMessageBox
+try:
+    from google.oauth2.service_account import Credentials
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+except Exception:  # noqa: BLE001
+    Credentials = None  # type: ignore[assignment]
+    build = lambda *a, **k: None  # type: ignore[assignment]
+    MediaFileUpload = None  # type: ignore[assignment]
+
+try:
+    from PySide6.QtWidgets import QMessageBox
+except Exception:  # PySide6 может отсутствовать в тестах
+    QMessageBox = None
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +36,8 @@ GOOGLE_DRIVE_LOCAL_ROOT = os.getenv("GOOGLE_DRIVE_LOCAL_ROOT", r"G:\Мой ди�
 
 @lru_cache(maxsize=1)
 def get_drive_service():
+    if Credentials is None:
+        raise RuntimeError("Google Drive libraries are not available")
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     return build("drive", "v3", credentials=creds)
 

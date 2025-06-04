@@ -21,3 +21,12 @@ def test_db():
     yield
     main_db.drop_tables([Client, Deal, Policy, Payment, Income, Task])
     main_db.close()
+
+
+@pytest.fixture(autouse=True)
+def drive_root(tmp_path, monkeypatch):
+    """Используем временную папку вместо реального Google Drive."""
+    path = tmp_path / "drive"
+    monkeypatch.setenv("GOOGLE_DRIVE_LOCAL_ROOT", str(path))
+    return path
+

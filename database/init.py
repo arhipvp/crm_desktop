@@ -1,13 +1,13 @@
-"""
-Единое место для инициализации Peewee-Proxy `db`.
-Вызывайте init_from_env() один раз в самом начале entry-point’а.
+"""Единое место для инициализации Peewee-Proxy `db`.
+Вызывайте :func:`init_from_env` в начале entry-point'а.
 """
 from __future__ import annotations
 
 import os
 import urllib.parse
 from peewee import PostgresqlDatabase, SqliteDatabase
-from .db import db  #  <-- тот самый Proxy
+
+from .db import db  # тот самый Proxy
 
 _DEFAULT_ENV = "DATABASE_URL"
 
@@ -24,14 +24,14 @@ def _postgres_from_url(url: str) -> PostgresqlDatabase:
 
 
 def init_from_env(env_var: str = _DEFAULT_ENV) -> None:
+    """Инициализирует :data:`db` из переменной окружения.
+
+    Поддерживает строки вида:
+      • ``postgres://user:pass@host:port/dbname``
+      • ``sqlite:///absolute/path.db`` или ``sqlite:///:memory:``
+    Повторный вызов безопасен.
     """
-    Инициализирует `db` из переменной окружения.
-    Поддерживает:
-      • postgres://user:pass@host:port/dbname
-      • sqlite:///absolute/path.db   или  sqlite:///:memory:
-    Повторный вызов НЕ ломает приложение.
-    """
-    if getattr(db, "obj", None):      # Peewee ≥ 3.17 — Proxy уже инициализирован
+    if getattr(db, "obj", None):
         return
 
     url = os.getenv(env_var)
@@ -39,10 +39,10 @@ def init_from_env(env_var: str = _DEFAULT_ENV) -> None:
         raise RuntimeError(f"{env_var} is not set")
 
     if url.startswith("sqlite"):
-        # sqlite:///home/me/db.sqlite  → путь начинается после третьего '/'
         path = url.replace("sqlite:///", "", 1) or ":memory:"
         database = SqliteDatabase(path, pragmas={"foreign_keys": 1})
     else:
         database = _postgres_from_url(url)
 
     db.initialize(database)
+
