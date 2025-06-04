@@ -1,25 +1,31 @@
+"""Сервисные функции для работы с задачами."""
+
 import logging
+import datetime as _dt
+from typing import Iterable
+
+from peewee import JOIN, ModelSelect, fn
+from playhouse.shortcuts import prefetch
 
 logger = logging.getLogger(__name__)
-import datetime as _dt
-
-from peewee import JOIN, fn
-from playhouse.shortcuts import prefetch
 
 from database.db import db
 from database.models import Client, Deal, Policy, Task
 
 
 # ───────────────────────── базовые CRUD ─────────────────────────
-def get_all_tasks():
+def get_all_tasks() -> ModelSelect:
+    """Вернуть все задачи без удалённых."""
     return Task.select().where(Task.is_deleted == False)
 
 
-def get_pending_tasks():
+def get_pending_tasks() -> ModelSelect:
+    """Невыполненные задачи."""
     return Task.select().where((Task.is_done == False) & (Task.is_deleted == False))
 
 
-def add_task(**kwargs):
+def add_task(**kwargs) -> Task:
+    """Создать новую задачу."""
     allowed_fields = {
         'title',
         'due_date',
@@ -58,6 +64,7 @@ def add_task(**kwargs):
 
 
 def update_task(task: Task, **fields) -> Task:
+    """Изменить задачу и при необходимости отметить выполненной."""
     allowed_fields = {
         "title", "due_date", "deal_id", "policy_id",
         "is_done", "note", "dispatch_state",
@@ -122,7 +129,8 @@ def update_task(task: Task, **fields) -> Task:
 
 
 
-def mark_task_deleted(task: Task | int):
+def mark_task_deleted(task: Task | int) -> None:
+    """Пометить задачу удалённой."""
     task_obj = task if isinstance(task, Task) else Task.get_or_none(Task.id == task)
     if task_obj:
         task_obj.is_deleted = True
@@ -133,7 +141,7 @@ def mark_task_deleted(task: Task | int):
 
 
 # ─────────────────────── очередь Telegram ───────────────────────
-def queue_task(task_id: int):
+def queue_task(task_id: int) -> None:
     """Поставить задачу в очередь (idle → queued)."""
     t = Task.get_or_none(Task.id == task_id, Task.is_deleted == False)
     if t and t.dispatch_state == "idle":
@@ -147,6 +155,7 @@ def queue_task(task_id: int):
 
 
 def pop_next(chat_id: int) -> Task | None:
+    """Взять из очереди следующую задачу и пометить отправленной."""
     with db.atomic():
         query = (Task
             .select(Task.id)
@@ -173,7 +182,8 @@ def pop_next(chat_id: int) -> Task | None:
         return task
 
 
-def return_to_queue(task_id: int):
+def return_to_queue(task_id: int) -> None:
+    """Вернуть задачу в очередь из состояния sent."""
     t = Task.get_or_none(Task.id == task_id, Task.is_deleted == False)
     if t and t.dispatch_state == "sent":
         t.dispatch_state = "queued"
@@ -185,14 +195,15 @@ def return_to_queue(task_id: int):
 
 
 
-def link_telegram(task_id: int, chat_id: int, msg_id: int):
+def link_telegram(task_id: int, chat_id: int, msg_id: int) -> None:
+    """Сохранить идентификаторы сообщения Telegram для задачи."""
     (Task.update(tg_chat_id=chat_id, tg_message_id=msg_id)
          .where(Task.id == task_id)
          .execute())
     logger.info("🔗 Telegram-связь установлена для задачи #%s", task_id)
 
 
-def mark_done(task_id: int):
+def mark_done(task_id: int) -> None:
     (Task.update(is_done=True, dispatch_state="idle")
          .where(Task.id == task_id)
          .execute())
@@ -200,7 +211,8 @@ def mark_done(task_id: int):
 
 
 
-def append_note(task_id: int, text: str):
+def append_note(task_id: int, text: str) -> None:
+    """Дополнить задачу произвольной заметкой."""
     if not text.strip():
         return
     t = Task.get_or_none(Task.id == task_id)
@@ -222,7 +234,8 @@ def build_task_query(
     policy_id=None,
     sort_field="due_date",
     sort_order="asc",
-):
+) -> ModelSelect:
+    """Сформировать базовый запрос задач."""
     query = Task.select()
     if not include_done:
         query = query.where(Task.is_done == False)
@@ -255,7 +268,14 @@ def build_task_query(
     return query
 
 
-def get_tasks_page(page: int, per_page: int, sort_field="due_date", sort_order="asc", **filters):
+def get_tasks_page(
+    page: int,
+    per_page: int,
+    sort_field: str = "due_date",
+    sort_order: str = "asc",
+    **filters,
+) -> ModelSelect:
+    """Получить страницу задач с сортировкой."""
     logger.debug("🔽 Применяем сортировку: field=%s, order=%s", sort_field, sort_order)
 
     offset = (page - 1) * per_page
@@ -273,7 +293,8 @@ def get_tasks_page(page: int, per_page: int, sort_field="due_date", sort_order="
 
 
 
-def get_pending_tasks_page(page: int, per_page: int):
+def get_pending_tasks_page(page: int, per_page: int) -> ModelSelect:
+    """Невыполненные задачи постранично."""
     offset = (page - 1) * per_page
     return (Task
             .select()
@@ -284,6 +305,7 @@ def get_pending_tasks_page(page: int, per_page: int):
 
 
 def unassign_from_telegram(task_id: int) -> None:
+    """Снять связь задачи с сообщением Telegram."""
     task = Task.get_by_id(task_id)
     task.dispatch_state = "idle"
     task.tg_chat_id = None
@@ -294,6 +316,7 @@ def unassign_from_telegram(task_id: int) -> None:
 
 
 def get_tasks_by_deal(deal_id: int) -> list[Task]:
+    """Все задачи по конкретной сделке."""
     return Task.select().where(
         (Task.deal_id == deal_id) & (Task.is_deleted == False)
     )

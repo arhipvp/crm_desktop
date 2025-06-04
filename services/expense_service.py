@@ -1,4 +1,10 @@
+"""Утилиты для управления расходами."""
+
 import logging
+from typing import Iterable
+
+from peewee import ModelSelect
+
 logger = logging.getLogger(__name__)
 from datetime import date
 
@@ -7,11 +13,13 @@ from services.payment_service import get_payment_by_id
 
 # ─────────────────────────── CRUD ────────────────────────────
 
-def get_all_expenses():
+def get_all_expenses() -> ModelSelect:
+    """Вернуть выборку всех расходов без удалённых."""
     return Expense.select().where(Expense.is_deleted == False)
 
 
-def get_pending_expenses():
+def get_pending_expenses() -> ModelSelect:
+    """Расходы без даты оплаты."""
     return Expense.select().where(
         (Expense.is_deleted == False) &
         (Expense.expense_date.is_null(True))
@@ -19,10 +27,12 @@ def get_pending_expenses():
 
 
 def get_expense_by_id(expense_id: int) -> Expense | None:
+    """Найти расход по ``id``."""
     return Expense.get_or_none(Expense.id == expense_id)
 
 
-def mark_expense_deleted(expense_id: int):
+def mark_expense_deleted(expense_id: int) -> None:
+    """Пометить расход удалённым."""
     expense = Expense.get_or_none(Expense.id == expense_id)
     if expense:
         expense.is_deleted = True
@@ -33,7 +43,8 @@ def mark_expense_deleted(expense_id: int):
 
 # ─────────────────────────── Добавление ───────────────────────────
 
-def add_expense(**kwargs):
+def add_expense(**kwargs) -> Expense:
+    """Создать расход, связанный с платёжкой."""
     payment = kwargs.get("payment") or get_payment_by_id(kwargs.get("payment_id"))
     if not payment:
         raise ValueError("Платёж не найден")
@@ -68,7 +79,8 @@ def add_expense(**kwargs):
 
 # ─────────────────────────── Обновление ───────────────────────────
 
-def update_expense(expense: Expense, **kwargs):
+def update_expense(expense: Expense, **kwargs) -> Expense:
+    """Обновить поля расхода."""
     allowed_fields = {"payment", "payment_id", "amount", "expense_type", "expense_date"}
 
     updates = {}
@@ -94,13 +106,30 @@ def update_expense(expense: Expense, **kwargs):
 
 
 
-def get_expenses_page(page: int, per_page: int, *, search_text: str = "", show_deleted: bool = False, deal_id: int = None, only_unpaid: bool = False):
+def get_expenses_page(
+    page: int,
+    per_page: int,
+    *,
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    only_unpaid: bool = False,
+) -> ModelSelect:
+    """Вернуть страницу расходов."""
     query = build_expense_query(search_text=search_text, show_deleted=show_deleted, deal_id=deal_id, only_unpaid=only_unpaid)
     offset = (page - 1) * per_page
     return query.order_by(Expense.expense_date.desc()).limit(per_page).offset(offset)
 
 
-def apply_expense_filters(query, search_text=None, show_deleted=False, deal_id=None, only_unpaid=False, **kwargs):
+def apply_expense_filters(
+    query: ModelSelect,
+    search_text: str | None = None,
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    only_unpaid: bool = False,
+    **kwargs,
+) -> ModelSelect:
+    """Применить фильтры к выборке расходов."""
 
 
 
@@ -120,14 +149,22 @@ def apply_expense_filters(query, search_text=None, show_deleted=False, deal_id=N
 
 
 
-def build_expense_query(search_text=None, show_deleted=False, deal_id=None, only_unpaid=False, **kwargs):
+def build_expense_query(
+    search_text: str | None = None,
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    only_unpaid: bool = False,
+    **kwargs,
+) -> ModelSelect:
+    """Сформировать базовый запрос расходов."""
 
     query = Expense.select(Expense, Payment, Policy, Client).join(Payment).join(Policy).join(Client)
     return apply_expense_filters(query, search_text, show_deleted, deal_id, only_unpaid, **kwargs)
 
 
 
-def get_expenses_by_deal(deal_id: int):
+def get_expenses_by_deal(deal_id: int) -> ModelSelect:
+    """Расходы, связанные со сделкой."""
     return (
         Expense
         .select(Expense, Payment, Policy, Client)

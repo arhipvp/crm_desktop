@@ -36,6 +36,7 @@ GOOGLE_DRIVE_LOCAL_ROOT = os.getenv("GOOGLE_DRIVE_LOCAL_ROOT", r"G:\Мой ди�
 
 @lru_cache(maxsize=1)
 def get_drive_service():
+    """Создать и закешировать клиент Google Drive."""
     if Credentials is None:
         raise RuntimeError("Google Drive libraries are not available")
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
@@ -52,12 +53,14 @@ def sanitize_name(name: str) -> str:
     return name.rstrip(' .')                         # убираем завершающие пробелы/точки
 
 
-def extract_folder_id(link: str) -> str:
+def extract_folder_id(link: str) -> str | None:
+    """Извлечь ID папки из ссылки Google Drive."""
     if not link:
         return None
     return link.rstrip("/").split("/")[-1]
 
 def create_drive_folder(folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> str:
+    """Создать папку в Google Drive и вернуть ссылку на неё."""
     folder_name = sanitize_name(folder_name)
     service = get_drive_service()
 

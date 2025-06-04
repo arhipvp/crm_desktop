@@ -1,7 +1,12 @@
+"""Функции для работы с доходами клиентов."""
+
 import logging
+from datetime import date
+from typing import Iterable
+
+from peewee import ModelSelect
 
 logger = logging.getLogger(__name__)
-from datetime import date
 
 from database.models import Client, Income, Payment, Policy
 from services.payment_service import get_payment_by_id
@@ -9,22 +14,26 @@ from services.task_service import add_task
 
 # ───────────────────────── базовые CRUD ─────────────────────────
 
-def get_all_incomes():
+def get_all_incomes() -> ModelSelect:
+    """Вернуть выборку всех не удалённых доходов."""
     return Income.select().where(Income.is_deleted == False)
 
 
-def get_pending_incomes():
+def get_pending_incomes() -> ModelSelect:
+    """Доходы без даты получения."""
     return Income.select().where(
         (Income.is_deleted == False) &
         (Income.received_date.is_null(True))
     )
 
 
-def get_income_by_id(income_id: int):
+def get_income_by_id(income_id: int) -> Income | None:
+    """Найти доход по ``id`` либо ``None``."""
     return Income.get_or_none(Income.id == income_id)
 
 
-def mark_income_deleted(income_id: int):
+def mark_income_deleted(income_id: int) -> None:
+    """Пометить доход удалённым."""
     income = Income.get_or_none(Income.id == income_id)
     if income:
         income.is_deleted = True
@@ -34,15 +43,17 @@ def mark_income_deleted(income_id: int):
 
 
 def get_incomes_page(
-    page: int, per_page: int,
+    page: int,
+    per_page: int,
     order_by: str = "received_date",
     order_dir: str = "desc",
     search_text: str = "",
     show_deleted: bool = False,
     only_unreceived: bool = False,
-    received_date_range=None,
-    **kwargs
-):
+    received_date_range: Iterable[date] | None = None,
+    **kwargs,
+) -> ModelSelect:
+    """Постраничный список доходов."""
     query = build_income_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -67,7 +78,8 @@ def get_incomes_page(
 
 # ─────────────────────────── Добавление ───────────────────────────
 
-def add_income(**kwargs):
+def add_income(**kwargs) -> Income:
+    """Создать запись дохода по платёжке."""
     payment = kwargs.get("payment") or get_payment_by_id(kwargs.get("payment_id"))
     if not payment:
         raise ValueError("Не найден платёж")
@@ -108,7 +120,8 @@ def add_income(**kwargs):
 
 # ─────────────────────────── Обновление ───────────────────────────
 
-def update_income(income: Income, **kwargs):
+def update_income(income: Income, **kwargs) -> Income:
+    """Обновить параметры дохода."""
     allowed_fields = {"payment", "payment_id", "amount", "received_date", "commission_source"}
 
     updates = {}
@@ -133,7 +146,15 @@ def update_income(income: Income, **kwargs):
     return income
 
 
-def apply_income_filters(query, search_text="", show_deleted=False, only_unreceived=False, received_date_range=None, deal_id=None):
+def apply_income_filters(
+    query: ModelSelect,
+    search_text: str = "",
+    show_deleted: bool = False,
+    only_unreceived: bool = False,
+    received_date_range: Iterable[date] | None = None,
+    deal_id: int | None = None,
+) -> ModelSelect:
+    """Фильтрация выборки доходов."""
     if not show_deleted:
         query = query.where(Income.is_deleted == False)
     if search_text:
@@ -158,9 +179,10 @@ def build_income_query(
     search_text: str = "",
     show_deleted: bool = False,
     only_unreceived: bool = False,
-    received_date_range=None,
-    **kwargs
-):
+    received_date_range: Iterable[date] | None = None,
+    **kwargs,
+) -> ModelSelect:
+    """Сформировать базовый запрос доходов с JOIN'ами."""
     # JOIN Payment, Policy, Client
     query = (
         Income
@@ -202,6 +224,7 @@ def build_income_query(
 
 
 def create_stub_income(deal_id: int | None = None) -> Income:
+    """Создать временный объект дохода для формы."""
     from services.payment_service import get_all_payments
     payments = get_all_payments()
     if deal_id:

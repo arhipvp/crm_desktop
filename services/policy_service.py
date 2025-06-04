@@ -1,7 +1,9 @@
+"""Функционал CRUD и вспомогательные операции для полисов."""
+
 import logging
 from datetime import timedelta
 
-from peewee import fn
+from peewee import ModelSelect, fn
 
 from database.db import db
 from database.models import Client  # если ещё не импортирован
@@ -19,17 +21,20 @@ logger = logging.getLogger(__name__)
 
 
 
-def get_all_policies():
+def get_all_policies() -> ModelSelect:
+    """Вернуть все полисы без удалённых."""
     return Policy.select().where(Policy.is_deleted == False)
 
 
-def get_policies_by_client_id(client_id: int):
+def get_policies_by_client_id(client_id: int) -> ModelSelect:
+    """Полисы клиента по его ``id``."""
     return Policy.select().where(
         (Policy.client_id == client_id) & (Policy.is_deleted == False)
     )
 
 
-def get_policies_by_deal_id(deal_id: int):
+def get_policies_by_deal_id(deal_id: int) -> ModelSelect:
+    """Полисы, связанные со сделкой."""
     return (
         Policy
         .select()
@@ -42,16 +47,25 @@ def get_policies_by_deal_id(deal_id: int):
 
 
 
-def get_policy_by_number(policy_number: str):
+def get_policy_by_number(policy_number: str) -> Policy | None:
+    """Найти полис по его номеру."""
     return Policy.get_or_none(Policy.policy_number == policy_number)
 
 
 
 
 def get_policies_page(
-    page, per_page, search_text="", show_deleted=False, deal_id=None, client_id=None,
-    order_by="start_date", order_dir="asc", **filters
-):
+    page: int,
+    per_page: int,
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    client_id: int | None = None,
+    order_by: str = "start_date",
+    order_dir: str = "asc",
+    **filters,
+) -> ModelSelect:
+    """Вернуть страницу полисов с учётом фильтров."""
     query = build_policy_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -76,7 +90,8 @@ def get_policies_page(
 
 
 
-def mark_policy_deleted(policy_id: int):
+def mark_policy_deleted(policy_id: int) -> None:
+    """Пометить полис как удалённый."""
     policy = Policy.get_or_none(Policy.id == policy_id)
     if policy:
         policy.is_deleted = True
@@ -87,7 +102,7 @@ def mark_policy_deleted(policy_id: int):
 
 # ─────────────────────────── Добавление ───────────────────────────
 
-def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
+def add_policy(*, payments=None, first_payment_paid: bool = False, **kwargs) -> Policy:
 
     """
     Создаёт новый полис с привязкой к клиенту и (опционально) сделке.
@@ -215,7 +230,8 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
 
 # ─────────────────────────── Обновление ───────────────────────────
 
-def update_policy(policy: Policy, **kwargs):
+def update_policy(policy: Policy, **kwargs) -> Policy:
+    """Изменить параметры существующего полиса."""
     allowed_fields = {
         "policy_number",
         "insurance_type",
@@ -267,6 +283,7 @@ def update_policy(policy: Policy, **kwargs):
 # ─────────────────────────── Пролонгация ───────────────────────────
 
 def prolong_policy(original_policy: Policy) -> Policy:
+    """Создать новый полис на основе предыдущего."""
     if not original_policy.start_date or not original_policy.end_date:
         raise ValueError("У полиса должны быть указаны даты начала и окончания.")
 
@@ -289,7 +306,14 @@ def prolong_policy(original_policy: Policy) -> Policy:
     return new_policy
 
 
-def apply_policy_filters(query, search_text="", show_deleted=False, deal_id=None, client_id=None):
+def apply_policy_filters(
+    query: ModelSelect,
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    client_id: int | None = None,
+) -> ModelSelect:
+    """Применить фильтры к выборке полисов."""
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
     if client_id is not None:
@@ -304,18 +328,27 @@ def apply_policy_filters(query, search_text="", show_deleted=False, deal_id=None
     return query
 
 
-def build_policy_query(search_text="", show_deleted=False, deal_id=None, client_id=None, **filters):
+def build_policy_query(
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    client_id: int | None = None,
+    **filters,
+) -> ModelSelect:
+    """Базовый запрос полисов с JOIN клиентом."""
     query = Policy.select(Policy, Client).join(Client)
     return apply_policy_filters(query, search_text, show_deleted, deal_id, client_id)
 
 
 
 def get_policy_by_id(policy_id: int) -> Policy | None:
+    """Получить полис по ``id``."""
     return Policy.get_or_none((Policy.id == policy_id) & (Policy.is_deleted == False))
 
 
 
 def get_unique_policy_field_values(field_name: str) -> list[str]:
+    """Вернуть отсортированный список уникальных значений указанного поля."""
     # Проверка, что поле допустимо
     allowed_fields = {
         "vehicle_brand", "vehicle_model",
