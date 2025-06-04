@@ -45,6 +45,7 @@ class DealDetailView(QDialog):
 
         # Заголовок
         header = QLabel(f"<h1>Сделка #{deal.id}</h1>")
+        header.setTextFormat(Qt.RichText)
         header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.layout.addWidget(header)
 
@@ -69,9 +70,14 @@ class DealDetailView(QDialog):
         # Здесь используем тот же сервис задач
 
         cnt_tasks = len(get_tasks_by_deal_id(self.instance.id))
-        kpi_layout.addWidget(QLabel(f"Полисов: <b>{cnt_policies}</b>"))
-        kpi_layout.addWidget(QLabel(f"Платежей: <b>{cnt_payments}</b>"))
-        kpi_layout.addWidget(QLabel(f"Задач: <b>{cnt_tasks}</b>"))
+        for text in [
+            f"Полисов: <b>{cnt_policies}</b>",
+            f"Платежей: <b>{cnt_payments}</b>",
+            f"Задач: <b>{cnt_tasks}</b>",
+        ]:
+            lbl = QLabel(text)
+            lbl.setTextFormat(Qt.RichText)
+            kpi_layout.addWidget(lbl)
         kpi_layout.addStretch()
         self.layout.addLayout(kpi_layout)
 
@@ -86,7 +92,9 @@ class DealDetailView(QDialog):
         # 1) Информация
         info = QWidget()
         form = QFormLayout(info)
-        form.setVerticalSpacing(4)  # уменьшить вертикальные отступы
+        form.setVerticalSpacing(2)
+        form.setHorizontalSpacing(10)
+        form.setLabelAlignment(Qt.AlignRight)
 
         def tight_label(text: str) -> QLabel:
             lbl = QLabel(text)
@@ -113,14 +121,19 @@ class DealDetailView(QDialog):
         self.desc_edit.setReadOnly(True)
         form.addRow("Описание:", self.desc_edit)
 
-        # Добавить в расчеты — строка
-        self.calc_append = QLineEdit()
+        # Добавить в расчеты
+        self.calc_append = QTextEdit()
+        self.calc_append.setPlaceholderText("Новая запись…")
+        self.calc_append.setFixedHeight(50)
         form.addRow("Добавить в расчеты:", self.calc_append)
 
         # Расчеты — только для чтения
-        self.calc_view = QTextEdit(self.instance.calculations or "")
+        self.calc_view = QTextEdit()
         self.calc_view.setReadOnly(True)
-        self.calc_view.setFixedHeight(120)
+        self.calc_view.setFixedHeight(140)
+        from PySide6.QtGui import QFontDatabase
+        self.calc_view.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self.calc_view.setPlainText(self.instance.calculations or "—")
         form.addRow("Расчеты:", self.calc_view)
 
         # Напоминание — редактируемая дата
@@ -342,7 +355,7 @@ class DealDetailView(QDialog):
 
         status = self.status_edit.toPlainText().strip()
         reminder = self.reminder_date.date().toPython() if self.reminder_date.date().isValid() else None
-        new_calc_part = self.calc_append.text().strip()
+        new_calc_part = self.calc_append.toPlainText().strip()
         if reminder:
             delta = abs(reminder - date.today())
             if delta > timedelta(days=31):
@@ -357,7 +370,7 @@ class DealDetailView(QDialog):
                 calculations=new_calc_part or None,
             )
             self.calc_append.clear()
-            self.calc_view.setText(self.instance.calculations or "—")
+            self.calc_view.setPlainText(self.instance.calculations or "—")
         except Exception as e:
             from ui.common.message_boxes import show_error
             show_error(str(e))
