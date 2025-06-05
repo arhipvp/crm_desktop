@@ -151,7 +151,9 @@ def add_payment(**kwargs):
         payment.amount,
     )
     try:
-        add_income(payment=payment, amount=payment.amount, policy=policy)
+        # При создании платежа доход добавляется автоматически, но без суммы.
+        # Сумма будет указана отдельно после фактического получения средств.
+        add_income(payment=payment, amount=0, policy=policy)
     except Exception as e:
         logger.error("❌ Ошибка при добавлении дохода: %s", e)
 
