@@ -56,7 +56,36 @@ pip install -r requirements.txt
 python telegram_bot/bot.py
 ```
 
-или через Docker Compose сервис `telegram_bot`.
+
+## Docker Compose
+
+В репозитории есть `docker-compose.yml` для запуска PostgreSQL и бота.
+Перед стартом создайте в корне файл `.env` с параметрами базы:
+
+```env
+POSTGRES_DB=crm
+POSTGRES_USER=crm_user
+POSTGRES_PASSWORD=crm_pass
+```
+
+Также создайте `telegram_bot/.env`:
+
+```env
+DATABASE_URL=postgres://crm_user:crm_pass@db:5432/crm
+TG_BOT_TOKEN=000000:telegram-bot-token
+GOOGLE_DRIVE_LOCAL_ROOT=/path/to/drive  # опционально
+GOOGLE_CREDENTIALS=credentials.json     # опционально
+```
+
+Запустите сервисы командой:
+
+```bash
+docker-compose up -d
+```
+
+Сервис `db` использует том `db_data:/var/lib/postgresql/data`.
+Контейнер `telegram_bot` монтирует
+`G:/Мой диск/Клиенты:/data/clients` и `./logs:/app/logs`.
 
 ## Тесты
 
