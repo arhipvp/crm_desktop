@@ -13,6 +13,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from PySide6.QtGui import (
+    QSyntaxHighlighter,
+    QTextCharFormat,
+    QColor,
+    QFontDatabase,
+    QFont,
+)
+import re
 
 from database.models import Task
 from services.deal_service import (
@@ -37,6 +45,20 @@ from ui.forms.task_form import TaskForm
 from ui.views.payment_table_view import PaymentTableView
 from ui.views.policy_table_view import PolicyTableView
 from ui.views.task_table_view import TaskTableView  # ← наш переиспользуемый вид задач
+
+
+class _CalcHighlighter(QSyntaxHighlighter):
+    """Highlight timestamps at the beginning of each line."""
+
+    _regex = re.compile(r"^\[\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}\]")
+
+    def highlightBlock(self, text: str) -> None:
+        m = self._regex.match(text)
+        if m:
+            fmt = QTextCharFormat()
+            fmt.setForeground(QColor("blue"))
+            fmt.setFontWeight(QFont.Bold)
+            self.setFormat(m.start(), m.end() - m.start(), fmt)
 
 
 class DealDetailView(QDialog):
@@ -135,10 +157,9 @@ class DealDetailView(QDialog):
         self.calc_view = QTextEdit()
         self.calc_view.setReadOnly(True)
         self.calc_view.setFixedHeight(140)
-        from PySide6.QtGui import QFontDatabase
-
         self.calc_view.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.calc_view.setPlainText(self.instance.calculations or "—")
+        self._calc_highlighter = _CalcHighlighter(self.calc_view.document())
         form.addRow("Расчеты:", self.calc_view)
 
         # Напоминание — редактируемая дата

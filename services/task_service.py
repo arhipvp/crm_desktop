@@ -4,6 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 import datetime as _dt
+from utils.time_utils import now_str
 
 from peewee import JOIN
 from playhouse.shortcuts import prefetch
@@ -121,8 +122,8 @@ def update_task(task: Task, **fields) -> Task:
 
     # 2) Если задача отмечена выполненной — формируем новую запись
     if is_marking_done:
-        timestamp = _dt.datetime.now().strftime("%d.%m.%Y %H:%M")
-        header = f"{timestamp} — Задача №{task.id}: {task.title}"
+        timestamp = now_str()
+        header = f"[{timestamp}] — Задача №{task.id}: {task.title}"
         # Собираем тело, сохраняем оригинальные переносы
         body_lines = user_text.splitlines()
         body = "\n".join(body_lines)
