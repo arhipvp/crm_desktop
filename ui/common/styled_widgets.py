@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout
 from PySide6.QtGui import QKeySequence
 from PySide6.QtCore import Qt
 
@@ -23,13 +23,20 @@ def styled_button(
         Визуальная роль ("primary", "danger")
     """
     btn = QPushButton()
-    text = f"{icon} {label}".strip()
+    layout = QVBoxLayout(btn)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)
+
+    text_label = QLabel(f"{icon} {label}".strip())
+    text_label.setAlignment(Qt.AlignCenter)
+    layout.addWidget(text_label)
 
     if shortcut:
         btn.setShortcut(QKeySequence(shortcut))
-        text += f"<br/><span style='color:gray;font-size:8pt'>{shortcut}</span>"
-
-    btn.setText(text)
+        shortcut_label = QLabel(shortcut)
+        shortcut_label.setAlignment(Qt.AlignCenter)
+        shortcut_label.setStyleSheet("color: gray; font-size: 8pt")
+        layout.addWidget(shortcut_label)
 
     if tooltip:
         btn.setToolTip(tooltip)
