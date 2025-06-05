@@ -69,6 +69,9 @@ class BaseTableView(QWidget):
 
         self.default_sort_column = 0  # по умолчанию — первый столбец
         self.default_sort_order = Qt.AscendingOrder
+        # запоминаем текущие настройки сортировки
+        self.current_sort_column = self.default_sort_column
+        self.current_sort_order = self.default_sort_order
 
         self.page = 1
         self.per_page = 30
@@ -134,6 +137,10 @@ class BaseTableView(QWidget):
 
         self.table.setModel(None)  # Пока модель не установлена
         self.table.setSortingEnabled(True)
+        # запоминаем изменения сортировки пользователя
+        self.table.horizontalHeader().sortIndicatorChanged.connect(
+            self._on_sort_indicator_changed
+        )
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -152,7 +159,7 @@ class BaseTableView(QWidget):
 
         # Безопасная попытка resize
         try:
-            self.table.sortByColumn(self.default_sort_column, self.default_sort_order)
+            self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
             self.table.resizeColumnsToContents()
         except NotImplementedError:
             pass
@@ -346,5 +353,10 @@ class BaseTableView(QWidget):
         if not index.isValid():
             return None
         return self.model.get_item(self._source_row(index))
+
+    def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
+        """Сохраняет текущую сортировку таблицы."""
+        self.current_sort_column = column
+        self.current_sort_order = order
 
     
