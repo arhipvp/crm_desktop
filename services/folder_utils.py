@@ -107,25 +107,25 @@ def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
         folder_name = "???"  # fallback имя
 
     client_path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, folder_name)
-    print(">>> [search] checking client path:", client_path)
+    logger.debug(">>> [search] checking client path: %s", client_path)
 
     if os.path.isdir(client_path):
         # Если есть локальная папка клиента
         for sub in os.listdir(client_path):
             sub_path = os.path.join(client_path, sub)
             if os.path.isdir(sub_path) and (sub == folder_name or sub.endswith(folder_name)):
-                print(">>> [match] found subfolder:", sub_path)
+                logger.debug(">>> [match] found subfolder: %s", sub_path)
                 os.startfile(sub_path)
                 return
 
         # Или просто открыть саму папку клиента
-        print(">>> [fallback] opening client root folder:", client_path)
+        logger.info(">>> [fallback] opening client root folder: %s", client_path)
         os.startfile(client_path)
         return
 
     # Если локальной папки нет, но есть web-ссылка
     if folder_link:
-        print(">>> [fallback] opening web link:", folder_link)
+        logger.info(">>> [fallback] opening web link: %s", folder_link)
         webbrowser.open(folder_link)
     else:
         QMessageBox.warning(parent, "Ошибка", f"Не удалось найти папку клиента: {folder_name}")
@@ -211,7 +211,7 @@ def upload_to_drive(local_path: str, drive_folder_id: str) -> str:
         fields="id, webViewLink"
     ).execute()
 
-    print(f"☁️ Загружен: {uploaded['webViewLink']}")
+    logger.info("☁️ Загружен: %s", uploaded['webViewLink'])
     return uploaded["webViewLink"]
 
 def open_folder(path_or_url: str, *, parent: Optional["QWidget"] = None) -> None:  # noqa: N802 (keep API)
