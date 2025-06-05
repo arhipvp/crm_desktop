@@ -1,3 +1,5 @@
+"""Сервис управления страховыми полисами."""
+
 import logging
 from datetime import timedelta
 
@@ -20,16 +22,37 @@ logger = logging.getLogger(__name__)
 
 
 def get_all_policies():
+    """Вернуть все полисы без удалённых.
+
+    Returns:
+        ModelSelect: Выборка полисов.
+    """
     return Policy.select().where(Policy.is_deleted == False)
 
 
 def get_policies_by_client_id(client_id: int):
+    """Полисы, принадлежащие клиенту.
+
+    Args:
+        client_id: Идентификатор клиента.
+
+    Returns:
+        ModelSelect: Выборка полисов клиента.
+    """
     return Policy.select().where(
         (Policy.client_id == client_id) & (Policy.is_deleted == False)
     )
 
 
 def get_policies_by_deal_id(deal_id: int):
+    """Полисы, связанные со сделкой.
+
+    Args:
+        deal_id: Идентификатор сделки.
+
+    Returns:
+        ModelSelect: Выборка полисов.
+    """
     return (
         Policy
         .select()
@@ -43,6 +66,14 @@ def get_policies_by_deal_id(deal_id: int):
 
 
 def get_policy_by_number(policy_number: str):
+    """Найти полис по его номеру.
+
+    Args:
+        policy_number: Номер полиса.
+
+    Returns:
+        Policy | None: Найденный полис либо ``None``.
+    """
     return Policy.get_or_none(Policy.policy_number == policy_number)
 
 
@@ -60,6 +91,22 @@ def get_policies_page(
     include_renewed=True,
     **filters,
 ):
+    """Получить страницу полисов с указанными фильтрами.
+
+    Args:
+        page: Номер страницы.
+        per_page: Количество записей на странице.
+        search_text: Поисковая строка.
+        show_deleted: Учитывать удалённые записи.
+        deal_id: Фильтр по сделке.
+        client_id: Фильтр по клиенту.
+        order_by: Поле сортировки.
+        order_dir: Направление сортировки.
+        include_renewed: Показывать продлённые полисы.
+
+    Returns:
+        ModelSelect: Отфильтрованная выборка полисов.
+    """
     query = build_policy_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -222,6 +269,15 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
 # ─────────────────────────── Обновление ───────────────────────────
 
 def update_policy(policy: Policy, **kwargs):
+    """Обновить поля полиса.
+
+    Args:
+        policy: Изменяемый полис.
+        **kwargs: Новые значения полей.
+
+    Returns:
+        Policy: Обновлённый полис.
+    """
     allowed_fields = {
         "policy_number",
         "insurance_type",
@@ -340,11 +396,27 @@ def build_policy_query(
 
 
 def get_policy_by_id(policy_id: int) -> Policy | None:
+    """Получить полис по идентификатору.
+
+    Args:
+        policy_id: Идентификатор полиса.
+
+    Returns:
+        Policy | None: Найденный полис или ``None``.
+    """
     return Policy.get_or_none((Policy.id == policy_id) & (Policy.is_deleted == False))
 
 
 
 def get_unique_policy_field_values(field_name: str) -> list[str]:
+    """Получить уникальные значения указанного поля полиса.
+
+    Args:
+        field_name: Имя поля модели ``Policy``.
+
+    Returns:
+        list[str]: Список уникальных значений.
+    """
     # Проверка, что поле допустимо
     allowed_fields = {
         "vehicle_brand", "vehicle_model",
