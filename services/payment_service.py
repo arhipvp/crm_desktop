@@ -1,4 +1,6 @@
 
+"""Сервис управления платежами."""
+
 import logging
 from datetime import date
 
@@ -14,28 +16,54 @@ logger = logging.getLogger(__name__)
 # ───────────────────────── базовые CRUD ─────────────────────────
 
 def get_all_payments() -> ModelSelect:
-    """Вернуть все платежи без удалённых."""
+    """Вернуть все платежи без удалённых.
+
+    Returns:
+        ModelSelect: Выборка платежей.
+    """
     return Payment.select().where(Payment.is_deleted == False)
 
 
 def get_payments_by_policy_id(policy_id: int) -> ModelSelect:
-    """Получить платежи по полису."""
+    """Получить платежи по полису.
+
+    Args:
+        policy_id: Идентификатор полиса.
+
+    Returns:
+        ModelSelect: Выборка платежей.
+    """
     return Payment.select().where(
         (Payment.policy_id == policy_id) & (Payment.is_deleted == False)
     )
 
 
 def get_payment_by_id(payment_id: int) -> Payment | None:
-    """Получить платёж по ``id``."""
+    """Получить платёж по идентификатору.
+
+    Args:
+        payment_id: Идентификатор платежа.
+
+    Returns:
+        Payment | None: Найденный платёж или ``None``.
+    """
     return Payment.get_or_none(Payment.id == payment_id)
 
 
 def get_payments_by_client_id(client_id: int) -> ModelSelect:
-    """Платежи клиента через связанные полисы."""
-    return (Payment
-            .select()
-            .join(Policy)
-            .where((Policy.client == client_id) & (Payment.is_deleted == False)))
+    """Платежи клиента через связанные полисы.
+
+    Args:
+        client_id: Идентификатор клиента.
+
+    Returns:
+        ModelSelect: Выборка платежей клиента.
+    """
+    return (
+        Payment.select()
+        .join(Policy)
+        .where((Policy.client == client_id) & (Payment.is_deleted == False))
+    )
 
 
 
@@ -48,7 +76,19 @@ def get_payments_page(
     only_paid: bool = False,
     **filters,
 ) -> ModelSelect:
-    """Получить страницу платежей по заданным фильтрам."""
+    """Получить страницу платежей по заданным фильтрам.
+
+    Args:
+        page: Номер страницы.
+        per_page: Количество записей на странице.
+        search_text: Строка поиска.
+        show_deleted: Учитывать удалённые записи.
+        deal_id: Фильтр по сделке.
+        only_paid: Только неоплаченные/оплаченные.
+
+    Returns:
+        ModelSelect: Отфильтрованная выборка платежей.
+    """
     query = build_payment_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -76,7 +116,14 @@ def mark_payment_deleted(payment_id: int):
 # ─────────────────────────── Добавление ───────────────────────────
 
 def add_payment(**kwargs):
-    """Создать платёж и связанные записи дохода и расхода."""
+    """Создать платёж и связанные записи дохода и расхода.
+
+    Args:
+        **kwargs: Данные платежа, включая ``policy``/``policy_id`` и ``amount``.
+
+    Returns:
+        Payment: Созданный платёж.
+    """
     from services.income_service import add_income
     policy = kwargs.get("policy") or Policy.get_or_none(Policy.id == kwargs.get("policy_id"))
     if not policy:
@@ -140,7 +187,15 @@ def add_payment(**kwargs):
 # ─────────────────────────── Обновление ───────────────────────────
 
 def update_payment(payment: Payment, **kwargs) -> Payment:
-    """Обновить поля платежа."""
+    """Обновить поля платежа.
+
+    Args:
+        payment: Объект платежа для обновления.
+        **kwargs: Изменяемые поля.
+
+    Returns:
+        Payment: Обновлённый платёж.
+    """
     allowed_fields = {"amount", "payment_date", "actual_payment_date", "policy", "policy_id"}
 
     updates = {}
@@ -226,7 +281,14 @@ def build_payment_query(
     return query
 
 def get_payments_by_deal_id(deal_id: int) -> ModelSelect:
-    """Платежи, относящиеся к сделке."""
+    """Платежи, относящиеся к сделке.
+
+    Args:
+        deal_id: Идентификатор сделки.
+
+    Returns:
+        ModelSelect: Выборка платежей по сделке.
+    """
     return (
         Payment
         .select()

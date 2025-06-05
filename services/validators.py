@@ -1,9 +1,15 @@
+"""Валидаторы и нормализаторы входных данных."""
+
 import re
 
 def normalize_phone(phone: str) -> str:
-    """
-    Приводит номер к формату +7XXXXXXXXXX.
-    Удаляет все нецифровые символы, берёт последние 10 цифр.
+    """Нормализовать номер телефона.
+
+    Args:
+        phone: Исходный номер.
+
+    Returns:
+        str: Номер в формате ``+7XXXXXXXXXX``.
     """
     digits = re.sub(r"\D", "", phone or "")
     if len(digits) > 10:

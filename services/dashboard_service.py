@@ -1,9 +1,12 @@
+"""Функции для получения сводной информации на дашборд."""
+
 from playhouse.shortcuts import prefetch
 
 from database.models import Client, Deal, Policy, Task
 
 
 def get_basic_stats() -> dict:
+    """Получить общее количество записей по основным сущностям."""
     return {
         "clients": Client.select().where(Client.is_deleted == False).count(),
         "deals": Deal.select().where(Deal.is_deleted == False).count(),
@@ -13,6 +16,7 @@ def get_basic_stats() -> dict:
 
 
 def count_assistant_tasks() -> int:
+    """Количество задач, отправленных ассистенту в Telegram."""
     return (
         Task.select()
         .where(
@@ -25,6 +29,7 @@ def count_assistant_tasks() -> int:
 
 
 def get_upcoming_tasks(limit: int = 10) -> list[Task]:
+    """Ближайшие невыполненные задачи."""
     base = (
         Task.select()
         .where((Task.is_done == False) & (Task.is_deleted == False))
@@ -35,6 +40,7 @@ def get_upcoming_tasks(limit: int = 10) -> list[Task]:
 
 
 def get_expiring_policies(limit: int = 10) -> list[Policy]:
+    """Полисы, срок действия которых скоро заканчивается."""
     base = (
         Policy.select()
         .where(
@@ -48,6 +54,7 @@ def get_expiring_policies(limit: int = 10) -> list[Policy]:
 
 
 def get_upcoming_deal_reminders(limit: int = 10) -> list[Deal]:
+    """Ближайшие напоминания по открытым сделкам."""
     base = (
         Deal.select()
         .where(

@@ -1,3 +1,5 @@
+"""Сервисные функции для работы с задачами."""
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,14 +14,24 @@ from database.models import Client, Deal, Policy, Task
 
 # ───────────────────────── базовые CRUD ─────────────────────────
 def get_all_tasks():
+    """Вернуть все задачи без удалённых."""
     return Task.select().where(Task.is_deleted == False)
 
 
 def get_pending_tasks():
+    """Невыполненные активные задачи."""
     return Task.select().where((Task.is_done == False) & (Task.is_deleted == False))
 
 
 def add_task(**kwargs):
+    """Создать задачу.
+
+    Args:
+        **kwargs: Поля задачи, такие как ``title`` и ``due_date``.
+
+    Returns:
+        Task: Созданная задача.
+    """
     allowed_fields = {
         'title',
         'due_date',
@@ -58,6 +70,15 @@ def add_task(**kwargs):
 
 
 def update_task(task: Task, **fields) -> Task:
+    """Изменить поля задачи.
+
+    Args:
+        task: Задача для изменения.
+        **fields: Обновляемые поля.
+
+    Returns:
+        Task: Обновлённая задача.
+    """
     allowed_fields = {
         "title", "due_date", "deal_id", "policy_id",
         "is_done", "note", "dispatch_state",
@@ -256,6 +277,18 @@ def build_task_query(
 
 
 def get_tasks_page(page: int, per_page: int, sort_field="due_date", sort_order="asc", **filters):
+    """Получить страницу задач.
+
+    Args:
+        page: Номер страницы.
+        per_page: Количество задач на странице.
+        sort_field: Поле сортировки.
+        sort_order: Направление сортировки.
+        **filters: Дополнительные фильтры.
+
+    Returns:
+        ModelSelect: Выборка задач.
+    """
     logger.debug("🔽 Применяем сортировку: field=%s, order=%s", sort_field, sort_order)
 
     offset = (page - 1) * per_page
@@ -274,13 +307,22 @@ def get_tasks_page(page: int, per_page: int, sort_field="due_date", sort_order="
 
 
 def get_pending_tasks_page(page: int, per_page: int):
+    """Получить страницу невыполненных задач.
+
+    Args:
+        page: Номер страницы.
+        per_page: Количество задач на странице.
+
+    Returns:
+        ModelSelect: Выборка задач.
+    """
     offset = (page - 1) * per_page
-    return (Task
-            .select()
-            .where((Task.is_done == False) & (Task.is_deleted == False))
-            #.order_by(Task.due_date.asc())
-            .offset(offset)
-            .limit(per_page))
+    return (
+        Task.select()
+        .where((Task.is_done == False) & (Task.is_deleted == False))
+        .offset(offset)
+        .limit(per_page)
+    )
 
 
 def unassign_from_telegram(task_id: int) -> None:
@@ -294,6 +336,14 @@ def unassign_from_telegram(task_id: int) -> None:
 
 
 def get_tasks_by_deal(deal_id: int) -> list[Task]:
+    """Получить задачи, связанные со сделкой.
+
+    Args:
+        deal_id: Идентификатор сделки.
+
+    Returns:
+        list[Task]: Список задач сделки.
+    """
     return Task.select().where(
         (Task.deal_id == deal_id) & (Task.is_deleted == False)
     )

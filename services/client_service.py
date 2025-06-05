@@ -1,4 +1,4 @@
-"""Сервисные функции для работы с сущностью :class:`~database.models.Client`."""
+"""Сервисный модуль для управления клиентами."""
 
 import logging
 import re
@@ -21,13 +21,24 @@ CLIENT_ALLOWED_FIELDS = {"name", "phone", "email", "is_company", "note"}
 
 # ──────────────────────────── Получение ─────────────────────────────
 
-def get_all_clients():
-    """Возвращает выборку всех не удалённых клиентов."""
+def get_all_clients() -> ModelSelect:
+    """Вернуть выборку всех активных клиентов.
+
+    Returns:
+        ModelSelect: Peewee-выборка клиентов без пометки удаления.
+    """
     return Client.select().where(Client.is_deleted == False)
 
 
 def get_client_by_id(client_id: int) -> Client | None:
-    """Получить клиента по ``id`` или ``None`` если не найден."""
+    """Получить клиента по его идентификатору.
+
+    Args:
+        client_id: Идентификатор клиента.
+
+    Returns:
+        Client | None: Объект клиента или ``None``, если не найден.
+    """
     return Client.get_or_none((Client.id == client_id) & (Client.is_deleted == False))
 
 
@@ -37,7 +48,17 @@ def get_clients_page(
     search_text: str = "",
     show_deleted: bool = False,
 ) -> ModelSelect:
-    """Возвращает страницу клиентов с учётом фильтров."""
+    """Получить страницу клиентов с учётом фильтров.
+
+    Args:
+        page: Номер страницы, начиная с 1.
+        per_page: Количество записей на странице.
+        search_text: Текст для поиска по имени, телефону и т.д.
+        show_deleted: Учитывать ли помеченных удалёнными.
+
+    Returns:
+        ModelSelect: Отфильтрованная выборка клиентов.
+    """
     query = Client.select()
     query = apply_client_filters(query, search_text, show_deleted)
 
@@ -51,7 +72,14 @@ def get_clients_page(
 # ──────────────────────────── Добавление ─────────────────────────────
 
 def add_client(**kwargs) -> Client:
-    """Создаёт и возвращает нового клиента."""
+    """Создать и вернуть нового клиента.
+
+    Args:
+        **kwargs: Поля клиента ``name``, ``phone``, ``email`` и пр.
+
+    Returns:
+        Client: Созданный объект клиента.
+    """
 
     allowed_fields = CLIENT_ALLOWED_FIELDS
 
@@ -99,7 +127,15 @@ def add_client(**kwargs) -> Client:
 
 
 def update_client(client: Client, **kwargs) -> Client:
-    """Обновляет клиента и, при смене ФИО, переименовывает его папку."""
+    """Обновить данные клиента и переименовать папку при смене имени.
+
+    Args:
+        client: Объект клиента для изменения.
+        **kwargs: Обновляемые поля клиента.
+
+    Returns:
+        Client: Обновлённый объект клиента.
+    """
 
     allowed = CLIENT_ALLOWED_FIELDS
 

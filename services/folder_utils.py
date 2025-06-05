@@ -1,3 +1,5 @@
+"""Утилиты для работы с локальными папками и Google Drive."""
+
 from __future__ import annotations
 
 import logging
@@ -37,6 +39,11 @@ GOOGLE_DRIVE_LOCAL_ROOT = os.getenv("GOOGLE_DRIVE_LOCAL_ROOT", r"G:\Мой ди�
 
 @lru_cache(maxsize=1)
 def get_drive_service():
+    """Создать и закешировать сервис Google Drive.
+
+    Returns:
+        Resource: Клиент API Google Drive.
+    """
     if Credentials is None:
         raise RuntimeError("Google Drive libraries are not available")
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)

@@ -1,3 +1,5 @@
+"""Сервисные функции для учёта доходов."""
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -10,10 +12,12 @@ from services.task_service import add_task
 # ───────────────────────── базовые CRUD ─────────────────────────
 
 def get_all_incomes():
+    """Вернуть все доходы без удалённых."""
     return Income.select().where(Income.is_deleted == False)
 
 
 def get_pending_incomes():
+    """Доходы, которые ещё не получены."""
     return Income.select().where(
         (Income.is_deleted == False) &
         (Income.received_date.is_null(True))
@@ -21,6 +25,7 @@ def get_pending_incomes():
 
 
 def get_income_by_id(income_id: int):
+    """Получить доход по идентификатору."""
     return Income.get_or_none(Income.id == income_id)
 
 
@@ -43,6 +48,21 @@ def get_incomes_page(
     received_date_range=None,
     **kwargs
 ):
+    """Получить страницу доходов по фильтрам.
+
+    Args:
+        page: Номер страницы.
+        per_page: Количество записей на странице.
+        order_by: Поле сортировки.
+        order_dir: Направление сортировки.
+        search_text: Строка поиска.
+        show_deleted: Учитывать удалённые записи.
+        only_unreceived: Только не полученные доходы.
+        received_date_range: Диапазон дат получения.
+
+    Returns:
+        ModelSelect: Отфильтрованная выборка доходов.
+    """
     query = build_income_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -68,6 +88,14 @@ def get_incomes_page(
 # ─────────────────────────── Добавление ───────────────────────────
 
 def add_income(**kwargs):
+    """Создать запись дохода по платежу.
+
+    Args:
+        **kwargs: Параметры дохода, включая ``payment`` или ``payment_id`` и ``amount``.
+
+    Returns:
+        Income: Созданная запись дохода.
+    """
     payment = kwargs.get("payment") or get_payment_by_id(kwargs.get("payment_id"))
     if not payment:
         raise ValueError("Не найден платёж")
@@ -109,6 +137,15 @@ def add_income(**kwargs):
 # ─────────────────────────── Обновление ───────────────────────────
 
 def update_income(income: Income, **kwargs):
+    """Обновить запись дохода.
+
+    Args:
+        income: Изменяемый объект дохода.
+        **kwargs: Поля для обновления.
+
+    Returns:
+        Income: Обновлённая запись дохода.
+    """
     allowed_fields = {"payment", "payment_id", "amount", "received_date", "commission_source"}
 
     updates = {}
