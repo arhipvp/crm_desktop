@@ -54,3 +54,25 @@ def test_add_new_client_form_called(qtbot, monkeypatch):
 
     view.add_new()
     assert called.get("refreshed")
+
+
+def test_task_detail_buttons(qtbot, monkeypatch):
+    from datetime import date
+    from services.task_service import add_task
+    from ui.views.task_detail_view import TaskDetailView
+    from ui.forms.task_form import TaskForm
+
+    task = add_task(title="t", due_date=date.today())
+    dlg = TaskDetailView(task)
+    qtbot.addWidget(dlg)
+
+    flags = {}
+    monkeypatch.setattr(TaskForm, "exec", lambda self: flags.setdefault("edit", True) or True)
+    dlg.edit()
+    assert flags.get("edit")
+
+    monkeypatch.setattr("ui.views.task_detail_view.confirm", lambda text: True)
+    monkeypatch.setattr("ui.views.task_detail_view.mark_task_deleted", lambda tid: flags.setdefault("del", tid))
+    monkeypatch.setattr("ui.views.task_detail_view.QMessageBox.information", lambda *a, **k: None)
+    dlg.delete()
+    assert flags.get("del") == task.id
