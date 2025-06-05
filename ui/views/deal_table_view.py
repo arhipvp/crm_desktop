@@ -1,15 +1,11 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QLineEdit, QTableView, QVBoxLayout
 
 from database.models import Deal
-from services.deal_service import (build_deal_query, get_deals_page,
-                                   mark_deal_deleted)
+from services.deal_service import build_deal_query, get_deals_page, mark_deal_deleted
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.deal_form import DealForm
 from ui.views.deal_detail_view import DealDetailView
-
-
 
 
 class DealTableView(BaseTableView):
@@ -35,7 +31,6 @@ class DealTableView(BaseTableView):
 
         self.load_data()
 
-
     def get_filters(self) -> dict:
         """
         Собираем все фильтры:
@@ -46,7 +41,6 @@ class DealTableView(BaseTableView):
             "search_text": self.filter_controls.get_search_text(),
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
             "show_closed": self.filter_controls.is_checked("Показать закрытые"),
-
         }
 
     def load_data(self):
@@ -58,12 +52,10 @@ class DealTableView(BaseTableView):
             self.per_page,
             order_by=self.sort_field,
             order_dir=self.sort_order,
-            **filters
+            **filters,
         )
         total = build_deal_query(**filters).count()
         self.set_model_class_and_items(Deal, list(items), total_count=total)
-
-
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         super().set_model_class_and_items(model_class, items, total_count)
@@ -75,13 +67,12 @@ class DealTableView(BaseTableView):
         # показываем пользователю правильный индикатор сортировки
         self.table.horizontalHeader().setSortIndicator(col, order)
         # и не даём базовому классу перезаписывать порядок
-        
+
     def get_selected(self):
         index = self.table.currentIndex()
         if not index.isValid():
             return None
         return self.model.get_item(self._source_row(index))
-
 
     def add_new(self):
         form = DealForm()
@@ -90,7 +81,6 @@ class DealTableView(BaseTableView):
             if form.instance:
                 dlg = DealDetailView(form.instance, parent=self)
                 dlg.exec()
-
 
     def edit_selected(self, _=None):
         deal = self.get_selected()

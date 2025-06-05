@@ -4,12 +4,14 @@ from PySide6.QtWidgets import QMessageBox
 
 logger = logging.getLogger(__name__)
 
+
 def confirm(text: str, title="Подтверждение") -> bool:
-    return QMessageBox.question(
-        None, title, text,
-        QMessageBox.Yes | QMessageBox.No,
-        QMessageBox.No
-    ) == QMessageBox.Yes
+    return (
+        QMessageBox.question(
+            None, title, text, QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        == QMessageBox.Yes
+    )
 
 
 def show_error(message: str, title="Ошибка"):

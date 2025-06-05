@@ -1,6 +1,5 @@
 import os
 import sys
-import urllib.parse
 import logging
 
 from PySide6.QtWidgets import QApplication
@@ -12,9 +11,7 @@ init_from_env()
 from pathlib import Path
 
 from dotenv import load_dotenv
-from peewee import PostgresqlDatabase
 
-from database.db import db  # ← это Proxy
 from ui.main_window import MainWindow
 from utils.logging_config import setup_logging
 
@@ -29,7 +26,6 @@ if __name__ == "__main__":
     DATABASE_URL = os.getenv("DATABASE_URL")
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL не задан в .env")
-
 
     # ───── GUI ─────
     app = QApplication(sys.argv)

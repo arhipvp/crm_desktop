@@ -12,10 +12,9 @@ from PySide6.QtWidgets import QApplication
 
 # Теперь корректные импорты
 from database.db import db
-from database.models import Client, Policy
+from database.models import Policy
 from services.client_service import get_or_create_client_by_name
 from services.policy_service import add_policy
-from services.task_service import add_task  # если нужно
 from ui.common.client_import_dialog import ClientImportDialog
 
 EXCEL_FILENAME = "policies_import.xlsx"
@@ -64,15 +63,18 @@ def run_import():
             client, created = get_or_create_client_by_name(client_name)
 
             if created or not client.phone:
-                dlg = ClientImportDialog(suggested_name=client.name, suggested_phone=client.phone)
+                dlg = ClientImportDialog(
+                    suggested_name=client.name, suggested_phone=client.phone
+                )
 
                 if dlg.exec():
                     client = dlg.client
                 else:
-                    logger.info("⛔ Импорт прерван по пользователю для клиента: %s", client_name)
+                    logger.info(
+                        "⛔ Импорт прерван по пользователю для клиента: %s", client_name
+                    )
                     skipped += 1
                     continue
-
 
             # Проверка на дубликат номера
             original_number = policy_number
@@ -100,16 +102,18 @@ def run_import():
 
             policy = add_policy(
                 **policy_data,
-                payments=[{
-                    "amount": float(data.get("Сумма", 0)) or 0,
-                    "payment_date": start_date
-                }],
-                first_payment_paid=True
+                payments=[
+                    {
+                        "amount": float(data.get("Сумма", 0)) or 0,
+                        "payment_date": start_date,
+                    }
+                ],
+                first_payment_paid=True,
             )
 
-
-
-            logger.info("✅ Добавлен полис: %s (клиент: %s)", policy.policy_number, client.name)
+            logger.info(
+                "✅ Добавлен полис: %s (клиент: %s)", policy.policy_number, client.name
+            )
             success += 1
 
     logger.info("\n✅ Импорт завершён: %s добавлено, %s пропущено.", success, skipped)

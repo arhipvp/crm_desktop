@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from peewee import ModelSelect, fn  # если ещё не импортирован
+from peewee import ModelSelect  # если ещё не импортирован
 
 from database.db import db
 from database.models import Client  # обязательно!
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # ──────────────────────────── Получение ─────────────────────────────
 
+
 def get_all_deals():
     """Возвращает все сделки, кроме помеченных как удалённые."""
     return Deal.select().where(Deal.is_deleted == False)
@@ -30,9 +31,7 @@ def get_all_deals():
 
 def get_open_deals():
     """Открытые (не закрытые) сделки, не помеченные как удалённые."""
-    return Deal.select().where(
-        (Deal.is_closed == False) & (Deal.is_deleted == False)
-    )
+    return Deal.select().where((Deal.is_closed == False) & (Deal.is_deleted == False))
 
 
 def get_deals_by_client_id(client_id: int):
@@ -46,6 +45,7 @@ def get_deal_by_id(deal_id: int) -> Deal | None:
 
 
 # ──────────────────────────── Добавление ─────────────────────────────
+
 
 def add_deal(**kwargs):
     """Создаёт новую сделку и связанные задачи.
@@ -86,23 +86,27 @@ def add_deal(**kwargs):
 
     with db.atomic():
         deal: Deal = Deal.create(**clean_data)
-        logger.info("✅ Сделка #%s создана: клиент %s — %s", deal.id, client.name, deal.description)
-
+        logger.info(
+            "✅ Сделка #%s создана: клиент %s — %s",
+            deal.id,
+            client.name,
+            deal.description,
+        )
 
         # ───── создание папки сделки ─────
         local_path, web_link = create_deal_folder(
             client.name,
             deal.description,
-            client_drive_link=client.drive_folder_link, 
+            client_drive_link=client.drive_folder_link,
         )
         logger.info("📁 Папка сделки создана: %s", local_path)
         if web_link:
             logger.info("🔗 Google Drive-ссылка сделки: %s", web_link)
         deal.drive_folder_path = local_path
-        deal.drive_folder_link = web_link or ""   # пустая строка, если Drive не создался
+        deal.drive_folder_link = web_link or ""  # пустая строка, если Drive не создался
         deal.save()
         # базовые задачи по умолчанию
-        
+
         add_task(title="расчеты", due_date=deal.start_date, deal_id=deal.id)
         add_task(title="собрать документы", due_date=deal.start_date, deal_id=deal.id)
 
@@ -110,6 +114,7 @@ def add_deal(**kwargs):
 
 
 # ──────────────────────────── Обновление ─────────────────────────────
+
 
 def update_deal(deal: Deal, **kwargs):
     """Обновляет сделку. Если передано ``calculations``,
@@ -149,7 +154,6 @@ def update_deal(deal: Deal, **kwargs):
         auto_note = f"[{ts}]: Сделка закрыта. Причина: {reason}"
         new_calc = f"{auto_note}\n{new_calc or ''}".strip()
 
-
     # Если нечего обновлять — возвращаем сделку как есть
     if not updates and not new_calc:
         return deal
@@ -170,6 +174,7 @@ def update_deal(deal: Deal, **kwargs):
 
 # ──────────────────────────── Удаление ─────────────────────────────
 
+
 def mark_deal_deleted(deal_id: int):
     deal = Deal.get_or_none(Deal.id == deal_id)
     if deal:
@@ -184,18 +189,15 @@ def apply_deal_filters(query, search_text: str = "", show_deleted: bool = False)
         query = query.where(Deal.is_deleted == False)
     if search_text:
         query = query.where(
-            (Deal.description.contains(search_text)) |
-            (Deal.status.contains(search_text)) |
-            (Client.name.contains(search_text)) |
-            (Deal.calculations.contains(search_text))
+            (Deal.description.contains(search_text))
+            | (Deal.status.contains(search_text))
+            | (Client.name.contains(search_text))
+            | (Deal.calculations.contains(search_text))
         )
     return query
 
+
 # ──────────────────────────── Пагинация ─────────────────────────────
-
-    
-
-
 
 
 def get_deals_page(
@@ -205,13 +207,12 @@ def get_deals_page(
     show_deleted: bool = False,
     order_by: str = "reminder_date",
     order_dir: str = "asc",
-    **filters
+    **filters,
 ) -> ModelSelect:
     """Вернуть страницу сделок с указанными фильтрами."""
     query = build_deal_query(**filters)
 
     query = apply_deal_filters(query, search_text, show_deleted)
-
 
     # 👉 Только один order_by
     if order_by and hasattr(Deal, order_by):
@@ -223,13 +224,8 @@ def get_deals_page(
     else:
         query = query.order_by(Deal.start_date.desc())
 
-
     offset = (page - 1) * per_page
     return query.limit(per_page).offset(offset)
-
-
-
-
 
 
 def get_open_deals_page(page: int = 1, per_page: int = 50) -> ModelSelect:
@@ -244,9 +240,12 @@ def get_open_deals_page(page: int = 1, per_page: int = 50) -> ModelSelect:
 
 # ──────────────────────────── Связанные сущности ─────────────────────────────
 
+
 def get_policies_by_deal_id(deal_id: int) -> ModelSelect:
     """Вернуть полисы, привязанные к сделке."""
-    return Policy.select().where((Policy.deal == deal_id) & (Policy.is_deleted == False))
+    return Policy.select().where(
+        (Policy.deal == deal_id) & (Policy.is_deleted == False)
+    )
 
 
 def get_tasks_by_deal_id(deal_id: int) -> ModelSelect:
@@ -254,8 +253,9 @@ def get_tasks_by_deal_id(deal_id: int) -> ModelSelect:
     return Task.select().where((Task.deal == deal_id) & (Task.is_deleted == False))
 
 
-
-def build_deal_query(search_text: str = "", show_deleted: bool = False, show_closed: bool = False) -> ModelSelect:
+def build_deal_query(
+    search_text: str = "", show_deleted: bool = False, show_closed: bool = False
+) -> ModelSelect:
     """Базовый запрос сделок с фильтрами по статусам."""
     query = Deal.select().join(Client)
 
@@ -267,8 +267,6 @@ def build_deal_query(search_text: str = "", show_deleted: bool = False, show_clo
     return query
 
 
-
-
 def get_next_deal(current_deal: Deal) -> Deal | None:
     """Найти следующую сделку по дате напоминания."""
     if current_deal.reminder_date is None:
@@ -277,8 +275,11 @@ def get_next_deal(current_deal: Deal) -> Deal | None:
     return (
         get_open_deals()
         .where(
-            (Deal.reminder_date > current_deal.reminder_date) |
-            ((Deal.reminder_date == current_deal.reminder_date) & (Deal.id > current_deal.id))
+            (Deal.reminder_date > current_deal.reminder_date)
+            | (
+                (Deal.reminder_date == current_deal.reminder_date)
+                & (Deal.id > current_deal.id)
+            )
         )
         .order_by(Deal.reminder_date.asc(), Deal.id.asc())
         .first()
@@ -293,8 +294,11 @@ def get_prev_deal(current_deal: Deal) -> Deal | None:
     return (
         get_open_deals()
         .where(
-            (Deal.reminder_date < current_deal.reminder_date) |
-            ((Deal.reminder_date == current_deal.reminder_date) & (Deal.id < current_deal.id))
+            (Deal.reminder_date < current_deal.reminder_date)
+            | (
+                (Deal.reminder_date == current_deal.reminder_date)
+                & (Deal.id < current_deal.id)
+            )
         )
         .order_by(Deal.reminder_date.desc(), Deal.id.desc())
         .first()

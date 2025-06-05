@@ -20,9 +20,9 @@ def count_assistant_tasks() -> int:
     return (
         Task.select()
         .where(
-            (Task.dispatch_state == "sent") &
-            (Task.is_deleted == False) &
-            (Task.is_done == False)
+            (Task.dispatch_state == "sent")
+            & (Task.is_deleted == False)
+            & (Task.is_done == False)
         )
         .count()
     )
@@ -43,10 +43,7 @@ def get_expiring_policies(limit: int = 10) -> list[Policy]:
     """Полисы, срок действия которых скоро заканчивается."""
     base = (
         Policy.select()
-        .where(
-            (Policy.is_deleted == False) &
-            (Policy.end_date.is_null(False))
-        )
+        .where((Policy.is_deleted == False) & (Policy.end_date.is_null(False)))
         .order_by(Policy.end_date.asc())
         .limit(limit)
     )
@@ -58,9 +55,9 @@ def get_upcoming_deal_reminders(limit: int = 10) -> list[Deal]:
     base = (
         Deal.select()
         .where(
-            (Deal.is_deleted == False) &
-            (Deal.is_closed == False) &
-            (Deal.reminder_date.is_null(False))
+            (Deal.is_deleted == False)
+            & (Deal.is_closed == False)
+            & (Deal.reminder_date.is_null(False))
         )
         .order_by(Deal.reminder_date.asc())
         .limit(limit)

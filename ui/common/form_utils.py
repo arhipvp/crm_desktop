@@ -30,6 +30,7 @@ def set_combo_index(combo: QComboBox, value):
     if index >= 0:
         combo.setCurrentIndex(index)
 
+
 def clear_widget(widget):
     """Очищает QLineEdit, QTextEdit, QComboBox."""
     if isinstance(widget, QLineEdit):
@@ -38,6 +39,7 @@ def clear_widget(widget):
         widget.clear()
     elif isinstance(widget, QComboBox):
         widget.setCurrentIndex(-1)
+
 
 def set_text_safe(widget, text: str):
     """Устанавливает текст в QLineEdit или QTextEdit."""

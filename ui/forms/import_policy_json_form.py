@@ -2,8 +2,13 @@
 
 import json
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout,
-    QMessageBox, QInputDialog
+    QDialog,
+    QVBoxLayout,
+    QTextEdit,
+    QPushButton,
+    QHBoxLayout,
+    QMessageBox,
+    QInputDialog,
 )
 
 from services.client_service import get_all_clients, add_client
@@ -48,8 +53,17 @@ class ImportPolicyJsonForm(QDialog):
             return
 
         # Проверка ключей
-        if not isinstance(data, dict) or "client_name" not in data or "policy" not in data or "payments" not in data:
-            QMessageBox.warning(self, "Ошибка", "JSON должен содержать ключи: client_name, policy, payments")
+        if (
+            not isinstance(data, dict)
+            or "client_name" not in data
+            or "policy" not in data
+            or "payments" not in data
+        ):
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "JSON должен содержать ключи: client_name, policy, payments",
+            )
             return
 
         client_name = data["client_name"].strip()
@@ -59,16 +73,16 @@ class ImportPolicyJsonForm(QDialog):
 
         # Поиск клиента
         matches = [
-            c for c in get_all_clients()
-            if client_name.lower() in c.name.lower()
+            c for c in get_all_clients() if client_name.lower() in c.name.lower()
         ]
 
         if not matches:
             resp = QMessageBox.question(
-                self, "Клиент не найден",
+                self,
+                "Клиент не найден",
                 f"Клиент «{client_name}» не найден. Создать нового?",
                 QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.No,
             )
             if resp != QMessageBox.Yes:
                 return
@@ -78,9 +92,11 @@ class ImportPolicyJsonForm(QDialog):
         else:
             names = [c.name for c in matches]
             selected_name, ok = QInputDialog.getItem(
-                self, "Выбор клиента",
+                self,
+                "Выбор клиента",
                 f"Найдено несколько клиентов по имени «{client_name}». Выберите нужного:",
-                names, editable=False
+                names,
+                editable=False,
             )
             if not ok:
                 return
@@ -90,10 +106,7 @@ class ImportPolicyJsonForm(QDialog):
         policy_data = data.get("policy", {})
         payments_data = data.get("payments", [])
 
-        form = PolicyForm(
-            forced_client=client,
-            parent=self
-        )
+        form = PolicyForm(forced_client=client, parent=self)
 
         # Заполняем поля из policy
         for key, val in policy_data.items():
@@ -105,6 +118,7 @@ class ImportPolicyJsonForm(QDialog):
                     widget.setCurrentText(str(val))
                 elif hasattr(widget, "setDate") and isinstance(val, str):
                     from datetime import datetime
+
                     try:
                         dt = datetime.strptime(val, "%Y-%m-%d").date()
                         widget.setDate(dt)
@@ -116,12 +130,16 @@ class ImportPolicyJsonForm(QDialog):
         for pay in payments_data:
             if isinstance(pay.get("payment_date"), str):
                 try:
-                    pay["payment_date"] = datetime.strptime(pay["payment_date"], "%Y-%m-%d").date()
+                    pay["payment_date"] = datetime.strptime(
+                        pay["payment_date"], "%Y-%m-%d"
+                    ).date()
                 except Exception:
                     pass
             if isinstance(pay.get("actual_payment_date"), str):
                 try:
-                    pay["actual_payment_date"] = datetime.strptime(pay["actual_payment_date"], "%Y-%m-%d").date()
+                    pay["actual_payment_date"] = datetime.strptime(
+                        pay["actual_payment_date"], "%Y-%m-%d"
+                    ).date()
                 except Exception:
                     pass
             form.add_payment_row(pay)

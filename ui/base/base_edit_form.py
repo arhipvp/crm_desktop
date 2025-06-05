@@ -15,21 +15,34 @@ import logging
 
 import peewee
 from peewee import BooleanField, DateField, ForeignKeyField
-from PySide6.QtCore import QDate, QDateTime, Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDateEdit, QDialog,
-                               QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPushButton, QVBoxLayout)
+from PySide6.QtCore import QDate, QDateTime
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
+    QDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QVBoxLayout,
+)
 
 from ui.common.date_utils import OptionalDateEdit, TypableDateEdit
 from ui.common.styled_widgets import styled_button
 
 logger = logging.getLogger(__name__)
 
+
 class BaseEditForm(QDialog):
     """Универсальная форма создания/редактирования, строится по Peewee‑модели."""
+
     EXTRA_HIDDEN: set[str] = set()
 
-    def __init__(self, instance=None, model_class=None, entity_name="объект", parent=None):
+    def __init__(
+        self, instance=None, model_class=None, entity_name="объект", parent=None
+    ):
         super().__init__(parent)
         self.instance = instance
         self.model_class = model_class or type(instance)
@@ -51,8 +64,6 @@ class BaseEditForm(QDialog):
         if self.instance:
             self.fill_from_obj(self.instance)
         self._create_button_panel()
-
-
 
     # ------------------------------------------------------------------
     # UI helpers
@@ -93,10 +104,6 @@ class BaseEditForm(QDialog):
                 else:
                     widget = QLineEdit()
 
-
-
-
-
             # ---------- Boolean ----------
             elif isinstance(field, BooleanField):
                 field_name = name
@@ -126,8 +133,6 @@ class BaseEditForm(QDialog):
             # вызов хука update_context, если он определён
         if hasattr(self, "update_context"):
             self.update_context()
-        
-
 
     # ------------------------------------------------------------------
     # Utils
@@ -167,7 +172,6 @@ class BaseEditForm(QDialog):
                 if value:
                     widget.setDate(QDate(value.year, value.month, value.day))
 
-
     # ------------------------------------------------------------------
     # Collect & Save
     # ------------------------------------------------------------------
@@ -190,9 +194,15 @@ class BaseEditForm(QDialog):
                 elif isinstance(field, peewee.FloatField):
                     value = float(value) if value is not None else None
                 elif isinstance(field, peewee.DateField):
-                    value = QDate.fromString(txt, "dd.MM.yyyy").toPython() if txt else None
+                    value = (
+                        QDate.fromString(txt, "dd.MM.yyyy").toPython() if txt else None
+                    )
                 elif isinstance(field, peewee.DateTimeField):
-                    value = QDateTime.fromString(txt, "yyyy-MM-dd").toPython() if txt else None
+                    value = (
+                        QDateTime.fromString(txt, "yyyy-MM-dd").toPython()
+                        if txt
+                        else None
+                    )
 
             # ---------- QCheckBox ----------
             elif isinstance(widget, QCheckBox):
@@ -201,7 +211,6 @@ class BaseEditForm(QDialog):
             # ---------- QComboBox ----------
             elif isinstance(widget, QComboBox):
                 value = widget.currentData()
-
 
             # ---------- DateEdit ----------
             elif isinstance(widget, QDateEdit):
@@ -220,11 +229,11 @@ class BaseEditForm(QDialog):
             if saved:
                 self.saved_instance = saved
                 self.accept()
-        except Exception as e:
+        except Exception:
             logger.exception("❌ Ошибка при сохранении в %s", self.__class__.__name__)
-            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить {self.entity_name}.")
-
-            
+            QMessageBox.critical(
+                self, "Ошибка", f"Не удалось сохранить {self.entity_name}."
+            )
 
     def save_data(self):
         raise NotImplementedError
@@ -233,13 +242,16 @@ class BaseEditForm(QDialog):
     def get_fields(self):
         HIDDEN = {"drive_folder_path", "drive_folder_link", "is_deleted"}
         custom_hidden = getattr(self, "EXTRA_HIDDEN", set())
-        if not hasattr(self.model_class, "_meta") or not hasattr(self.model_class._meta, "sorted_fields"):
+        if not hasattr(self.model_class, "_meta") or not hasattr(
+            self.model_class._meta, "sorted_fields"
+        ):
             return []
-        return [f for f in self.model_class._meta.sorted_fields if f.name not in HIDDEN | custom_hidden]
-
+        return [
+            f
+            for f in self.model_class._meta.sorted_fields
+            if f.name not in HIDDEN | custom_hidden
+        ]
 
     def build_custom_fields(self):
         """Потомки могут добавить дополнительные виджеты до автогенерации."""
         pass
-
-    

@@ -32,7 +32,6 @@ class CheckboxFilters(QWidget):
         box = self.checkboxes.get(label)
         return box.isChecked() if box else False
 
-    
     def get_all_states(self) -> dict:
         """Вернёт словарь состояний всех чекбоксов."""
         return {label: box.isChecked() for label, box in self.checkboxes.items()}

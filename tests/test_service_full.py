@@ -2,32 +2,59 @@ from datetime import date
 import pytest
 
 from services.client_service import (
-    add_client, get_clients_page, mark_client_deleted,
-    build_client_query, format_phone_for_whatsapp, update_client,
+    add_client,
+    get_clients_page,
+    mark_client_deleted,
+    build_client_query,
+    format_phone_for_whatsapp,
+    update_client,
 )
 from services.deal_service import (
-    add_deal, get_deals_page, get_deal_by_id,
-    update_deal, mark_deal_deleted, get_policies_by_deal_id,
+    add_deal,
+    get_deals_page,
+    get_deal_by_id,
+    update_deal,
+    mark_deal_deleted,
+    get_policies_by_deal_id,
     get_tasks_by_deal_id,
 )
 from services.policy_service import (
-    add_policy, get_policies_page, prolong_policy,
-    update_policy, get_unique_policy_field_values,
+    add_policy,
+    get_policies_page,
+    prolong_policy,
+    update_policy,
+    get_unique_policy_field_values,
 )
 from services.payment_service import (
-    add_payment, get_payments_page, update_payment, mark_payment_deleted,
+    add_payment,
+    get_payments_page,
+    update_payment,
+    mark_payment_deleted,
 )
 from services.income_service import (
-    add_income, get_all_incomes, get_incomes_page,
-    update_income, mark_income_deleted, create_stub_income,
+    add_income,
+    get_incomes_page,
+    update_income,
+    mark_income_deleted,
+    create_stub_income,
 )
 from services.expense_service import (
-    add_expense, get_expenses_page, update_expense, mark_expense_deleted,
+    add_expense,
+    get_expenses_page,
+    update_expense,
+    mark_expense_deleted,
 )
 from services.task_service import (
-    add_task, queue_task, pop_next, return_to_queue,
-    link_telegram, mark_done, build_task_query,
-    get_tasks_page, get_pending_tasks, unassign_from_telegram,
+    add_task,
+    queue_task,
+    pop_next,
+    return_to_queue,
+    link_telegram,
+    mark_done,
+    build_task_query,
+    get_tasks_page,
+    get_pending_tasks,
+    unassign_from_telegram,
 )
 from database.models import Expense, Income, Payment, Policy
 
@@ -41,12 +68,15 @@ def extra_tables(test_db):
 
 # ---- Client service -------------------------------------------------
 
+
 def test_client_update_and_query(monkeypatch):
     c1 = add_client(name="A")
     c2 = add_client(name="B")
 
-    monkeypatch.setattr("services.client_service.rename_client_folder",
-                        lambda o, n, l: (f"/tmp/{n}", f"link/{n}"))
+    monkeypatch.setattr(
+        "services.client_service.rename_client_folder",
+        lambda o, n, l: (f"/tmp/{n}", f"link/{n}"),
+    )
     update_client(c1, phone="8 900 111-22-33")
     assert c1.phone == "+79001112233"
 
@@ -62,9 +92,10 @@ def test_client_update_and_query(monkeypatch):
 
 # ---- Deal service ---------------------------------------------------
 
+
 def test_deal_update_and_pages():
     client = add_client(name="Client")
-    deal = add_deal(client_id=client.id, start_date=date(2025,1,1), description="D")
+    deal = add_deal(client_id=client.id, start_date=date(2025, 1, 1), description="D")
 
     update_deal(deal, calculations="note", is_closed=True, closed_reason="ok")
     assert "Сделка закрыта" in deal.calculations
@@ -72,9 +103,14 @@ def test_deal_update_and_pages():
     page = list(get_deals_page(1, 10, show_closed=True))
     assert page[0].id == deal.id
 
-    policy = add_policy(client_id=client.id, deal_id=deal.id,
-                        policy_number="P1", start_date=date(2025,1,1), end_date=date(2025,12,31))
-    task = add_task(title="t", due_date=date(2025,1,2), deal_id=deal.id)
+    policy = add_policy(
+        client_id=client.id,
+        deal_id=deal.id,
+        policy_number="P1",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+    task = add_task(title="t", due_date=date(2025, 1, 2), deal_id=deal.id)
     assert policy in list(get_policies_by_deal_id(deal.id))
     tasks = list(get_tasks_by_deal_id(deal.id))
     assert task in tasks
@@ -85,14 +121,21 @@ def test_deal_update_and_pages():
 
 # ---- Income and Expense service ------------------------------------
 
+
 def test_income_expense_flow():
     client = add_client(name="IClient")
-    policy = add_policy(client_id=client.id, policy_number="INC1",
-                        start_date=date(2025,1,1), end_date=date(2025,12,31))
-    payment = add_payment(policy_id=policy.id, amount=100, payment_date=date(2025,1,2))
+    policy = add_policy(
+        client_id=client.id,
+        policy_number="INC1",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+    payment = add_payment(
+        policy_id=policy.id, amount=100, payment_date=date(2025, 1, 2)
+    )
 
     income = add_income(payment_id=payment.id, amount=50)
-    update_income(income, amount=60, received_date=date(2025,1,3))
+    update_income(income, amount=60, received_date=date(2025, 1, 3))
     assert income.amount == 60
 
     stub = create_stub_income()
@@ -117,12 +160,18 @@ def test_income_expense_flow():
 
 # ---- Payment and Policy service ------------------------------------
 
+
 def test_payment_policy_flow(monkeypatch):
     client = add_client(name="PClient")
-    deal = add_deal(client_id=client.id, start_date=date(2025,1,1), description="X")
-    policy = add_policy(client_id=client.id, deal_id=deal.id,
-                        policy_number="NUM", start_date=date(2025,1,1), end_date=date(2025,12,31))
-    payment = add_payment(policy_id=policy.id, amount=10, payment_date=date(2025,1,1))
+    deal = add_deal(client_id=client.id, start_date=date(2025, 1, 1), description="X")
+    policy = add_policy(
+        client_id=client.id,
+        deal_id=deal.id,
+        policy_number="NUM",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+    payment = add_payment(policy_id=policy.id, amount=10, payment_date=date(2025, 1, 1))
 
     update_payment(payment, amount=20)
     assert payment.amount == 20
@@ -135,11 +184,15 @@ def test_payment_policy_flow(monkeypatch):
     assert Payment.get_by_id(payment.id).is_deleted
 
     update_policy(policy, note="upd")
+
     def fake_create(**kw):
         obj = Policy(**kw)
         obj.id = 999
         return obj
-    monkeypatch.setattr("services.policy_service.Policy.create", staticmethod(fake_create))
+
+    monkeypatch.setattr(
+        "services.policy_service.Policy.create", staticmethod(fake_create)
+    )
     monkeypatch.setattr("services.policy_service.Policy.save", lambda self: None)
     new_policy = prolong_policy(policy)
     assert new_policy.start_date > policy.start_date
@@ -152,10 +205,11 @@ def test_payment_policy_flow(monkeypatch):
 
 # ---- Task service ---------------------------------------------------
 
+
 def test_task_queue_flow():
     client = add_client(name="TClient")
-    deal = add_deal(client_id=client.id, start_date=date(2025,1,1), description="Q")
-    task = add_task(title="qq", due_date=date(2025,1,2), deal_id=deal.id)
+    deal = add_deal(client_id=client.id, start_date=date(2025, 1, 1), description="Q")
+    task = add_task(title="qq", due_date=date(2025, 1, 2), deal_id=deal.id)
 
     queue_task(task.id)
     got = pop_next(1)

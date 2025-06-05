@@ -1,6 +1,7 @@
 from services.deal_service import add_deal, get_deals_by_client_id
 from services.client_service import add_client
-from database.models import Deal, Task
+from database.models import Task
+
 
 def test_add_deal_creates_deal_and_tasks():
     # 1. создаём клиента
@@ -8,9 +9,7 @@ def test_add_deal_creates_deal_and_tasks():
 
     # 2. создаём сделку
     deal = add_deal(
-        client_id=client.id,
-        start_date="2025-01-01",
-        description="ОСАГО для VW"
+        client_id=client.id, start_date="2025-01-01", description="ОСАГО для VW"
     )
 
     # 3. проверяем сделку
@@ -27,4 +26,3 @@ def test_add_deal_creates_deal_and_tasks():
     # 5. проверяем, что можно получить через `get_deals_by_client_id`
     deals = get_deals_by_client_id(client.id)
     assert len(deals) == 1
-

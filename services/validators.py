@@ -2,6 +2,7 @@
 
 import re
 
+
 def normalize_phone(phone: str) -> str:
     """Нормализовать номер телефона.
 
@@ -17,5 +18,7 @@ def normalize_phone(phone: str) -> str:
     if len(digits) == 10:
         digits = "7" + digits
     if len(digits) != 11:
-        raise ValueError(f"Неверный формат телефона: ожидается 10 цифр, получили {len(digits)}")
+        raise ValueError(
+            f"Неверный формат телефона: ожидается 10 цифр, получили {len(digits)}"
+        )
     return f"+{digits}"

@@ -2,14 +2,13 @@ from datetime import date
 from services.client_service import add_client
 from services.deal_service import add_deal
 from services.policy_service import add_policy
-from database.models import Policy, Task, Payment, Income
+from database.models import Task, Payment, Income
+
 
 def test_add_policy_creates_everything():
     client = add_client(name="Тестовый клиент")
     deal = add_deal(
-        client_id=client.id,
-        start_date=date(2025, 1, 1),
-        description="ОСАГО для VW"
+        client_id=client.id, start_date=date(2025, 1, 1), description="ОСАГО для VW"
     )
 
     policy = add_policy(
@@ -60,7 +59,3 @@ def test_first_payment_paid():
     assert payment.actual_payment_date == payment.payment_date
     income = Income.get(Income.payment == payment)
     assert income.received_date is None
-
-
-
-

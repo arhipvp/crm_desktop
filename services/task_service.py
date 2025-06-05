@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 import datetime as _dt
 
-from peewee import JOIN, fn
+from peewee import JOIN
 from playhouse.shortcuts import prefetch
 
 from database.db import db
@@ -33,16 +33,16 @@ def add_task(**kwargs):
         Task: Созданная задача.
     """
     allowed_fields = {
-        'title',
-        'due_date',
-        'deal_id',
-        'policy_id',
-        'is_done',
-        'note',
-        'dispatch_state',
-        'queued_at',
-        'tg_chat_id',
-        'tg_message_id',
+        "title",
+        "due_date",
+        "deal_id",
+        "policy_id",
+        "is_done",
+        "note",
+        "dispatch_state",
+        "queued_at",
+        "tg_chat_id",
+        "tg_message_id",
     }
 
     clean_data = {}
@@ -62,11 +62,10 @@ def add_task(**kwargs):
         logger.error("❌ Ошибка при создании задачи: %s", e)
         raise
 
-
-    logger.info("📝 Создана задача #%s: '%s' (due %s)", task.id, task.title, task.due_date)
+    logger.info(
+        "📝 Создана задача #%s: '%s' (due %s)", task.id, task.title, task.due_date
+    )
     return task
-
-
 
 
 def update_task(task: Task, **fields) -> Task:
@@ -80,15 +79,26 @@ def update_task(task: Task, **fields) -> Task:
         Task: Обновлённая задача.
     """
     allowed_fields = {
-        "title", "due_date", "deal_id", "policy_id",
-        "is_done", "note", "dispatch_state",
-        "queued_at", "tg_chat_id", "tg_message_id"
+        "title",
+        "due_date",
+        "deal_id",
+        "policy_id",
+        "is_done",
+        "note",
+        "dispatch_state",
+        "queued_at",
+        "tg_chat_id",
+        "tg_message_id",
     }
 
     # Определяем, снимают ли is_done
     is_marking_done = fields.get("is_done") is True
     raw_note = fields.get("note")
-    user_text = raw_note.strip() if isinstance(raw_note, str) and raw_note.strip() else "Задача выполнена."
+    user_text = (
+        raw_note.strip()
+        if isinstance(raw_note, str) and raw_note.strip()
+        else "Задача выполнена."
+    )
 
     # 1) Обновляем поля задачи
     for key, value in fields.items():
@@ -108,7 +118,6 @@ def update_task(task: Task, **fields) -> Task:
 
     task.save()
     logger.info("✅ Задача #%s помечена как выполненная", task.id)
-
 
     # 2) Если задача отмечена выполненной — формируем новую запись
     if is_marking_done:
@@ -139,10 +148,6 @@ def update_task(task: Task, **fields) -> Task:
     return task
 
 
-
-
-
-
 def mark_task_deleted(task: Task | int):
     task_obj = task if isinstance(task, Task) else Task.get_or_none(Task.id == task)
     if task_obj:
@@ -163,17 +168,19 @@ def queue_task(task_id: int):
         t.save()
         logger.info("📤 Задача #%s поставлена в очередь", t.id)
     else:
-        logger.info("⏭ Задача #%s не поставлена в очередь: состояние %s", t.id, t.dispatch_state)
-
+        logger.info(
+            "⏭ Задача #%s не поставлена в очередь: состояние %s", t.id, t.dispatch_state
+        )
 
 
 def pop_next(chat_id: int) -> Task | None:
     with db.atomic():
-        query = (Task
-            .select(Task.id)
+        query = (
+            Task.select(Task.id)
             .where((Task.dispatch_state == "queued") & (Task.is_deleted == False))
             .order_by(Task.queued_at.asc())
-            .limit(1))
+            .limit(1)
+        )
 
         task_ids = [t.id for t in query]
         if not task_ids:
@@ -205,20 +212,24 @@ def return_to_queue(task_id: int):
         logger.info("↩ Задача #%s возвращена в очередь", t.id)
 
 
-
 def link_telegram(task_id: int, chat_id: int, msg_id: int):
-    (Task.update(tg_chat_id=chat_id, tg_message_id=msg_id)
-         .where(Task.id == task_id)
-         .execute())
+    (
+        Task.update(tg_chat_id=chat_id, tg_message_id=msg_id)
+        .where(Task.id == task_id)
+        .execute()
+    )
     logger.info("🔗 Telegram-связь установлена для задачи #%s", task_id)
 
 
 def mark_done(task_id: int):
-    (Task.update(is_done=True, dispatch_state="idle")
-         .where(Task.id == task_id)
-         .execute())
-    logger.info("✅ Задача #%s помечена выполненной (без дополнительных обновлений)", task_id)
-
+    (
+        Task.update(is_done=True, dispatch_state="idle")
+        .where(Task.id == task_id)
+        .execute()
+    )
+    logger.info(
+        "✅ Задача #%s помечена выполненной (без дополнительных обновлений)", task_id
+    )
 
 
 def append_note(task_id: int, text: str):
@@ -229,7 +240,6 @@ def append_note(task_id: int, text: str):
         t.note = ((t.note + "\n") if t.note else "") + text
         t.save()
         logger.info("🗒 К задаче #%s добавлена заметка", t.id)
-
 
 
 # ─────────────────────── постраничный вывод ─────────────────────
@@ -253,17 +263,16 @@ def build_task_query(
         query = query.where(Task.dispatch_state == "queued")
     if search_text:
         query = (
-            query
-            .join(Deal, JOIN.LEFT_OUTER)
+            query.join(Deal, JOIN.LEFT_OUTER)
             .join(Client, JOIN.LEFT_OUTER, on=(Deal.client == Client.id))
             .switch(Task)
             .join(Policy, JOIN.LEFT_OUTER)
             .where(
-                (Task.title.contains(search_text)) |
-                (Task.note.contains(search_text)) |
-                (Deal.description.contains(search_text)) |
-                (Policy.policy_number.contains(search_text)) |
-                (Client.name.contains(search_text))
+                (Task.title.contains(search_text))
+                | (Task.note.contains(search_text))
+                | (Deal.description.contains(search_text))
+                | (Policy.policy_number.contains(search_text))
+                | (Client.name.contains(search_text))
             )
         )
 
@@ -276,7 +285,9 @@ def build_task_query(
     return query
 
 
-def get_tasks_page(page: int, per_page: int, sort_field="due_date", sort_order="asc", **filters):
+def get_tasks_page(
+    page: int, per_page: int, sort_field="due_date", sort_order="asc", **filters
+):
     """Получить страницу задач.
 
     Args:
@@ -302,8 +313,6 @@ def get_tasks_page(page: int, per_page: int, sort_field="due_date", sort_order="
         query = query.order_by(Task.due_date.desc())
 
     return query.offset(offset).limit(per_page)
-
-
 
 
 def get_pending_tasks_page(page: int, per_page: int):
@@ -334,7 +343,6 @@ def unassign_from_telegram(task_id: int) -> None:
     logger.info("❎ Задача #%s снята с Telegram", task.id)
 
 
-
 def get_tasks_by_deal(deal_id: int) -> list[Task]:
     """Получить задачи, связанные со сделкой.
 
@@ -344,6 +352,4 @@ def get_tasks_by_deal(deal_id: int) -> list[Task]:
     Returns:
         list[Task]: Список задач сделки.
     """
-    return Task.select().where(
-        (Task.deal_id == deal_id) & (Task.is_deleted == False)
-    )
+    return Task.select().where((Task.deal_id == deal_id) & (Task.is_deleted == False))

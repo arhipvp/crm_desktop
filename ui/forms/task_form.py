@@ -3,25 +3,23 @@ from PySide6.QtWidgets import QCheckBox, QLabel
 from database.models import Task
 from services.task_service import add_task, update_task
 from ui.base.base_edit_form import BaseEditForm
-from ui.common.combo_helpers import (create_deal_combobox,
-                                     create_policy_combobox,
-                                     create_policy_combobox_for_deal)
+from ui.common.combo_helpers import (
+    create_deal_combobox,
+    create_policy_combobox,
+    create_policy_combobox_for_deal,
+)
 
 
 class TaskForm(BaseEditForm):
-    
     EXTRA_HIDDEN = {"drive_folder_path", "drive_folder_link"}
 
     def __init__(self, task=None, parent=None, forced_deal=None, forced_policy=None):
         self._forced_deal = forced_deal
         self._forced_policy = forced_policy
         super().__init__(
-            instance=task,
-            model_class=Task,
-            entity_name="задача",
-            parent=parent
+            instance=task, model_class=Task, entity_name="задача", parent=parent
         )
-    
+
     def build_custom_fields(self):
         # 1) Сделка (всегда одно место!)
         self.deal_combo = create_deal_combobox()
@@ -43,7 +41,6 @@ class TaskForm(BaseEditForm):
         self.form_layout.insertRow(3, QLabel("Полис:"), self.policy_combo)
         self.policy_combo.setCurrentIndex(-1)  # ничего не выбрано
 
-
         if self._forced_policy is not None and self.instance is None:
             policy_id = getattr(self._forced_policy, "id", self._forced_policy)
             idx = self.policy_combo.findData(policy_id)
@@ -55,8 +52,6 @@ class TaskForm(BaseEditForm):
         self.done_cb = QCheckBox()
         self.fields["is_done"] = self.done_cb
         self.form_layout.insertRow(5, QLabel("Выполнено:"), self.done_cb)
-
-
 
     def save_data(self):
         data = self.collect_data()

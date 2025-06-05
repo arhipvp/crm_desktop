@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLineEdit, QListView, QPushButton
-from PySide6.QtCore import QStringListModel, Qt
+from PySide6.QtCore import QStringListModel
 
 
 class SearchDialog(QDialog):
@@ -28,7 +28,9 @@ class SearchDialog(QDialog):
         layout.addWidget(self.ok_button)
 
     def filter_items(self, text):
-        filtered = [item for item in self.filtered_items if text.lower() in item.lower()]
+        filtered = [
+            item for item in self.filtered_items if text.lower() in item.lower()
+        ]
         self.model.setStringList(filtered)
 
     def select_item(self, index):

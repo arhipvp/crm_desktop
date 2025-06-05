@@ -1,13 +1,14 @@
 """Сервис работы с расходами."""
 
 import logging
+
 logger = logging.getLogger(__name__)
-from datetime import date
 
 from database.models import Client, Expense, Payment, Policy
 from services.payment_service import get_payment_by_id
 
 # ─────────────────────────── CRUD ────────────────────────────
+
 
 def get_all_expenses():
     """Вернуть все расходы без пометки удаления."""
@@ -17,8 +18,7 @@ def get_all_expenses():
 def get_pending_expenses():
     """Расходы без даты списания."""
     return Expense.select().where(
-        (Expense.is_deleted == False) &
-        (Expense.expense_date.is_null(True))
+        (Expense.is_deleted == False) & (Expense.expense_date.is_null(True))
     )
 
 
@@ -37,6 +37,7 @@ def mark_expense_deleted(expense_id: int):
 
 
 # ─────────────────────────── Добавление ───────────────────────────
+
 
 def add_expense(**kwargs):
     """Создать запись расхода по платежу.
@@ -69,18 +70,15 @@ def add_expense(**kwargs):
 
     try:
         return Expense.create(
-            payment=payment,
-            policy_id=payment.policy_id,
-            is_deleted=False,
-            **clean_data
+            payment=payment, policy_id=payment.policy_id, is_deleted=False, **clean_data
         )
     except Exception as e:
         logger.error("❌ Ошибка при создании расхода: %s", e)
         raise
 
 
-
 # ─────────────────────────── Обновление ───────────────────────────
+
 
 def update_expense(expense: Expense, **kwargs):
     """Обновить информацию о расходе.
@@ -116,8 +114,15 @@ def update_expense(expense: Expense, **kwargs):
 # ──────────────────────── Постраничный вывод ───────────────────────
 
 
-
-def get_expenses_page(page: int, per_page: int, *, search_text: str = "", show_deleted: bool = False, deal_id: int = None, only_unpaid: bool = False):
+def get_expenses_page(
+    page: int,
+    per_page: int,
+    *,
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int = None,
+    only_unpaid: bool = False,
+):
     """Вернуть страницу расходов с фильтрами.
 
     Args:
@@ -131,23 +136,32 @@ def get_expenses_page(page: int, per_page: int, *, search_text: str = "", show_d
     Returns:
         ModelSelect: Выборка расходов.
     """
-    query = build_expense_query(search_text=search_text, show_deleted=show_deleted, deal_id=deal_id, only_unpaid=only_unpaid)
+    query = build_expense_query(
+        search_text=search_text,
+        show_deleted=show_deleted,
+        deal_id=deal_id,
+        only_unpaid=only_unpaid,
+    )
     offset = (page - 1) * per_page
     return query.order_by(Expense.expense_date.desc()).limit(per_page).offset(offset)
 
 
-def apply_expense_filters(query, search_text=None, show_deleted=False, deal_id=None, only_unpaid=False, **kwargs):
-
-
-
+def apply_expense_filters(
+    query,
+    search_text=None,
+    show_deleted=False,
+    deal_id=None,
+    only_unpaid=False,
+    **kwargs,
+):
     if not show_deleted:
         query = query.where(Expense.is_deleted == False)
     if deal_id:
         query = query.where(Policy.deal_id == deal_id)
     if search_text:
         query = query.where(
-            (Policy.policy_number.contains(search_text)) |
-            (Client.name.contains(search_text))
+            (Policy.policy_number.contains(search_text))
+            | (Client.name.contains(search_text))
         )
     if only_unpaid:
         query = query.where(Expense.expense_date.is_null(True))
@@ -155,12 +169,18 @@ def apply_expense_filters(query, search_text=None, show_deleted=False, deal_id=N
     return query
 
 
-
-def build_expense_query(search_text=None, show_deleted=False, deal_id=None, only_unpaid=False, **kwargs):
-
-    query = Expense.select(Expense, Payment, Policy, Client).join(Payment).join(Policy).join(Client)
-    return apply_expense_filters(query, search_text, show_deleted, deal_id, only_unpaid, **kwargs)
-
+def build_expense_query(
+    search_text=None, show_deleted=False, deal_id=None, only_unpaid=False, **kwargs
+):
+    query = (
+        Expense.select(Expense, Payment, Policy, Client)
+        .join(Payment)
+        .join(Policy)
+        .join(Client)
+    )
+    return apply_expense_filters(
+        query, search_text, show_deleted, deal_id, only_unpaid, **kwargs
+    )
 
 
 def get_expenses_by_deal(deal_id: int):
@@ -173,14 +193,10 @@ def get_expenses_by_deal(deal_id: int):
         ModelSelect: Выборка расходов по сделке.
     """
     return (
-        Expense
-        .select(Expense, Payment, Policy, Client)
+        Expense.select(Expense, Payment, Policy, Client)
         .join(Payment)
         .join(Policy)
         .join(Client)
-        .where(
-            (Policy.deal_id == deal_id) &
-            (Expense.is_deleted == False)
-        )
+        .where((Policy.deal_id == deal_id) & (Expense.is_deleted == False))
         .order_by(Expense.expense_date.asc())
     )

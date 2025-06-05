@@ -1,8 +1,11 @@
 from PySide6.QtCore import Qt
 
 from database.models import Expense
-from services.expense_service import (build_expense_query, get_expenses_page,
-                                      mark_expense_deleted)
+from services.expense_service import (
+    build_expense_query,
+    get_expenses_page,
+    mark_expense_deleted,
+)
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
@@ -11,14 +14,11 @@ from ui.views.expense_detail_view import ExpenseDetailView
 
 
 class ExpenseTableModel(BaseTableModel):
-    
     def __init__(self, objects, model_class, parent=None):
         super().__init__(objects, model_class, parent)
-        
+
         self.fields = []  # отключаем автоколонки
         self.headers = ["Полис", "Тип расхода", "Контрагент", "Сумма", "Дата выплаты"]
-
-
 
     def columnCount(self, parent=None):
         return len(self.headers)
@@ -29,7 +29,6 @@ class ExpenseTableModel(BaseTableModel):
         if 0 <= section < len(self.headers):
             return self.headers[section]
         return super().headerData(section, orientation, role)
-
 
     def data(self, index, role=Qt.DisplayRole):
         if not index.isValid() or role != Qt.DisplayRole:
@@ -46,18 +45,17 @@ class ExpenseTableModel(BaseTableModel):
         elif col == 1:
             return obj.expense_type or "—"
         elif col == 2:
-            return getattr(payment, "contractor", None) or getattr(policy, "contractor", "—") if policy else "—"
+            return (
+                getattr(payment, "contractor", None)
+                or getattr(policy, "contractor", "—")
+                if policy
+                else "—"
+            )
         elif col == 3:
             return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
         elif col == 4:
             return obj.expense_date.strftime("%d.%m.%Y") if obj.expense_date else "—"
 
-
-
-
-    
-        
-        
 
 class ExpenseTableView(BaseTableView):
     def __init__(self, parent=None, deal_id=None):
@@ -66,19 +64,20 @@ class ExpenseTableView(BaseTableView):
         }
         self.deal_id = deal_id
         super().__init__(parent=parent, checkbox_map=checkbox_map)
-        self.model_class = Expense            # или Client, Policy и т.д.
-        self.form_class = ExpenseForm        # соответствующая форма
+        self.model_class = Expense  # или Client, Policy и т.д.
+        self.form_class = ExpenseForm  # соответствующая форма
         self.virtual_fields = ["policy_num", "deal_desc", "client_name", "contractor"]
-        
+
         self.row_double_clicked.connect(self.open_detail)
         self.load_data()
-        
 
     def get_filters(self) -> dict:
         filters = {
             "search_text": self.filter_controls.get_search_text(),
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "only_unpaid": not self.filter_controls.is_checked("Показывать выплаченные"),
+            "only_unpaid": not self.filter_controls.is_checked(
+                "Показывать выплаченные"
+            ),
         }
         if self.deal_id:
             filters["deal_id"] = self.deal_id
@@ -93,19 +92,6 @@ class ExpenseTableView(BaseTableView):
 
         return filters
 
-
-
-
-    
-
-    
-    
-    
-      
-
-    
-
-
     def load_data(self):
         # 1) читаем фильтры
         filters = self.get_filters()
@@ -116,13 +102,8 @@ class ExpenseTableView(BaseTableView):
         items = get_expenses_page(self.page, self.per_page, **filters)
         total = build_expense_query(**filters).count()
 
-    
-
-
         # 3) обновляем модель и пагинатор
         self.set_model_class_and_items(Expense, list(items), total_count=total)
-
-
 
     def get_selected(self):
         idx = self.table.currentIndex()

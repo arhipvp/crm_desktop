@@ -1,6 +1,12 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QPushButton,
-                               QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ui.common.styled_widgets import styled_button
 
@@ -47,7 +53,9 @@ class BaseDetailView(QDialog):
 
     def populate_info_tab(self):
         """Автоматически выводит все поля модели."""
-        if not hasattr(self.instance, "_meta") or not hasattr(self.instance._meta, "sorted_fields"):
+        if not hasattr(self.instance, "_meta") or not hasattr(
+            self.instance._meta, "sorted_fields"
+        ):
             self.info_layout.addWidget(QLabel("Нет информации для отображения."))
             return
         for field in self.instance._meta.sorted_fields:
