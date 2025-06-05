@@ -8,8 +8,9 @@ from database.models import Task
 
 
 class TaskDetailView(BaseDetailView):
-    def __init__(self, task: Task, parent=None):
+    def __init__(self, task: Task, parent=None, on_change=None):
         super().__init__(task, parent=parent)
+        self.on_change = on_change
 
     def edit(self):
         form = TaskForm(self.instance, parent=self)
@@ -17,12 +18,16 @@ class TaskDetailView(BaseDetailView):
             # Обновляем данные, если пользователь сохранил изменения
             self.instance = Task.get_by_id(self.instance.id)
             self._refresh_info()
+            if self.on_change:
+                self.on_change()
 
     def delete(self):
         if confirm(f"Удалить задачу №{self.instance.id}?"):
             try:
                 mark_task_deleted(self.instance.id)
                 QMessageBox.information(self, "Задача удалена", "Задача помечена как удалённая")
+                if self.on_change:
+                    self.on_change()
                 self.accept()
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", str(e))
