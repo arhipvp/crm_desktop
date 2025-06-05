@@ -1,3 +1,8 @@
+"""Резервное копирование базы данных.
+
+Перед запуском требуется переменная окружения ``DATABASE_URL``.
+"""
+
 import logging
 import os
 import subprocess
@@ -8,7 +13,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from peewee import PostgresqlDatabase
 
-from database.db import DATABASE_URL, db
+from database.db import db
 from database.models import (Client, Deal, Expense, Income, Payment, Policy,
                              Task)
 from services.folder_utils import (create_drive_folder, extract_folder_id,
@@ -18,6 +23,7 @@ from utils.logging_config import setup_logging
 # ───────────── setup ─────────────
 logger = logging.getLogger(__name__)
 load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 setup_logging()
 
 DATE = datetime.now().strftime("%Y-%m-%d_%H-%M")

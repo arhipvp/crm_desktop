@@ -55,3 +55,8 @@ pytest
 каталог синхронизации в `GOOGLE_DRIVE_LOCAL_ROOT`. Для корректной работы
 необходимы библиотеки `google-api-python-client`, `google-auth` и
 `google-auth-oauthlib` (уже перечислены в `requirements.txt`).
+
+## Резервное копирование
+
+Скрипт `backup.py` использует переменную окружения `DATABASE_URL` и
+сохраняет файлы бэкапа в Google Drive.
