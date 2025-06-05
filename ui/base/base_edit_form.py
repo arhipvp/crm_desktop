@@ -70,10 +70,11 @@ class BaseEditForm(QDialog):
     # ------------------------------------------------------------------
     def _create_button_panel(self):
         btns = QHBoxLayout()
-        self.save_btn = styled_button("Сохранить", icon="💾", role="primary")
+        self.save_btn = styled_button(
+            "Сохранить", icon="💾", role="primary", shortcut="Ctrl+S"
+        )
         self.save_btn.setDefault(True)
-        self.cancel_btn = styled_button("Отмена", icon="❌")
-        self.cancel_btn.setShortcut("Esc")
+        self.cancel_btn = styled_button("Отмена", icon="❌", shortcut="Esc")
 
         self.save_btn.clicked.connect(self.save)
         self.cancel_btn.clicked.connect(self.reject)

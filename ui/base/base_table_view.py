@@ -103,18 +103,24 @@ class BaseTableView(QWidget):
         # Кнопки
         self.button_row = QHBoxLayout()
 
-        self.add_btn = styled_button("Добавить", icon="➕", role="primary")
+        self.add_btn = styled_button(
+            "Добавить", icon="➕", role="primary", shortcut="Ctrl+N"
+        )
         self.add_btn.clicked.connect(self.add_new)
         self.button_row.addWidget(self.add_btn)
         self.add_btn.setVisible(self.can_add)
 
-        self.edit_btn = styled_button("Редактировать", icon="✏️")
+        self.edit_btn = styled_button(
+            "Редактировать", icon="✏️", shortcut="F2"
+        )
         self.edit_btn.setVisible(self.can_edit)
 
         self.edit_btn.clicked.connect(self._on_edit)
         self.button_row.addWidget(self.edit_btn)
 
-        self.delete_btn = styled_button("Удалить", icon="🗑️", role="danger")
+        self.delete_btn = styled_button(
+            "Удалить", icon="🗑️", role="danger", shortcut="Del"
+        )
         self.delete_btn.clicked.connect(self._on_delete)
         self.button_row.addWidget(self.delete_btn)
         self.delete_btn.setVisible(self.can_delete)

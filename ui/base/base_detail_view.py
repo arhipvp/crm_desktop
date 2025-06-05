@@ -38,8 +38,12 @@ class BaseDetailView(QDialog):
 
         # ───── Кнопки ─────
         btns = QHBoxLayout()
-        self.edit_btn = styled_button("Редактировать", icon="✏️")
-        self.delete_btn = styled_button("Удалить", icon="🗑️", role="danger")
+        self.edit_btn = styled_button(
+            "Редактировать", icon="✏️", shortcut="F2"
+        )
+        self.delete_btn = styled_button(
+            "Удалить", icon="🗑️", role="danger", shortcut="Del"
+        )
         self.edit_btn.clicked.connect(self.edit)
         self.delete_btn.clicked.connect(self.delete)
         btns.addStretch()
