@@ -1,12 +1,17 @@
 # ui/views/policy_table_view.py
 
 from database.models import Policy
-from services.policy_service import (build_policy_query, get_policies_page,
-                                     mark_policy_deleted)
+from services.policy_service import (
+    build_policy_query,
+    get_policies_page,
+    mark_policy_deleted,
+    mark_policy_renewed,
+)
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.policy_form import PolicyForm
 from ui.views.policy_detail_view import PolicyDetailView
+from ui.common.styled_widgets import styled_button
 
 
 
@@ -15,10 +20,12 @@ from ui.views.policy_detail_view import PolicyDetailView
 class PolicyTableView(BaseTableView):
     def __init__(self, parent=None, deal_id=None, **kwargs):
         self.deal_id = deal_id
+        checkbox_map = {"Показывать продленное": self.on_filter_changed}
         super().__init__(
             parent=parent,
             model_class=Policy,
             form_class=PolicyForm,
+            checkbox_map=checkbox_map,
             **kwargs,
         )
         self.table.setSortingEnabled(True)
@@ -26,12 +33,18 @@ class PolicyTableView(BaseTableView):
         #self.row_double_clicked.connect(self.open_detail)
         self.order_by = "start_date"
         self.order_dir = "asc"
+        # кнопка «Полис продлен (без привязки)»
+        self.mark_renewed_btn = styled_button("Полис продлен (без привязки)")
+        idx = self.button_row.count() - 1
+        self.button_row.insertWidget(idx, self.mark_renewed_btn)
+        self.mark_renewed_btn.clicked.connect(self._on_mark_renewed)
         self.load_data()
 
     def get_filters(self) -> dict:
         filters = {
             "search_text": self.filter_controls.get_search_text(),
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
+            "include_renewed": self.filter_controls.is_checked("Показывать продленное"),
         }
         if getattr(self, "deal_id", None) is not None:
             filters["deal_id"] = self.deal_id
@@ -53,7 +66,7 @@ class PolicyTableView(BaseTableView):
             self.per_page,
             order_by=self.order_by,
             order_dir=self.order_dir,
-            **filters
+            **filters,
         )
 
         total = build_policy_query(**filters).count()
@@ -90,6 +103,16 @@ class PolicyTableView(BaseTableView):
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
+
+    def _on_mark_renewed(self):
+        policy = self.get_selected()
+        if not policy:
+            return
+        try:
+            mark_policy_renewed(policy.id)
+            self.refresh()
+        except Exception as e:
+            show_error(str(e))
 
     def open_detail(self, _=None):
         policy = self.get_selected()
