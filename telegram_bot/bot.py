@@ -10,6 +10,7 @@ from database.init import init_from_env
 import os
 import re
 import datetime as _dt
+from utils.time_utils import now_str
 import tempfile
 import logging
 from dotenv import load_dotenv
@@ -147,7 +148,7 @@ async def h_text(update: Update, _ctx):
     if not m:
         return
     tid = int(m.group(1))
-    stamp = _dt.datetime.now().strftime("%d.%m %H:%M")
+    stamp = now_str()
     ts.append_note(tid, f"[TG {stamp}] {update.message.text}")
     await update.message.reply_text("Комментарий сохранён 👍")
 

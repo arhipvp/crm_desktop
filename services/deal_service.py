@@ -8,7 +8,7 @@ from __future__ import annotations
 • Типизация и мелкие правки PEP 8.
 """
 import logging
-from datetime import datetime
+from utils.time_utils import now_str
 
 from peewee import ModelSelect  # если ещё не импортирован
 
@@ -80,6 +80,10 @@ def add_deal(**kwargs):
         if key in kwargs and kwargs[key] not in ("", None)
     }
 
+    if "calculations" in clean_data:
+        ts = now_str()
+        clean_data["calculations"] = f"[{ts}]: {clean_data['calculations']}"
+
     # FK клиент
     clean_data["client"] = client
     clean_data["is_deleted"] = False
@@ -150,7 +154,7 @@ def update_deal(deal: Deal, **kwargs):
     # если закрываем сделку — допишем причину в calculations
     if kwargs.get("is_closed") and kwargs.get("closed_reason"):
         reason = kwargs["closed_reason"]
-        ts = datetime.now().strftime("%d.%m.%Y %H:%M")
+        ts = now_str()
         auto_note = f"[{ts}]: Сделка закрыта. Причина: {reason}"
         new_calc = f"{auto_note}\n{new_calc or ''}".strip()
 
@@ -164,7 +168,7 @@ def update_deal(deal: Deal, **kwargs):
 
     # Аппендим расчёты
     if new_calc:
-        ts = datetime.now().strftime("%d.%m.%Y %H:%M")
+        ts = now_str()
         old = deal.calculations or ""
         deal.calculations = f"[{ts}]: {new_calc}\n{old}"
 
