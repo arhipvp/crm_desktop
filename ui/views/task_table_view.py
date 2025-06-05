@@ -92,7 +92,7 @@ class TaskTableView(BaseTableView):
                 sent += 1
             except Exception as exc:
                 skipped += 1
-                print(f"[queue_task] failed for {t.id}: {exc}")
+                logger.debug("[queue_task] failed for %s: %s", t.id, exc)
         QMessageBox.information(
             self, "Telegram",
             f"В очередь помещено: {sent}\nОшибок: {skipped}",

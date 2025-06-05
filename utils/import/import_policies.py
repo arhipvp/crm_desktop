@@ -1,6 +1,7 @@
 import datetime as dt
 import os
 import sys
+import logging
 
 from openpyxl import load_workbook
 
@@ -18,6 +19,8 @@ from services.task_service import add_task  # если нужно
 from ui.common.client_import_dialog import ClientImportDialog
 
 EXCEL_FILENAME = "policies_import.xlsx"
+
+logger = logging.getLogger(__name__)
 
 
 def parse_date(value) -> dt.date | None:
@@ -53,7 +56,7 @@ def run_import():
             end_date = parse_date(data.get("Дата окончания"))
 
             if not client_name or not policy_number or not start_date or not end_date:
-                print(f"❌ Пропущено: не хватает обязательных данных → {data}")
+                logger.info("❌ Пропущено: не хватает обязательных данных → %s", data)
                 skipped += 1
                 continue
 
@@ -66,7 +69,7 @@ def run_import():
                 if dlg.exec():
                     client = dlg.client
                 else:
-                    print(f"⛔ Импорт прерван по пользователю для клиента: {client_name}")
+                    logger.info("⛔ Импорт прерван по пользователю для клиента: %s", client_name)
                     skipped += 1
                     continue
 
@@ -106,10 +109,10 @@ def run_import():
 
 
 
-            print(f"✅ Добавлен полис: {policy.policy_number} (клиент: {client.name})")
+            logger.info("✅ Добавлен полис: %s (клиент: %s)", policy.policy_number, client.name)
             success += 1
 
-    print(f"\n✅ Импорт завершён: {success} добавлено, {skipped} пропущено.")
+    logger.info("\n✅ Импорт завершён: %s добавлено, %s пропущено.", success, skipped)
 
 
 if __name__ == "__main__":

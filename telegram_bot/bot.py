@@ -7,6 +7,7 @@ Telegram‑бот для очереди задач CRM_desktop.
 from database.init import init_from_env
 
 import os, re, datetime as _dt, tempfile
+import logging
 from dotenv import load_dotenv
 from pathlib import Path
 from telegram import (
@@ -25,6 +26,8 @@ init_from_env()
 BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
 if not BOT_TOKEN:
     raise RuntimeError("TG_BOT_TOKEN не найден. Укажите его в .env")
+
+logger = logging.getLogger(__name__)
 
 # ───────────── imports из core ─────────────
 from services import task_service as ts
@@ -146,7 +149,7 @@ async def h_file(update: Update, _ctx):
     ext = Path(tg_file.file_name or "").suffix if msg.document else ".jpg"
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=ext)
     os.close(tmp_fd)
-    print(f"[DEBUG] Получен файл: {tg_file.file_name or tg_file.file_id}")
+    logger.debug("Получен файл: %s", tg_file.file_name or tg_file.file_id)
     await tg_file.get_file().download_to_drive(tmp_path)
 
     dest = deal_path / Path(tmp_path).name
@@ -163,7 +166,7 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))
 
-    print("Telegram‑бот запущен внутри контейнера…")
+    logger.info("Telegram‑бот запущен внутри контейнера…")
     app.run_polling(allowed_updates=["message", "callback_query"])
 
 if __name__ == "__main__":
