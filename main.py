@@ -1,6 +1,7 @@
 import os
 import sys
 import urllib.parse
+import logging
 
 from PySide6.QtWidgets import QApplication
 
@@ -18,6 +19,7 @@ from ui.main_window import MainWindow
 from utils.logging_config import setup_logging
 
 setup_logging()
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     # ───── инициализация переменных ─────
@@ -37,7 +39,7 @@ if __name__ == "__main__":
         with open(style_path, "r", encoding="utf-8") as f:
             app.setStyleSheet(f.read())
     except Exception as e:
-        print("Не удалось загрузить стиль:", e)
+        logger.info("Не удалось загрузить стиль: %s", e)
 
     window = MainWindow()
     window.show()
