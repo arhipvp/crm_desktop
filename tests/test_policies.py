@@ -45,5 +45,22 @@ def test_add_policy_creates_everything():
     assert income.amount == 0
 
 
+def test_first_payment_paid():
+    client = add_client(name="Клиент")
+    policy = add_policy(
+        client_id=client.id,
+        policy_number="FP123",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+        payments=[{"amount": 1000, "payment_date": date(2025, 1, 1)}],
+        first_payment_paid=True,
+    )
+
+    payment = Payment.get(Payment.policy == policy)
+    assert payment.actual_payment_date == payment.payment_date
+    income = Income.get(Income.payment == payment)
+    assert income.received_date is None
+
+
 
 

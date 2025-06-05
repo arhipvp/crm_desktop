@@ -186,27 +186,13 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
             payment_date=policy.start_date
         )
         logger.info("💳 Авто-добавлен платёж с нулевой суммой для полиса #%s", policy.policy_number)
-        # отметить платёж как оплаченный, если указано
+
+    # отметить платёж как оплаченный, если указано
     if first_payment_paid:
         first_payment = policy.payments.order_by(Payment.payment_date).first()
         if first_payment:
-            first_payment.is_paid = True
+            first_payment.actual_payment_date = first_payment.payment_date
             first_payment.save()
-
-    # ────────── Доход по первой рассрочке, если оплачен ──────────
-    
-
-    if first_payment_paid:
-        first_payment = policy.payments.order_by(Payment.payment_date).first()
-        if first_payment and not first_payment.incomes.exists():
-            add_income(
-                payment_id=first_payment.id,
-                amount=first_payment.amount,
-                received_date=first_payment.payment_date,
-                note="Доход получен при добавлении полиса"
-            )
-
-
 
     return policy
 
