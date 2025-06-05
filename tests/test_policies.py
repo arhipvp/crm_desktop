@@ -59,7 +59,7 @@ def test_first_payment_paid():
     payment = Payment.get(Payment.policy == policy)
     assert payment.actual_payment_date == payment.payment_date
     income = Income.get(Income.payment == payment)
-    assert income.received_date == payment.payment_date
+    assert income.received_date is None
 
 
 

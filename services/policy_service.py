@@ -193,10 +193,6 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
         if first_payment:
             first_payment.actual_payment_date = first_payment.payment_date
             first_payment.save()
-            income = first_payment.incomes.first()
-            if income:
-                income.received_date = first_payment.payment_date
-                income.save()
 
     return policy
 
