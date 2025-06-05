@@ -1,21 +1,30 @@
 from datetime import date, timedelta
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
-                               QFormLayout, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QPushButton, QSizePolicy, QTableView,
-                               QTabWidget, QTextEdit, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
-from database.models import Payment, Policy, Task
-from services.deal_service import (get_next_deal, get_policies_by_deal_id,
-                                   get_prev_deal, get_tasks_by_deal_id,
-                                   update_deal)
+from database.models import Task
+from services.deal_service import (
+    get_next_deal,
+    get_policies_by_deal_id,
+    get_prev_deal,
+    get_tasks_by_deal_id,
+    update_deal,
+)
 from services.folder_utils import open_folder
 from services.payment_service import get_payments_by_deal_id
 from services.policy_service import get_policies_by_deal_id
-from services.task_service import add_task
-from ui.base.base_table_model import BaseTableModel
-from ui.base.base_table_view import BaseTableView
 from ui.common.date_utils import format_date
 from ui.common.message_boxes import confirm
 from ui.common.styled_widgets import styled_button
@@ -25,19 +34,18 @@ from ui.forms.income_form import IncomeForm
 from ui.forms.payment_form import PaymentForm
 from ui.forms.policy_form import PolicyForm
 from ui.forms.task_form import TaskForm
-from ui.views.payment_detail_view import PaymentDetailView
 from ui.views.payment_table_view import PaymentTableView
-from ui.views.policy_detail_view import PolicyDetailView
 from ui.views.policy_table_view import PolicyTableView
-from ui.views.task_table_view import \
-    TaskTableView  # ← наш переиспользуемый вид задач
+from ui.views.task_table_view import TaskTableView  # ← наш переиспользуемый вид задач
 
 
 class DealDetailView(QDialog):
     def __init__(self, deal, parent=None):
         super().__init__(parent)
         self.instance = deal
-        self.setWindowTitle(f"Сделка #{deal.id} — {deal.client.name}: {deal.description}")
+        self.setWindowTitle(
+            f"Сделка #{deal.id} — {deal.client.name}: {deal.description}"
+        )
         self.resize(1200, 800)
         self.setMinimumSize(1200, 800)
 
@@ -51,9 +59,6 @@ class DealDetailView(QDialog):
 
         # KPI-панель
         self._init_kpi_panel()
-
- 
-
 
         # Вкладки
         self.tabs = QTabWidget()
@@ -88,7 +93,6 @@ class DealDetailView(QDialog):
             self.tabs.removeTab(0)
             w.deleteLater()
 
-        
         # 1) Информация
         info = QWidget()
         form = QFormLayout(info)
@@ -132,12 +136,14 @@ class DealDetailView(QDialog):
         self.calc_view.setReadOnly(True)
         self.calc_view.setFixedHeight(140)
         from PySide6.QtGui import QFontDatabase
+
         self.calc_view.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         self.calc_view.setPlainText(self.instance.calculations or "—")
         form.addRow("Расчеты:", self.calc_view)
 
         # Напоминание — редактируемая дата
         from ui.common.date_utils import TypableDateEdit
+
         self.reminder_date = TypableDateEdit(self.instance.reminder_date)
         form.addRow("Напоминание:", self.reminder_date)
 
@@ -146,16 +152,11 @@ class DealDetailView(QDialog):
         btn_save.clicked.connect(self._on_inline_save)
         form.addRow(btn_save)
 
-
         info.setLayout(form)
         self.tabs.addTab(info, "Информация")
 
-
-
-
-
         # 2) Полисы
-        
+
         pol_tab = QWidget()
         pol_l = QVBoxLayout(pol_tab)
 
@@ -164,13 +165,14 @@ class DealDetailView(QDialog):
         btn_pol.clicked.connect(self._on_add_policy)
         hlayout.addWidget(btn_pol)
 
-        btn_import = styled_button("📥 Импорт из JSON", tooltip="Импорт полиса по данным")
+        btn_import = styled_button(
+            "📥 Импорт из JSON", tooltip="Импорт полиса по данным"
+        )
         btn_import.clicked.connect(self._on_import_policy_json)
         hlayout.addWidget(btn_import)
 
         hlayout.addStretch()
         pol_l.addLayout(hlayout)
-        
 
         pol_view = PolicyTableView(
             parent=self,
@@ -179,16 +181,16 @@ class DealDetailView(QDialog):
         pol_view.load_data()
         pol_l.addWidget(pol_view)
 
-
         self.tabs.addTab(pol_tab, "Полисы")
 
         # 3) Платежи
         pay_tab = QWidget()
         pay_l = QVBoxLayout(pay_tab)
-        btn_pay = styled_button("➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+Shift+N")
+        btn_pay = styled_button(
+            "➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+Shift+N"
+        )
         btn_pay.clicked.connect(self._on_add_payment)
         payments = list(get_payments_by_deal_id(self.instance.id))
-        
 
         pay_view = PaymentTableView(
             parent=self,
@@ -197,14 +199,13 @@ class DealDetailView(QDialog):
         pay_view.load_data()
         pay_l.addWidget(pay_view)
 
-
         self.tabs.addTab(pay_tab, "Платежи")
 
         # 4) Доходы
         from ui.views.income_table_view import IncomeTableView
+
         income_tab = QWidget()
         income_layout = QVBoxLayout(income_tab)
-        
 
         btn_income = styled_button("➕ Доход", tooltip="Добавить доход")
         btn_income.clicked.connect(self._on_add_income)
@@ -222,12 +223,12 @@ class DealDetailView(QDialog):
 
         # 5) Расходы
         from ui.views.expense_table_view import ExpenseTableView
+
         expense_tab = QWidget()
         expense_layout = QVBoxLayout(expense_tab)
         btn_expense = styled_button("➕ Расход", tooltip="Добавить расход")
         btn_expense.clicked.connect(self._on_add_expense)
         expense_layout.addWidget(btn_expense, alignment=Qt.AlignLeft)
-
 
         expense_view = ExpenseTableView(parent=self, deal_id=self.instance.id)
         expense_view.load_data()
@@ -235,9 +236,8 @@ class DealDetailView(QDialog):
 
         self.tabs.addTab(expense_tab, "Расходы")
 
-
         # 4) Задачи — внедряем TaskTableView с фильтром по сделке
-       # ─── Задачи ───────────────────────────────────────────
+        # ─── Задачи ───────────────────────────────────────────
         task_tab = QWidget()
         vbox = QVBoxLayout(task_tab)
 
@@ -247,12 +247,13 @@ class DealDetailView(QDialog):
 
         # Подгружаем ТОЛЬКО задачи этой сделки
         from services.task_service import get_tasks_by_deal
+
         tasks = list(get_tasks_by_deal(self.instance.id))
 
         task_view = TaskTableView(parent=self, deal_id=self.instance.id)
         vbox.addWidget(task_view)
         self.task_view = task_view
-        
+
         task_view.set_model_class_and_items(Task, tasks, total_count=len(tasks))
         sel = task_view.table.selectionModel()
         if sel:
@@ -262,10 +263,8 @@ class DealDetailView(QDialog):
         task_view.table.setSortingEnabled(True)
         task_view.row_double_clicked.connect(self._on_task_double_clicked)
 
-
         self.tabs.addTab(task_tab, "Задачи")
-        self.task_view = task_view          # сохраняем для refresh
-
+        self.task_view = task_view  # сохраняем для refresh
 
     def _init_actions(self):
         box = QHBoxLayout()
@@ -292,7 +291,6 @@ class DealDetailView(QDialog):
             btn_close.clicked.connect(self._on_close_deal)
             box.addWidget(btn_close)
 
-
     def _on_edit(self):
         form = DealForm(self.instance, parent=self)
         if form.exec():
@@ -311,41 +309,33 @@ class DealDetailView(QDialog):
             forced_deal=self.instance,
         )
         if form.exec():
-            self._init_tabs()      # перерисовать KPI + таблицы
-
+            self._init_tabs()  # перерисовать KPI + таблицы
 
     def _on_add_payment(self):
         form = PaymentForm(parent=self)
         if form.exec():
             self._init_tabs()
 
-
-    
-    
-
     def _on_add_task(self):
         form = TaskForm(parent=self, forced_deal=self.instance)
         # префилл по сделке
-        if hasattr(form, 'deal_combo'):
+        if hasattr(form, "deal_combo"):
             idx = form.deal_combo.findData(self.instance.id)
             if idx >= 0:
                 form.deal_combo.setCurrentIndex(idx)
         if form.exec():
-            self.task_view.refresh()      # загрузит только задачи сделки
+            self.task_view.refresh()  # загрузит только задачи сделки
             self._init_kpi_panel()
-
-
 
     def _open_folder(self):
         open_folder(
             self.instance.drive_folder_path or self.instance.drive_folder_link,
-            parent=self  # QWidget, чтобы показывались QMessageBox-ы
+            parent=self,  # QWidget, чтобы показывались QMessageBox-ы
         )
 
-
     def _open_whatsapp(self):
-        from services.client_service import (format_phone_for_whatsapp,
-                                             open_whatsapp)
+        from services.client_service import format_phone_for_whatsapp, open_whatsapp
+
         phone = self.instance.client.phone
         if phone:
             open_whatsapp(format_phone_for_whatsapp(phone))
@@ -354,12 +344,18 @@ class DealDetailView(QDialog):
         from services.deal_service import update_deal
 
         status = self.status_edit.toPlainText().strip()
-        reminder = self.reminder_date.date().toPython() if self.reminder_date.date().isValid() else None
+        reminder = (
+            self.reminder_date.date().toPython()
+            if self.reminder_date.date().isValid()
+            else None
+        )
         new_calc_part = self.calc_append.toPlainText().strip()
         if reminder:
             delta = abs(reminder - date.today())
             if delta > timedelta(days=31):
-                if not confirm(f"Дата напоминания отличается от текущей более чем на месяц.\nУстановить {reminder:%d.%m.%Y}?"):
+                if not confirm(
+                    f"Дата напоминания отличается от текущей более чем на месяц.\nУстановить {reminder:%d.%m.%Y}?"
+                ):
                     return
 
         try:
@@ -373,9 +369,8 @@ class DealDetailView(QDialog):
             self.calc_view.setPlainText(self.instance.calculations or "—")
         except Exception as e:
             from ui.common.message_boxes import show_error
+
             show_error(str(e))
-
-
 
     def _on_task_double_clicked(self, task):
         form = TaskForm(task, parent=self)
@@ -384,13 +379,9 @@ class DealDetailView(QDialog):
             self._init_kpi_panel()
 
     def _on_add_income(self):
-        from ui.forms.income_form import IncomeForm
         dlg = IncomeForm(parent=self, deal_id=self.instance.id)
         if dlg.exec():
             self._init_tabs()  # перезапустить вкладки для обновления данных
-
-
-    
 
     def _on_prev_deal(self):
         prev = get_prev_deal(self.instance)
@@ -406,6 +397,7 @@ class DealDetailView(QDialog):
 
     def _on_add_expense(self):
         from ui.forms.expense_form import ExpenseForm
+
         dlg = ExpenseForm(parent=self, deal_id=self.instance.id)
         if dlg.exec():
             self._init_tabs()  # чтобы обновить таблицу расходов
@@ -416,19 +408,20 @@ class DealDetailView(QDialog):
             reason = dlg.get_reason()
             if not reason:
                 from ui.common.message_boxes import show_error
+
                 show_error("Причина обязательна.")
                 return
             update_deal(self.instance, is_closed=True, closed_reason=reason)
             from ui.common.message_boxes import show_info
+
             show_info("Сделка успешно закрыта.")
             self.close()
             DealDetailView(self.instance).exec()
+
     def _on_import_policy_json(self):
-        from ui.forms.import_policy_json_form import ImportPolicyJsonForm
         dlg = ImportPolicyJsonForm(parent=self)
         if dlg.exec():
             self._init_tabs()
-
 
 
 class CloseDealDialog(QDialog):

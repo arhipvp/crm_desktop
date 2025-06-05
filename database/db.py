@@ -4,4 +4,3 @@ from peewee import Proxy
 # или в тестах через main_db.initialize(...)
 
 db = Proxy()
-

@@ -2,12 +2,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from PySide6.QtCore import (QDate, QRegularExpression, QSortFilterProxyModel,
-                            Qt, Signal)
-from PySide6.QtWidgets import (QHBoxLayout, QHeaderView, QSplitter, QTableView,
-                               QVBoxLayout, QWidget)
+from PySide6.QtCore import QDate, QSortFilterProxyModel, Qt, Signal
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QHeaderView,
+    QSplitter,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
 
-from ui.base.base_edit_form import BaseEditForm
 from ui.base.base_table_model import BaseTableModel
 from ui.common.filter_controls import FilterControls
 from ui.common.paginator import Paginator
@@ -21,6 +25,7 @@ class DateAwareSortFilterProxyModel(QSortFilterProxyModel):
         if isinstance(left_data, QDate) and isinstance(right_data, QDate):
             return left_data < right_data
         return super().lessThan(left, right)
+
 
 class BaseTableView(QWidget):
     row_double_clicked = Signal(object)  # объект строки по двойному клику
@@ -42,10 +47,10 @@ class BaseTableView(QWidget):
         filter_func=None,
         custom_actions=None,
         detail_view_class=None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(parent)
-        
+
         self.model_class = model_class
         self.form_class = form_class
         self.get_page_func = get_page_func
@@ -59,12 +64,7 @@ class BaseTableView(QWidget):
         self.custom_actions = custom_actions or []
         self.detail_view_class = detail_view_class
 
-        
-        
-        
-
-
-        self.use_inline_details = True   # включить встроенные детали
+        self.use_inline_details = True  # включить встроенные детали
         self.detail_widget = None
 
         self.default_sort_column = 0  # по умолчанию — первый столбец
@@ -77,12 +77,6 @@ class BaseTableView(QWidget):
         self.per_page = 30
         self.total_count = 0
 
-        
-        
-        
-        
-        
-
         # --- мастер-детал макет ---
         self.outer_layout = QVBoxLayout(self)
         self.splitter = QSplitter()
@@ -94,12 +88,14 @@ class BaseTableView(QWidget):
 
         # Фильтры
         checkbox_map = kwargs.get("checkbox_map") or {}
-        checkbox_map.setdefault("Показывать удалённые", lambda state: self.on_filter_changed())
+        checkbox_map.setdefault(
+            "Показывать удалённые", lambda state: self.on_filter_changed()
+        )
 
         self.filter_controls = FilterControls(
             search_callback=self.on_filter_changed,
-            checkbox_map=checkbox_map,  
-            on_filter=self.on_filter_changed
+            checkbox_map=checkbox_map,
+            on_filter=self.on_filter_changed,
         )
 
         self.left_layout.addWidget(self.filter_controls)
@@ -123,10 +119,11 @@ class BaseTableView(QWidget):
         self.button_row.addWidget(self.delete_btn)
         self.delete_btn.setVisible(self.can_delete)
 
-        self.refresh_btn = styled_button("Обновить", icon="🔄", tooltip="Обновить список", shortcut="F5")
+        self.refresh_btn = styled_button(
+            "Обновить", icon="🔄", tooltip="Обновить список", shortcut="F5"
+        )
         self.refresh_btn.clicked.connect(self.refresh)
         self.button_row.addWidget(self.refresh_btn)
-
 
         self.button_row.addStretch()
         self.left_layout.addLayout(self.button_row)
@@ -164,14 +161,10 @@ class BaseTableView(QWidget):
         except NotImplementedError:
             pass
 
-
-        
         if total_count is not None:
             self.total_count = total_count
             self.paginator.update(self.total_count, self.page)
             self.data_loaded.emit(self.total_count)
-
-
 
     def load_data(self):
         if not self.model_class or not self.get_page_func:
@@ -179,9 +172,10 @@ class BaseTableView(QWidget):
 
         # 1. Собираем фильтры
         filters = {}
-        filters["show_deleted"] = self.filter_controls.is_checked("Показывать удалённые")
+        filters["show_deleted"] = self.filter_controls.is_checked(
+            "Показывать удалённые"
+        )
         filters["search_text"] = self.filter_controls.get_search_text()
-
 
         date_range = self.filter_controls.get_date_filter()
         if date_range:
@@ -189,17 +183,10 @@ class BaseTableView(QWidget):
 
         # 2. Загружаем данные
         items = self.get_page_func(self.page, self.per_page, **filters)
-        total = (
-            self.get_total_func(**filters) if self.get_total_func
-            else len(items)
-        )
+        total = self.get_total_func(**filters) if self.get_total_func else len(items)
 
         # 3. Обновляем таблицу и пагинатор
         self.set_model_class_and_items(self.model_class, list(items), total_count=total)
-
-
-
-
 
     def refresh(self):
         self.load_data()
@@ -227,11 +214,9 @@ class BaseTableView(QWidget):
     def edit_selected(self, _=None):
         self._on_edit()
 
-
     def delete_selected(self):
         # Заглушка: потомок может переопределить
         pass
-
 
     def set_detail_widget(self, widget):
         """Показывает виджет деталей справа от таблицы."""
@@ -249,6 +234,7 @@ class BaseTableView(QWidget):
             if f.name == field_name:
                 return i
         return 0
+
     def _on_edit(self):
         if self.edit_callback:
             self.edit_callback()
@@ -267,8 +253,6 @@ class BaseTableView(QWidget):
             return
         obj = self.model.get_item(self._source_row(index))
 
-
-
         # Вот тут изменяем:
         if self.detail_view_class:
             dlg = self.detail_view_class(obj, parent=self)
@@ -279,10 +263,9 @@ class BaseTableView(QWidget):
             if form.exec():
                 self.refresh()
 
-
-
     def delete_selected_default(self):
         from ui.common.message_boxes import confirm, show_error
+
         index = self.table.currentIndex()
         if not index.isValid():
             return
@@ -292,7 +275,9 @@ class BaseTableView(QWidget):
             try:
                 # Попробуй найти функцию mark_<entity>_deleted по имени модели
                 svc = self._get_service_for_model(self.model_class)
-                mark_func = getattr(svc, f"mark_{self.model_class.__name__.lower()}_deleted", None)
+                mark_func = getattr(
+                    svc, f"mark_{self.model_class.__name__.lower()}_deleted", None
+                )
                 if mark_func:
                     mark_func(obj.id)
                 self.refresh()
@@ -304,30 +289,35 @@ class BaseTableView(QWidget):
         # Импортируй нужный сервис по классу модели
         if model_class.__name__ == "Policy":
             from services import policy_service
+
             return policy_service
         if model_class.__name__ == "Payment":
             from services import payment_service
+
             return payment_service
         if model_class.__name__ == "Income":
             from services import income_service
+
             return income_service
         if model_class.__name__ == "Deal":
             from services import deal_service
+
             return deal_service
         if model_class.__name__ == "Task":
             from services import task_service
-            return task_service 
+
+            return task_service
         if model_class.__name__ == "Expense":
             from services import expense_service
+
             return expense_service
         if model_class.__name__ == "Client":
             from services import client_service
-            return client_service
 
+            return client_service
 
         # Добавь другие сущности по необходимости
         raise ValueError("Нет сервиса для модели", model_class)
-
 
     def open_detail_view(self):
         index = self.table.currentIndex()
@@ -335,13 +325,9 @@ class BaseTableView(QWidget):
             return
         obj = self.model.get_item(self._source_row(index))
 
-
         dlg = self.detail_view_class(obj, parent=self)
         dlg.exec()
         self.refresh()
-
-
-
 
     def _source_row(self, view_index):
         """Возвращает номер строки в исходной модели для индекса из таблицы."""
@@ -358,5 +344,3 @@ class BaseTableView(QWidget):
         """Сохраняет текущую сортировку таблицы."""
         self.current_sort_column = column
         self.current_sort_order = order
-
-    

@@ -6,7 +6,6 @@ from database.models import Expense
 from services.expense_service import add_expense, update_expense
 from services.payment_service import get_payment_by_id
 from ui.base.base_edit_form import BaseEditForm
-from ui.common.combo_helpers import create_fk_combobox
 
 
 class ExpenseForm(BaseEditForm):
@@ -14,8 +13,9 @@ class ExpenseForm(BaseEditForm):
 
     def __init__(self, expense=None, parent=None, deal_id=None):
         self.deal_id = deal_id
-        super().__init__(instance=expense, model_class=Expense, entity_name="расход", parent=parent)
-
+        super().__init__(
+            instance=expense, model_class=Expense, entity_name="расход", parent=parent
+        )
 
     def save_data(self):
         data = self.collect_data()
@@ -24,21 +24,15 @@ class ExpenseForm(BaseEditForm):
         return add_expense(**data)
 
     def build_custom_fields(self):
-        
-
         payments = self.model_class.payment.rel_model.select()
         if self.deal_id:
             payments = payments.join(self.model_class.policy.rel_model).where(
                 self.model_class.policy.rel_model.deal_id == self.deal_id
             )
 
-        
-
         if self.deal_id:
             payments = (
-                Payment.select()
-                .join(Policy)
-                .where(Policy.deal_id == self.deal_id)
+                Payment.select().join(Policy).where(Policy.deal_id == self.deal_id)
             )
         else:
             payments = Payment.select()
@@ -47,18 +41,14 @@ class ExpenseForm(BaseEditForm):
             items=list(payments),
             label_func=lambda p: f"#{p.id}  {p.policy.policy_number}  {p.payment_date:%d.%m.%Y}",
             id_attr="id",
-            placeholder="— Платёж —"
+            placeholder="— Платёж —",
         )
 
         self.fields["payment_id"] = self.payment_combo
         self.form_layout.insertRow(0, "Платёж:", self.payment_combo)
 
-
-
         self.fields["payment_id"] = self.payment_combo
         self.form_layout.insertRow(0, "Платёж:", self.payment_combo)
-
-
 
     def update_context(self):
         self.payment_info = QLabel("—")

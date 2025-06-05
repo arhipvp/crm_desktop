@@ -1,6 +1,7 @@
 """Единое место для инициализации Peewee-Proxy `db`.
 Вызывайте :func:`init_from_env` в начале entry-point'а.
 """
+
 from __future__ import annotations
 
 import os
@@ -45,4 +46,3 @@ def init_from_env(env_var: str = _DEFAULT_ENV) -> None:
         database = _postgres_from_url(url)
 
     db.initialize(database)
-

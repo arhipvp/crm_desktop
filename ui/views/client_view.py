@@ -1,6 +1,14 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QCheckBox, QScrollArea
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLineEdit,
+    QCheckBox,
+    QScrollArea,
+)
 
-from services.client_service import get_clients_page, get_all_clients
+from services.client_service import get_clients_page
 from ui.widgets.client_card import ClientCard
 from ui.forms.client_form import ClientForm
 from ui.common.paginator import Paginator
@@ -62,7 +70,9 @@ class ClientView(QWidget):
         search_text = self.search_input.text().strip().lower()
         show_deleted = self.show_deleted_checkbox.isChecked()
 
-        self.clients = get_clients_page(self.current_page, self.per_page, search_text, show_deleted)
+        self.clients = get_clients_page(
+            self.current_page, self.per_page, search_text, show_deleted
+        )
         self.render_clients()
         self.paginator.update_page(self.current_page)
 

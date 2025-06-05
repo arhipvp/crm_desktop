@@ -10,20 +10,15 @@ from __future__ import annotations
 """
 from PySide6.QtWidgets import QLabel
 
-from database.models import Income
-from services.income_service import (add_income, create_stub_income,
-                                     update_income)
+from services.income_service import add_income, create_stub_income, update_income
 from services.payment_service import get_all_payments, get_payment_by_id
 from ui.base.base_edit_form import BaseEditForm
-from ui.common.combo_helpers import create_entity_combobox, create_fk_combobox
+from ui.common.combo_helpers import create_entity_combobox
 from ui.common.date_utils import OptionalDateEdit, get_date_or_none
 
 
 class IncomeForm(BaseEditForm):
     EXTRA_HIDDEN = {"policy"}
-
-    
-
 
     def __init__(self, instance=None, parent=None, deal_id=None):
         self.deal_id = deal_id
@@ -32,10 +27,6 @@ class IncomeForm(BaseEditForm):
         else:
             inst = create_stub_income(deal_id)
         super().__init__(instance=inst, parent=parent)
-
-
-
-    
 
     # ------------------------------------------------------------------
     # Сбор данных
@@ -62,29 +53,25 @@ class IncomeForm(BaseEditForm):
             return update_income(self.instance, **data)
         return add_income(**data)
 
-
-
     def build_custom_fields(self):
         payments = get_all_payments()
         if self.deal_id:
-            payments = [p for p in payments if p.policy and p.policy.deal_id == self.deal_id]
+            payments = [
+                p for p in payments if p.policy and p.policy.deal_id == self.deal_id
+            ]
 
         self.payment_combo = create_entity_combobox(
             items=payments,
             label_func=lambda p: f"#{p.id}  {p.policy.policy_number}  {p.payment_date:%d.%m.%Y}",
             id_attr="id",
-            placeholder="— Платёж —"
+            placeholder="— Платёж —",
         )
         self.fields["payment_id"] = self.payment_combo
         self.form_layout.insertRow(0, "Платёж:", self.payment_combo)
-                
 
         self.received_date_edit = OptionalDateEdit()
         self.fields["received_date"] = self.received_date_edit
         self.form_layout.addRow("Дата получения:", self.received_date_edit)
-
-
-
 
     def update_context(self):
         self.payment_info = QLabel("—")
@@ -109,4 +96,3 @@ class IncomeForm(BaseEditForm):
             self.payment_combo.setCurrentIndex(index)
             self.payment_combo.setEnabled(False)
             self.setWindowTitle(f"Добавить доход (платёж #{payment_id})")
-

@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QDialog, QFormLayout, QHBoxLayout, QHeaderView,
-                               QLabel, QTableView, QTabWidget, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QTableView,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from database.models import Expense, Income, Payment
 from services.folder_utils import open_folder
@@ -17,7 +25,6 @@ from ui.forms.income_form import IncomeForm
 from ui.forms.payment_form import PaymentForm
 from ui.views.expense_detail_view import ExpenseDetailView
 from ui.views.income_detail_view import IncomeDetailView
-
 
 
 class PaymentDetailView(QDialog):
@@ -40,8 +47,6 @@ class PaymentDetailView(QDialog):
         self.layout.addWidget(self.tabs, stretch=1)
         self._init_tabs()
         self._init_actions()
-
-        
 
     # ------------------------------------------------------------------
     # KPI
@@ -73,7 +78,9 @@ class PaymentDetailView(QDialog):
         form.addRow("Полис:", QLabel(f"#{pol.id} {pol.policy_number}" if pol else "—"))
         form.addRow("Сумма:", QLabel(f"{self.instance.amount:.2f} ₽"))
         form.addRow("Плановая дата:", QLabel(format_date(self.instance.payment_date)))
-        form.addRow("Фактическая дата:", QLabel(format_date(self.instance.actual_payment_date)))
+        form.addRow(
+            "Фактическая дата:", QLabel(format_date(self.instance.actual_payment_date))
+        )
         info.setLayout(form)
         self.tabs.addTab(info, "Информация")
 
@@ -90,7 +97,9 @@ class PaymentDetailView(QDialog):
         # 3) Расходы
         exp_tab = QWidget()
         exp_l = QVBoxLayout(exp_tab)
-        btn_exp = styled_button("➕ Расход", tooltip="Добавить расход", shortcut="Ctrl+Shift+N")
+        btn_exp = styled_button(
+            "➕ Расход", tooltip="Добавить расход", shortcut="Ctrl+Shift+N"
+        )
         btn_exp.clicked.connect(self._on_add_expense)
         exp_l.addWidget(btn_exp, alignment=Qt.AlignLeft)
         expenses = list(Expense.select().where(Expense.payment == self.instance))
@@ -126,7 +135,6 @@ class PaymentDetailView(QDialog):
             folder_btn.setDisabled(True)
 
         self.layout.addLayout(row)
-
 
     # ------------------------------------------------------------------
     # Slots
@@ -172,6 +180,6 @@ class PaymentDetailView(QDialog):
     def _open_policy(self):
         if self.instance.policy:
             from ui.views.policy_detail_view import PolicyDetailView
+
             dlg = PolicyDetailView(self.instance.policy, parent=self)
             dlg.exec()
-

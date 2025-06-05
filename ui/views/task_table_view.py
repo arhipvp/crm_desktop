@@ -5,15 +5,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox, QTableView
+from PySide6.QtWidgets import QMessageBox
 
 from database.models import Task
-from services.task_service import (build_task_query, get_tasks_page,
-                                   mark_task_deleted, queue_task)
+from services.task_service import build_task_query, get_tasks_page, queue_task
 from ui.base.base_table_view import BaseTableView
 from ui.common.delegates import StatusDelegate
 from ui.common.filter_controls import FilterControls
-from ui.common.message_boxes import confirm, show_error
 from ui.common.styled_widgets import styled_button
 from ui.forms.task_form import TaskForm
 from ui.views import task_detail_view
@@ -31,13 +29,11 @@ class TaskTableView(BaseTableView):
         )
         self.sort_field = "due_date"
         self.sort_order = "asc"
-        self.deal_id = deal_id 
+        self.deal_id = deal_id
         self.table.setItemDelegate(StatusDelegate(self.table))
         self.table.verticalHeader().setVisible(False)  # убираем нумерацию строк
         self.table.horizontalHeader().sectionClicked.connect(self.on_sort_requested)
         self.edit_btn.clicked.connect(self.edit_selected)
-
-
 
         # ────────────────── Панель фильтров ──────────────────
         self.left_layout.removeWidget(self.filter_controls)
@@ -55,7 +51,8 @@ class TaskTableView(BaseTableView):
 
         # ────────────────── Кнопка «Отправить» ──────────────────
         self.send_btn = styled_button(
-            "Отправить", icon="📤",
+            "Отправить",
+            icon="📤",
             tooltip="Поставить выбранные задачи в очередь Telegram",
             shortcut="Ctrl+Shift+S",
         )
@@ -68,7 +65,6 @@ class TaskTableView(BaseTableView):
         sel.selectionChanged.connect(self._update_actions_state)
         self.load_data()
 
-
     def _update_actions_state(self, *_):
         has_sel = bool(self.table.selectionModel().selectedRows())
         self.edit_btn.setEnabled(has_sel)
@@ -78,8 +74,11 @@ class TaskTableView(BaseTableView):
         if not self.model:
             return []
         sel = self.table.selectionModel()
-        return [self.model.get_item(self._source_row(index))
-                for index in sel.selectedRows() if index.isValid()]
+        return [
+            self.model.get_item(self._source_row(index))
+            for index in sel.selectedRows()
+            if index.isValid()
+        ]
 
     def _queue_selected_tasks_to_telegram(self):
         tasks = self._selected_tasks()
@@ -94,7 +93,8 @@ class TaskTableView(BaseTableView):
                 skipped += 1
                 logger.debug("[queue_task] failed for %s: %s", t.id, exc)
         QMessageBox.information(
-            self, "Telegram",
+            self,
+            "Telegram",
             f"В очередь помещено: {sent}\nОшибок: {skipped}",
         )
         self.refresh()
@@ -105,16 +105,19 @@ class TaskTableView(BaseTableView):
             "include_deleted": self.filter_controls.is_checked("Показывать удалённые"),
             "include_done": self.filter_controls.is_checked("Показывать выполненные"),
         }
+
     def refresh(self):
         self.load_data()
 
     def load_data(self) -> None:
         logger.debug("📥 Используется метод загрузки: get_tasks_page")
-        
-        #self.table.setModel(None)  # сброс до загрузки данных
+
+        # self.table.setModel(None)  # сброс до загрузки данных
 
         f = self.get_filters()
-        logger.debug("📋 Сортировка задач: field=%s, order=%s", self.sort_field, self.sort_order)
+        logger.debug(
+            "📋 Сортировка задач: field=%s, order=%s", self.sort_field, self.sort_order
+        )
 
         if self.deal_id:
             items = get_tasks_page(
@@ -134,12 +137,7 @@ class TaskTableView(BaseTableView):
                 deal_id=self.deal_id,
             ).count()
 
-            #items = items.order_by(Task.due_date).paginate(self.page, self.per_page)
-
-
-
-
-
+            # items = items.order_by(Task.due_date).paginate(self.page, self.per_page)
 
         else:
             items = get_tasks_page(
@@ -154,22 +152,16 @@ class TaskTableView(BaseTableView):
             total = build_task_query(**f).count()
 
         self.set_model_class_and_items(Task, list(items), total_count=total)
-        self.table.sortByColumn(self.get_column_index(self.sort_field),
-                        Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder)
+        self.table.sortByColumn(
+            self.get_column_index(self.sort_field),
+            Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder,
+        )
 
         self.proxy_model.setSourceModel(self.model)
-        #self.table.setModel(self.proxy_model)
-
-
-
-
-
-
-
+        # self.table.setModel(self.proxy_model)
 
         # DEBUG: поля модели
         logger.debug("TaskTableView fields: %s", [f.name for f in self.model.fields])
-
 
         # ───── ВАЖНО: переносим title в начало ─────
         if self.model:
@@ -183,32 +175,40 @@ class TaskTableView(BaseTableView):
             self.table.setColumnHidden(0, True)
 
         if self.model:
-            idx_title  = self.model.fields.index(Task.title)
-            idx_deal   = self.model.fields.index(Task.deal)
+            idx_title = self.model.fields.index(Task.title)
+            idx_deal = self.model.fields.index(Task.deal)
             idx_policy = self.model.fields.index(Task.policy)
             for row, task in enumerate(self.model.objects):
                 title_txt = task.title or "—"
-                deal_txt = f"{task.deal.client.name} — {task.deal.description}" if task.deal_id and task.deal and task.deal.client else "—"
-                policy_txt = f"#{task.policy.policy_number}" if task.policy_id and task.policy else "—"
-                
+                deal_txt = (
+                    f"{task.deal.client.name} — {task.deal.description}"
+                    if task.deal_id and task.deal and task.deal.client
+                    else "—"
+                )
+                policy_txt = (
+                    f"#{task.policy.policy_number}"
+                    if task.policy_id and task.policy
+                    else "—"
+                )
 
-
-
-                self.model.setData(self.model.index(row, idx_title), title_txt, role=Qt.DisplayRole)
-                self.model.setData(self.model.index(row, idx_deal), deal_txt, role=Qt.DisplayRole)
-                self.model.setData(self.model.index(row, idx_policy), policy_txt, role=Qt.DisplayRole)
+                self.model.setData(
+                    self.model.index(row, idx_title), title_txt, role=Qt.DisplayRole
+                )
+                self.model.setData(
+                    self.model.index(row, idx_deal), deal_txt, role=Qt.DisplayRole
+                )
+                self.model.setData(
+                    self.model.index(row, idx_policy), policy_txt, role=Qt.DisplayRole
+                )
         # восстановление сортировки после обновления модели
         col = self.get_column_index(self.sort_field)
         order = Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder
         self.table.horizontalHeader().setSortIndicator(col, order)
 
-        
-
         self._update_actions_state()
 
     def get_selected(self):
         return self.get_selected_object()
-
 
     def add_new(self):
         form = TaskForm(parent=self)
@@ -236,7 +236,7 @@ class TaskTableView(BaseTableView):
         self.sort_field = self.model.fields[column].name
         self.sort_order = "desc" if order == Qt.DescendingOrder else "asc"
         self.load_data()
-        
+
     def on_sort_requested(self, column: int):
         if not self.model or column >= len(self.model.fields):
             return

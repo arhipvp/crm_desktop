@@ -19,4 +19,3 @@ class FinanceTab(QWidget):
 
         layout.addWidget(tabs)
         self.setLayout(layout)
-        

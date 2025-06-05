@@ -63,8 +63,9 @@ def create_entity_combobox(
 
     if len(items) > dialog_threshold:
         # При большом количестве записей удобнее отдельный диалог поиска
-        from .search_dialog import \
-            SearchDialog  # локальный импорт, чтобы избежать циклов
+        from .search_dialog import (
+            SearchDialog,
+        )  # локальный импорт, чтобы избежать циклов
 
         combo.setEditable(True)
         combo.view().hide()  # подавляем стандартный дроп‑даун
@@ -159,7 +160,6 @@ def create_editable_combo(options: list[str]) -> QComboBox:
     for option in cleaned_options:
         combo.addItem(option, userData=option)
 
-
     combo.setInsertPolicy(QComboBox.InsertAtTop)
     combo.setDuplicatesEnabled(False)
     combo.setPlaceholderText("— выберите или введите —")
@@ -167,9 +167,11 @@ def create_editable_combo(options: list[str]) -> QComboBox:
     setup_completer(combo)
     return combo
 
+
 def get_selected_item(combo: QComboBox) -> Any:
     """Вернуть объект, связанный с текущим выбранным элементом."""
     return combo.currentData()
+
 
 def set_selected_by_id(combo: QComboBox, value_id: Any) -> None:
     """Установить текущий элемент по userData (например, id модели)."""
@@ -177,4 +179,3 @@ def set_selected_by_id(combo: QComboBox, value_id: Any) -> None:
         if combo.itemData(index) == value_id:
             combo.setCurrentIndex(index)
             break
-

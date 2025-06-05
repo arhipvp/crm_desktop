@@ -1,4 +1,12 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QCheckBox, QScrollArea
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLineEdit,
+    QCheckBox,
+    QScrollArea,
+)
 
 from services.payment_service import get_payments_page
 from ui.widgets.payment_card import PaymentCard
@@ -37,7 +45,9 @@ class PaymentView(QWidget):
         control_layout.addWidget(self.only_paid_checkbox)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Поиск по номеру полиса или имени клиента...")
+        self.search_input.setPlaceholderText(
+            "Поиск по номеру полиса или имени клиента..."
+        )
         self.search_input.textChanged.connect(self.reset_pagination)
         control_layout.addWidget(self.search_input)
 
@@ -73,7 +83,7 @@ class PaymentView(QWidget):
             self.per_page,
             search_text,
             show_deleted,
-            only_paid=only_paid
+            only_paid=only_paid,
         )
 
         self.render_payments()

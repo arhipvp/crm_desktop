@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 """Форма создания/редактирования платежа.
@@ -45,7 +44,6 @@ class PaymentForm(BaseEditForm):
         self.form_layout.insertRow(0, QLabel("Полис:"), self.policy_combo)
 
         if self._forced_policy is not None:
-
             policy_id = getattr(self._forced_policy, "id", self._forced_policy)
             self.setWindowTitle(f"Добавить платёж (полис #{policy_id})")
             idx = self.policy_combo.findData(policy_id)
@@ -81,9 +79,6 @@ class PaymentForm(BaseEditForm):
             return update_payment(self.instance, **data)
         return add_payment(**data)
 
-
-    
-
     def update_context(self):
         self.policy_info = QLabel("—")
         self.form_layout.insertRow(1, "Полис:", self.policy_info)
@@ -100,6 +95,3 @@ class PaymentForm(BaseEditForm):
 
         self.fields["policy_id"].currentIndexChanged.connect(refresh)
         refresh()
-
-
-

@@ -17,8 +17,8 @@ from ui.views.client_detail_view import ClientDetailView
 class ClientTableView(BaseTableView):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.model_class = Client            # или Client, Policy и т.д.
-        self.form_class = ClientForm        # соответствующая форма
+        self.model_class = Client  # или Client, Policy и т.д.
+        self.form_class = ClientForm  # соответствующая форма
         self.form_class = ClientForm
         self.row_double_clicked.connect(self.open_detail)
         folder_btn = styled_button("📂 Папка", tooltip="Открыть папку клиента")
@@ -80,4 +80,3 @@ class ClientTableView(BaseTableView):
             return
         path = client.drive_folder_path or client.drive_folder_link
         open_folder(path, parent=self)
-

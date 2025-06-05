@@ -1,4 +1,12 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QCheckBox, QScrollArea
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLineEdit,
+    QCheckBox,
+    QScrollArea,
+)
 
 from services.policy_service import get_policies_page
 from ui.widgets.policy_card import PolicyCard
@@ -32,7 +40,9 @@ class PolicyView(QWidget):
         control_layout.addWidget(self.show_deleted_checkbox)
 
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Поиск по номеру полиса или имени клиента...")
+        self.search_input.setPlaceholderText(
+            "Поиск по номеру полиса или имени клиента..."
+        )
         self.search_input.textChanged.connect(self.reset_pagination)
         control_layout.addWidget(self.search_input)
 
@@ -62,7 +72,9 @@ class PolicyView(QWidget):
         search_text = self.search_input.text().strip().lower()
         show_deleted = self.show_deleted_checkbox.isChecked()
 
-        self.policies = get_policies_page(self.current_page, self.per_page, search_text, show_deleted)
+        self.policies = get_policies_page(
+            self.current_page, self.per_page, search_text, show_deleted
+        )
         self.render_policies()
         self.paginator.update_page(self.current_page)
 

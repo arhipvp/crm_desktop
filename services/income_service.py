@@ -3,13 +3,12 @@
 import logging
 
 logger = logging.getLogger(__name__)
-from datetime import date
 
 from database.models import Client, Income, Payment, Policy
 from services.payment_service import get_payment_by_id
-from services.task_service import add_task
 
 # ───────────────────────── базовые CRUD ─────────────────────────
+
 
 def get_all_incomes():
     """Вернуть все доходы без удалённых."""
@@ -19,8 +18,7 @@ def get_all_incomes():
 def get_pending_incomes():
     """Доходы, которые ещё не получены."""
     return Income.select().where(
-        (Income.is_deleted == False) &
-        (Income.received_date.is_null(True))
+        (Income.is_deleted == False) & (Income.received_date.is_null(True))
     )
 
 
@@ -39,14 +37,15 @@ def mark_income_deleted(income_id: int):
 
 
 def get_incomes_page(
-    page: int, per_page: int,
+    page: int,
+    per_page: int,
     order_by: str = "received_date",
     order_dir: str = "desc",
     search_text: str = "",
     show_deleted: bool = False,
     only_unreceived: bool = False,
     received_date_range=None,
-    **kwargs
+    **kwargs,
 ):
     """Получить страницу доходов по фильтрам.
 
@@ -68,7 +67,7 @@ def get_incomes_page(
         show_deleted=show_deleted,
         only_unreceived=only_unreceived,
         received_date_range=received_date_range,
-        **kwargs
+        **kwargs,
     )
     # --- сортировка ---
     # --- сортировка ---
@@ -82,10 +81,8 @@ def get_incomes_page(
     return query.limit(per_page).offset(offset)
 
 
-
-
-
 # ─────────────────────────── Добавление ───────────────────────────
+
 
 def add_income(**kwargs):
     """Создать запись дохода по платежу.
@@ -113,15 +110,10 @@ def add_income(**kwargs):
     }
 
     try:
-        income = Income.create(
-            payment=payment,
-            is_deleted=False,
-            **clean_data
-        )
+        income = Income.create(payment=payment, is_deleted=False, **clean_data)
     except Exception as e:
         logger.error("❌ Ошибка при создании дохода: %s", e)
         raise
-
 
     # Автоматическая задача
     # due_date = payment.payment_date or date.today()
@@ -136,6 +128,7 @@ def add_income(**kwargs):
 
 # ─────────────────────────── Обновление ───────────────────────────
 
+
 def update_income(income: Income, **kwargs):
     """Обновить запись дохода.
 
@@ -146,7 +139,13 @@ def update_income(income: Income, **kwargs):
     Returns:
         Income: Обновлённая запись дохода.
     """
-    allowed_fields = {"payment", "payment_id", "amount", "received_date", "commission_source"}
+    allowed_fields = {
+        "payment",
+        "payment_id",
+        "amount",
+        "received_date",
+        "commission_source",
+    }
 
     updates = {}
 
@@ -170,13 +169,20 @@ def update_income(income: Income, **kwargs):
     return income
 
 
-def apply_income_filters(query, search_text="", show_deleted=False, only_unreceived=False, received_date_range=None, deal_id=None):
+def apply_income_filters(
+    query,
+    search_text="",
+    show_deleted=False,
+    only_unreceived=False,
+    received_date_range=None,
+    deal_id=None,
+):
     if not show_deleted:
         query = query.where(Income.is_deleted == False)
     if search_text:
         query = query.where(
-            (Policy.policy_number.contains(search_text)) |
-            (Client.name.contains(search_text))
+            (Policy.policy_number.contains(search_text))
+            | (Client.name.contains(search_text))
         )
     if only_unreceived:
         query = query.where(Income.received_date.is_null(True))
@@ -196,17 +202,11 @@ def build_income_query(
     show_deleted: bool = False,
     only_unreceived: bool = False,
     received_date_range=None,
-    **kwargs
+    **kwargs,
 ):
     # JOIN Payment, Policy, Client
     query = (
-        Income
-        .select(
-            Income,
-            Payment,
-            Policy,
-            Client
-        )
+        Income.select(Income, Payment, Policy, Client)
         .join(Payment, on=(Income.payment == Payment.id))
         .switch(Payment)
         .join(Policy, on=(Payment.policy == Policy.id))
@@ -219,10 +219,10 @@ def build_income_query(
 
     if search_text:
         query = query.where(
-            (Policy.policy_number.contains(search_text)) |
-            (Client.name.contains(search_text))
+            (Policy.policy_number.contains(search_text))
+            | (Client.name.contains(search_text))
         )
-        
+
     if only_unreceived:
         query = query.where(Income.received_date.is_null(True))
     if received_date_range:
@@ -240,6 +240,7 @@ def build_income_query(
 
 def create_stub_income(deal_id: int | None = None) -> Income:
     from services.payment_service import get_all_payments
+
     payments = get_all_payments()
     if deal_id:
         payments = [p for p in payments if p.policy and p.policy.deal_id == deal_id]

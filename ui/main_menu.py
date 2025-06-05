@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QMenuBar, QMenu, QMessageBox, QFileDialog
+from PySide6.QtWidgets import QMenuBar, QMessageBox, QFileDialog
 from PySide6.QtGui import QAction, QKeySequence
 
 
@@ -20,11 +20,11 @@ class MainMenu(QMenuBar):
         refresh_action.setShortcut(QKeySequence("F5"))
         refresh_action.triggered.connect(self.on_refresh_triggered)
         file_menu.addAction(refresh_action)
-        
+
         import_policy_action = QAction("📥 Импорт полиса из JSON…", self)
         import_policy_action.triggered.connect(self.open_import_policy_json)
         file_menu.addAction(import_policy_action)
-        
+
         file_menu.addSeparator()
 
         exit_action = QAction("Выход", self)
@@ -44,7 +44,9 @@ class MainMenu(QMenuBar):
         help_menu.addAction(docs_action)
 
     def export_to_csv(self):
-        file_path, _ = QFileDialog.getSaveFileName(self, "Сохранить как CSV", "", "CSV Files (*.csv)")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Сохранить как CSV", "", "CSV Files (*.csv)"
+        )
         if file_path:
             QMessageBox.information(self, "Экспорт", f"Сюда будет экспорт: {file_path}")
             # 🔧 Здесь ты можешь вызвать свою функцию экспорта
@@ -56,7 +58,7 @@ class MainMenu(QMenuBar):
         QMessageBox.about(
             self,
             "О программе",
-            "CRM-десктоп\nВерсия 1.0\n\nРазработано специально для учёта клиентов, сделок и полисов.\nПодробнее смотрите в документации."
+            "CRM-десктоп\nВерсия 1.0\n\nРазработано специально для учёта клиентов, сделок и полисов.\nПодробнее смотрите в документации.",
         )
 
     def register_refresh_callback(self, func):
@@ -75,4 +77,5 @@ class MainMenu(QMenuBar):
 
     def open_docs(self):
         import webbrowser
+
         webbrowser.open_new_tab("https://example.com/docs")

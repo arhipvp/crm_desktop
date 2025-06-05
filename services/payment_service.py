@@ -1,19 +1,17 @@
-
 """Сервис управления платежами."""
 
 import logging
-from datetime import date
 
 from peewee import JOIN, ModelSelect  # обязательно
-from peewee import SQL, Case, fn
+from peewee import fn
 
 from database.models import Client, Expense, Income, Payment, Policy
-from services.task_service import add_task
 
 logger = logging.getLogger(__name__)
 
 
 # ───────────────────────── базовые CRUD ─────────────────────────
+
 
 def get_all_payments() -> ModelSelect:
     """Вернуть все платежи без удалённых.
@@ -66,7 +64,6 @@ def get_payments_by_client_id(client_id: int) -> ModelSelect:
     )
 
 
-
 def get_payments_page(
     page: int,
     per_page: int,
@@ -94,13 +91,10 @@ def get_payments_page(
         show_deleted=show_deleted,
         deal_id=deal_id,
         only_paid=only_paid,
-        **filters
+        **filters,
     )
     offset = (page - 1) * per_page
     return query.order_by(Payment.payment_date.asc()).offset(offset).limit(per_page)
-
-
-
 
 
 def mark_payment_deleted(payment_id: int):
@@ -115,6 +109,7 @@ def mark_payment_deleted(payment_id: int):
 
 # ─────────────────────────── Добавление ───────────────────────────
 
+
 def add_payment(**kwargs):
     """Создать платёж и связанные записи дохода и расхода.
 
@@ -125,9 +120,15 @@ def add_payment(**kwargs):
         Payment: Созданный платёж.
     """
     from services.income_service import add_income
-    policy = kwargs.get("policy") or Policy.get_or_none(Policy.id == kwargs.get("policy_id"))
+
+    policy = kwargs.get("policy") or Policy.get_or_none(
+        Policy.id == kwargs.get("policy_id")
+    )
     if not policy:
-        logger.warning("❌ Не удалось добавить платёж: не найден полис #%s", kwargs.get("policy_id"))
+        logger.warning(
+            "❌ Не удалось добавить платёж: не найден полис #%s",
+            kwargs.get("policy_id"),
+        )
         raise ValueError("Полис не найден")
 
     amount = kwargs.get("amount")
@@ -142,49 +143,51 @@ def add_payment(**kwargs):
         for field in allowed_fields
         if field in kwargs  # убрали фильтр по None
     }
-    payment = Payment.create(
-        policy=policy,
-        is_deleted=False,
-        **clean_data
+    payment = Payment.create(policy=policy, is_deleted=False, **clean_data)
+    logger.info(
+        "✅ Добавлен платёж #%s к полису #%s на сумму %.2f",
+        payment.id,
+        policy.policy_number,
+        payment.amount,
     )
-    logger.info("✅ Добавлен платёж #%s к полису #%s на сумму %.2f", payment.id, policy.policy_number, payment.amount)
     try:
         add_income(payment=payment, amount=payment.amount, policy=policy)
     except Exception as e:
         logger.error("❌ Ошибка при добавлении дохода: %s", e)
 
-    
     # Автоматическая выплата контрагенту
     from services.expense_service import add_expense
-    contractor = (policy.contractor or "").strip()      # строка из полиса
-    if contractor:                                      # есть значение → считаем контрагентом
+
+    contractor = (policy.contractor or "").strip()  # строка из полиса
+    if contractor:  # есть значение → считаем контрагентом
         try:
             add_expense(
                 payment=payment,
                 amount=0,
                 expense_type="контрагент",
-                note=f"выплата контрагенту {contractor}"
+                note=f"выплата контрагенту {contractor}",
             )
             logger.info(
                 "💸 Авто-расход контрагенту: платёж #%s ↔ полис #%s (%s)",
-                payment.id, policy.id, contractor
+                payment.id,
+                policy.id,
+                contractor,
             )
         except Exception as e:
             logger.error("❌ Ошибка при добавлении расхода: %s", e)
 
-
-    
     # Автоматическая задача
-#    add_task(
-#        title="проверить оплату",
-#        due_date=payment.payment_date,
-#        policy_id=policy.id
-#    )
+    #    add_task(
+    #        title="проверить оплату",
+    #        due_date=payment.payment_date,
+    #        policy_id=policy.id
+    #    )
 
     return payment
 
 
 # ─────────────────────────── Обновление ───────────────────────────
+
 
 def update_payment(payment: Payment, **kwargs) -> Payment:
     """Обновить поля платежа.
@@ -196,7 +199,13 @@ def update_payment(payment: Payment, **kwargs) -> Payment:
     Returns:
         Payment: Обновлённый платёж.
     """
-    allowed_fields = {"amount", "payment_date", "actual_payment_date", "policy", "policy_id"}
+    allowed_fields = {
+        "amount",
+        "payment_date",
+        "actual_payment_date",
+        "policy",
+        "policy_id",
+    }
 
     updates = {}
 
@@ -217,8 +226,13 @@ def update_payment(payment: Payment, **kwargs) -> Payment:
     return payment
 
 
-
-def apply_payment_filters(query: ModelSelect, search_text: str = "", show_deleted: bool = False, deal_id: int | None = None, only_paid: bool = False) -> ModelSelect:
+def apply_payment_filters(
+    query: ModelSelect,
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    only_paid: bool = False,
+) -> ModelSelect:
     """Фильтры для выборки платежей."""
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
@@ -226,15 +240,13 @@ def apply_payment_filters(query: ModelSelect, search_text: str = "", show_delete
         query = query.where(Payment.is_deleted == False)
     if search_text:
         query = query.where(
-            (Policy.policy_number.contains(search_text)) |
-            (Client.name.contains(search_text))
+            (Policy.policy_number.contains(search_text))
+            | (Client.name.contains(search_text))
         )
     if not only_paid:
         query = query.where(Payment.actual_payment_date.is_null(True))
 
-
     return query
-
 
 
 def build_payment_query(
@@ -245,21 +257,14 @@ def build_payment_query(
     **filters,
 ) -> ModelSelect:
     """Сконструировать базовый запрос платежей с агрегатами."""
-    income_subq = (Income
-        .select(fn.COUNT(Income.id))
-        .where(Income.payment == Payment.id)
+    income_subq = Income.select(fn.COUNT(Income.id)).where(Income.payment == Payment.id)
+    expense_subq = Expense.select(fn.COUNT(Expense.id)).where(
+        Expense.payment == Payment.id
     )
-    expense_subq = (Expense
-        .select(fn.COUNT(Expense.id))
-        .where(Expense.payment == Payment.id)
-    )
-
-
 
     # Сразу делаем JOIN к Policy и Client
     query = (
-        Payment
-        .select(
+        Payment.select(
             Payment,
             Payment.id,
             Payment.amount,
@@ -276,9 +281,8 @@ def build_payment_query(
     # Фильтрация по deal_id через Policy
     query = apply_payment_filters(query, search_text, show_deleted, deal_id, only_paid)
 
-
-
     return query
+
 
 def get_payments_by_deal_id(deal_id: int) -> ModelSelect:
     """Платежи, относящиеся к сделке.
@@ -290,13 +294,8 @@ def get_payments_by_deal_id(deal_id: int) -> ModelSelect:
         ModelSelect: Выборка платежей по сделке.
     """
     return (
-        Payment
-        .select()
+        Payment.select()
         .join(Policy)
-        .where(
-            (Policy.deal_id == deal_id) &
-            (Payment.is_deleted == False)
-        )
+        .where((Policy.deal_id == deal_id) & (Payment.is_deleted == False))
         .order_by(Payment.payment_date.asc())
     )
-

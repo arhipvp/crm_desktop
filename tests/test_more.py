@@ -40,7 +40,9 @@ def test_sanitize_and_extract():
 
 
 def test_create_policy_folder(drive_root, monkeypatch):
-    monkeypatch.setattr("services.folder_utils.GOOGLE_DRIVE_LOCAL_ROOT", str(drive_root))
+    monkeypatch.setattr(
+        "services.folder_utils.GOOGLE_DRIVE_LOCAL_ROOT", str(drive_root)
+    )
     path = create_policy_folder("Клиент", "POL123")
     assert path.startswith(str(drive_root))
     assert os.path.isdir(path)
@@ -53,14 +55,31 @@ def test_build_client_query_filters():
     assert [c.name for c in build_client_query()] == ["Иван"]
     all_names = {c.name for c in build_client_query(show_deleted=True)}
     assert all_names == {"Иван", "Джон"}
-    assert [c.name for c in build_client_query(search_text="Джон", show_deleted=True)] == ["Джон"]
+    assert [
+        c.name for c in build_client_query(search_text="Джон", show_deleted=True)
+    ] == ["Джон"]
 
 
 def test_next_prev_deal():
     client = add_client(name="Клиент")
-    d1 = add_deal(client_id=client.id, start_date=date(2025, 1, 1), description="A", reminder_date=date(2025, 1, 1))
-    d2 = add_deal(client_id=client.id, start_date=date(2025, 1, 2), description="B", reminder_date=date(2025, 1, 2))
-    d3 = add_deal(client_id=client.id, start_date=date(2025, 1, 3), description="C", reminder_date=date(2025, 1, 2))
+    d1 = add_deal(
+        client_id=client.id,
+        start_date=date(2025, 1, 1),
+        description="A",
+        reminder_date=date(2025, 1, 1),
+    )
+    d2 = add_deal(
+        client_id=client.id,
+        start_date=date(2025, 1, 2),
+        description="B",
+        reminder_date=date(2025, 1, 2),
+    )
+    d3 = add_deal(
+        client_id=client.id,
+        start_date=date(2025, 1, 3),
+        description="C",
+        reminder_date=date(2025, 1, 2),
+    )
     assert get_prev_deal(d1) is None
     assert get_next_deal(d1) == d2
     assert get_prev_deal(d3) == d2

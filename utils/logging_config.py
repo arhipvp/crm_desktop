@@ -1,4 +1,5 @@
 """Простая конфигурация логирования для приложений CRM."""
+
 import logging
 import os
 from logging.handlers import RotatingFileHandler
@@ -33,4 +34,3 @@ def setup_logging() -> None:
     )
 
     logging.getLogger().setLevel(logging.DEBUG)
-

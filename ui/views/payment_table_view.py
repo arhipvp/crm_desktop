@@ -4,9 +4,12 @@ logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Qt
 
-from database.models import Client, Payment
-from services.payment_service import (build_payment_query, get_payments_page,
-                                      mark_payment_deleted)
+from database.models import Payment
+from services.payment_service import (
+    build_payment_query,
+    get_payments_page,
+    mark_payment_deleted,
+)
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
@@ -26,7 +29,7 @@ class PaymentTableView(BaseTableView):
             model_class=Payment,
             checkbox_map=checkbox_map,
         )
-        self.model_class = Payment            # или Client, Policy и т.д.
+        self.model_class = Payment  # или Client, Policy и т.д.
         self.form_class = PaymentForm
         self.row_double_clicked.connect(self.open_detail)
         self.load_data()
@@ -41,8 +44,6 @@ class PaymentTableView(BaseTableView):
             filters["deal_id"] = self.deal_id
         return filters
 
-
-
     def load_data(self):
         # 1) читаем фильтры
         filters = self.get_filters()
@@ -51,7 +52,6 @@ class PaymentTableView(BaseTableView):
         logger.debug("📊 Фильтры платежей: %s", filters)
 
         items = get_payments_page(self.page, self.per_page, **filters)
-        
 
         total = build_payment_query(**filters).count()
 
@@ -60,15 +60,11 @@ class PaymentTableView(BaseTableView):
         # 3) обновляем модель и пагинатор через базовый метод
         self.set_model_class_and_items(Payment, list(items), total_count=total)
 
-        
-
     def get_selected(self):
         idx = self.table.currentIndex()
         if not idx.isValid():
             return None
         return self.model.get_item(idx.row())
-
-
 
     def add_new(self):
         form = PaymentForm()
@@ -99,8 +95,6 @@ class PaymentTableView(BaseTableView):
         else:
             dlg = PaymentDetailView(payment, parent=self)
             dlg.exec()
-
-
 
 
 class PaymentTableModel(BaseTableModel):
@@ -142,4 +136,3 @@ class PaymentTableModel(BaseTableModel):
             return self.headers[section]
         else:
             return self.virtual_fields[section - len(self.fields)].capitalize()
-

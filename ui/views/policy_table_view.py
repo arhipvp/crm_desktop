@@ -14,9 +14,6 @@ from ui.views.policy_detail_view import PolicyDetailView
 from ui.common.styled_widgets import styled_button
 
 
-
-
-
 class PolicyTableView(BaseTableView):
     def __init__(self, parent=None, deal_id=None, **kwargs):
         self.deal_id = deal_id
@@ -30,7 +27,7 @@ class PolicyTableView(BaseTableView):
         )
         self.table.setSortingEnabled(True)
         self.table.horizontalHeader().sectionClicked.connect(self.on_section_clicked)
-        #self.row_double_clicked.connect(self.open_detail)
+        # self.row_double_clicked.connect(self.open_detail)
         self.order_by = "start_date"
         self.order_dir = "asc"
         # кнопка «Полис продлен (без привязки)»
@@ -49,12 +46,6 @@ class PolicyTableView(BaseTableView):
         if getattr(self, "deal_id", None) is not None:
             filters["deal_id"] = self.deal_id
         return filters
-
-    
-    
-    
-    
-
 
     def load_data(self):
         # 1) читаем фильтры
@@ -79,7 +70,6 @@ class PolicyTableView(BaseTableView):
         if not idx.isValid():
             return None
         return self.model.get_item(idx.row())
-
 
     def add_new(self):
         form = PolicyForm()
@@ -119,11 +109,14 @@ class PolicyTableView(BaseTableView):
         if policy:
             dlg = PolicyDetailView(policy)
             dlg.exec()
+
     def on_section_clicked(self, logicalIndex):
         # Получаем имя поля по номеру колонки
-        field = self.model.fields[logicalIndex].name  # или self.model._fields[logicalIndex]
+        field = self.model.fields[
+            logicalIndex
+        ].name  # или self.model._fields[logicalIndex]
         if not hasattr(Policy, field):
-        # Например, если столбец виртуальный, сортировать не получится
+            # Например, если столбец виртуальный, сортировать не получится
             return
         # Определяем направление сортировки
         order = self.table.horizontalHeader().sortIndicatorOrder()

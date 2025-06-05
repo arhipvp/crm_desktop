@@ -1,11 +1,10 @@
 import os
-os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-import pytest
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 from PySide6.QtWidgets import QMessageBox
 
 from ui.main_window import MainWindow
-from ui.main_menu import MainMenu
 from ui.views.client_table_view import ClientTableView
 from ui.forms.client_form import ClientForm
 
@@ -24,11 +23,11 @@ def test_menu_refresh_trigger(qtbot):
     called = {}
 
     def refresh():
-        called['ok'] = True
+        called["ok"] = True
 
     window.menu_bar.register_refresh_callback(refresh)
     window.menu_bar.on_refresh_triggered()
-    assert called.get('ok')
+    assert called.get("ok")
 
 
 def test_menu_show_about(qtbot, monkeypatch):
@@ -37,12 +36,12 @@ def test_menu_show_about(qtbot, monkeypatch):
     captured = {}
 
     def fake_about(parent, title, text):
-        captured['title'] = title
-        captured['text'] = text
+        captured["title"] = title
+        captured["text"] = text
 
-    monkeypatch.setattr(QMessageBox, 'about', fake_about)
+    monkeypatch.setattr(QMessageBox, "about", fake_about)
     window.menu_bar.show_about()
-    assert 'CRM-десктоп' in captured['text']
+    assert "CRM-десктоп" in captured["text"]
 
 
 def test_add_new_client_form_called(qtbot, monkeypatch):
@@ -50,8 +49,8 @@ def test_add_new_client_form_called(qtbot, monkeypatch):
     qtbot.addWidget(view)
     called = {}
 
-    monkeypatch.setattr(ClientForm, 'exec', lambda self: True)
-    monkeypatch.setattr(view, 'refresh', lambda: called.setdefault('refreshed', True))
+    monkeypatch.setattr(ClientForm, "exec", lambda self: True)
+    monkeypatch.setattr(view, "refresh", lambda: called.setdefault("refreshed", True))
 
     view.add_new()
-    assert called.get('refreshed')
+    assert called.get("refreshed")

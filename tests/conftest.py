@@ -12,6 +12,7 @@ from database.models import Client, Deal, Income, Payment, Policy, Task, Expense
 
 TEST_DB = SqliteExtDatabase(":memory:")
 
+
 @pytest.fixture(autouse=True)
 def test_db():
     main_db.initialize(TEST_DB)
@@ -29,4 +30,3 @@ def drive_root(tmp_path, monkeypatch):
     path = tmp_path / "drive"
     monkeypatch.setenv("GOOGLE_DRIVE_LOCAL_ROOT", str(path))
     return path
-

@@ -4,19 +4,30 @@ Telegram‑бот для очереди задач CRM_desktop.
 Бот забирает токен из .env (том монтируется в контейнер).
 Теперь поддерживает приём документов и фотографий в ответ на сообщение сделки — файл сохраняется в папку сделки на диске.
 """
+
 from database.init import init_from_env
 
-import os, re, datetime as _dt, tempfile
+import os
+import re
+import datetime as _dt
+import tempfile
 import logging
 from dotenv import load_dotenv
 from pathlib import Path
 from telegram import (
-    InlineKeyboardButton, InlineKeyboardMarkup,
-    ForceReply, Update, constants,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ForceReply,
+    Update,
+    constants,
 )
 from telegram.ext import (
-    Application, CallbackQueryHandler, CommandHandler,
-    MessageHandler, ContextTypes, filters,
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
 )
 
 # ───────────── env ─────────────
@@ -31,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 # ───────────── imports из core ─────────────
 from services import task_service as ts
+
 
 # ───────────── helpers ─────────────
 def fmt_task(t: ts.Task) -> str:
@@ -66,20 +78,29 @@ def fmt_task(t: ts.Task) -> str:
 
     return "\n".join(lines)
 
+
 def kb_task(tid: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[ 
-        InlineKeyboardButton("✅ Выполнить", callback_data=f"done:{tid}"),
-        InlineKeyboardButton("💬 Ответить",  callback_data=f"reply:{tid}"),
-        InlineKeyboardButton("🔄 Вернуть",   callback_data=f"ret:{tid}"),
-    ]])
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ Выполнить", callback_data=f"done:{tid}"),
+                InlineKeyboardButton("💬 Ответить", callback_data=f"reply:{tid}"),
+                InlineKeyboardButton("🔄 Вернуть", callback_data=f"ret:{tid}"),
+            ]
+        ]
+    )
+
 
 # ───────────── handlers ─────────────
 async def h_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("📥 Получить задачу", callback_data="get")]])
+    kb = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("📥 Получить задачу", callback_data="get")]]
+    )
     await update.message.reply_text(
         "Привет! Я бот CRM. Нажми кнопку, чтобы взять следующую задачу.",
         reply_markup=kb,
     )
+
 
 async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -92,6 +113,7 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     msg = await q.message.reply_html(fmt_task(task), reply_markup=kb_task(task.id))
     ts.link_telegram(task.id, msg.chat_id, msg.message_id)
 
+
 async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
@@ -101,17 +123,22 @@ async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 
     if action == "done":
         ts.unassign_from_telegram(tid)
-        await q.message.edit_text("✅ Задача скрыта из очереди", parse_mode=constants.ParseMode.HTML)
+        await q.message.edit_text(
+            "✅ Задача скрыта из очереди", parse_mode=constants.ParseMode.HTML
+        )
 
     elif action == "ret":
         ts.return_to_queue(tid)
-        await q.message.edit_text("🔄 <i>Задача возвращена в очередь</i>", parse_mode=constants.ParseMode.HTML)
+        await q.message.edit_text(
+            "🔄 <i>Задача возвращена в очередь</i>", parse_mode=constants.ParseMode.HTML
+        )
 
     elif action == "reply":
         await q.message.reply_text(
             f"Напишите комментарий к задаче #{tid}:",
             reply_markup=ForceReply(selective=True),
         )
+
 
 async def h_text(update: Update, _ctx):
     if not update.message.reply_to_message:
@@ -123,6 +150,7 @@ async def h_text(update: Update, _ctx):
     stamp = _dt.datetime.now().strftime("%d.%m %H:%M")
     ts.append_note(tid, f"[TG {stamp}] {update.message.text}")
     await update.message.reply_text("Комментарий сохранён 👍")
+
 
 async def h_file(update: Update, _ctx):
     msg = update.message
@@ -156,6 +184,7 @@ async def h_file(update: Update, _ctx):
     os.replace(tmp_path, dest)
     await msg.reply_text("📂 Файл сохранён в папке сделки ✔️")
 
+
 # ───────────── main ─────────────
 def main() -> None:
     app = Application.builder().token(BOT_TOKEN).build()
@@ -168,6 +197,7 @@ def main() -> None:
 
     logger.info("Telegram‑бот запущен внутри контейнера…")
     app.run_polling(allowed_updates=["message", "callback_query"])
+
 
 if __name__ == "__main__":
     main()

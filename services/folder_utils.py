@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+
 # services/folder_utils.py
 import os
 import re
@@ -35,8 +36,6 @@ ROOT_FOLDER_ID = "1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm"  # ID папки в Google 
 GOOGLE_DRIVE_LOCAL_ROOT = os.getenv("GOOGLE_DRIVE_LOCAL_ROOT", r"G:\Мой диск\Клиенты")
 
 
-
-
 @lru_cache(maxsize=1)
 def get_drive_service():
     """Создать и закешировать сервис Google Drive.
@@ -49,15 +48,15 @@ def get_drive_service():
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     return build("drive", "v3", credentials=creds)
 
+
 def sanitize_name(name: str) -> str:
     """
     Очищает имя от недопустимых символов для файловой системы:
     Заменяет символы: < > : "  и пробельные/невидимые.
     """
-    import re
-    name = re.sub(r'[<>:"/\\|?*\n\r\t]', '_', name)  # заменяем все опасные символы
-    name = re.sub(r'\s{2,}', ' ', name).strip()      # схлопываем пробелы
-    return name.rstrip(' .')                         # убираем завершающие пробелы/точки
+    name = re.sub(r'[<>:"/\\|?*\n\r\t]', "_", name)  # заменяем все опасные символы
+    name = re.sub(r"\s{2,}", " ", name).strip()  # схлопываем пробелы
+    return name.rstrip(" .")  # убираем завершающие пробелы/точки
 
 
 def extract_folder_id(link: str) -> str:
@@ -65,12 +64,15 @@ def extract_folder_id(link: str) -> str:
         return None
     return link.rstrip("/").split("/")[-1]
 
+
 def create_drive_folder(folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> str:
     folder_name = sanitize_name(folder_name)
     service = get_drive_service()
 
     query = f"'{parent_id}' in parents and name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-    response = service.files().list(q=query, fields="files(id)", spaces='drive').execute()
+    response = (
+        service.files().list(q=query, fields="files(id)", spaces="drive").execute()
+    )
     files = response.get("files", [])
 
     if files:
@@ -80,11 +82,12 @@ def create_drive_folder(folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> st
     metadata = {
         "name": folder_name,
         "mimeType": "application/vnd.google-apps.folder",
-        "parents": [parent_id]
+        "parents": [parent_id],
     }
 
     folder = service.files().create(body=metadata, fields="id").execute()
     return f"https://drive.google.com/drive/folders/{folder['id']}"
+
 
 def create_client_drive_folder(client_name: str) -> tuple[str, str]:
     """Создать локальную папку клиента и вернуть (локальный путь, веб-ссылку)."""
@@ -120,7 +123,9 @@ def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
         # Если есть локальная папка клиента
         for sub in os.listdir(client_path):
             sub_path = os.path.join(client_path, sub)
-            if os.path.isdir(sub_path) and (sub == folder_name or sub.endswith(folder_name)):
+            if os.path.isdir(sub_path) and (
+                sub == folder_name or sub.endswith(folder_name)
+            ):
                 logger.debug(">>> [match] found subfolder: %s", sub_path)
                 os.startfile(sub_path)
                 return
@@ -135,15 +140,16 @@ def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
         logger.info(">>> [fallback] opening web link: %s", folder_link)
         webbrowser.open(folder_link)
     else:
-        QMessageBox.warning(parent, "Ошибка", f"Не удалось найти папку клиента: {folder_name}")
-
+        QMessageBox.warning(
+            parent, "Ошибка", f"Не удалось найти папку клиента: {folder_name}"
+        )
 
 
 def create_deal_folder(
     client_name: str,
     deal_description: str,
     *,
-    client_drive_link: str | None,          # ← ссылка на ПАПКУ КЛИЕНТА
+    client_drive_link: str | None,  # ← ссылка на ПАПКУ КЛИЕНТА
 ) -> Tuple[str, Optional[str]]:
     """
     Создаёт папку сделки на диске и (если есть client_drive_link)
@@ -154,7 +160,7 @@ def create_deal_folder(
     (local_path, web_link or None)
     """
     # -------- название папки сделки
-    deal_name   = sanitize_name(f"Сделка - {deal_description}")
+    deal_name = sanitize_name(f"Сделка - {deal_description}")
 
     # -------- локальный путь  G:\…\Клиенты\<Клиент>\Сделка - …
     local_path = os.path.join(
@@ -169,8 +175,8 @@ def create_deal_folder(
     web_link: Optional[str] = None
     if client_drive_link:
         try:
-            parent_id = extract_folder_id(client_drive_link)       # ID папки клиента
-            web_link  = create_drive_folder(deal_name, parent_id)  # подпапка сделки
+            parent_id = extract_folder_id(client_drive_link)  # ID папки клиента
+            web_link = create_drive_folder(deal_name, parent_id)  # подпапка сделки
             logger.info("☁️  Drive-папка сделки: %s", web_link)
         except Exception:
             logger.exception("Не удалось создать подпапку сделки на Drive")
@@ -178,15 +184,18 @@ def create_deal_folder(
     return local_path, web_link
 
 
-
-def create_policy_folder(client_name: str, policy_number: str, deal_description: str = None) -> str:
+def create_policy_folder(
+    client_name: str, policy_number: str, deal_description: str = None
+) -> str:
     """Создать папку для полиса внутри клиента или сделки."""
     client_name = sanitize_name(client_name)
     policy_name = sanitize_name(f"Полис - {policy_number}")
 
     if deal_description:
         deal_name = sanitize_name(f"Сделка - {deal_description}")
-        path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, client_name, deal_name, policy_name)
+        path = os.path.join(
+            GOOGLE_DRIVE_LOCAL_ROOT, client_name, deal_name, policy_name
+        )
     else:
         path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, client_name, policy_name)
 
@@ -198,6 +207,7 @@ def create_policy_folder(client_name: str, policy_number: str, deal_description:
 
         return None
 
+
 def upload_to_drive(local_path: str, drive_folder_id: str) -> str:
     """
     Загружает файл на Google Drive и возвращает ссылку.
@@ -206,20 +216,18 @@ def upload_to_drive(local_path: str, drive_folder_id: str) -> str:
 
     service = get_drive_service()  # ← вместо get_gdrive_credentials
 
-    file_metadata = {
-        "name": os.path.basename(local_path),
-        "parents": [drive_folder_id]
-    }
+    file_metadata = {"name": os.path.basename(local_path), "parents": [drive_folder_id]}
     media = MediaFileUpload(local_path, resumable=True)
 
-    uploaded = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id, webViewLink"
-    ).execute()
+    uploaded = (
+        service.files()
+        .create(body=file_metadata, media_body=media, fields="id, webViewLink")
+        .execute()
+    )
 
-    logger.info("☁️ Загружен: %s", uploaded['webViewLink'])
+    logger.info("☁️ Загружен: %s", uploaded["webViewLink"])
     return uploaded["webViewLink"]
+
 
 def open_folder(path_or_url: str, *, parent: Optional["QWidget"] = None) -> None:  # noqa: N802 (keep API)
     """Пытается открыть строку как локальный путь, иначе — как URL.
@@ -253,6 +261,7 @@ def open_folder(path_or_url: str, *, parent: Optional["QWidget"] = None) -> None
 
     # иначе трактуем как URL
     webbrowser.open(path_or_url)
+
 
 def _msg(text: str, parent: Optional["QWidget"]) -> None:
     """Показывает информационное QMessageBox, если Qt доступен."""
@@ -291,11 +300,10 @@ def rename_client_folder(old_name: str, new_name: str, drive_link: str | None):
             service.files().update(
                 fileId=file_id,
                 body={"name": new_name},
-                fields="id"          # ничего лишнего не запрашиваем
+                fields="id",  # ничего лишнего не запрашиваем
             ).execute()
             # ссылка вида .../folders/<id> остаётся валидной → можно вернуть как есть
         except Exception:
             logger.exception("Не удалось переименовать папку клиента на Drive")
 
     return new_path, drive_link
-

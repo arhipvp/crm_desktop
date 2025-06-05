@@ -14,10 +14,12 @@ from dotenv import load_dotenv
 from peewee import PostgresqlDatabase
 
 from database.db import db
-from database.models import (Client, Deal, Expense, Income, Payment, Policy,
-                             Task)
-from services.folder_utils import (create_drive_folder, extract_folder_id,
-                                   upload_to_drive)
+from database.models import Client, Deal, Expense, Income, Payment, Policy, Task
+from services.folder_utils import (
+    create_drive_folder,
+    extract_folder_id,
+    upload_to_drive,
+)
 from utils.logging_config import setup_logging
 
 # ───────────── setup ─────────────
@@ -38,43 +40,48 @@ logger.info("📦 SQL-дамп через docker exec…")
 
 pg_container = "crm_db"
 pg_user = os.getenv("POSTGRES_USER", "crm_user")
-pg_db   = os.getenv("POSTGRES_DB", "crm")
+pg_db = os.getenv("POSTGRES_DB", "crm")
 
 # Инициализация Proxy
 url = urllib.parse.urlparse(DATABASE_URL)
-db.initialize(PostgresqlDatabase(
-    database=url.path[1:],
-    user=url.username,
-    password=url.password,
-    host=url.hostname,
-    port=url.port or 5432
-    ))
+db.initialize(
+    PostgresqlDatabase(
+        database=url.path[1:],
+        user=url.username,
+        password=url.password,
+        host=url.hostname,
+        port=url.port or 5432,
+    )
+)
 
 try:
     with open(SQL_PATH, "w", encoding="utf-8") as f:
-        subprocess.run([
-            "docker", "exec", pg_container,
-            "pg_dump", "-U", pg_user, "-d", pg_db
-        ], stdout=f, check=True)
-    logger.info(f"✅ SQL-дамп сохранён: {SQL_PATH}")   
-except Exception as e:
+        subprocess.run(
+            ["docker", "exec", pg_container, "pg_dump", "-U", pg_user, "-d", pg_db],
+            stdout=f,
+            check=True,
+        )
+    logger.info(f"✅ SQL-дамп сохранён: {SQL_PATH}")
+except Exception:
     logger.exception("⚠️ Не удалось создать SQL-дамп")
 
 # ───────────── Excel ─────────────
 logger.info("📊 Excel-файл…")
 
+
 def peewee_to_df(model):
     return pd.DataFrame([m.__data__ for m in model.select()])
 
+
 with db.connection_context():
     sheets = {
-        "clients":  peewee_to_df(Client),
-        "deals":    peewee_to_df(Deal),
+        "clients": peewee_to_df(Client),
+        "deals": peewee_to_df(Deal),
         "policies": peewee_to_df(Policy),
         "payments": peewee_to_df(Payment),
-        "incomes":  peewee_to_df(Income),
+        "incomes": peewee_to_df(Income),
         "expenses": peewee_to_df(Expense),
-        "tasks":    peewee_to_df(Task),
+        "tasks": peewee_to_df(Task),
     }
 
 with pd.ExcelWriter(XLSX_PATH, engine="openpyxl") as writer:

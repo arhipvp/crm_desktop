@@ -8,16 +8,17 @@ Fixed imports so they match PySide6 modules:
  • QStyle, QToolButton → QtWidgets
 """
 
-from datetime import date, datetime
+from datetime import date
 
-from PySide6.QtCore import QDate, QRegularExpression, Qt
-from PySide6.QtGui import QKeyEvent, QRegularExpressionValidator
+from PySide6.QtCore import QDate, Qt
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QDateEdit, QLineEdit, QStyle, QToolButton
 
 # --- existing util functions (stubs, keep original implementation) ---
 
-def is_date_empty(d):
-    ...
+
+def is_date_empty(d): ...
+
 
 def get_date_or_none(widget: QDateEdit):
     qd = widget.date()
@@ -26,19 +27,20 @@ def get_date_or_none(widget: QDateEdit):
     return qd.toPython()
 
 
-def set_optional_date(widget, d):
-    ...
+def set_optional_date(widget, d): ...
 
-def format_date(d):
-    ...
 
-class DateLineEdit(QLineEdit):
-    ...
+def format_date(d): ...
 
-class TypableDateEdit(QDateEdit):
-    ...
+
+class DateLineEdit(QLineEdit): ...
+
+
+class TypableDateEdit(QDateEdit): ...
+
 
 # ---------------------------------------------------------------------
+
 
 class OptionalDateEdit(QDateEdit):
     """QDateEdit that allows clearing to None."""
@@ -86,7 +88,9 @@ class OptionalDateEdit(QDateEdit):
         else:
             super().keyPressEvent(e)
 
+
 # --- NEW: Add universal date helper here ---
+
 
 def add_year_minus_one_day(qdate: QDate) -> QDate:
     """
@@ -96,6 +100,7 @@ def add_year_minus_one_day(qdate: QDate) -> QDate:
     if not qdate or not qdate.isValid():
         return QDate()
     return qdate.addYears(1).addDays(-1)
+
 
 __all__ = [
     "is_date_empty",
@@ -109,13 +114,13 @@ __all__ = [
 ]
 
 
-
 def parse_date_str(text: str) -> QDate:
     """Парсит строку dd.mm.yyyy в QDate. Невалидная строка → QDate()."""
     try:
         return QDate.fromString(text.strip(), "dd.MM.yyyy")
     except Exception:
         return QDate()
+
 
 def to_qdate(d: date | None) -> QDate:
     """Преобразует date в QDate или возвращает пустую QDate()."""

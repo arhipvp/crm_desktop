@@ -1,7 +1,7 @@
 from ui.base.base_detail_view import BaseDetailView
 from database.models import Income
 
-from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout
+from PySide6.QtWidgets import QHBoxLayout
 from ui.common.styled_widgets import styled_button
 
 
@@ -22,5 +22,6 @@ class IncomeDetailView(BaseDetailView):
 
     def _open_payment(self):
         from ui.views.payment_detail_view import PaymentDetailView
+
         dlg = PaymentDetailView(self.instance.payment, parent=self)
         dlg.exec()

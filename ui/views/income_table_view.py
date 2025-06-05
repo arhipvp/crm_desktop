@@ -2,17 +2,22 @@ from peewee import prefetch
 from PySide6.QtCore import Qt
 
 from database.models import Client, Income, Payment, Policy
-from services.income_service import (build_income_query, get_incomes_page,
-                                     mark_income_deleted)
+from services.income_service import build_income_query, mark_income_deleted
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.income_form import IncomeForm
-from ui.views.income_detail_view import IncomeDetailView
 
 
 class IncomeTableModel(BaseTableModel):
-    VIRTUAL_FIELDS = ["payment_info", "deal_desc", "client_name", "contractor", "amount", "received"]
+    VIRTUAL_FIELDS = [
+        "payment_info",
+        "deal_desc",
+        "client_name",
+        "contractor",
+        "amount",
+        "received",
+    ]
 
     def __init__(self, objects, model_class, parent=None):
         super().__init__(objects, model_class, parent)
@@ -20,7 +25,6 @@ class IncomeTableModel(BaseTableModel):
 
         self.virtual_fields = self.VIRTUAL_FIELDS
         self.headers = ["Полис", "Клиент", "Сумма комиссии", "Дата получения"]
-
 
     def columnCount(self, parent=None):
         return len(self.headers)
@@ -45,6 +49,7 @@ class IncomeTableModel(BaseTableModel):
             return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
         elif col == 3:
             return obj.received_date.strftime("%d.%m.%Y") if obj.received_date else "—"
+
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if role != Qt.DisplayRole or orientation != Qt.Horizontal:
             return None
@@ -53,13 +58,18 @@ class IncomeTableModel(BaseTableModel):
         return super().headerData(section, orientation, role)
 
 
-
 class IncomeTableView(BaseTableView):
     def __init__(self, parent=None, deal_id=None):
         checkbox_map = {
             "Показывать выплаченные": self.load_data,
         }
-        super().__init__(parent=parent, model_class=Income, form_class=IncomeForm, entity_name="Доход", checkbox_map=checkbox_map)
+        super().__init__(
+            parent=parent,
+            model_class=Income,
+            form_class=IncomeForm,
+            entity_name="Доход",
+            checkbox_map=checkbox_map,
+        )
         self.deal_id = deal_id
         self.default_sort_column = 6
         self.default_sort_order = Qt.DescendingOrder
@@ -74,8 +84,9 @@ class IncomeTableView(BaseTableView):
         filters = {
             "search_text": self.filter_controls.get_search_text(),
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "only_unreceived": not self.filter_controls.is_checked("Показывать выплаченные"),
-
+            "only_unreceived": not self.filter_controls.is_checked(
+                "Показывать выплаченные"
+            ),
         }
         if self.deal_id:
             filters["deal_id"] = self.deal_id
@@ -91,7 +102,6 @@ class IncomeTableView(BaseTableView):
 
     def load_data(self):
         filters = self.get_filters()  # используем метод подкласса
-        
 
         query = build_income_query(**filters)
         page_query = query.paginate(self.page, self.per_page)
@@ -99,8 +109,6 @@ class IncomeTableView(BaseTableView):
         total = query.count()
 
         self.set_model_class_and_items(self.model_class, items, total_count=total)
-
-
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         self.model = IncomeTableModel(items, model_class)
@@ -151,7 +159,9 @@ class IncomeTableView(BaseTableView):
     def on_sort_requested(self, column):
         if column == self.current_sort_column:
             self.current_sort_order = (
-                Qt.DescendingOrder if self.current_sort_order == Qt.AscendingOrder else Qt.AscendingOrder
+                Qt.DescendingOrder
+                if self.current_sort_order == Qt.AscendingOrder
+                else Qt.AscendingOrder
             )
         else:
             self.current_sort_column = column

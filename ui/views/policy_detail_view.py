@@ -19,8 +19,8 @@ from PySide6.QtWidgets import (
 from database.models import Expense, Income, Payment, Policy
 from services.folder_utils import open_folder
 from services.payment_service import get_payments_by_policy_id
-from services.income_service import get_incomes_page, build_income_query
-from services.expense_service import get_expenses_page, build_expense_query
+from services.income_service import build_income_query
+from services.expense_service import build_expense_query
 from ui.base.base_table_model import BaseTableModel
 from ui.common.date_utils import format_date
 from ui.common.styled_widgets import styled_button
@@ -68,8 +68,14 @@ class PolicyDetailView(QDialog):
         """Короткая статистика сверху окна."""
         kpi = QHBoxLayout()
         cnt_payments = get_payments_by_policy_id(self.instance.id).count()
-        cnt_incomes = build_income_query().where(Income.payment.policy == self.instance.id).count()
-        cnt_expenses = build_expense_query().where(Expense.policy == self.instance.id).count()
+        cnt_incomes = (
+            build_income_query()
+            .where(Income.payment.policy == self.instance.id)
+            .count()
+        )
+        cnt_expenses = (
+            build_expense_query().where(Expense.policy == self.instance.id).count()
+        )
         kpi.addWidget(QLabel(f"Платежей: <b>{cnt_payments}</b>"))
         kpi.addWidget(QLabel(f"Доходов: <b>{cnt_incomes}</b>"))
         kpi.addWidget(QLabel(f"Расходов: <b>{cnt_expenses}</b>"))
@@ -99,7 +105,9 @@ class PolicyDetailView(QDialog):
         # ——— Платежи ————————————————————————————
         pay_tab = QWidget()
         pay_l = QVBoxLayout(pay_tab)
-        btn_add_payment = styled_button("➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+N")
+        btn_add_payment = styled_button(
+            "➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+N"
+        )
         btn_add_payment.clicked.connect(self._on_add_payment)
         pay_l.addWidget(btn_add_payment, alignment=Qt.AlignLeft)
         payments = list(get_payments_by_policy_id(self.instance.id))
@@ -109,7 +117,9 @@ class PolicyDetailView(QDialog):
         # ——— Доходы ————————————————————————————
         inc_tab = QWidget()
         inc_l = QVBoxLayout(inc_tab)
-        incomes = list(build_income_query().where(Income.payment.policy == self.instance.id))
+        incomes = list(
+            build_income_query().where(Income.payment.policy == self.instance.id)
+        )
         inc_l.addWidget(self._make_subtable(incomes, Income, IncomeDetailView))
         self.tabs.addTab(inc_tab, "Доходы")
 
@@ -142,8 +152,6 @@ class PolicyDetailView(QDialog):
             self._init_kpi_panel()
             self._init_tabs()
 
-
-    
     def _on_add_payment(self):
         form = PaymentForm(parent=self, forced_policy=self.instance)
         if form.exec():

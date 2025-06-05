@@ -1,14 +1,12 @@
 # ui/common/filter_controls.py
 
 from datetime import date
-from typing import Optional
 
 from PySide6.QtCore import QDate
-from PySide6.QtWidgets import (QDateEdit, QHBoxLayout, QLabel, QPushButton,
-                               QWidget)
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 from ui.common.checkbox_filters import CheckboxFilters
-from ui.common.date_utils import OptionalDateEdit, TypableDateEdit
+from ui.common.date_utils import OptionalDateEdit
 from ui.common.search_box import SearchBox
 
 
@@ -35,6 +33,7 @@ class FilterControls(QWidget):
     parent : QWidget, optional
         Родительский виджет.
     """
+
     def __init__(
         self,
         search_callback,
@@ -118,7 +117,7 @@ class FilterControls(QWidget):
             if d1 or d2:
                 return {self._date_filter_field: (d1, d2)}
         return None
-    
+
     def add_extra_widgets(self, widgets: list[tuple[str, QWidget]]):
         """
         Добавляет дополнительные виджеты в строку фильтров.

@@ -1,16 +1,13 @@
 from PySide6.QtWidgets import QPushButton
 from PySide6.QtGui import QKeySequence
 
+
 def styled_button(
-    label: str,
-    icon: str = "",
-    tooltip: str = "",
-    shortcut: str = "",
-    role: str = None
+    label: str, icon: str = "", tooltip: str = "", shortcut: str = "", role: str = None
 ) -> QPushButton:
     """
     Создаёт стилизованную кнопку с иконкой, подсказкой и шорткатом.
-    
+
     Parameters
     ----------
     label : str

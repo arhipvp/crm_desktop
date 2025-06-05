@@ -1,5 +1,12 @@
-from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPushButton, QVBoxLayout)
+from PySide6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+)
 
 from database.models import Client
 from services.validators import normalize_phone
@@ -7,14 +14,12 @@ from services.validators import normalize_phone
 
 class ClientImportDialog(QDialog):
     def __init__(self, suggested_name="", suggested_phone="", parent=None):
-
         super().__init__(parent)
         self.setWindowTitle("Выбор или создание клиента")
         self.setMinimumWidth(400)
 
         self.name_edit = QLineEdit(suggested_name)
         self.phone_edit = QLineEdit(suggested_phone)
-    
 
         self.phone_edit.setPlaceholderText("Введите номер телефона")
 
@@ -51,11 +56,12 @@ class ClientImportDialog(QDialog):
             QMessageBox.warning(self, "Ошибка", "ФИО и телефон обязательны")
             return
 
-        self.client, created = Client.get_or_create(name=name, defaults={"phone": phone})
+        self.client, created = Client.get_or_create(
+            name=name, defaults={"phone": phone}
+        )
 
         if not created and not self.client.phone and phone:
             self.client.phone = phone
             self.client.save()
 
         self.accept()
-

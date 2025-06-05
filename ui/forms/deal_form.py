@@ -13,7 +13,9 @@ class DealForm(BaseEditForm):
     EXTRA_HIDDEN = {"is_closed", "closed_reason"}
 
     def __init__(self, deal=None, parent=None):
-        super().__init__(instance=deal, model_class=Deal, entity_name="сделку", parent=parent)
+        super().__init__(
+            instance=deal, model_class=Deal, entity_name="сделку", parent=parent
+        )
 
     def build_custom_fields(self):
         # Клиент: комбобокс с поиском
@@ -27,8 +29,6 @@ class DealForm(BaseEditForm):
             w = self.fields.pop(fld, None)
             if isinstance(w, QWidget):
                 w.hide()
-
-
 
     def collect_data(self):
         data = super().collect_data()
@@ -48,13 +48,14 @@ class DealForm(BaseEditForm):
         # Проверим, что клиент выбран
         if not data.get("client_id"):
             raise ValueError("Нужно выбрать клиента")
-        
 
         reminder = data.get("reminder_date")
         if reminder:
             delta = abs(reminder - date.today())
             if delta > timedelta(days=31):
-                if not confirm(f"Дата напоминания отличается от текущей более чем на месяц.\nУстановить {reminder:%d.%m.%Y}?"):
+                if not confirm(
+                    f"Дата напоминания отличается от текущей более чем на месяц.\nУстановить {reminder:%d.%m.%Y}?"
+                ):
                     return None
         if self.instance:
             if all(getattr(self.instance, k) == v for k, v in data.items()):
@@ -66,5 +67,3 @@ class DealForm(BaseEditForm):
             data["is_closed"] = False
             self.instance = add_deal(**data)
             return self.instance
-
-    

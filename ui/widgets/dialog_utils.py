@@ -1,5 +1,5 @@
-
 from PySide6.QtWidgets import QDialog, QVBoxLayout
+
 
 def open_edit_dialog(form_widget):
     dlg = QDialog()

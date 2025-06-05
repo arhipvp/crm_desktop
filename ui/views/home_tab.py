@@ -37,21 +37,23 @@ class HomeTab(QWidget):
         self.tg_tasks_label.setTextFormat(Qt.RichText)
         layout.addWidget(self.tg_tasks_label)
 
-        self.upcoming_tasks_label = QLabel('<b>Ближайшие 10 задач</b>')
+        self.upcoming_tasks_label = QLabel("<b>Ближайшие 10 задач</b>")
         self.upcoming_tasks_label.setTextFormat(Qt.RichText)
         layout.addWidget(self.upcoming_tasks_label)
         self.upcoming_tasks_list = QListWidget()
         layout.addWidget(self.upcoming_tasks_list)
         self.upcoming_tasks_list.itemDoubleClicked.connect(self.open_task_detail)
 
-        self.expiring_policies_label = QLabel('<b>Ближайшие 10 заканчивающихся полисов</b>')
+        self.expiring_policies_label = QLabel(
+            "<b>Ближайшие 10 заканчивающихся полисов</b>"
+        )
         self.expiring_policies_label.setTextFormat(Qt.RichText)
         layout.addWidget(self.expiring_policies_label)
         self.expiring_policies_list = QListWidget()
         layout.addWidget(self.expiring_policies_list)
         self.expiring_policies_list.itemDoubleClicked.connect(self.open_policy_detail)
 
-        self.deal_reminders_label = QLabel('<b>Ближайшие 10 напоминаний по сделкам</b>')
+        self.deal_reminders_label = QLabel("<b>Ближайшие 10 напоминаний по сделкам</b>")
         self.deal_reminders_label.setTextFormat(Qt.RichText)
         layout.addWidget(self.deal_reminders_label)
         self.deal_reminders_list = QListWidget()
@@ -72,9 +74,7 @@ class HomeTab(QWidget):
         self.info_label.setText(html)
 
         tg_count = count_assistant_tasks()
-        self.tg_tasks_label.setText(
-            f"Задач в работе у помощника: <b>{tg_count}</b>"
-        )
+        self.tg_tasks_label.setText(f"Задач в работе у помощника: <b>{tg_count}</b>")
 
         self.upcoming_tasks_list.clear()
         tasks = get_upcoming_tasks()
@@ -82,7 +82,7 @@ class HomeTab(QWidget):
             note = (t.note or "").strip()
             short_note = note[:30] + ("…" if len(note) > 30 else "") if note else ""
             parts = [
-                t.due_date.strftime('%d.%m.%Y'),
+                t.due_date.strftime("%d.%m.%Y"),
                 t.title,
                 short_note,
             ]
@@ -108,7 +108,7 @@ class HomeTab(QWidget):
             note = (p.note or "").strip()
             short_note = note[:30] + ("…" if len(note) > 30 else "") if note else ""
             parts = [
-                p.end_date.strftime('%d.%m.%Y') if p.end_date else '',
+                p.end_date.strftime("%d.%m.%Y") if p.end_date else "",
                 p.policy_number,
                 short_note,
             ]
@@ -128,7 +128,7 @@ class HomeTab(QWidget):
         deals = get_upcoming_deal_reminders()
         for d in deals:
             parts = [
-                d.reminder_date.strftime('%d.%m.%Y') if d.reminder_date else '',
+                d.reminder_date.strftime("%d.%m.%Y") if d.reminder_date else "",
                 d.description,
             ]
             if d.client_id:

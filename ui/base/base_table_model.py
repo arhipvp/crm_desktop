@@ -10,18 +10,17 @@ from ui.common.ru_headers import RU_HEADERS
 
 HIDDEN_FIELDS = {"id", "is_deleted", "drive_folder_path", "link_to_drive", "deleted_at"}
 
+
 class BaseTableModel(QAbstractTableModel):
-
-
     def __init__(self, objects: list, model_class, parent=None):
         super().__init__(parent)
         self.objects = objects
         self.model_class = model_class
         self.fields = [
-            f for f in self.model_class._meta.sorted_fields
+            f
+            for f in self.model_class._meta.sorted_fields
             if f.name not in HIDDEN_FIELDS
         ]
-
 
         self.headers = [f.name for f in self.fields]
 
@@ -30,7 +29,6 @@ class BaseTableModel(QAbstractTableModel):
 
     def columnCount(self, parent=None):
         return len(self.fields)
-
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if role != Qt.DisplayRole:
@@ -41,7 +39,6 @@ class BaseTableModel(QAbstractTableModel):
                 field = self.fields[section]
                 return RU_HEADERS.get(field.name, field.name)
         return super().headerData(section, orientation, role)
-
 
     def get_item(self, row):
         return self.objects[row]
@@ -56,9 +53,11 @@ class BaseTableModel(QAbstractTableModel):
             value = getattr(obj, field.name)
         except Exception as e:
             import logging
-            logging.getLogger(__name__).warning(f"⚠️ Ошибка при доступе к {field.name} у объекта {obj}: {e}")
-            value = None
 
+            logging.getLogger(__name__).warning(
+                f"⚠️ Ошибка при доступе к {field.name} у объекта {obj}: {e}"
+            )
+            value = None
 
         # ─── роль сортировки ───────────────────────────
         if role == Qt.UserRole:
@@ -74,15 +73,17 @@ class BaseTableModel(QAbstractTableModel):
             if isinstance(value, (datetime.date, datetime.datetime)):
                 return self.format_date(value)
 
-            if isinstance(value, (int, float)) and field.name in {"amount", "sum", "price"}:
+            if isinstance(value, (int, float)) and field.name in {
+                "amount",
+                "sum",
+                "price",
+            }:
                 return self.format_money(value)
 
             if isinstance(value, str) and len(value) > 40:
                 return self.shorten_text(value)
 
-
             return "—" if value is None else str(value)
-
 
         # ─── подсказка при наведении ───────────────────
         if role == Qt.ToolTipRole and isinstance(value, str) and len(value) > 40:
@@ -94,7 +95,7 @@ class BaseTableModel(QAbstractTableModel):
                 return Qt.AlignRight | Qt.AlignVCenter
 
         return None
-    
+
     def format_money(self, value):
         return f"{value:,.2f} ₽".replace(",", " ").replace(".00", ",00")
 
@@ -122,7 +123,7 @@ class BaseTableModel(QAbstractTableModel):
             self.dataChanged.emit(index, index, [Qt.DisplayRole])
             return True
         except Exception as e:
-            logger.error("❌ Ошибка сохранения %s.%s: %s", type(obj).__name__, field.name, e)
+            logger.error(
+                "❌ Ошибка сохранения %s.%s: %s", type(obj).__name__, field.name, e
+            )
             return False
-
-    
