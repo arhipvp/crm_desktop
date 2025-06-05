@@ -49,15 +49,24 @@ def get_policy_by_number(policy_number: str):
 
 
 def get_policies_page(
-    page, per_page, search_text="", show_deleted=False, deal_id=None, client_id=None,
-    order_by="start_date", order_dir="asc", **filters
+    page,
+    per_page,
+    search_text="",
+    show_deleted=False,
+    deal_id=None,
+    client_id=None,
+    order_by="start_date",
+    order_dir="asc",
+    include_renewed=True,
+    **filters,
 ):
     query = build_policy_query(
         search_text=search_text,
         show_deleted=show_deleted,
         deal_id=deal_id,
         client_id=client_id,
-        **filters
+        include_renewed=include_renewed,
+        **filters,
     )
     # Выбираем поле сортировки
     if hasattr(Policy, order_by):
@@ -83,6 +92,17 @@ def mark_policy_deleted(policy_id: int):
         policy.save()
     else:
         logger.warning("❗ Полис с id=%s не найден для удаления", policy_id)
+
+
+def mark_policy_renewed(policy_id: int):
+    """Пометить полис как продлённый без привязки к новому."""
+    policy = Policy.get_or_none(Policy.id == policy_id)
+    if policy:
+        policy.renewed_to = True
+        policy.save()
+        logger.info("🔁 Полис %s помечен продлённым", policy_id)
+    else:
+        logger.warning("❗ Полис с id=%s не найден для продления", policy_id)
 
 
 # ─────────────────────────── Добавление ───────────────────────────
@@ -275,13 +295,22 @@ def prolong_policy(original_policy: Policy) -> Policy:
     return new_policy
 
 
-def apply_policy_filters(query, search_text="", show_deleted=False, deal_id=None, client_id=None):
+def apply_policy_filters(
+    query,
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    client_id: int | None = None,
+    include_renewed: bool = True,
+):
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
     if client_id is not None:
         query = query.where(Policy.client == client_id)
     if not show_deleted:
         query = query.where(Policy.is_deleted == False)
+    if not include_renewed:
+        query = query.where((Policy.renewed_to.is_null(True)) | (Policy.renewed_to == ""))
     if search_text:
         query = query.where(
             (Policy.policy_number.contains(search_text)) |
@@ -290,9 +319,23 @@ def apply_policy_filters(query, search_text="", show_deleted=False, deal_id=None
     return query
 
 
-def build_policy_query(search_text="", show_deleted=False, deal_id=None, client_id=None, **filters):
+def build_policy_query(
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    client_id: int | None = None,
+    include_renewed: bool = True,
+    **filters,
+):
     query = Policy.select(Policy, Client).join(Client)
-    return apply_policy_filters(query, search_text, show_deleted, deal_id, client_id)
+    return apply_policy_filters(
+        query,
+        search_text,
+        show_deleted,
+        deal_id,
+        client_id,
+        include_renewed,
+    )
 
 
 
