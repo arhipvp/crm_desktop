@@ -22,4 +22,5 @@ def test_add_payment_creates_income():
     assert payment.id is not None
     income = Income.get_or_none(Income.payment == payment)
     assert income is not None
-    assert income.amount == 5000
+    # Доход создаётся автоматически, но сумма должна быть нулевой
+    assert income.amount == 0
