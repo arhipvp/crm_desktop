@@ -54,3 +54,64 @@ def test_add_new_client_form_called(qtbot, monkeypatch):
 
     view.add_new()
     assert called.get("refreshed")
+
+
+def test_task_detail_buttons(qtbot, monkeypatch):
+    from datetime import date
+    from services.task_service import add_task
+    from ui.views.task_detail_view import TaskDetailView
+    from ui.forms.task_form import TaskForm
+
+    task = add_task(title="t", due_date=date.today())
+    called = {"cb": 0}
+
+    def on_change():
+        called["cb"] += 1
+
+    dlg = TaskDetailView(task, on_change=on_change)
+    qtbot.addWidget(dlg)
+
+    def fake_exec(self):
+        called["edit"] = True
+        return True
+
+    monkeypatch.setattr(TaskForm, "exec", fake_exec)
+    dlg.edit()
+    assert called.get("edit")
+    assert called["cb"] == 1
+
+    monkeypatch.setattr("ui.views.task_detail_view.confirm", lambda text: True)
+    monkeypatch.setattr("ui.views.task_detail_view.mark_task_deleted", lambda tid: called.setdefault("del", tid))
+    monkeypatch.setattr("ui.views.task_detail_view.QMessageBox.information", lambda *a, **k: None)
+    dlg.delete()
+    assert called.get("del") == task.id
+    assert called["cb"] == 2
+
+
+def test_home_tab_refreshes_on_task_detail_close(qtbot, monkeypatch):
+    from datetime import date
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QListWidgetItem
+    from services.task_service import add_task
+    from ui.views.home_tab import HomeTab
+
+    task = add_task(title="t", due_date=date.today())
+    item = QListWidgetItem("t")
+    item.setData(Qt.UserRole, task)
+
+    called = {}
+
+    class FakeDialog:
+        def __init__(self, *a, **kw):
+            pass
+        def exec(self):
+            called["exec"] = True
+
+    home = HomeTab()
+    qtbot.addWidget(home)
+    monkeypatch.setattr("ui.views.home_tab.TaskDetailView", FakeDialog)
+    monkeypatch.setattr(home, "update_stats", lambda: called.setdefault("upd", True))
+
+    home.open_task_detail(item)
+    assert called.get("exec")
+    assert called.get("upd")

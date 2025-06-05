@@ -146,15 +146,18 @@ class HomeTab(QWidget):
         if task:
             dlg = TaskDetailView(task, parent=self)
             dlg.exec()
+            self.update_stats()
 
     def open_policy_detail(self, item):
         policy = item.data(Qt.UserRole)
         if policy:
             dlg = PolicyDetailView(policy, parent=self)
             dlg.exec()
+            self.update_stats()
 
     def open_deal_detail(self, item):
         deal = item.data(Qt.UserRole)
         if deal:
             dlg = DealDetailView(deal, parent=self)
             dlg.exec()
+            self.update_stats()
