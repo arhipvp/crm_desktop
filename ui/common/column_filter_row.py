@@ -1,0 +1,39 @@
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit
+from PySide6.QtCore import Signal
+
+class ColumnFilterRow(QWidget):
+    """Строка фильтров по столбцам таблицы."""
+
+    filter_changed = Signal(int, str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._editors = []
+        self.setLayout(QHBoxLayout())
+        self.layout().setContentsMargins(0, 0, 0, 0)
+        self.layout().setSpacing(3)
+
+    def set_headers(self, headers: list[str]):
+        """Создаёт по одному полю ввода на каждый столбец."""
+        # очистка старых редакторов
+        for e in self._editors:
+            e.deleteLater()
+        self._editors.clear()
+        while self.layout().count():
+            item = self.layout().takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        if not headers:
+            return
+        for idx, h in enumerate(headers):
+            le = QLineEdit(self)
+            le.setPlaceholderText(str(h))
+            le.textChanged.connect(lambda text, col=idx: self.filter_changed.emit(col, text))
+            self.layout().addWidget(le)
+            self._editors.append(le)
+        self.layout().addStretch()
+
+    def get_text(self, column: int) -> str:
+        if 0 <= column < len(self._editors):
+            return self._editors[column].text().strip()
+        return ""

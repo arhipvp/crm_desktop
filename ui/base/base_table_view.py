@@ -2,7 +2,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from PySide6.QtCore import QDate, QSortFilterProxyModel, Qt, Signal
+from PySide6.QtCore import QDate, Qt, Signal, QSortFilterProxyModel
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -16,15 +16,8 @@ from ui.base.base_table_model import BaseTableModel
 from ui.common.filter_controls import FilterControls
 from ui.common.paginator import Paginator
 from ui.common.styled_widgets import styled_button
-
-
-class DateAwareSortFilterProxyModel(QSortFilterProxyModel):
-    def lessThan(self, left, right):
-        left_data = self.sourceModel().data(left, Qt.UserRole)
-        right_data = self.sourceModel().data(right, Qt.UserRole)
-        if isinstance(left_data, QDate) and isinstance(right_data, QDate):
-            return left_data < right_data
-        return super().lessThan(left, right)
+from ui.common.column_proxy_model import ColumnFilterProxyModel
+from ui.common.column_filter_row import ColumnFilterRow
 
 
 class BaseTableView(QWidget):
@@ -148,7 +141,10 @@ class BaseTableView(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.left_layout.addWidget(self.table)
-        self.proxy_model = DateAwareSortFilterProxyModel(self)
+        self.column_filters = ColumnFilterRow()
+        self.column_filters.filter_changed.connect(self._on_column_filter_changed)
+        self.left_layout.insertWidget(self.left_layout.count() - 1, self.column_filters)
+        self.proxy_model = ColumnFilterProxyModel(self)
         self.table.setModel(self.proxy_model)
 
         # Пагинация
@@ -171,6 +167,13 @@ class BaseTableView(QWidget):
             self.total_count = total_count
             self.paginator.update(self.total_count, self.page)
             self.data_loaded.emit(self.total_count)
+
+        # обновление заголовков для фильтров
+        headers = [
+            self.model.headerData(i, Qt.Horizontal)
+            for i in range(self.model.columnCount())
+        ]
+        self.column_filters.set_headers(headers)
 
     def load_data(self):
         if not self.model_class or not self.get_page_func:
@@ -209,6 +212,9 @@ class BaseTableView(QWidget):
         if self.page > 1:
             self.page -= 1
             self.load_data()
+
+    def _on_column_filter_changed(self, column: int, text: str):
+        self.proxy_model.set_filter(column, text)
 
     def add_new(self):
         if not self.form_class:
