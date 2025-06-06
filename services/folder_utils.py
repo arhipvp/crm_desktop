@@ -263,6 +263,28 @@ def open_folder(path_or_url: str, *, parent: Optional["QWidget"] = None) -> None
     webbrowser.open(path_or_url)
 
 
+def copy_path_to_clipboard(path_or_url: str, *, parent: Optional["QWidget"] = None) -> None:
+    """Копировать путь или ссылку в буфер обмена."""
+    if not path_or_url:
+        _msg("Папка не задана.", parent)
+        return
+
+    path_or_url = path_or_url.strip()
+
+    try:
+        from PySide6.QtGui import QGuiApplication
+    except Exception:  # PySide6 может отсутствовать в тестах
+        logger.info("Clipboard not available")
+        return
+
+    if QGuiApplication.instance() is None:
+        logger.info("No GUI application for clipboard")
+        return
+
+    QGuiApplication.clipboard().setText(path_or_url)
+    _msg("Путь скопирован в буфер обмена.", parent)
+
+
 def _msg(text: str, parent: Optional["QWidget"]) -> None:
     """Показывает информационное QMessageBox, если Qt доступен."""
     if QMessageBox is None or QApplication is None or QApplication.instance() is None:

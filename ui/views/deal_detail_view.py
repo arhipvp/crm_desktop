@@ -30,7 +30,7 @@ from services.deal_service import (
     get_tasks_by_deal_id,
     update_deal,
 )
-from services.folder_utils import open_folder
+from services.folder_utils import open_folder, copy_path_to_clipboard
 from services.payment_service import get_payments_by_deal_id
 from services.policy_service import get_policies_by_deal_id
 from ui.common.date_utils import format_date
@@ -296,6 +296,9 @@ class DealDetailView(QDialog):
         btn_folder = styled_button("📂 Папка")
         btn_folder.clicked.connect(self._open_folder)
         box.addWidget(btn_folder)
+        btn_copy = styled_button("📋", tooltip="Скопировать путь к папке")
+        btn_copy.clicked.connect(self._copy_folder_path)
+        box.addWidget(btn_copy)
         btn_wa = styled_button("💬 WhatsApp")
         btn_wa.clicked.connect(self._open_whatsapp)
         box.addWidget(btn_wa)
@@ -352,6 +355,12 @@ class DealDetailView(QDialog):
         open_folder(
             self.instance.drive_folder_path or self.instance.drive_folder_link,
             parent=self,  # QWidget, чтобы показывались QMessageBox-ы
+        )
+
+    def _copy_folder_path(self):
+        copy_path_to_clipboard(
+            self.instance.drive_folder_path or self.instance.drive_folder_link,
+            parent=self,
         )
 
     def _open_whatsapp(self):
