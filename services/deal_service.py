@@ -17,7 +17,6 @@ from database.models import Client  # обязательно!
 from database.models import Deal, Policy, Task
 from services.client_service import get_client_by_id
 from services.folder_utils import create_deal_folder
-from services.task_service import add_task
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +47,7 @@ def get_deal_by_id(deal_id: int) -> Deal | None:
 
 
 def add_deal(**kwargs):
-    """Создаёт новую сделку и связанные задачи.
+    """Создаёт новую сделку.
 
     Обязательные поля: ``client_id``, ``start_date``, ``description``.
     После создания создаётся локальная папка сделки «Сделка - …» внутри папки клиента;
@@ -109,11 +108,6 @@ def add_deal(**kwargs):
         deal.drive_folder_path = local_path
         deal.drive_folder_link = web_link or ""  # пустая строка, если Drive не создался
         deal.save()
-        # базовые задачи по умолчанию
-
-        add_task(title="расчеты", due_date=deal.start_date, deal_id=deal.id)
-        add_task(title="собрать документы", due_date=deal.start_date, deal_id=deal.id)
-
         return deal
 
 
