@@ -169,7 +169,9 @@ class DealDetailView(QDialog):
         form.addRow("Напоминание:", self.reminder_date)
 
         # Кнопка сохранения
-        btn_save = styled_button("💾 Сохранить изменения")
+        btn_save = styled_button(
+            "💾 Сохранить изменения", shortcut="Ctrl+Enter"
+        )
         btn_save.clicked.connect(self._on_inline_save)
         form.addRow(btn_save)
 
