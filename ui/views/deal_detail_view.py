@@ -19,6 +19,8 @@ from PySide6.QtGui import (
     QColor,
     QFontDatabase,
     QFont,
+    QKeySequence,
+    QShortcut,
 )
 import re
 
@@ -170,10 +172,11 @@ class DealDetailView(QDialog):
 
         # Кнопка сохранения
         btn_save = styled_button(
-            "💾 Сохранить изменения", shortcut="Ctrl+Enter"
+            "Сохранить изменения", icon="💾", shortcut="Ctrl+Enter"
         )
         btn_save.clicked.connect(self._on_inline_save)
         form.addRow(btn_save)
+        QShortcut(QKeySequence("Ctrl+Enter"), self, activated=self._on_inline_save)
 
         info.setLayout(form)
         self.tabs.addTab(info, "Информация")
