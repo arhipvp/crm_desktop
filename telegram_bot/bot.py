@@ -15,6 +15,7 @@ import tempfile
 import logging
 from dotenv import load_dotenv
 from pathlib import Path
+from html import escape
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -65,6 +66,10 @@ def fmt_task(t: ts.Task) -> str:
                 lines.append(f'<a href="{d.drive_folder_link}">📂 Папка сделки</a>')
             elif c.drive_folder_link:
                 lines.append(f'<a href="{c.drive_folder_link}">📂 Папка клиента</a>')
+
+        if d.calculations:
+            calc = escape(d.calculations)
+            lines.append(f"\n<b>Журнал:</b>\n<pre>{calc}</pre>")
 
     p = getattr(t, "policy", None)
     if p:
