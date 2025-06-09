@@ -24,6 +24,7 @@ from services.expense_service import build_expense_query
 from ui.base.base_table_model import BaseTableModel
 from ui.common.date_utils import format_date
 from ui.common.styled_widgets import styled_button
+from utils.screen_utils import get_scaled_size
 from ui.forms.payment_form import PaymentForm
 from ui.forms.policy_form import PolicyForm
 from ui.views.payment_detail_view import PaymentDetailView
@@ -45,8 +46,9 @@ class PolicyDetailView(QDialog):
         super().__init__(parent)
         self.instance = policy
         self.setWindowTitle(f"Полис #{policy.id} — {policy.policy_number or ''}")
-        self.resize(1000, 700)
-        self.setMinimumSize(900, 600)
+        size = get_scaled_size(1000, 700)
+        self.resize(size)
+        self.setMinimumSize(640, 480)
 
         self.layout = QVBoxLayout(self)
 

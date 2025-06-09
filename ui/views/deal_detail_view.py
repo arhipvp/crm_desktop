@@ -36,6 +36,7 @@ from services.policy_service import get_policies_by_deal_id
 from ui.common.date_utils import format_date
 from ui.common.message_boxes import confirm
 from ui.common.styled_widgets import styled_button
+from utils.screen_utils import get_scaled_size
 from ui.forms.deal_form import DealForm
 from ui.forms.import_policy_json_form import ImportPolicyJsonForm
 from ui.forms.income_form import IncomeForm
@@ -68,8 +69,9 @@ class DealDetailView(QDialog):
         self.setWindowTitle(
             f"Сделка #{deal.id} — {deal.client.name}: {deal.description}"
         )
-        self.resize(1200, 800)
-        self.setMinimumSize(1200, 800)
+        size = get_scaled_size(1200, 800)
+        self.resize(size)
+        self.setMinimumSize(640, 480)
 
         self.layout = QVBoxLayout(self)
 

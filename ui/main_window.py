@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QStatusBar,
 )
+from utils.screen_utils import get_scaled_size
 
 from ui.forms.import_policy_json_form import ImportPolicyJsonForm
 from ui.main_menu import MainMenu
@@ -19,7 +20,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CRM Desktop")
-        self.resize(1300, 850)
+        size = get_scaled_size(1300, 850)
+        self.resize(size)
+        self.setMinimumSize(800, 600)
 
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
