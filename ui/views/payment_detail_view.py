@@ -20,6 +20,7 @@ from services.folder_utils import open_folder
 from ui.base.base_table_model import BaseTableModel
 from ui.common.date_utils import format_date
 from ui.common.styled_widgets import styled_button
+from utils.screen_utils import get_scaled_size
 from ui.forms.expense_form import ExpenseForm
 from ui.forms.income_form import IncomeForm
 from ui.forms.payment_form import PaymentForm
@@ -34,8 +35,9 @@ class PaymentDetailView(QDialog):
         super().__init__(parent)
         self.instance = payment
         self.setWindowTitle(f"Платёж #{payment.id} — {payment.amount:.2f} ₽")
-        self.resize(900, 650)
-        self.setMinimumSize(850, 550)
+        size = get_scaled_size(900, 650)
+        self.resize(size)
+        self.setMinimumSize(640, 480)
 
         self.layout = QVBoxLayout(self)
 

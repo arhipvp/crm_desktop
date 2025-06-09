@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.styled_widgets import styled_button
+from utils.screen_utils import get_scaled_size
 
 
 class BaseDetailView(QDialog):
@@ -16,7 +17,9 @@ class BaseDetailView(QDialog):
         super().__init__(parent)
         self.instance = instance
         self.setWindowTitle(title or f"{type(instance).__name__} — Подробнее")
-        self.setMinimumSize(600, 500)
+        size = get_scaled_size(600, 500)
+        self.resize(size)
+        self.setMinimumSize(400, 300)
 
         self.layout = QVBoxLayout(self)
 
