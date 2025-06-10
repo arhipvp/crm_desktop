@@ -2,13 +2,16 @@ from datetime import date, timedelta
 
 from PySide6.QtCore import QDate
 
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QHBoxLayout, QWidget
 
 from database.models import Deal, DealStatus
 from services.deal_service import add_deal, update_deal
 from ui.base.base_edit_form import BaseEditForm
-from ui.common.combo_helpers import create_client_combobox
+from ui.common.combo_helpers import create_client_combobox, populate_combo
 from ui.common.message_boxes import confirm
+from ui.common.styled_widgets import styled_button
+from ui.forms.client_form import ClientForm
+from services.client_service import get_all_clients
 
 
 class DealForm(BaseEditForm):
@@ -28,15 +31,45 @@ class DealForm(BaseEditForm):
     def build_custom_fields(self):
         # Клиент: комбобокс с поиском
         self.client_combo = create_client_combobox()
+        self.btn_add_client = styled_button("➕", tooltip="Добавить клиента")
+        self.btn_add_client.clicked.connect(self.on_add_client)
+
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.addWidget(self.client_combo)
+        row_layout.addWidget(self.btn_add_client)
+
         # вместо стандартного client_id
         self.fields["client_id"] = self.client_combo
-        self.form_layout.insertRow(0, "Клиент:", self.client_combo)
+        self.form_layout.insertRow(0, "Клиент:", row_widget)
 
         # Скрываем поля с путями к папкам
         for fld in ("drive_folder_path", "drive_folder_link"):
             w = self.fields.pop(fld, None)
             if isinstance(w, QWidget):
                 w.hide()
+
+    def refresh_client_combo(self, selected_id: int | None = None) -> None:
+        clients = list(get_all_clients())
+        populate_combo(
+            self.client_combo,
+            clients,
+            label_func=lambda c: c.name,
+            id_attr="id",
+            placeholder="— Клиент —",
+        )
+        if selected_id is not None:
+            idx = self.client_combo.findData(selected_id)
+            if idx >= 0:
+                self.client_combo.setCurrentIndex(idx)
+
+    def on_add_client(self):
+        form = ClientForm(parent=self)
+        if form.exec():
+            saved = getattr(form, "saved_instance", None)
+            saved_id = saved.id if saved else None
+            self.refresh_client_combo(saved_id)
 
     def collect_data(self):
         data = super().collect_data()
