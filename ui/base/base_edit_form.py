@@ -119,6 +119,10 @@ class BaseEditForm(QDialog):
                 else:
                     widget = OptionalDateEdit() if field.null else TypableDateEdit()
 
+                # по умолчанию — сегодняшняя дата, только при создании
+                if not field.null and self.instance is None:
+                    widget.setDate(QDate.currentDate())
+
             # ---------- Default (Char / Text / Numeric) ----------
             else:
                 field_name = name
