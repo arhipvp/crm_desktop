@@ -82,6 +82,9 @@ class DealDetailView(QDialog):
         self.layout.addWidget(header)
 
         # KPI-панель
+        # KPI panel is updated in place to avoid duplicates when refreshed
+        self.kpi_layout = QHBoxLayout()
+        self.layout.addLayout(self.kpi_layout)
         self._init_kpi_panel()
 
         # Вкладки
@@ -93,12 +96,19 @@ class DealDetailView(QDialog):
         self._init_actions()
 
     def _init_kpi_panel(self):
-        kpi_layout = QHBoxLayout()
+        """(Re)populate the KPI panel without adding new duplicates."""
+        # remove previous widgets
+        while self.kpi_layout.count():
+            item = self.kpi_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
         cnt_policies = len(get_policies_by_deal_id(self.instance.id))
         cnt_payments = len(get_payments_by_deal_id(self.instance.id))
         # Здесь используем тот же сервис задач
-
         cnt_tasks = len(get_tasks_by_deal_id(self.instance.id))
+
         for text in [
             f"Полисов: <b>{cnt_policies}</b>",
             f"Платежей: <b>{cnt_payments}</b>",
@@ -106,9 +116,8 @@ class DealDetailView(QDialog):
         ]:
             lbl = QLabel(text)
             lbl.setTextFormat(Qt.RichText)
-            kpi_layout.addWidget(lbl)
-        kpi_layout.addStretch()
-        self.layout.addLayout(kpi_layout)
+            self.kpi_layout.addWidget(lbl)
+        self.kpi_layout.addStretch()
 
     def _init_tabs(self):
         # удаляем старые вкладки
