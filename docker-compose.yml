@@ -21,9 +21,7 @@ services:
       container_name: crm_telegram_bot
       env_file:
         - telegram_bot/.env   # ← вот он
-      volumes:
-        - "G:/Мой диск/Клиенты:/data/clients"
-        - ./logs:/app/logs             # если ведёте логи
+
       restart: unless-stopped
 
 
