@@ -29,24 +29,29 @@ def count_assistant_tasks() -> int:
 
 
 def count_sent_tasks() -> int:
-    """Количество задач со статусом ``sent``."""
+    """Количество задач, отправленных в Telegram (по ``queued_at``)."""
     return (
         Task.select()
-        .where(
-            (Task.dispatch_state == "sent")
-            & (Task.is_deleted == False)
-        )
+        .where(Task.queued_at.is_null(False) & (Task.is_deleted == False))
+        .count()
+    )
+
+
+def count_working_tasks() -> int:
+    """Количество задач, находящихся у помощника в работе."""
+    return (
+        Task.select()
+        .where(Task.tg_chat_id.is_null(False) & (Task.is_deleted == False))
         .count()
     )
 
 
 def count_unconfirmed_tasks() -> int:
-    """Задачи, снятые с бота и ещё не подтверждённые."""
+    """Количество задач с заметкой, но не подтверждённых пользователем."""
     return (
         Task.select()
         .where(
-            (Task.dispatch_state == "idle")
-            & (Task.queued_at.is_null(False))
+            Task.note.is_null(False)
             & (Task.is_done == False)
             & (Task.is_deleted == False)
         )
