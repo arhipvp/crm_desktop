@@ -15,6 +15,7 @@ from services.dashboard_service import (
     get_basic_stats,
     count_assistant_tasks,
     count_sent_tasks,
+    count_working_tasks,
     count_unconfirmed_tasks,
     get_upcoming_tasks,
     get_expiring_policies,
@@ -109,18 +110,20 @@ def test_dashboard_count_assistant_tasks():
 
 
 def test_dashboard_count_sent_tasks():
-    add_task(title='a1', due_date=date.today(), dispatch_state='sent')
-    add_task(title='a2', due_date=date.today(), dispatch_state='sent', is_done=True)
+    now = datetime.utcnow()
+    add_task(title='a1', due_date=date.today(), queued_at=now)
+    add_task(title='a2', due_date=date.today(), queued_at=now, is_done=True)
     assert count_sent_tasks() == 2
 
 
+def test_dashboard_count_working_tasks():
+    add_task(title='w1', due_date=date.today(), tg_chat_id=123)
+    add_task(title='w2', due_date=date.today(), tg_chat_id=456, is_done=True)
+    assert count_working_tasks() == 2
+
+
 def test_dashboard_count_unconfirmed_tasks():
-    add_task(
-        title='b1',
-        due_date=date.today(),
-        dispatch_state='idle',
-        queued_at=datetime.utcnow(),
-    )
+    add_task(title='b1', due_date=date.today(), note='done')
     add_task(title='b2', due_date=date.today())
     assert count_unconfirmed_tasks() == 1
 
