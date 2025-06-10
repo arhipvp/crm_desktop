@@ -1,8 +1,10 @@
 from datetime import date, timedelta
 
+from PySide6.QtCore import QDate
+
 from PySide6.QtWidgets import QWidget
 
-from database.models import Deal
+from database.models import Deal, DealStatus
 from services.deal_service import add_deal, update_deal
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import create_client_combobox
@@ -16,6 +18,12 @@ class DealForm(BaseEditForm):
         super().__init__(
             instance=deal, model_class=Deal, entity_name="сделку", parent=parent
         )
+
+        if deal is None:
+            if "reminder_date" in self.fields:
+                self.fields["reminder_date"].setDate(QDate.currentDate())
+            if "status" in self.fields:
+                self.fields["status"].setText(DealStatus.IN_PROGRESS)
 
     def build_custom_fields(self):
         # Клиент: комбобокс с поиском
