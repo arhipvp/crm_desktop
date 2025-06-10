@@ -1,0 +1,206 @@
+import os
+import sys
+from datetime import date
+import types
+
+import pytest
+
+from services.client_service import add_client
+from services.deal_service import add_deal
+from services.policy_service import add_policy
+from services.payment_service import add_payment, apply_payment_filters
+from services.expense_service import add_expense, apply_expense_filters
+from services.income_service import add_income, create_stub_income, apply_income_filters
+from services.dashboard_service import (
+    get_basic_stats,
+    count_assistant_tasks,
+    get_upcoming_tasks,
+    get_expiring_policies,
+    get_upcoming_deal_reminders,
+)
+from services.folder_utils import rename_client_folder, open_local_or_web, copy_path_to_clipboard
+from services.task_service import add_task, append_note, mark_task_deleted
+from utils import screen_utils, time_utils
+from database.models import Expense, Income, Payment, Task, Client, Deal, Policy
+
+
+def test_rename_client_folder_local(tmp_path, monkeypatch):
+    root = tmp_path / 'drive'
+    old = root / 'Old'
+    old.mkdir(parents=True)
+    monkeypatch.setenv('GOOGLE_DRIVE_LOCAL_ROOT', str(root))
+    monkeypatch.setattr('services.folder_utils.GOOGLE_DRIVE_LOCAL_ROOT', str(root))
+    new_path, link = rename_client_folder('Old', 'New', None)
+    assert os.path.isdir(new_path)
+    assert link is None
+
+
+def test_open_local_or_web_local(tmp_path, monkeypatch):
+    root = tmp_path / 'drive'
+    sub = root / 'Foo' / 'Foo'
+    sub.mkdir(parents=True)
+    monkeypatch.setenv('GOOGLE_DRIVE_LOCAL_ROOT', str(root))
+    monkeypatch.setattr('services.folder_utils.GOOGLE_DRIVE_LOCAL_ROOT', str(root))
+    captured = {}
+    monkeypatch.setattr(os, 'startfile', lambda p: captured.setdefault('path', p), raising=False)
+    open_local_or_web('', folder_name='Foo')
+    assert captured.get('path') == str(sub)
+
+
+def test_open_local_or_web_web(monkeypatch):
+    monkeypatch.setattr(os.path, 'isdir', lambda p: False)
+    captured = {}
+    monkeypatch.setattr(sys.modules['webbrowser'], 'open', lambda u: captured.setdefault('url', u))
+    open_local_or_web('http://x', folder_name='Foo')
+    assert captured.get('url') == 'http://x'
+
+
+class DummyClipboard:
+    def __init__(self):
+        self.text = ''
+    def setText(self, text):
+        self.text = text
+
+
+class DummyQApp:
+    _instance = None
+    def __init__(self):
+        DummyQApp._instance = self
+        self.clip = DummyClipboard()
+    @staticmethod
+    def instance():
+        return DummyQApp._instance
+    @staticmethod
+    def clipboard():
+        return DummyQApp._instance.clip
+
+
+def test_copy_path_to_clipboard(monkeypatch):
+    qmod = types.SimpleNamespace(QGuiApplication=DummyQApp)
+    monkeypatch.setitem(sys.modules, 'PySide6.QtGui', qmod)
+    DummyQApp()
+    msgs = {}
+    monkeypatch.setattr('services.folder_utils._msg', lambda t, parent=None: msgs.setdefault('msg', t))
+    copy_path_to_clipboard('abc')
+    assert DummyQApp._instance.clip.text == 'abc'
+    assert msgs['msg']
+
+
+def test_copy_path_to_clipboard_no_app(monkeypatch):
+    class NoApp:
+        @staticmethod
+        def instance():
+            return None
+    qmod = types.SimpleNamespace(QGuiApplication=NoApp)
+    monkeypatch.setitem(sys.modules, 'PySide6.QtGui', qmod)
+    copy_path_to_clipboard('abc')
+
+
+def test_dashboard_basic_stats_empty():
+    assert get_basic_stats() == {'clients': 0, 'deals': 0, 'policies': 0, 'tasks': 0}
+
+
+def test_dashboard_count_assistant_tasks():
+    add_task(title='t1', due_date=date.today(), dispatch_state='sent')
+    add_task(title='t2', due_date=date.today())
+    assert count_assistant_tasks() == 1
+
+
+def test_dashboard_upcoming_lists_order():
+    client = add_client(name='C')
+    deal1 = add_deal(client_id=client.id, start_date=date(2025,1,1), description='A', reminder_date=date(2025,1,3))
+    deal2 = add_deal(client_id=client.id, start_date=date(2025,1,1), description='B', reminder_date=date(2025,1,1))
+    add_policy(
+        client_id=client.id,
+        deal_id=deal1.id,
+        policy_number='1',
+        start_date=date(2025,1,1),
+        end_date=date(2025,1,10),
+        open_folder=lambda *_: None,
+    )
+    add_policy(
+        client_id=client.id,
+        deal_id=deal2.id,
+        policy_number='2',
+        start_date=date(2025,1,1),
+        end_date=date(2025,1,5),
+        open_folder=lambda *_: None,
+    )
+    tasks = get_upcoming_tasks()
+    assert tasks[0].due_date <= tasks[1].due_date
+    pols = get_expiring_policies()
+    assert pols[0].end_date <= pols[1].end_date
+    reminders = get_upcoming_deal_reminders()
+    assert reminders[0].reminder_date <= reminders[1].reminder_date
+
+
+def test_apply_expense_filters_only_unpaid():
+    client = add_client(name='E')
+    pol = add_policy(client_id=client.id, policy_number='P1', start_date=date(2025,1,1), end_date=date(2025,1,10))
+    pay = add_payment(policy_id=pol.id, amount=10, payment_date=date(2025,1,2))
+    exp = add_expense(payment_id=pay.id, amount=5, expense_type='agent')
+    query = apply_expense_filters(Expense.select().join(Payment).join(Policy).join(Client), only_unpaid=True)
+    assert list(query) == [exp]
+    exp.expense_date = date(2025,1,3)
+    exp.save()
+    assert list(apply_expense_filters(Expense.select().join(Payment).join(Policy).join(Client), only_unpaid=True)) == []
+
+
+def test_apply_income_filters_range_and_unreceived():
+    client = add_client(name='I')
+    pol = add_policy(client_id=client.id, policy_number='IP1', start_date=date(2025,1,1), end_date=date(2025,1,10))
+    pay = add_payment(policy_id=pol.id, amount=10, payment_date=date(2025,1,2))
+    inc1 = add_income(payment_id=pay.id, amount=5, received_date=date(2025,1,3))
+    inc2 = add_income(payment_id=pay.id, amount=5)
+    q1 = apply_income_filters(Income.select().join(Payment).join(Policy).join(Client), received_date_range=(date(2025,1,2), date(2025,1,4)))
+    assert list(q1) == [inc1]
+    q2 = apply_income_filters(
+        Income.select().join(Payment).join(Policy).join(Client),
+        only_unreceived=True,
+    )
+    res2 = list(q2)
+    assert inc2 in res2
+
+
+def test_apply_payment_filters():
+    client = add_client(name='P')
+    pol = add_policy(client_id=client.id, policy_number='PP1', start_date=date(2025,1,1), end_date=date(2025,1,10))
+    pay1 = add_payment(policy_id=pol.id, amount=10, payment_date=date(2025,1,2), actual_payment_date=date(2025,1,2))
+    pay2 = add_payment(policy_id=pol.id, amount=20, payment_date=date(2025,1,3))
+    q_unpaid = apply_payment_filters(
+        Payment.select().join(Policy).join(Client),
+        only_paid=False,
+    )
+    assert pay2 in list(q_unpaid)
+    q_search = apply_payment_filters(
+        Payment.select().join(Policy).join(Client),
+        search_text='PP1',
+        only_paid=True,
+    )
+    res = list(q_search)
+    assert pay1 in res and pay2 in res
+
+
+def test_screen_utils_no_screen(monkeypatch):
+    app = types.SimpleNamespace(primaryScreen=lambda: None)
+    monkeypatch.setattr(screen_utils, 'QApplication', app)
+    sz = screen_utils.get_scaled_size(800,600)
+    assert sz.width() == 800 and sz.height() == 600
+
+
+def test_time_utils_format():
+    s = time_utils.now_str()
+    assert len(s) >= 16
+
+
+def test_create_stub_income_no_payments():
+    with pytest.raises(ValueError):
+        create_stub_income()
+
+
+def test_append_and_delete_task():
+    task = add_task(title='t', due_date=date.today())
+    append_note(task.id, 'x')
+    assert 'x' in Task.get_by_id(task.id).note
+    mark_task_deleted(task.id)
+    assert Task.get_by_id(task.id).is_deleted
