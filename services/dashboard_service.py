@@ -28,6 +28,32 @@ def count_assistant_tasks() -> int:
     )
 
 
+def count_sent_tasks() -> int:
+    """Количество задач со статусом ``sent``."""
+    return (
+        Task.select()
+        .where(
+            (Task.dispatch_state == "sent")
+            & (Task.is_deleted == False)
+        )
+        .count()
+    )
+
+
+def count_unconfirmed_tasks() -> int:
+    """Задачи, снятые с бота и ещё не подтверждённые."""
+    return (
+        Task.select()
+        .where(
+            (Task.dispatch_state == "idle")
+            & (Task.queued_at.is_null(False))
+            & (Task.is_done == False)
+            & (Task.is_deleted == False)
+        )
+        .count()
+    )
+
+
 def get_upcoming_tasks(limit: int = 10) -> list[Task]:
     """Ближайшие невыполненные задачи."""
     base = (
