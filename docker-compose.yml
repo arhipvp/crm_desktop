@@ -22,7 +22,7 @@ services:
       env_file:
         - telegram_bot/.env   # ← вот он
       volumes:
-        - "G:/Мой диск/Клиенты:/data/clients"
+        - "${GOOGLE_DRIVE_LOCAL_ROOT:-./data/clients}:/data/clients"
         - ./logs:/app/logs             # если ведёте логи
       restart: unless-stopped
 
