@@ -9,7 +9,8 @@ from PySide6.QtCore import Qt
 
 from services.dashboard_service import (
     get_basic_stats,
-    count_assistant_tasks,
+    count_sent_tasks,
+    count_unconfirmed_tasks,
     get_upcoming_tasks,
     get_expiring_policies,
     get_upcoming_deal_reminders,
@@ -73,8 +74,12 @@ class HomeTab(QWidget):
         )
         self.info_label.setText(html)
 
-        tg_count = count_assistant_tasks()
-        self.tg_tasks_label.setText(f"Задач в работе у помощника: <b>{tg_count}</b>")
+        sent_count = count_sent_tasks()
+        done_count = count_unconfirmed_tasks()
+        self.tg_tasks_label.setText(
+            f"задач отправлено: <b>{sent_count}</b> штук<br>"
+            f"задач выполнено (в ожидании подтверждения): <b>{done_count}</b> штук"
+        )
 
         self.upcoming_tasks_list.clear()
         tasks = get_upcoming_tasks()

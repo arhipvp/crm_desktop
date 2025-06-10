@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import date
+from datetime import date, datetime
 import types
 
 import pytest
@@ -14,6 +14,8 @@ from services.income_service import add_income, create_stub_income, apply_income
 from services.dashboard_service import (
     get_basic_stats,
     count_assistant_tasks,
+    count_sent_tasks,
+    count_unconfirmed_tasks,
     get_upcoming_tasks,
     get_expiring_policies,
     get_upcoming_deal_reminders,
@@ -104,6 +106,23 @@ def test_dashboard_count_assistant_tasks():
     add_task(title='t1', due_date=date.today(), dispatch_state='sent')
     add_task(title='t2', due_date=date.today())
     assert count_assistant_tasks() == 1
+
+
+def test_dashboard_count_sent_tasks():
+    add_task(title='a1', due_date=date.today(), dispatch_state='sent')
+    add_task(title='a2', due_date=date.today(), dispatch_state='sent', is_done=True)
+    assert count_sent_tasks() == 2
+
+
+def test_dashboard_count_unconfirmed_tasks():
+    add_task(
+        title='b1',
+        due_date=date.today(),
+        dispatch_state='idle',
+        queued_at=datetime.utcnow(),
+    )
+    add_task(title='b2', due_date=date.today())
+    assert count_unconfirmed_tasks() == 1
 
 
 def test_dashboard_upcoming_lists_order():
