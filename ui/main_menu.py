@@ -1,5 +1,8 @@
 from PySide6.QtWidgets import QMenuBar, QMessageBox, QFileDialog
 from PySide6.QtGui import QAction, QKeySequence
+import subprocess
+import sys
+from pathlib import Path
 
 
 class MainMenu(QMenuBar):
@@ -14,6 +17,11 @@ class MainMenu(QMenuBar):
         export_action.setShortcut(QKeySequence("Ctrl+E"))
         export_action.triggered.connect(self.export_to_csv)
         file_menu.addAction(export_action)
+
+        backup_action = QAction("💾 Резервное копирование", self)
+        backup_action.setShortcut(QKeySequence("Ctrl+B"))
+        backup_action.triggered.connect(self.run_backup)
+        file_menu.addAction(backup_action)
 
         # 🔄 Обновить
         refresh_action = QAction("🔄 Обновить", self)
@@ -79,3 +87,16 @@ class MainMenu(QMenuBar):
         import webbrowser
 
         webbrowser.open_new_tab("https://example.com/docs")
+
+    def run_backup(self):
+        """Запуск скрипта резервного копирования."""
+        script = Path(__file__).resolve().parent.parent / "backup.py"
+        try:
+            subprocess.run([sys.executable, str(script)], check=True)
+            QMessageBox.information(self, "Бэкап", "Резервная копия создана.")
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Ошибка",
+                f"Не удалось выполнить бэкап:\n{exc}",
+            )
