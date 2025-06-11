@@ -67,9 +67,12 @@ def fmt_task(t: ts.Task) -> str:
             elif c.drive_folder_link:
                 lines.append(f'<a href="{c.drive_folder_link}">📂 Папка клиента</a>')
 
+        lines.append("\n<b>Журнал:</b>")
         if d.calculations:
             calc = escape(d.calculations)
-            lines.append(f"\n<b>Журнал:</b>\n<pre>{calc}</pre>")
+            lines.append(f"<pre>{calc}</pre>")
+        else:
+            lines.append("—")
 
     p = getattr(t, "policy", None)
     if p:

@@ -21,3 +21,21 @@ def test_complete_task_appends_to_deal():
 
     deal = Deal.get_by_id(deal.id)
     assert "Задача" in (deal.calculations or "")
+
+
+def test_fmt_task_includes_deal_log(monkeypatch):
+    monkeypatch.setenv("TG_BOT_TOKEN", "x")
+    from telegram_bot.bot import fmt_task
+
+    client = add_client(name="User")
+    deal = add_deal(
+        client_id=client.id,
+        start_date=date(2025, 1, 1),
+        description="Desc",
+        calculations="note",
+    )
+    task = add_task(title="t", due_date=date(2025, 1, 2), deal_id=deal.id)
+
+    text = fmt_task(task)
+    assert "Журнал" in text
+    assert "note" in text
