@@ -12,6 +12,7 @@ from ui.common.combo_helpers import create_fk_combobox
 • Код автосохранения/валидаторов не трогался.
 """
 import logging
+import datetime as dt
 
 import peewee
 from peewee import BooleanField, DateField, ForeignKeyField
@@ -203,11 +204,13 @@ class BaseEditForm(QDialog):
                         QDate.fromString(txt, "dd.MM.yyyy").toPython() if txt else None
                     )
                 elif isinstance(field, peewee.DateTimeField):
-                    value = (
-                        QDateTime.fromString(txt, "yyyy-MM-dd").toPython()
-                        if txt
-                        else None
-                    )
+                    if txt:
+                        try:
+                            value = dt.datetime.fromisoformat(txt)
+                        except ValueError:
+                            value = QDateTime.fromString(txt, "yyyy-MM-dd").toPython()
+                    else:
+                        value = None
 
             # ---------- QCheckBox ----------
             elif isinstance(widget, QCheckBox):

@@ -11,7 +11,14 @@ from ui.common.combo_helpers import (
 
 
 class TaskForm(BaseEditForm):
-    EXTRA_HIDDEN = {"drive_folder_path", "drive_folder_link"}
+    EXTRA_HIDDEN = {
+        "drive_folder_path",
+        "drive_folder_link",
+        "dispatch_state",
+        "queued_at",
+        "tg_chat_id",
+        "tg_message_id",
+    }
 
     def __init__(self, task=None, parent=None, forced_deal=None, forced_policy=None):
         self._forced_deal = forced_deal
