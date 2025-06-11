@@ -118,6 +118,14 @@ def test_home_tab_refreshes_on_task_detail_close(qtbot, monkeypatch):
     assert called.get("upd")
 
 
+def test_home_tab_has_chart(qtbot):
+    from ui.views.home_tab import HomeTab
+
+    home = HomeTab()
+    qtbot.addWidget(home)
+    assert home.reminder_chart.chart() is not None
+
+
 def test_menu_backup_runs(qtbot, monkeypatch):
     window = MainWindow()
     qtbot.addWidget(window)
