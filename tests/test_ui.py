@@ -3,6 +3,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QMessageBox
+import subprocess
 
 from ui.main_window import MainWindow
 from ui.views.client_table_view import ClientTableView
@@ -115,3 +116,17 @@ def test_home_tab_refreshes_on_task_detail_close(qtbot, monkeypatch):
     home.open_task_detail(item)
     assert called.get("exec")
     assert called.get("upd")
+
+
+def test_menu_backup_runs(qtbot, monkeypatch):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    called = {}
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: called.setdefault("run", True))
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: called.setdefault("msg", True))
+
+    window.menu_bar.run_backup()
+
+    assert called.get("run")
+    assert called.get("msg")
