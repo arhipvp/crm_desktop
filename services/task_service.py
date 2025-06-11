@@ -174,6 +174,72 @@ def queue_task(task_id: int):
         )
 
 
+def get_clients_with_queued_tasks() -> list[Client]:
+    """Вернуть уникальных клиентов с задачами в состоянии ``queued``."""
+    base = (
+        Task.select()
+        .where((Task.dispatch_state == "queued") & (Task.is_deleted == False))
+    )
+    tasks = prefetch(base, Deal, Policy, Client)
+
+    seen: set[int] = set()
+    clients: list[Client] = []
+    for t in tasks:
+        c = None
+        if t.deal and t.deal.client:
+            c = t.deal.client
+        elif t.policy and t.policy.client:
+            c = t.policy.client
+        if c and c.id not in seen:
+            seen.add(c.id)
+            clients.append(c)
+    return clients
+
+
+def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
+    """Выдать следующую задачу из очереди, фильтруя по клиенту."""
+    with db.atomic():
+        query = (
+            Task.select(Task.id)
+            .join(Deal, JOIN.LEFT_OUTER)
+            .switch(Task)
+            .join(Policy, JOIN.LEFT_OUTER)
+            .where(
+                (Task.dispatch_state == "queued")
+                & (Task.is_deleted == False)
+                & (
+                    (Deal.client_id == client_id)
+                    | (Policy.client_id == client_id)
+                )
+            )
+            .order_by(Task.queued_at.asc())
+            .limit(1)
+        )
+
+        task_ids = [t.id for t in query]
+        if not task_ids:
+            logger.info("📭 Нет задач в очереди для клиента %s", client_id)
+            return None
+
+        base = Task.select().where(Task.id.in_(task_ids))
+        task_list = prefetch(base, Deal, Policy, Client)
+        task = task_list[0] if task_list else None
+
+        if task:
+            task.dispatch_state = "sent"
+            task.tg_chat_id = chat_id
+            task.save()
+            logger.info(
+                "📬 Задача #%s выдана в Telegram для клиента %s: chat_id=%s",
+                task.id,
+                client_id,
+                chat_id,
+            )
+        else:
+            logger.info("📭 Нет задач в очереди для клиента %s", client_id)
+        return task
+
+
 def pop_next(chat_id: int) -> Task | None:
     with db.atomic():
         query = (

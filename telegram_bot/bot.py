@@ -112,9 +112,28 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
 
-    task = ts.pop_next(q.from_user.id)
-    if not task:
+    clients = ts.get_clients_with_queued_tasks()
+    if not clients:
         return await q.answer("Очередь пуста 💤", show_alert=True)
+
+    buttons = [
+        [InlineKeyboardButton(c.name.split()[0], callback_data=f"client:{c.id}")]
+        for c in clients
+    ]
+    kb = InlineKeyboardMarkup(buttons)
+    await q.message.reply_text("Выберите клиента:", reply_markup=kb)
+
+
+async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    _p, cid = q.data.split(":")
+    cid = int(cid)
+
+    task = ts.pop_next_by_client(q.from_user.id, cid)
+    if not task:
+        return await q.answer("Задачи закончились", show_alert=True)
 
     msg = await q.message.reply_html(fmt_task(task), reply_markup=kb_task(task.id))
     ts.link_telegram(task.id, msg.chat_id, msg.message_id)
@@ -197,6 +216,7 @@ def main() -> None:
 
     app.add_handler(CommandHandler("start", h_start))
     app.add_handler(CallbackQueryHandler(h_get, pattern="^get$"))
+    app.add_handler(CallbackQueryHandler(h_choose_client, pattern=r"^client:\d+$"))
     app.add_handler(CallbackQueryHandler(h_action, pattern=r"^(done|ret|reply):"))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))

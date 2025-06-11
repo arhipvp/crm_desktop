@@ -48,6 +48,8 @@ from services.task_service import (
     add_task,
     queue_task,
     pop_next,
+    pop_next_by_client,
+    get_clients_with_queued_tasks,
     return_to_queue,
     link_telegram,
     mark_done,
@@ -212,10 +214,15 @@ def test_task_queue_flow():
     task = add_task(title="qq", due_date=date(2025, 1, 2), deal_id=deal.id)
 
     queue_task(task.id)
-    got = pop_next(1)
+    clients = get_clients_with_queued_tasks()
+    assert [c.id for c in clients] == [client.id]
+
+    got = pop_next_by_client(1, client.id)
     assert got.id == task.id
     link_telegram(task.id, 1, 2)
     return_to_queue(task.id)
+    got2 = pop_next(1)
+    assert got2.id == task.id
     mark_done(task.id)
     unassign_from_telegram(task.id)
 

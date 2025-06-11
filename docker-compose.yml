@@ -22,8 +22,7 @@ services:
       depends_on:
         - db
       env_file:
-        - telegram_bot/.env   # ← вот он
-      
+        - telegram_bot/.env 
       restart: unless-stopped
       volumes:
         - ./logs:/app/logs
