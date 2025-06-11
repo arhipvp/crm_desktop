@@ -1,6 +1,8 @@
 """Функции для получения сводной информации на дашборд."""
 
 from playhouse.shortcuts import prefetch
+from peewee import fn
+from datetime import date, timedelta
 
 from database.models import Client, Deal, Policy, Task
 
@@ -94,3 +96,28 @@ def get_upcoming_deal_reminders(limit: int = 10) -> list[Deal]:
         .limit(limit)
     )
     return list(prefetch(base, Client))
+
+
+def get_deal_reminder_counts(days: int = 14) -> dict:
+    """Количество напоминаний по сделкам на ближайшие ``days`` дней."""
+    today = date.today()
+    # Включаем все дни в диапазоне, даже если напоминаний нет
+    counts = {today + timedelta(days=i): 0 for i in range(days)}
+    end_date = today + timedelta(days=days - 1)
+
+    query = (
+        Deal.select(Deal.reminder_date, fn.COUNT(Deal.id).alias("cnt"))
+        .where(
+            (Deal.is_deleted == False)
+            & (Deal.is_closed == False)
+            & (Deal.reminder_date.is_null(False))
+            & (Deal.reminder_date.between(today, end_date))
+        )
+        .group_by(Deal.reminder_date)
+        .order_by(Deal.reminder_date.asc())
+    )
+
+    for row in query:
+        counts[row.reminder_date] = row.cnt
+
+    return counts

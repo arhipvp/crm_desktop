@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import types
 
 import pytest
@@ -20,6 +20,7 @@ from services.dashboard_service import (
     get_upcoming_tasks,
     get_expiring_policies,
     get_upcoming_deal_reminders,
+    get_deal_reminder_counts,
 )
 from services.folder_utils import rename_client_folder, open_local_or_web, copy_path_to_clipboard
 from services.task_service import add_task, append_note, mark_task_deleted
@@ -154,6 +155,21 @@ def test_dashboard_upcoming_lists_order():
     assert pols[0].end_date <= pols[1].end_date
     reminders = get_upcoming_deal_reminders()
     assert reminders[0].reminder_date <= reminders[1].reminder_date
+
+
+def test_get_deal_reminder_counts():
+    client = add_client(name='D')
+    today = date.today()
+    add_deal(client_id=client.id, start_date=today, description='A', reminder_date=today + timedelta(days=1))
+    add_deal(client_id=client.id, start_date=today, description='B', reminder_date=today + timedelta(days=1))
+    add_deal(client_id=client.id, start_date=today, description='C', reminder_date=today + timedelta(days=2))
+
+    counts = get_deal_reminder_counts()
+    # Должны быть данные на все 14 дней, включая нулевые значения
+    assert len(counts) == 14
+    assert counts[today] == 0
+    assert counts[today + timedelta(days=1)] == 2
+    assert counts[today + timedelta(days=2)] == 1
 
 
 def test_apply_expense_filters_only_unpaid():

@@ -6,6 +6,15 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPainter
+from PySide6.QtCharts import (
+    QChart,
+    QChartView,
+    QBarSeries,
+    QBarSet,
+    QBarCategoryAxis,
+    QValueAxis,
+)
 
 from services.dashboard_service import (
     get_basic_stats,
@@ -15,6 +24,7 @@ from services.dashboard_service import (
     get_upcoming_tasks,
     get_expiring_policies,
     get_upcoming_deal_reminders,
+    get_deal_reminder_counts,
 )
 
 from ui.views.task_detail_view import TaskDetailView
@@ -61,6 +71,15 @@ class HomeTab(QWidget):
         self.deal_reminders_list = QListWidget()
         layout.addWidget(self.deal_reminders_list)
         self.deal_reminders_list.itemDoubleClicked.connect(self.open_deal_detail)
+
+        self.reminder_chart_label = QLabel(
+            "<b>Напоминания по сделкам на 2 недели</b>"
+        )
+        self.reminder_chart_label.setTextFormat(Qt.RichText)
+        layout.addWidget(self.reminder_chart_label)
+        self.reminder_chart = QChartView()
+        self.reminder_chart.setMinimumHeight(200)
+        layout.addWidget(self.reminder_chart)
 
         layout.addStretch()
         self.update_stats()
@@ -149,6 +168,8 @@ class HomeTab(QWidget):
             empty.setFlags(Qt.NoItemFlags)
             self.deal_reminders_list.addItem(empty)
 
+        self.update_reminder_chart()
+
     def open_task_detail(self, item):
         task = item.data(Qt.UserRole)
         if task:
@@ -169,3 +190,30 @@ class HomeTab(QWidget):
             dlg = DealDetailView(deal, parent=self)
             dlg.exec()
             self.update_stats()
+
+    def update_reminder_chart(self):
+        counts = get_deal_reminder_counts()
+        chart = QChart()
+        bar_set = QBarSet("Напоминания")
+        categories = []
+        for d in sorted(counts.keys()):
+            bar_set.append(counts[d])
+            categories.append(d.strftime("%d.%m"))
+        series = QBarSeries()
+        series.append(bar_set)
+        chart.addSeries(series)
+
+        axis_x = QBarCategoryAxis()
+        axis_x.append(categories)
+        chart.addAxis(axis_x, Qt.AlignBottom)
+        series.attachAxis(axis_x)
+
+        axis_y = QValueAxis()
+        axis_y.setRange(0, max(counts.values()) if counts else 0)
+        chart.addAxis(axis_y, Qt.AlignLeft)
+        series.attachAxis(axis_y)
+
+        chart.legend().setVisible(False)
+        chart.setAnimationOptions(QChart.SeriesAnimations)
+        self.reminder_chart.setChart(chart)
+        self.reminder_chart.setRenderHint(QPainter.Antialiasing)
