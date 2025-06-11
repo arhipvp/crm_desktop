@@ -84,8 +84,7 @@ docker-compose up -d
 ```
 
 Сервис `db` использует том `db_data:/var/lib/postgresql/data`.
-Контейнер `telegram_bot` монтирует
-`G:/Мой диск/Клиенты:/data/clients` и `./logs:/app/logs`.
+Контейнер `telegram_bot` монтирует `./logs:/app/logs`.
 
 ## Тесты
 

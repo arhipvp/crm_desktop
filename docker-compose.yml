@@ -26,7 +26,6 @@ services:
       
       restart: unless-stopped
       volumes:
-        - "G:/Мой диск/Клиенты:/data/clients"
         - ./logs:/app/logs
 
 
