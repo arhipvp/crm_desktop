@@ -19,10 +19,15 @@ services:
         context: .
         dockerfile: telegram_bot/Dockerfile
       container_name: crm_telegram_bot
+      depends_on:
+        - db
       env_file:
         - telegram_bot/.env   # ← вот он
-
+      
       restart: unless-stopped
+      volumes:
+        - "G:/Мой диск/Клиенты:/data/clients"
+        - ./logs:/app/logs
 
 
 volumes:
