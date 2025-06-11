@@ -165,6 +165,9 @@ def test_get_deal_reminder_counts():
     add_deal(client_id=client.id, start_date=today, description='C', reminder_date=today + timedelta(days=2))
 
     counts = get_deal_reminder_counts()
+    # Должны быть данные на все 14 дней, включая нулевые значения
+    assert len(counts) == 14
+    assert counts[today] == 0
     assert counts[today + timedelta(days=1)] == 2
     assert counts[today + timedelta(days=2)] == 1
 

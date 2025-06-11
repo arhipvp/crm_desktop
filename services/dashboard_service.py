@@ -101,7 +101,10 @@ def get_upcoming_deal_reminders(limit: int = 10) -> list[Deal]:
 def get_deal_reminder_counts(days: int = 14) -> dict:
     """Количество напоминаний по сделкам на ближайшие ``days`` дней."""
     today = date.today()
-    end_date = today + timedelta(days=days)
+    # Включаем все дни в диапазоне, даже если напоминаний нет
+    counts = {today + timedelta(days=i): 0 for i in range(days)}
+    end_date = today + timedelta(days=days - 1)
+
     query = (
         Deal.select(Deal.reminder_date, fn.COUNT(Deal.id).alias("cnt"))
         .where(
@@ -113,4 +116,8 @@ def get_deal_reminder_counts(days: int = 14) -> dict:
         .group_by(Deal.reminder_date)
         .order_by(Deal.reminder_date.asc())
     )
-    return {row.reminder_date: row.cnt for row in query}
+
+    for row in query:
+        counts[row.reminder_date] = row.cnt
+
+    return counts

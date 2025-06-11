@@ -123,7 +123,11 @@ def test_home_tab_has_chart(qtbot):
 
     home = HomeTab()
     qtbot.addWidget(home)
-    assert home.reminder_chart.chart() is not None
+    chart = home.reminder_chart.chart()
+    assert chart is not None
+    series = chart.series()[0]
+    barset = series.barSets()[0]
+    assert barset.count() == 14
 
 
 def test_menu_backup_runs(qtbot, monkeypatch):
