@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QHeaderView,
 )
 from PySide6.QtGui import (
     QSyntaxHighlighter,
@@ -299,6 +300,29 @@ class DealDetailView(QDialog):
 
         self.tabs.addTab(task_tab, "Задачи")
         self.task_view = task_view  # сохраняем для refresh
+
+        task_view.data_loaded.connect(self._adjust_task_columns)
+
+    def _adjust_task_columns(self, *_):
+        """Настройка колонок таблицы задач во вкладке сделки."""
+        tv = getattr(self, "task_view", None)
+        if not tv or not tv.model:
+            return
+
+        header = tv.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Interactive)
+
+        try:
+            idx_deal = tv.model.fields.index(Task.deal)
+            tv.table.setColumnHidden(idx_deal, True)
+        except ValueError:
+            pass
+
+        try:
+            idx_note = tv.model.fields.index(Task.note)
+            tv.table.setColumnWidth(idx_note, 250)
+        except ValueError:
+            pass
 
     def _init_actions(self):
         box = QHBoxLayout()
