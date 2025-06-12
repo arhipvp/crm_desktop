@@ -40,6 +40,12 @@ BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
 if not BOT_TOKEN:
     raise RuntimeError("TG_BOT_TOKEN не найден. Укажите его в .env")
 
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+try:
+    ADMIN_CHAT_ID = int(ADMIN_CHAT_ID) if ADMIN_CHAT_ID else None
+except ValueError:
+    ADMIN_CHAT_ID = None
+
 logger = logging.getLogger(__name__)
 
 # ───────────── imports из core ─────────────
@@ -100,6 +106,34 @@ def kb_task(tid: int) -> InlineKeyboardMarkup:
     )
 
 
+def kb_admin(tid: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("\u2705 Принять", callback_data=f"accept:{tid}"),
+                InlineKeyboardButton("\u270F\ufe0f Внести информацию", callback_data=f"info:{tid}"),
+            ]
+        ]
+    )
+
+
+async def notify_admin(bot, tid: int, user_text: str | None = None):
+    if not ADMIN_CHAT_ID:
+        return
+    task = ts.Task.get_or_none(ts.Task.id == tid)
+    if not task:
+        return
+    text = fmt_task(task)
+    if user_text:
+        text += f"\n\n{user_text}"
+    await bot.send_message(
+        ADMIN_CHAT_ID,
+        text,
+        reply_markup=kb_admin(tid),
+        parse_mode=constants.ParseMode.HTML,
+    )
+
+
 # ───────────── handlers ─────────────
 async def h_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     kb = InlineKeyboardMarkup(
@@ -154,6 +188,7 @@ async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         await q.message.edit_text(
             "✅ Задача скрыта из очереди", parse_mode=constants.ParseMode.HTML
         )
+        await notify_admin(_ctx.bot, tid)
 
     elif action == "ret":
         ts.return_to_queue(tid)
@@ -168,6 +203,25 @@ async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         )
 
 
+async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    action, tid = q.data.split(":")
+    tid = int(tid)
+
+    if action == "accept":
+        ts.mark_done(tid)
+        await q.message.edit_text(
+            "✅ Задача подтверждена", parse_mode=constants.ParseMode.HTML
+        )
+    elif action == "info":
+        await q.message.reply_text(
+            f"Введите информацию для задачи #{tid}:",
+            reply_markup=ForceReply(selective=True),
+        )
+
+
 async def h_text(update: Update, _ctx):
     if not update.message.reply_to_message:
         return
@@ -178,6 +232,8 @@ async def h_text(update: Update, _ctx):
     stamp = now_str()
     ts.append_note(tid, f"[TG {stamp}] {update.message.text}")
     await update.message.reply_text("Комментарий сохранён 👍")
+    if update.message.chat_id != ADMIN_CHAT_ID:
+        await notify_admin(_ctx.bot, tid, update.message.text)
 
 
 async def h_file(update: Update, _ctx):
@@ -221,6 +277,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(h_get, pattern="^get$"))
     app.add_handler(CallbackQueryHandler(h_choose_client, pattern=r"^client:\d+$"))
     app.add_handler(CallbackQueryHandler(h_action, pattern=r"^(done|ret|reply):"))
+    app.add_handler(CallbackQueryHandler(h_admin_action, pattern=r"^(accept|info):"))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))
 

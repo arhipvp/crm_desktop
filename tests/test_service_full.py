@@ -1,5 +1,6 @@
 from datetime import date
 import pytest
+import types
 
 from services.client_service import (
     add_client,
@@ -232,3 +233,85 @@ def test_task_queue_flow():
     assert task.id in [t.id for t in page]
 
     assert get_pending_tasks().count() >= 0
+
+
+class DummyBot:
+    def __init__(self):
+        self.sent = []
+
+    async def send_message(self, chat_id, text, reply_markup=None, parse_mode=None):
+        self.sent.append((chat_id, text, reply_markup))
+
+
+class DummyMessage:
+    def __init__(self, bot, text_html="", chat_id=1, reply_to=None):
+        self.bot = bot
+        self.text_html = text_html
+        self.chat_id = chat_id
+        self.reply_to_message = reply_to
+        self.edits = []
+        self.replies = []
+
+    async def edit_text(self, text, parse_mode=None):
+        self.edits.append(text)
+
+    async def reply_text(self, text, reply_markup=None):
+        self.replies.append((text, reply_markup))
+
+
+class DummyQuery:
+    def __init__(self, data, message):
+        self.data = data
+        self.message = message
+
+    async def answer(self, *a, **k):
+        pass
+
+
+def test_telegram_notify_and_accept(monkeypatch):
+    monkeypatch.setenv("TG_BOT_TOKEN", "x")
+    monkeypatch.setenv("ADMIN_CHAT_ID", "99")
+    import importlib
+    tg = importlib.reload(importlib.import_module("telegram_bot.bot"))
+
+    task = add_task(title="t", due_date=date.today())
+    task.dispatch_state = "sent"
+    task.save()
+
+    bot = DummyBot()
+    msg = DummyMessage(bot)
+    q = DummyQuery(f"done:{task.id}", msg)
+    ctx = types.SimpleNamespace(bot=bot)
+    import asyncio
+    asyncio.run(tg.h_action(types.SimpleNamespace(callback_query=q), ctx))
+
+    assert bot.sent
+
+    admin_msg = DummyMessage(bot)
+    q2 = DummyQuery(f"accept:{task.id}", admin_msg)
+    asyncio.run(tg.h_admin_action(types.SimpleNamespace(callback_query=q2), ctx))
+
+    assert admin_msg.edits
+    assert tg.ts.Task.get_by_id(task.id).is_done
+
+
+def test_telegram_comment_notify(monkeypatch):
+    monkeypatch.setenv("TG_BOT_TOKEN", "x")
+    monkeypatch.setenv("ADMIN_CHAT_ID", "77")
+    import importlib
+    tg = importlib.reload(importlib.import_module("telegram_bot.bot"))
+
+    task = add_task(title="t2", due_date=date.today())
+    bot = DummyBot()
+    reply = DummyMessage(bot, text_html=f"#{task.id}")
+    msg = DummyMessage(bot, chat_id=5, reply_to=reply)
+    msg.text = "note"
+    update = types.SimpleNamespace(message=msg)
+    ctx = types.SimpleNamespace(bot=bot)
+
+    import asyncio
+    asyncio.run(tg.h_text(update, ctx))
+
+    assert tg.ts.Task.get_by_id(task.id).note
+    assert bot.sent
+
