@@ -286,10 +286,12 @@ class DealDetailView(QDialog):
         tasks = list(get_tasks_by_deal(self.instance.id))
 
         task_view = TaskTableView(parent=self, deal_id=self.instance.id)
+        task_view.data_loaded.connect(self._adjust_task_columns)
         vbox.addWidget(task_view)
         self.task_view = task_view
 
         task_view.set_model_class_and_items(Task, tasks, total_count=len(tasks))
+        self._adjust_task_columns()
         sel = task_view.table.selectionModel()
         if sel:
             sel.selectionChanged.connect(task_view._update_actions_state)
@@ -300,8 +302,6 @@ class DealDetailView(QDialog):
 
         self.tabs.addTab(task_tab, "Задачи")
         self.task_view = task_view  # сохраняем для refresh
-
-        task_view.data_loaded.connect(self._adjust_task_columns)
 
     def _adjust_task_columns(self, *_):
         """Настройка колонок таблицы задач во вкладке сделки."""
