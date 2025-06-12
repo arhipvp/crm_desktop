@@ -48,6 +48,9 @@ except ValueError:
 
 logger = logging.getLogger(__name__)
 
+# Задачи, ожидающие подтверждения администратора
+pending_accept: dict[int, int] = {}
+
 # ───────────── imports из core ─────────────
 from services import task_service as ts
 
@@ -194,6 +197,7 @@ async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         await q.message.edit_text(
             "✅ Задача скрыта из очереди", parse_mode=constants.ParseMode.HTML
         )
+        pending_accept[tid] = q.message.chat_id
         await notify_admin(_ctx.bot, tid)
 
     elif action == "ret":
@@ -221,6 +225,9 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         await q.message.edit_text(
             "✅ Задача подтверждена", parse_mode=constants.ParseMode.HTML
         )
+        chat_id = pending_accept.pop(tid, None)
+        if chat_id:
+            await _ctx.bot.send_message(chat_id, "Задача принята")
     elif action == "info":
         await q.message.reply_text(
             f"Введите информацию для задачи #{tid}:",

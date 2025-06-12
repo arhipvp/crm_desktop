@@ -293,6 +293,7 @@ def test_telegram_notify_and_accept(monkeypatch):
 
     assert admin_msg.edits
     assert tg.ts.Task.get_by_id(task.id).is_done
+    assert any("принята" in m[1] for m in bot.sent if m[0] == msg.chat_id)
 
 
 def test_telegram_comment_notify(monkeypatch):
