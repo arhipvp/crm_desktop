@@ -315,3 +315,35 @@ def test_telegram_comment_notify(monkeypatch):
     assert tg.ts.Task.get_by_id(task.id).note
     assert bot.sent
 
+
+def test_telegram_admin_rework(monkeypatch):
+    monkeypatch.setenv("TG_BOT_TOKEN", "x")
+    monkeypatch.setenv("ADMIN_CHAT_ID", "55")
+    import importlib
+    tg = importlib.reload(importlib.import_module("telegram_bot.bot"))
+
+    task = add_task(title="t3", due_date=date.today())
+    task.dispatch_state = "sent"
+    task.save()
+
+    bot = DummyBot()
+    msg = DummyMessage(bot)
+    q = DummyQuery(f"done:{task.id}", msg)
+    ctx = types.SimpleNamespace(bot=bot)
+    import asyncio
+    asyncio.run(tg.h_action(types.SimpleNamespace(callback_query=q), ctx))
+
+    admin_msg = DummyMessage(bot)
+    q2 = DummyQuery(f"rework:{task.id}", admin_msg)
+    asyncio.run(tg.h_admin_action(types.SimpleNamespace(callback_query=q2), ctx))
+
+    assert tg.ts.Task.get_by_id(task.id).dispatch_state == "queued"
+    assert admin_msg.replies
+
+    reply = DummyMessage(bot, text_html=f"#{task.id}")
+    msg2 = DummyMessage(bot, chat_id=55, reply_to=reply)
+    msg2.text = "fix"
+    asyncio.run(tg.h_text(types.SimpleNamespace(message=msg2), ctx))
+
+    assert "fix" in tg.ts.Task.get_by_id(task.id).note
+

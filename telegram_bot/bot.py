@@ -112,7 +112,13 @@ def kb_admin(tid: int) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton("\u2705 Принять", callback_data=f"accept:{tid}"),
                 InlineKeyboardButton("\u270F\ufe0f Внести информацию", callback_data=f"info:{tid}"),
-            ]
+            ],
+            [
+                InlineKeyboardButton(
+                    "\u21a9\ufe0f Прокомментировать и вернуть",
+                    callback_data=f"rework:{tid}",
+                )
+            ],
         ]
     )
 
@@ -220,6 +226,16 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
             f"Введите информацию для задачи #{tid}:",
             reply_markup=ForceReply(selective=True),
         )
+    elif action == "rework":
+        ts.queue_task(tid)
+        await q.message.edit_text(
+            "↩ Задача возвращена на доработку",
+            parse_mode=constants.ParseMode.HTML,
+        )
+        await q.message.reply_text(
+            f"Прокомментируйте задачу #{tid}:",
+            reply_markup=ForceReply(selective=True),
+        )
 
 
 async def h_text(update: Update, _ctx):
@@ -277,7 +293,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(h_get, pattern="^get$"))
     app.add_handler(CallbackQueryHandler(h_choose_client, pattern=r"^client:\d+$"))
     app.add_handler(CallbackQueryHandler(h_action, pattern=r"^(done|ret|reply):"))
-    app.add_handler(CallbackQueryHandler(h_admin_action, pattern=r"^(accept|info):"))
+    app.add_handler(CallbackQueryHandler(h_admin_action, pattern=r"^(accept|info|rework):"))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))
 
