@@ -121,3 +121,5 @@ class Expense(BaseModel):
     note = TextField(null=True)
     is_deleted = BooleanField(default=False)
     policy = ForeignKeyField(Policy, backref="expenses")
+
+
