@@ -260,9 +260,10 @@ class DummyMessage:
 
 
 class DummyQuery:
-    def __init__(self, data, message):
+    def __init__(self, data, message, user=None):
         self.data = data
         self.message = message
+        self.from_user = user or types.SimpleNamespace(id=0, full_name="Anon", username=None)
 
     async def answer(self, *a, **k):
         pass
@@ -280,7 +281,7 @@ def test_telegram_notify_and_accept(monkeypatch):
 
     bot = DummyBot()
     msg = DummyMessage(bot)
-    q = DummyQuery(f"done:{task.id}", msg)
+    q = DummyQuery(f"done:{task.id}", msg, user=types.SimpleNamespace(id=5, full_name="Exec", username=None))
     ctx = types.SimpleNamespace(bot=bot)
     import asyncio
     asyncio.run(tg.h_action(types.SimpleNamespace(callback_query=q), ctx))
@@ -288,7 +289,11 @@ def test_telegram_notify_and_accept(monkeypatch):
     assert bot.sent
 
     admin_msg = DummyMessage(bot)
-    q2 = DummyQuery(f"accept:{task.id}", admin_msg)
+    q2 = DummyQuery(
+        f"accept:{task.id}",
+        admin_msg,
+        user=types.SimpleNamespace(id=99, full_name="Admin", username=None),
+    )
     asyncio.run(tg.h_admin_action(types.SimpleNamespace(callback_query=q2), ctx))
 
     assert admin_msg.edits
@@ -307,7 +312,10 @@ def test_telegram_comment_notify(monkeypatch):
     reply = DummyMessage(bot, text_html=f"#{task.id}")
     msg = DummyMessage(bot, chat_id=5, reply_to=reply)
     msg.text = "note"
-    update = types.SimpleNamespace(message=msg)
+    update = types.SimpleNamespace(
+        message=msg,
+        effective_user=types.SimpleNamespace(id=5, full_name="Exec", username=None),
+    )
     ctx = types.SimpleNamespace(bot=bot)
 
     import asyncio
@@ -329,13 +337,21 @@ def test_telegram_admin_rework(monkeypatch):
 
     bot = DummyBot()
     msg = DummyMessage(bot)
-    q = DummyQuery(f"done:{task.id}", msg)
+    q = DummyQuery(
+        f"done:{task.id}",
+        msg,
+        user=types.SimpleNamespace(id=7, full_name="Exec2", username=None),
+    )
     ctx = types.SimpleNamespace(bot=bot)
     import asyncio
     asyncio.run(tg.h_action(types.SimpleNamespace(callback_query=q), ctx))
 
     admin_msg = DummyMessage(bot)
-    q2 = DummyQuery(f"rework:{task.id}", admin_msg)
+    q2 = DummyQuery(
+        f"rework:{task.id}",
+        admin_msg,
+        user=types.SimpleNamespace(id=55, full_name="Admin", username=None),
+    )
     asyncio.run(tg.h_admin_action(types.SimpleNamespace(callback_query=q2), ctx))
 
     assert tg.ts.Task.get_by_id(task.id).dispatch_state == "queued"
@@ -344,7 +360,15 @@ def test_telegram_admin_rework(monkeypatch):
     reply = DummyMessage(bot, text_html=f"#{task.id}")
     msg2 = DummyMessage(bot, chat_id=55, reply_to=reply)
     msg2.text = "fix"
-    asyncio.run(tg.h_text(types.SimpleNamespace(message=msg2), ctx))
+    asyncio.run(
+        tg.h_text(
+            types.SimpleNamespace(
+                message=msg2,
+                effective_user=types.SimpleNamespace(id=55, full_name="Admin", username=None),
+            ),
+            ctx,
+        )
+    )
 
     assert "fix" in tg.ts.Task.get_by_id(task.id).note
 

@@ -50,8 +50,9 @@ except ValueError:
 
 logger = logging.getLogger(__name__)
 
-# Задачи, ожидающие подтверждения администратора
-pending_accept: dict[int, int] = {}
+# Задачи, ожидающие подтверждения администратора.
+# Храним чат исполнителя и его имя для уведомлений.
+pending_accept: dict[int, tuple[int, str]] = {}
 
 # ───────────── imports из core ─────────────
 from services import task_service as ts
@@ -128,13 +129,18 @@ def kb_admin(tid: int) -> InlineKeyboardMarkup:
     )
 
 
-async def notify_admin(bot, tid: int, user_text: str | None = None):
+async def notify_admin(
+    bot, tid: int, user_text: str | None = None, executor: str | None = None
+):
+    """Отправить администратору информацию о задаче."""
     if not ADMIN_CHAT_ID:
         return
     task = ts.Task.get_or_none(ts.Task.id == tid)
     if not task:
         return
     text = fmt_task(task)
+    if executor:
+        text += f"\n\nИсполнитель: {executor}"
     if user_text:
         text += f"\n\n{user_text}"
     logger.info("Notify admin about %s", tid)
@@ -205,8 +211,9 @@ async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         await q.message.edit_text(
             "✅ Задача скрыта из очереди", parse_mode=constants.ParseMode.HTML
         )
-        pending_accept[tid] = q.message.chat_id
-        await notify_admin(_ctx.bot, tid)
+        user_name = q.from_user.full_name or ("@" + q.from_user.username) if q.from_user.username else str(q.from_user.id)
+        pending_accept[tid] = (q.message.chat_id, user_name)
+        await notify_admin(_ctx.bot, tid, executor=user_name)
         logger.info("Task %s marked done, awaiting admin", tid)
 
     elif action == "ret":
@@ -237,7 +244,8 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         await q.message.edit_text(
             "✅ Задача подтверждена", parse_mode=constants.ParseMode.HTML
         )
-        chat_id = pending_accept.pop(tid, None)
+        info = pending_accept.pop(tid, None)
+        chat_id = info[0] if isinstance(info, tuple) else info
         if chat_id:
             await _ctx.bot.send_message(chat_id, "Задача принята")
         logger.info("Task %s accepted", tid)
@@ -273,7 +281,13 @@ async def h_text(update: Update, _ctx):
     await update.message.reply_text("Комментарий сохранён 👍")
     logger.info("Note added to %s", tid)
     if update.message.chat_id != ADMIN_CHAT_ID:
-        await notify_admin(_ctx.bot, tid, update.message.text)
+        user_name = (
+            update.effective_user.full_name
+            or ("@" + update.effective_user.username)
+            if update.effective_user.username
+            else str(update.effective_user.id)
+        )
+        await notify_admin(_ctx.bot, tid, update.message.text, executor=user_name)
 
 
 async def h_file(update: Update, _ctx):
