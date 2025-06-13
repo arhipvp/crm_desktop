@@ -173,7 +173,6 @@ def update_deal(deal: Deal, **kwargs):
         deal.calculations = f"[{ts}]: {new_calc}\n{old}"
 
     deal.save()
-    refresh_deal_drive_link(deal)
     return deal
 
 

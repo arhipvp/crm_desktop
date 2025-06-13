@@ -11,6 +11,7 @@ from playhouse.shortcuts import prefetch
 
 from database.db import db
 from database.models import Client, Deal, Policy, Task
+from services.deal_service import refresh_deal_drive_link
 
 
 # ───────────────────────── базовые CRUD ─────────────────────────
@@ -66,13 +67,6 @@ def add_task(**kwargs):
     logger.info(
         "📝 Создана задача #%s: '%s' (due %s)", task.id, task.title, task.due_date
     )
-
-    if task.deal_id:
-        from services.deal_service import refresh_deal_drive_link, get_deal_by_id
-
-        deal = get_deal_by_id(task.deal_id)
-        if deal:
-            refresh_deal_drive_link(deal)
 
     return task
 
@@ -233,6 +227,8 @@ def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
             task.dispatch_state = "sent"
             task.tg_chat_id = chat_id
             task.save()
+            if task.deal:
+                refresh_deal_drive_link(task.deal)
             logger.info(
                 "📬 Задача #%s выдана в Telegram для клиента %s: chat_id=%s",
                 task.id,
@@ -266,6 +262,8 @@ def pop_next(chat_id: int) -> Task | None:
             task.dispatch_state = "sent"
             task.tg_chat_id = chat_id
             task.save()
+            if task.deal:
+                refresh_deal_drive_link(task.deal)
             logger.info("📬 Задача #%s выдана в Telegram: chat_id=%s", task.id, chat_id)
         else:
             logger.info("📭 Нет задач в очереди")
