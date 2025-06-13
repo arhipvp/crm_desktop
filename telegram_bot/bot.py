@@ -325,16 +325,16 @@ async def h_text(update: Update, _ctx):
     tid = int(m.group(1))
     logger.info("Text reply for %s from %s", tid, update.message.chat_id)
     stamp = now_str()
-    ts.append_note(tid, f"[TG {stamp}] {update.message.text}")
+    user_name = (
+        update.effective_user.full_name
+        or ("@" + update.effective_user.username)
+        if update.effective_user.username
+        else str(update.effective_user.id)
+    )
+    ts.append_note(tid, f"[TG {stamp}] {user_name}: {update.message.text}")
     await update.message.reply_text("Комментарий сохранён 👍")
     logger.info("Note added to %s", tid)
     if update.message.chat_id != ADMIN_CHAT_ID:
-        user_name = (
-            update.effective_user.full_name
-            or ("@" + update.effective_user.username)
-            if update.effective_user.username
-            else str(update.effective_user.id)
-        )
         await notify_admin(_ctx.bot, tid, update.message.text, executor=user_name)
 
 
