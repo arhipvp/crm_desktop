@@ -13,6 +13,7 @@ import datetime as _dt
 from utils.time_utils import now_str
 import tempfile
 import logging
+from utils.logging_config import setup_logging
 from dotenv import load_dotenv
 from pathlib import Path
 from html import escape
@@ -35,6 +36,7 @@ from telegram.ext import (
 # ───────────── env ─────────────
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 init_from_env()
+setup_logging()
 
 BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
 if not BOT_TOKEN:
@@ -135,6 +137,7 @@ async def notify_admin(bot, tid: int, user_text: str | None = None):
     text = fmt_task(task)
     if user_text:
         text += f"\n\n{user_text}"
+    logger.info("Notify admin about %s", tid)
     await bot.send_message(
         ADMIN_CHAT_ID,
         text,
@@ -145,6 +148,7 @@ async def notify_admin(bot, tid: int, user_text: str | None = None):
 
 # ───────────── handlers ─────────────
 async def h_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
+    logger.info("/start from %s", update.effective_user.id)
     kb = InlineKeyboardMarkup(
         [[InlineKeyboardButton("📥 Получить задачу", callback_data="get")]]
     )
@@ -157,6 +161,8 @@ async def h_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+    logger.info("Action '%s' from %s", q.data, q.from_user.id)
+    logger.info("%s requested tasks", q.from_user.id)
 
     clients = ts.get_clients_with_queued_tasks()
     if not clients:
@@ -173,6 +179,7 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+    logger.info("%s chose client", q.from_user.id)
 
     _p, cid = q.data.split(":")
     cid = int(cid)
@@ -181,6 +188,7 @@ async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     if not task:
         return await q.answer("Задачи закончились", show_alert=True)
 
+    logger.info("Выдана задача %s пользователю %s", task.id, q.from_user.id)
     msg = await q.message.reply_html(fmt_task(task), reply_markup=kb_task(task.id))
     ts.link_telegram(task.id, msg.chat_id, msg.message_id)
 
@@ -199,23 +207,27 @@ async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         )
         pending_accept[tid] = q.message.chat_id
         await notify_admin(_ctx.bot, tid)
+        logger.info("Task %s marked done, awaiting admin", tid)
 
     elif action == "ret":
         ts.return_to_queue(tid)
         await q.message.edit_text(
             "🔄 <i>Задача возвращена в очередь</i>", parse_mode=constants.ParseMode.HTML
         )
+        logger.info("Task %s returned to queue", tid)
 
     elif action == "reply":
         await q.message.reply_text(
             f"Напишите комментарий к задаче #{tid}:",
             reply_markup=ForceReply(selective=True),
         )
+        logger.info("Awaiting comment for %s", tid)
 
 
 async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+    logger.info("Admin action '%s'", q.data)
 
     action, tid = q.data.split(":")
     tid = int(tid)
@@ -228,11 +240,13 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         chat_id = pending_accept.pop(tid, None)
         if chat_id:
             await _ctx.bot.send_message(chat_id, "Задача принята")
+        logger.info("Task %s accepted", tid)
     elif action == "info":
         await q.message.reply_text(
             f"Введите информацию для задачи #{tid}:",
             reply_markup=ForceReply(selective=True),
         )
+        logger.info("Requesting info for task %s", tid)
     elif action == "rework":
         ts.queue_task(tid)
         await q.message.edit_text(
@@ -243,6 +257,7 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
             f"Прокомментируйте задачу #{tid}:",
             reply_markup=ForceReply(selective=True),
         )
+        logger.info("Task %s returned for rework", tid)
 
 
 async def h_text(update: Update, _ctx):
@@ -252,9 +267,11 @@ async def h_text(update: Update, _ctx):
     if not m:
         return
     tid = int(m.group(1))
+    logger.info("Text reply for %s from %s", tid, update.message.chat_id)
     stamp = now_str()
     ts.append_note(tid, f"[TG {stamp}] {update.message.text}")
     await update.message.reply_text("Комментарий сохранён 👍")
+    logger.info("Note added to %s", tid)
     if update.message.chat_id != ADMIN_CHAT_ID:
         await notify_admin(_ctx.bot, tid, update.message.text)
 
@@ -280,6 +297,7 @@ async def h_file(update: Update, _ctx):
     if not tg_file:
         await msg.reply_text("⚠️ Не удалось определить файл.")
         return
+    logger.info("File from %s for deal %s", msg.chat_id, deal_id)
 
     ext = Path(tg_file.file_name or "").suffix if msg.document else ".jpg"
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=ext)
@@ -290,6 +308,7 @@ async def h_file(update: Update, _ctx):
     dest = deal_path / Path(tmp_path).name
     os.replace(tmp_path, dest)
     await msg.reply_text("📂 Файл сохранён в папке сделки ✔️")
+    logger.info("Saved file to %s", dest)
 
 
 # ───────────── main ─────────────
