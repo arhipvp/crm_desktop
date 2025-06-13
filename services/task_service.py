@@ -66,6 +66,14 @@ def add_task(**kwargs):
     logger.info(
         "📝 Создана задача #%s: '%s' (due %s)", task.id, task.title, task.due_date
     )
+
+    if task.deal_id:
+        from services.deal_service import refresh_deal_drive_link, get_deal_by_id
+
+        deal = get_deal_by_id(task.deal_id)
+        if deal:
+            refresh_deal_drive_link(deal)
+
     return task
 
 
@@ -176,9 +184,8 @@ def queue_task(task_id: int):
 
 def get_clients_with_queued_tasks() -> list[Client]:
     """Вернуть уникальных клиентов с задачами в состоянии ``queued``."""
-    base = (
-        Task.select()
-        .where((Task.dispatch_state == "queued") & (Task.is_deleted == False))
+    base = Task.select().where(
+        (Task.dispatch_state == "queued") & (Task.is_deleted == False)
     )
     tasks = prefetch(base, Deal, Policy, Client)
 
@@ -207,10 +214,7 @@ def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
             .where(
                 (Task.dispatch_state == "queued")
                 & (Task.is_deleted == False)
-                & (
-                    (Deal.client_id == client_id)
-                    | (Policy.client_id == client_id)
-                )
+                & ((Deal.client_id == client_id) | (Policy.client_id == client_id))
             )
             .order_by(Task.queued_at.asc())
             .limit(1)
