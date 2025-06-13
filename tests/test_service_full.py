@@ -372,3 +372,27 @@ def test_telegram_admin_rework(monkeypatch):
 
     assert "fix" in tg.ts.Task.get_by_id(task.id).note
 
+
+def test_telegram_executor_approval(monkeypatch):
+    monkeypatch.setenv("TG_BOT_TOKEN", "x")
+    monkeypatch.setenv("ADMIN_CHAT_ID", "101")
+    import importlib
+    tg = importlib.reload(importlib.import_module("telegram_bot.bot"))
+
+    bot = DummyBot()
+    msg = DummyMessage(bot)
+    q = DummyQuery("get", msg, user=types.SimpleNamespace(id=9, full_name="New Exec", username=None))
+    ctx = types.SimpleNamespace(bot=bot)
+    import asyncio
+    asyncio.run(tg.h_get(types.SimpleNamespace(callback_query=q), ctx))
+
+    assert any("доступ" in m[1].lower() for m in bot.sent)
+    assert not tg.es.is_approved(9)
+
+    admin_msg = DummyMessage(bot)
+    q2 = DummyQuery("approve_exec:9", admin_msg, user=types.SimpleNamespace(id=101, full_name="Admin", username=None))
+    asyncio.run(tg.h_admin_action(types.SimpleNamespace(callback_query=q2), ctx))
+
+    assert tg.es.is_approved(9)
+    assert any("одобрены" in m[1] for m in bot.sent if m[0] == msg.chat_id)
+

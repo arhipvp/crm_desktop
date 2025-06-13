@@ -121,3 +121,12 @@ class Expense(BaseModel):
     note = TextField(null=True)
     is_deleted = BooleanField(default=False)
     policy = ForeignKeyField(Policy, backref="expenses")
+
+
+# ─────────────────────────── Исполнитель ────────────────────────────
+class Executor(BaseModel):
+    """Telegram-пользователь, который может выполнять задачи."""
+
+    tg_id = BigIntegerField(primary_key=True)
+    full_name = CharField(null=True)
+    is_approved = BooleanField(default=False)

@@ -53,9 +53,11 @@ logger = logging.getLogger(__name__)
 # Задачи, ожидающие подтверждения администратора.
 # Храним чат исполнителя и его имя для уведомлений.
 pending_accept: dict[int, tuple[int, str]] = {}
+pending_users: dict[int, tuple[int, str]] = {}
 
 # ───────────── imports из core ─────────────
 from services import task_service as ts
+from services import executor_service as es
 
 
 # ───────────── helpers ─────────────
@@ -152,6 +154,25 @@ async def notify_admin(
     )
 
 
+def kb_user(uid: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ Согласовать", callback_data=f"approve_exec:{uid}"),
+                InlineKeyboardButton("❌ Отказать", callback_data=f"deny_exec:{uid}"),
+            ]
+        ]
+    )
+
+
+async def notify_admin_user(bot, uid: int, name: str):
+    if not ADMIN_CHAT_ID:
+        return
+    text = f"Запрос на доступ от {name} ({uid})"
+    logger.info("Notify admin about executor %s", uid)
+    await bot.send_message(ADMIN_CHAT_ID, text, reply_markup=kb_user(uid))
+
+
 # ───────────── handlers ─────────────
 async def h_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     logger.info("/start from %s", update.effective_user.id)
@@ -170,6 +191,15 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     logger.info("Action '%s' from %s", q.data, q.from_user.id)
     logger.info("%s requested tasks", q.from_user.id)
 
+    user_id = q.from_user.id
+    user_name = q.from_user.full_name or ("@" + q.from_user.username) if q.from_user.username else str(user_id)
+    es.ensure_executor(user_id, user_name)
+    if not es.is_approved(user_id):
+        if user_id not in pending_users:
+            pending_users[user_id] = (q.message.chat_id, user_name)
+            await notify_admin_user(_ctx.bot, user_id, user_name)
+        return await q.answer("⏳ Ожидайте одобрения администратора", show_alert=True)
+
     clients = ts.get_clients_with_queued_tasks()
     if not clients:
         return await q.answer("Очередь пуста 💤", show_alert=True)
@@ -186,6 +216,9 @@ async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     logger.info("%s chose client", q.from_user.id)
+
+    if not es.is_approved(q.from_user.id):
+        return await q.answer("⏳ Ожидайте одобрения администратора", show_alert=True)
 
     _p, cid = q.data.split(":")
     cid = int(cid)
@@ -266,6 +299,21 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
             reply_markup=ForceReply(selective=True),
         )
         logger.info("Task %s returned for rework", tid)
+    elif action == "approve_exec":
+        es.approve_executor(tid)
+        info = pending_users.pop(tid, None)
+        chat_id = info[0] if isinstance(info, tuple) else info
+        await q.message.edit_text("Исполнитель подтверждён")
+        if chat_id:
+            await _ctx.bot.send_message(chat_id, "Вы одобрены. Можно брать задачи")
+        logger.info("Executor %s approved", tid)
+    elif action == "deny_exec":
+        info = pending_users.pop(tid, None)
+        chat_id = info[0] if isinstance(info, tuple) else info
+        await q.message.edit_text("Запрос отклонён")
+        if chat_id:
+            await _ctx.bot.send_message(chat_id, "Администратор отклонил доступ")
+        logger.info("Executor %s denied", tid)
 
 
 async def h_text(update: Update, _ctx):
@@ -333,7 +381,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(h_get, pattern="^get$"))
     app.add_handler(CallbackQueryHandler(h_choose_client, pattern=r"^client:\d+$"))
     app.add_handler(CallbackQueryHandler(h_action, pattern=r"^(done|ret|reply):"))
-    app.add_handler(CallbackQueryHandler(h_admin_action, pattern=r"^(accept|info|rework):"))
+    app.add_handler(CallbackQueryHandler(h_admin_action, pattern=r"^(accept|info|rework|approve_exec|deny_exec):"))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))
 
