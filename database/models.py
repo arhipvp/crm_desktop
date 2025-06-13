@@ -123,10 +123,3 @@ class Expense(BaseModel):
     policy = ForeignKeyField(Policy, backref="expenses")
 
 
-# ─────────────────────────── Исполнитель ────────────────────────────
-class Executor(BaseModel):
-    """Telegram-пользователь, который может выполнять задачи."""
-
-    tg_id = BigIntegerField(primary_key=True)
-    full_name = CharField(null=True)
-    is_approved = BooleanField(default=False)
