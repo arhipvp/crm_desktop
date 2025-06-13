@@ -16,7 +16,13 @@ from database.db import db
 from database.models import Client  # обязательно!
 from database.models import Deal, Policy, Task
 from services.client_service import get_client_by_id
-from services.folder_utils import create_deal_folder
+from services.folder_utils import (
+    create_deal_folder,
+    find_drive_folder,
+    sanitize_name,
+    extract_folder_id,
+    Credentials,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -301,3 +307,24 @@ def get_prev_deal(current_deal: Deal) -> Deal | None:
         .order_by(Deal.reminder_date.desc(), Deal.id.desc())
         .first()
     )
+
+
+def refresh_deal_drive_link(deal: Deal) -> None:
+    """Попытаться найти ссылку папки сделки на Google Drive."""
+    if deal.drive_folder_link:
+        return
+
+    client_link = deal.client.drive_folder_link if deal.client else None
+    if not client_link or Credentials is None:
+        return
+
+    try:
+        deal_name = sanitize_name(f"Сделка - {deal.description}")
+        parent_id = extract_folder_id(client_link)
+        link = find_drive_folder(deal_name, parent_id)
+        if link:
+            deal.drive_folder_link = link
+            deal.save(update_fields=["drive_folder_link"])
+            logger.info("🔗 Обновлена ссылка сделки на Drive: %s", link)
+    except Exception:
+        logger.exception("Не удалось обновить ссылку на папку сделки %s", deal.id)

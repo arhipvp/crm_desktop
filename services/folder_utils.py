@@ -11,6 +11,7 @@ import subprocess
 import sys
 import webbrowser
 from functools import lru_cache
+import time
 from typing import Optional, Tuple
 
 try:
@@ -89,7 +90,27 @@ def create_drive_folder(folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> st
     return f"https://drive.google.com/drive/folders/{folder['id']}"
 
 
-def create_client_drive_folder(client_name: str) -> tuple[str, str]:
+def find_drive_folder(folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> str | None:
+    """Найти существующую папку в Google Drive и вернуть webViewLink."""
+    folder_name = sanitize_name(folder_name)
+    service = get_drive_service()
+
+    query = (
+        f"'{parent_id}' in parents and name = '{folder_name}' and "
+        "mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    )
+    response = (
+        service.files()
+        .list(q=query, fields="files(id, webViewLink)", spaces="drive")
+        .execute()
+    )
+    files = response.get("files", [])
+    if files:
+        return files[0].get("webViewLink")
+    return None
+
+
+def create_client_drive_folder(client_name: str) -> Tuple[str, Optional[str]]:
     """Создать локальную папку клиента и вернуть (локальный путь, веб-ссылку)."""
     safe_name = sanitize_name(client_name)
     local_path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, safe_name)
@@ -101,8 +122,19 @@ def create_client_drive_folder(client_name: str) -> tuple[str, str]:
 
         return None, None
 
-    # Создаём настоящую папку в Google Диске
-    web_link = create_drive_folder(safe_name)
+    # Папку создаёт локальный клиент Google Drive; ждём появления в облаке
+    web_link = None
+    if Credentials is not None:
+        parent_id = ROOT_FOLDER_ID
+        for _ in range(10):
+            try:
+                web_link = find_drive_folder(safe_name, parent_id)
+                if web_link:
+                    break
+            except Exception:
+                logger.exception("Не удалось найти папку клиента на Drive")
+            time.sleep(2)
+
     return local_path, web_link
 
 
@@ -173,13 +205,17 @@ def create_deal_folder(
 
     # -------- облако: только если передали ссылку клиента
     web_link: Optional[str] = None
-    if client_drive_link:
-        try:
-            parent_id = extract_folder_id(client_drive_link)  # ID папки клиента
-            web_link = create_drive_folder(deal_name, parent_id)  # подпапка сделки
-            logger.info("☁️  Drive-папка сделки: %s", web_link)
-        except Exception:
-            logger.exception("Не удалось создать подпапку сделки на Drive")
+    if client_drive_link and Credentials is not None:
+        parent_id = extract_folder_id(client_drive_link)
+        for _ in range(10):
+            try:
+                web_link = find_drive_folder(deal_name, parent_id)
+                if web_link:
+                    logger.info("☁️  Drive-папка сделки: %s", web_link)
+                    break
+            except Exception:
+                logger.exception("Не удалось найти папку сделки на Drive")
+            time.sleep(2)
 
     return local_path, web_link
 
@@ -229,7 +265,9 @@ def upload_to_drive(local_path: str, drive_folder_id: str) -> str:
     return uploaded["webViewLink"]
 
 
-def open_folder(path_or_url: str, *, parent: Optional["QWidget"] = None) -> None:  # noqa: N802 (keep API)
+def open_folder(
+    path_or_url: str, *, parent: Optional["QWidget"] = None
+) -> None:  # noqa: N802 (keep API)
     """Пытается открыть строку как локальный путь, иначе — как URL.
 
     Parameters
@@ -263,7 +301,9 @@ def open_folder(path_or_url: str, *, parent: Optional["QWidget"] = None) -> None
     webbrowser.open(path_or_url)
 
 
-def copy_path_to_clipboard(path_or_url: str, *, parent: Optional["QWidget"] = None) -> None:
+def copy_path_to_clipboard(
+    path_or_url: str, *, parent: Optional["QWidget"] = None
+) -> None:
     """Копировать путь или ссылку в буфер обмена."""
     if not path_or_url:
         _msg("Папка не задана.", parent)
