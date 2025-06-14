@@ -2,7 +2,7 @@ from datetime import date
 
 from services.client_service import add_client
 from services.deal_service import add_deal
-from services.task_service import add_task, update_task
+from services.task_service import add_task, update_task, mark_done
 from database.models import Task, Deal
 
 
@@ -39,3 +39,42 @@ def test_fmt_task_includes_deal_log(monkeypatch):
     text = fmt_task(task)
     assert "Журнал" in text
     assert "note" in text
+
+
+def test_mark_done_updates_deal():
+    client = add_client(name="Bot")
+    deal = add_deal(
+        client_id=client.id,
+        start_date=date(2025, 1, 1),
+        description="BotDeal",
+    )
+    task = add_task(title="через бота", due_date=date(2025, 1, 2), deal_id=deal.id)
+
+    mark_done(task.id)
+
+    task = Task.get_by_id(task.id)
+    assert task.is_done
+
+    deal = Deal.get_by_id(deal.id)
+    assert "Задача" in (deal.calculations or "")
+
+
+def test_mark_done_logs_task_note():
+    client = add_client(name="NoteUser")
+    deal = add_deal(
+        client_id=client.id,
+        start_date=date(2025, 1, 1),
+        description="DealWithNotes",
+    )
+    task = add_task(
+        title="check note",
+        due_date=date(2025, 1, 2),
+        deal_id=deal.id,
+    )
+    task.note = "комментарий"
+    task.save()
+
+    mark_done(task.id)
+
+    deal = Deal.get_by_id(deal.id)
+    assert "комментарий" in (deal.calculations or "")
