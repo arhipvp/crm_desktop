@@ -57,3 +57,24 @@ def test_mark_done_updates_deal():
 
     deal = Deal.get_by_id(deal.id)
     assert "Задача" in (deal.calculations or "")
+
+
+def test_mark_done_logs_task_note():
+    client = add_client(name="NoteUser")
+    deal = add_deal(
+        client_id=client.id,
+        start_date=date(2025, 1, 1),
+        description="DealWithNotes",
+    )
+    task = add_task(
+        title="check note",
+        due_date=date(2025, 1, 2),
+        deal_id=deal.id,
+    )
+    task.note = "комментарий"
+    task.save()
+
+    mark_done(task.id)
+
+    deal = Deal.get_by_id(deal.id)
+    assert "комментарий" in (deal.calculations or "")

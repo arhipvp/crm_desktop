@@ -293,7 +293,7 @@ def link_telegram(task_id: int, chat_id: int, msg_id: int):
 def mark_done(task_id: int, note: str | None = None) -> None:
     """Отметить задачу выполненной и обновить связанные объекты.
 
-    Если ``note`` не указана, будет использована стандартная фраза.
+    Если ``note`` не указана, в журнал попадут примечания из самой задачи.
     Информация о выполнении также добавляется в связанную сделку или полис,
     аналогично обновлению через основное приложение.
     """
@@ -303,7 +303,8 @@ def mark_done(task_id: int, note: str | None = None) -> None:
         logger.warning("❗ Задача %s не найдена для завершения", task_id)
         return
 
-    update_task(task, is_done=True, note=note)
+    full_note = note if note is not None else task.note
+    update_task(task, is_done=True, note=full_note)
 
 
 def append_note(task_id: int, text: str):
