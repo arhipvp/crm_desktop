@@ -12,6 +12,7 @@ from playhouse.shortcuts import prefetch
 from database.db import db
 from database.models import Client, Deal, Policy, Task
 from services.deal_service import refresh_deal_drive_link
+from services.deal_service import get_deal_by_id  # re-export
 
 
 # ───────────────────────── базовые CRUD ─────────────────────────
@@ -237,6 +238,68 @@ def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
             )
         else:
             logger.info("📭 Нет задач в очереди для клиента %s", client_id)
+        return task
+
+
+def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
+    """Вернуть сделки клиента, у которых есть задачи в очереди."""
+    base = (
+        Task.select()
+        .join(Deal)
+        .where(
+            (Task.dispatch_state == "queued")
+            & (Task.is_deleted == False)
+            & (Deal.client_id == client_id)
+        )
+    )
+    tasks = prefetch(base, Deal)
+
+    seen: set[int] = set()
+    deals: list[Deal] = []
+    for t in tasks:
+        if t.deal and t.deal.id not in seen:
+            seen.add(t.deal.id)
+            deals.append(t.deal)
+    return deals
+
+
+def pop_next_by_deal(chat_id: int, deal_id: int) -> Task | None:
+    """Выдать следующую задачу из очереди для сделки."""
+    with db.atomic():
+        query = (
+            Task.select(Task.id)
+            .where(
+                (Task.dispatch_state == "queued")
+                & (Task.is_deleted == False)
+                & (Task.deal_id == deal_id)
+            )
+            .order_by(Task.queued_at.asc())
+            .limit(1)
+        )
+
+        task_ids = [t.id for t in query]
+        if not task_ids:
+            logger.info("📭 Нет задач в очереди для сделки %s", deal_id)
+            return None
+
+        base = Task.select().where(Task.id.in_(task_ids))
+        task_list = prefetch(base, Deal, Policy, Client)
+        task = task_list[0] if task_list else None
+
+        if task:
+            task.dispatch_state = "sent"
+            task.tg_chat_id = chat_id
+            task.save()
+            if task.deal:
+                refresh_deal_drive_link(task.deal)
+            logger.info(
+                "📬 Задача #%s выдана в Telegram для сделки %s: chat_id=%s",
+                task.id,
+                deal_id,
+                chat_id,
+            )
+        else:
+            logger.info("📭 Нет задач в очереди для сделки %s", deal_id)
         return task
 
 
