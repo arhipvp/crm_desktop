@@ -58,6 +58,7 @@ pending_users: dict[int, tuple[int, str]] = {}
 # ───────────── imports из core ─────────────
 from services import task_service as ts
 from services import executor_service as es
+from services import client_service as cs
 
 
 # ───────────── helpers ─────────────
@@ -241,12 +242,23 @@ async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     if not deals:
         return await q.answer("Нет задач по сделкам", show_alert=True)
 
+    client = cs.get_client_by_id(cid)
+    surname = client.name.split()[0] if client and client.name else ""
     buttons = [
         [InlineKeyboardButton(d.description.split()[0], callback_data=f"deal:{d.id}")]
         for d in deals
     ]
     kb = InlineKeyboardMarkup(buttons)
-    await q.message.reply_text("Выберите сделку:", reply_markup=kb)
+
+    info_lines = []
+    for d in deals:
+        log_line = d.calculations.splitlines()[0] if d.calculations else "журнал пуст"
+        info_lines.append(f"{d.description}: {log_line}")
+    info = "\n".join(info_lines)
+
+    await q.message.reply_text(
+        f"Выберите сделку клиента {surname}:\n{info}", reply_markup=kb
+    )
 
 
 async def h_choose_deal(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
