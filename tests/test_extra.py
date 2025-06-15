@@ -23,6 +23,7 @@ from services.dashboard_service import (
     get_deal_reminder_counts,
 )
 from services.folder_utils import rename_client_folder, open_local_or_web, copy_path_to_clipboard
+import services.folder_utils as folder_utils
 from services.task_service import add_task, append_note, mark_task_deleted
 from utils import screen_utils, time_utils
 from database.models import Expense, Income, Payment, Task, Client, Deal, Policy
@@ -57,6 +58,42 @@ def test_open_local_or_web_web(monkeypatch):
     monkeypatch.setattr(sys.modules['webbrowser'], 'open', lambda u: captured.setdefault('url', u))
     open_local_or_web('http://x', folder_name='Foo')
     assert captured.get('url') == 'http://x'
+
+
+def test_open_local_or_web_prompt(monkeypatch):
+    # GUI available but локальная папка отсутствует
+    monkeypatch.setattr(os.path, 'isdir', lambda p: False)
+
+    events = {}
+
+    class DummyMB:
+        Yes = 1
+        Cancel = 2
+
+        @staticmethod
+        def question(parent, title, text, buttons):
+            events['asked'] = text
+            return DummyMB.Cancel
+
+        @staticmethod
+        def warning(parent, title, text):
+            events['warn'] = text
+
+    class DummyApp:
+        @staticmethod
+        def instance():
+            return True
+
+    monkeypatch.setattr(folder_utils, 'QMessageBox', DummyMB)
+    monkeypatch.setattr(folder_utils, 'QApplication', DummyApp)
+
+    captured = {}
+    monkeypatch.setattr(sys.modules['webbrowser'], 'open', lambda u: captured.setdefault('url', u))
+
+    open_local_or_web('http://x', folder_name='Foo')
+
+    assert 'asked' in events
+    assert captured.get('url') is None
 
 
 class DummyClipboard:
