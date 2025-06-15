@@ -60,7 +60,14 @@ python telegram_bot/bot.py
 ## Docker Compose
 
 В репозитории есть `docker-compose.yml` для запуска PostgreSQL и бота.
-Перед стартом создайте в корне файл `.env` с параметрами базы:
+Перед стартом скопируйте примеры параметров из каталога `docker/`:
+
+```bash
+cp docker/db.env.example docker/db.env
+cp docker/bot.env.example docker/bot.env
+```
+
+Файл `db.env` содержит настройки контейнера с PostgreSQL:
 
 ```env
 POSTGRES_DB=crm
@@ -68,7 +75,7 @@ POSTGRES_USER=crm_user
 POSTGRES_PASSWORD=crm_pass
 ```
 
-Также создайте `telegram_bot/.env`:
+`bot.env` хранит параметры Telegram‑бота:
 
 ```env
 DATABASE_URL=postgres://crm_user:crm_pass@db:5432/crm

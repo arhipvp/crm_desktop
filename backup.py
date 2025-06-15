@@ -12,6 +12,15 @@ from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
 from peewee import PostgresqlDatabase
+from config import (
+    DATABASE_URL,
+    POSTGRES_DB,
+    POSTGRES_USER,
+    BACKUP_DIR,
+    SQL_BACKUP_TEMPLATE,
+    XLSX_BACKUP_TEMPLATE,
+    DRIVE_BACKUP_FOLDER,
+)
 
 from database.db import db
 from database.models import Client, Deal, Expense, Income, Payment, Policy, Task
@@ -25,22 +34,21 @@ from utils.logging_config import setup_logging
 # ───────────── setup ─────────────
 logger = logging.getLogger(__name__)
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
 setup_logging()
 
 DATE = datetime.now().strftime("%Y-%m-%d_%H-%M")
-SQL_PATH = f"backups/backup_{DATE}.sql"
-XLSX_PATH = f"backups/backup_{DATE}.xlsx"
-DRIVE_FOLDER_NAME = "Backups"
+SQL_PATH = BACKUP_DIR / SQL_BACKUP_TEMPLATE.format(date=DATE)
+XLSX_PATH = BACKUP_DIR / XLSX_BACKUP_TEMPLATE.format(date=DATE)
+DRIVE_FOLDER_NAME = DRIVE_BACKUP_FOLDER
 
-os.makedirs("backups", exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # ───────────── pg_dump via Docker ─────────────
 logger.info("📦 SQL-дамп через docker exec…")
 
 pg_container = "crm_db"
-pg_user = os.getenv("POSTGRES_USER", "crm_user")
-pg_db = os.getenv("POSTGRES_DB", "crm")
+pg_user = POSTGRES_USER
+pg_db = POSTGRES_DB
 
 # Инициализация Proxy
 url = urllib.parse.urlparse(DATABASE_URL)
@@ -96,11 +104,11 @@ logger.info("☁️ Загрузка в Google Drive…")
 folder_url = create_drive_folder(DRIVE_FOLDER_NAME)
 folder_id = extract_folder_id(folder_url)
 
-if os.path.exists(SQL_PATH):
-    upload_to_drive(SQL_PATH, folder_id)
+if SQL_PATH.exists():
+    upload_to_drive(str(SQL_PATH), folder_id)
 else:
     logger.warning("⚠️ SQL-файл не найден, пропускаем загрузку.")
 
-upload_to_drive(XLSX_PATH, folder_id)
+upload_to_drive(str(XLSX_PATH), folder_id)
 
 logger.info("✅ Готово: всё, что найдено, загружено в Google Drive.")

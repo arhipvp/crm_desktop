@@ -34,15 +34,15 @@ from telegram.ext import (
 )
 
 # ───────────── env ─────────────
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+from telegram_bot.container_config import TG_BOT_TOKEN, ADMIN_CHAT_ID
+
 init_from_env()
 setup_logging()
 
-BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
+BOT_TOKEN = TG_BOT_TOKEN
 if not BOT_TOKEN:
     raise RuntimeError("TG_BOT_TOKEN не найден. Укажите его в .env")
 
-ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
 try:
     ADMIN_CHAT_ID = int(ADMIN_CHAT_ID) if ADMIN_CHAT_ID else None
 except ValueError:
