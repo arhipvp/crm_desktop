@@ -111,29 +111,16 @@ def find_drive_folder(folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> str 
 
 
 def create_client_drive_folder(client_name: str) -> Tuple[str, Optional[str]]:
-    """Создать локальную папку клиента и вернуть (локальный путь, веб-ссылку)."""
+    """Создать папку клиента в Google Drive и вернуть локальный путь и ссылку."""
     safe_name = sanitize_name(client_name)
     local_path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, safe_name)
 
-    try:
-        os.makedirs(local_path, exist_ok=True)
-    except Exception as e:
-        logger.error("❌ Не удалось создать папку полиса: %s", e)
-
-        return None, None
-
-    # Папку создаёт локальный клиент Google Drive; ждём появления в облаке
-    web_link = None
+    web_link: Optional[str] = None
     if Credentials is not None:
-        parent_id = ROOT_FOLDER_ID
-        for _ in range(10):
-            try:
-                web_link = find_drive_folder(safe_name, parent_id)
-                if web_link:
-                    break
-            except Exception:
-                logger.exception("Не удалось найти папку клиента на Drive")
-            time.sleep(2)
+        try:
+            web_link = create_drive_folder(safe_name, ROOT_FOLDER_ID)
+        except Exception:
+            logger.exception("Не удалось создать папку клиента на Drive")
 
     return local_path, web_link
 
@@ -167,14 +154,36 @@ def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
         os.startfile(client_path)
         return
 
-    # Если локальной папки нет, но есть web-ссылка
+    # Локальной папки нет
+    if QApplication is not None and QMessageBox is not None and QApplication.instance():
+        res = QMessageBox.question(
+            parent,
+            "Папка не найдена",
+            "Не удалось найти локальную папку. Привязать путь вручную?",
+            QMessageBox.Yes | QMessageBox.Cancel,
+        )
+        if res == QMessageBox.Yes:
+            try:
+                from PySide6.QtWidgets import QFileDialog
+
+                chosen = QFileDialog.getExistingDirectory(parent, "Укажите папку клиента")
+                if chosen:
+                    os.startfile(chosen)
+            except Exception:
+                logger.exception("Ошибка выбора папки")
+        return
+
+    # Нет GUI или пользователь отменил → открываем ссылку, если есть
     if folder_link:
         logger.info(">>> [fallback] opening web link: %s", folder_link)
         webbrowser.open(folder_link)
     else:
-        QMessageBox.warning(
-            parent, "Ошибка", f"Не удалось найти папку клиента: {folder_name}"
-        )
+        if QMessageBox is not None:
+            QMessageBox.warning(
+                parent, "Ошибка", f"Не удалось найти папку клиента: {folder_name}"
+            )
+        else:
+            logger.warning("Не удалось найти папку клиента: %s", folder_name)
 
 
 def create_deal_folder(
@@ -200,22 +209,18 @@ def create_deal_folder(
         sanitize_name(client_name),
         deal_name,
     )
-    os.makedirs(local_path, exist_ok=True)
-    logger.info("📂  Создана локальная папка сделки: %s", local_path)
+
+    logger.info("📂  Ожидаемый путь сделки: %s", local_path)
 
     # -------- облако: только если передали ссылку клиента
     web_link: Optional[str] = None
     if client_drive_link and Credentials is not None:
         parent_id = extract_folder_id(client_drive_link)
-        for _ in range(10):
-            try:
-                web_link = find_drive_folder(deal_name, parent_id)
-                if web_link:
-                    logger.info("☁️  Drive-папка сделки: %s", web_link)
-                    break
-            except Exception:
-                logger.exception("Не удалось найти папку сделки на Drive")
-            time.sleep(2)
+        try:
+            web_link = create_drive_folder(deal_name, parent_id)
+            logger.info("☁️  Drive-папка сделки: %s", web_link)
+        except Exception:
+            logger.exception("Не удалось создать папку сделки на Drive")
 
     return local_path, web_link
 
