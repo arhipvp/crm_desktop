@@ -200,6 +200,20 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
             await notify_admin_user(_ctx.bot, user_id, user_name)
         return await q.answer("⏳ Ожидайте одобрения администратора", show_alert=True)
 
+    current_deal = es.get_assigned_deal(user_id)
+    if current_deal:
+        task = ts.pop_next_by_deal(user_id, current_deal)
+        if not task:
+            es.clear_deal(user_id)
+            return await q.answer("Задачи закончились", show_alert=True)
+
+        msg = await q.message.reply_html(
+            fmt_task(task), reply_markup=kb_task(task.id)
+        )
+        ts.link_telegram(task.id, msg.chat_id, msg.message_id)
+        logger.info("Выдана задача %s пользователю %s", task.id, user_id)
+        return
+
     clients = ts.get_clients_with_queued_tasks()
     if not clients:
         return await q.answer("Очередь пуста 💤", show_alert=True)
@@ -223,8 +237,33 @@ async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     _p, cid = q.data.split(":")
     cid = int(cid)
 
-    task = ts.pop_next_by_client(q.from_user.id, cid)
+    deals = ts.get_deals_with_queued_tasks(cid)
+    if not deals:
+        return await q.answer("Нет задач по сделкам", show_alert=True)
+
+    buttons = [
+        [InlineKeyboardButton(d.description.split()[0], callback_data=f"deal:{d.id}")]
+        for d in deals
+    ]
+    kb = InlineKeyboardMarkup(buttons)
+    await q.message.reply_text("Выберите сделку:", reply_markup=kb)
+
+
+async def h_choose_deal(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    logger.info("%s chose deal", q.from_user.id)
+
+    if not es.is_approved(q.from_user.id):
+        return await q.answer("⏳ Ожидайте одобрения администратора", show_alert=True)
+
+    _p, did = q.data.split(":")
+    did = int(did)
+
+    es.assign_deal(q.from_user.id, did)
+    task = ts.pop_next_by_deal(q.from_user.id, did)
     if not task:
+        es.clear_deal(q.from_user.id)
         return await q.answer("Задачи закончились", show_alert=True)
 
     logger.info("Выдана задача %s пользователю %s", task.id, q.from_user.id)
@@ -380,6 +419,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", h_start))
     app.add_handler(CallbackQueryHandler(h_get, pattern="^get$"))
     app.add_handler(CallbackQueryHandler(h_choose_client, pattern=r"^client:\d+$"))
+    app.add_handler(CallbackQueryHandler(h_choose_deal, pattern=r"^deal:\d+$"))
     app.add_handler(CallbackQueryHandler(h_action, pattern=r"^(done|ret|reply):"))
     app.add_handler(CallbackQueryHandler(h_admin_action, pattern=r"^(accept|info|rework|approve_exec|deny_exec):"))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))

@@ -9,6 +9,7 @@ class Executor:
     tg_id: int
     full_name: str | None = None
     is_approved: bool = False
+    current_deal_id: int | None = None
 
 
 # хранится только в памяти
@@ -41,3 +42,24 @@ def approve_executor(tg_id: int):
     if not ex.is_approved:
         ex.is_approved = True
         logger.info("Executor %s approved", tg_id)
+
+
+def assign_deal(tg_id: int, deal_id: int) -> None:
+    """Закрепить за исполнителем сделку."""
+    ex = ensure_executor(tg_id)
+    ex.current_deal_id = deal_id
+    logger.info("Executor %s assigned deal %s", tg_id, deal_id)
+
+
+def clear_deal(tg_id: int) -> None:
+    """Отвязать исполнителя от текущей сделки."""
+    ex = get_executor(tg_id)
+    if ex and ex.current_deal_id is not None:
+        ex.current_deal_id = None
+        logger.info("Executor %s cleared from deal", tg_id)
+
+
+def get_assigned_deal(tg_id: int) -> int | None:
+    """Получить id сделки, закреплённой за исполнителем."""
+    ex = get_executor(tg_id)
+    return ex.current_deal_id if ex else None
