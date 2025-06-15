@@ -138,7 +138,7 @@ class PolicyDetailView(QDialog):
         btn_edit = styled_button("✏️ Редактировать", shortcut="Ctrl+E")
         btn_edit.clicked.connect(self._on_edit)
         row.addWidget(btn_edit)
-        if self.instance.drive_folder_link or self.instance.drive_folder_path:
+        if getattr(self.instance, "drive_folder_path", None) or self.instance.drive_folder_link:
             btn_folder = styled_button("📂 Папка")
             btn_folder.clicked.connect(self._open_folder)
             row.addWidget(btn_folder)
@@ -171,7 +171,8 @@ class PolicyDetailView(QDialog):
 
     def _open_folder(self):
         open_folder(
-            self.instance.drive_folder_link or self.instance.drive_folder_link,
+            getattr(self.instance, "drive_folder_path", None)
+            or self.instance.drive_folder_link,
             parent=self,
         )
 
