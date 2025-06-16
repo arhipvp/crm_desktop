@@ -4,11 +4,12 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
+from config import LOG_FILE, LOGS_DIR
+
 
 def setup_logging() -> None:
-    """Настраивает вывод логов в консоль и файл ``logs/crm.log``."""
-    logs_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
-    os.makedirs(logs_dir, exist_ok=True)
+    """Настраивает вывод логов в консоль и файл ``LOG_FILE``."""
+    os.makedirs(LOGS_DIR, exist_ok=True)
 
     fmt = logging.Formatter(
         "%(asctime)s | %(levelname)-8s | %(name)s │ %(message)s",
@@ -16,7 +17,7 @@ def setup_logging() -> None:
     )
 
     file_h = RotatingFileHandler(
-        os.path.join(logs_dir, "crm.log"),
+        LOG_FILE,
         maxBytes=2_000_000,  # 2 MB
         backupCount=3,
         encoding="utf-8",

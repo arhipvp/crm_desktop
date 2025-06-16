@@ -8,22 +8,16 @@ from database.init import init_from_env
 
 init_from_env()
 
-from pathlib import Path
-
-from dotenv import load_dotenv
 
 from ui.main_window import MainWindow
 from utils.logging_config import setup_logging
+from config import DATABASE_URL
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    # ───── инициализация переменных ─────
-    dotenv_path = Path(__file__).resolve().parent / ".env"
-    load_dotenv(dotenv_path=dotenv_path)
-
-    DATABASE_URL = os.getenv("DATABASE_URL")
+    # ───── проверка переменных ─────
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL не задан в .env")
 

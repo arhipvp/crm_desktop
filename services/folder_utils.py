@@ -31,10 +31,15 @@ except Exception:  # PySide6 может отсутствовать в теста
 
 logger = logging.getLogger(__name__)
 
-SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_CREDENTIALS", "credentials.json")
-SCOPES = ["https://www.googleapis.com/auth/drive"]
-ROOT_FOLDER_ID = "1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm"  # ID папки в Google Drive
-GOOGLE_DRIVE_LOCAL_ROOT = os.getenv("GOOGLE_DRIVE_LOCAL_ROOT", r"G:\Мой диск\Клиенты")
+from config import (
+    GOOGLE_CREDENTIALS,
+    GOOGLE_DRIVE_LOCAL_ROOT,
+    ROOT_FOLDER_ID,
+    GOOGLE_DRIVE_SCOPES,
+)
+
+SERVICE_ACCOUNT_FILE = GOOGLE_CREDENTIALS
+SCOPES = GOOGLE_DRIVE_SCOPES
 
 
 @lru_cache(maxsize=1)

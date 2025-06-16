@@ -33,6 +33,7 @@ build/
 *.xlsx
 logs/
 backups/
+docker/*.env
 
 # Secrets
 credentials.json
