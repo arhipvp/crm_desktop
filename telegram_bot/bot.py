@@ -203,28 +203,42 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 
     current_deal = es.get_assigned_deal(user_id)
     if current_deal:
-        task = ts.pop_next_by_deal(user_id, current_deal)
-        if not task:
+        tasks = ts.pop_all_by_deal(user_id, current_deal)
+        if not tasks:
             es.clear_deal(user_id)
             return await q.answer("Задачи закончились", show_alert=True)
 
-        msg = await q.message.reply_html(
-            fmt_task(task), reply_markup=kb_task(task.id)
-        )
-        ts.link_telegram(task.id, msg.chat_id, msg.message_id)
-        logger.info("Выдана задача %s пользователю %s", task.id, user_id)
+        for task in tasks:
+            msg = await q.message.reply_html(
+                fmt_task(task), reply_markup=kb_task(task.id)
+            )
+            ts.link_telegram(task.id, msg.chat_id, msg.message_id)
+            logger.info("Выдана задача %s пользователю %s", task.id, user_id)
         return
 
-    clients = ts.get_clients_with_queued_tasks()
-    if not clients:
+    deals = ts.get_all_deals_with_queued_tasks()
+    if not deals:
         return await q.answer("Очередь пуста 💤", show_alert=True)
 
     buttons = [
-        [InlineKeyboardButton(c.name.split()[0], callback_data=f"client:{c.id}")]
-        for c in clients
+        [
+            InlineKeyboardButton(
+                f"{(d.client.name.split()[0] + ' ') if d.client and d.client.name else ''}{d.description.split()[0]}",
+                callback_data=f"deal:{d.id}",
+            )
+        ]
+        for d in deals
     ]
     kb = InlineKeyboardMarkup(buttons)
-    await q.message.reply_text("Выберите клиента:", reply_markup=kb)
+
+    info_lines = []
+    for d in deals:
+        calc = escape(d.calculations) if d.calculations else "журнал пуст"
+        client = d.client.name if d.client else ""
+        info_lines.append(f"<b>{client} — {d.description}</b>\n<pre>{calc}</pre>")
+    info = "\n\n".join(info_lines)
+
+    await q.message.reply_html("Выберите сделку:\n" + info, reply_markup=kb)
 
 
 async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
@@ -273,14 +287,17 @@ async def h_choose_deal(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     did = int(did)
 
     es.assign_deal(q.from_user.id, did)
-    task = ts.pop_next_by_deal(q.from_user.id, did)
-    if not task:
+    tasks = ts.pop_all_by_deal(q.from_user.id, did)
+    if not tasks:
         es.clear_deal(q.from_user.id)
         return await q.answer("Задачи закончились", show_alert=True)
 
-    logger.info("Выдана задача %s пользователю %s", task.id, q.from_user.id)
-    msg = await q.message.reply_html(fmt_task(task), reply_markup=kb_task(task.id))
-    ts.link_telegram(task.id, msg.chat_id, msg.message_id)
+    for task in tasks:
+        logger.info("Выдана задача %s пользователю %s", task.id, q.from_user.id)
+        msg = await q.message.reply_html(
+            fmt_task(task), reply_markup=kb_task(task.id)
+        )
+        ts.link_telegram(task.id, msg.chat_id, msg.message_id)
 
 
 async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):

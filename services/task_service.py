@@ -263,6 +263,26 @@ def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
     return deals
 
 
+def get_all_deals_with_queued_tasks() -> list[Deal]:
+    """Вернуть все сделки, у которых есть задачи в очереди."""
+    base = (
+        Task.select()
+        .join(Deal)
+        .where(
+            (Task.dispatch_state == "queued") & (Task.is_deleted == False)
+        )
+    )
+    tasks = prefetch(base, Deal, Client)
+
+    seen: set[int] = set()
+    deals: list[Deal] = []
+    for t in tasks:
+        if t.deal and t.deal.id not in seen:
+            seen.add(t.deal.id)
+            deals.append(t.deal)
+    return deals
+
+
 def pop_next_by_deal(chat_id: int, deal_id: int) -> Task | None:
     """Выдать следующую задачу из очереди для сделки."""
     with db.atomic():
@@ -301,6 +321,42 @@ def pop_next_by_deal(chat_id: int, deal_id: int) -> Task | None:
         else:
             logger.info("📭 Нет задач в очереди для сделки %s", deal_id)
         return task
+
+
+def pop_all_by_deal(chat_id: int, deal_id: int) -> list[Task]:
+    """Выдать все задачи из очереди для сделки."""
+    with db.atomic():
+        query = (
+            Task.select(Task.id)
+            .where(
+                (Task.dispatch_state == "queued")
+                & (Task.is_deleted == False)
+                & (Task.deal_id == deal_id)
+            )
+            .order_by(Task.queued_at.asc())
+        )
+
+        task_ids = [t.id for t in query]
+        if not task_ids:
+            logger.info("📭 Нет задач в очереди для сделки %s", deal_id)
+            return []
+
+        base = Task.select().where(Task.id.in_(task_ids))
+        task_list = list(prefetch(base, Deal, Policy, Client))
+
+        for task in task_list:
+            task.dispatch_state = "sent"
+            task.tg_chat_id = chat_id
+            task.save()
+            if task.deal:
+                refresh_deal_drive_link(task.deal)
+            logger.info(
+                "📬 Задача #%s выдана в Telegram для сделки %s: chat_id=%s",
+                task.id,
+                deal_id,
+                chat_id,
+            )
+        return task_list
 
 
 def pop_next(chat_id: int) -> Task | None:
