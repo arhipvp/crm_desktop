@@ -48,6 +48,15 @@ try:
 except ValueError:
     ADMIN_CHAT_ID = None
 
+APPROVED_EXECUTOR_IDS: set[int] = set()
+for part in re.split(r"[ ,]+", os.getenv("APPROVED_EXECUTOR_IDS", "").strip()):
+    if not part:
+        continue
+    try:
+        APPROVED_EXECUTOR_IDS.add(int(part))
+    except ValueError:
+        logging.getLogger(__name__).warning("Invalid executor id: %s", part)
+
 logger = logging.getLogger(__name__)
 
 # Задачи, ожидающие подтверждения администратора.
@@ -196,10 +205,16 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     user_name = q.from_user.full_name or ("@" + q.from_user.username) if q.from_user.username else str(user_id)
     es.ensure_executor(user_id, user_name)
     if not es.is_approved(user_id):
-        if user_id not in pending_users:
-            pending_users[user_id] = (q.message.chat_id, user_name)
-            await notify_admin_user(_ctx.bot, user_id, user_name)
-        return await q.answer("⏳ Ожидайте одобрения администратора", show_alert=True)
+        if user_id in APPROVED_EXECUTOR_IDS:
+            es.approve_executor(user_id)
+        else:
+            if user_id not in pending_users:
+                pending_users[user_id] = (q.message.chat_id, user_name)
+                await notify_admin_user(_ctx.bot, user_id, user_name)
+            return await q.answer(
+                "⏳ Ожидайте одобрения администратора",
+                show_alert=True,
+            )
 
     current_deal = es.get_assigned_deal(user_id)
     if current_deal:
