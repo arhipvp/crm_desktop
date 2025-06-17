@@ -103,17 +103,21 @@ def add_deal(**kwargs):
         )
 
         # ───── создание папки сделки ─────
-        local_path, web_link = create_deal_folder(
-            client.name,
-            deal.description,
-            client_drive_link=client.drive_folder_link,
-        )
-        logger.info("📁 Папка сделки создана: %s", local_path)
-        if web_link:
-            logger.info("🔗 Google Drive-ссылка сделки: %s", web_link)
-        deal.drive_folder_path = local_path
-        deal.drive_folder_link = web_link or ""  # пустая строка, если Drive не создался
-        deal.save()
+        try:
+            local_path, web_link = create_deal_folder(
+                client.name,
+                deal.description,
+                client_drive_link=client.drive_folder_link,
+            )
+            logger.info("📁 Папка сделки создана: %s", local_path)
+            if web_link:
+                logger.info("🔗 Google Drive-ссылка сделки: %s", web_link)
+            deal.drive_folder_path = local_path
+            deal.drive_folder_link = web_link
+            deal.save()
+        except Exception as e:
+            logger.error("❌ Ошибка создания папки сделки: %s", e)
+
         return deal
 
 
