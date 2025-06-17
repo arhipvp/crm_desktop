@@ -17,6 +17,7 @@
 ```env
 DATABASE_URL=sqlite:///crm.db
 TG_BOT_TOKEN=000000:telegram-bot-token
+APPROVED_EXECUTOR_IDS=111,222  # Telegram ID разрешённых исполнителей
 GOOGLE_DRIVE_LOCAL_ROOT=/path/to/drive
 GOOGLE_CREDENTIALS=credentials.json
 ```
@@ -73,6 +74,7 @@ POSTGRES_PASSWORD=crm_pass
 ```env
 DATABASE_URL=postgres://crm_user:crm_pass@db:5432/crm
 TG_BOT_TOKEN=000000:telegram-bot-token
+APPROVED_EXECUTOR_IDS=111,222
 GOOGLE_DRIVE_LOCAL_ROOT=/path/to/drive  # опционально
 GOOGLE_CREDENTIALS=credentials.json     # опционально
 ```
