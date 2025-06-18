@@ -241,11 +241,13 @@ def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
         return task
 
 
-def get_deals_with_queued_tasks(client_id: int, executor_id: int | None = None) -> list[Deal]:
+def get_deals_with_queued_tasks(
+    client_id: int, executor_id: int | None = None
+) -> list[Deal]:
     """Вернуть сделки клиента, у которых есть задачи в очереди.
 
     Если ``executor_id`` указан, выбираются только сделки, чей статус
-    содержит этот идентификатор.
+    содержит этот идентификатор как подстроку.
     """
     base = (
         Task.select()
@@ -257,8 +259,7 @@ def get_deals_with_queued_tasks(client_id: int, executor_id: int | None = None) 
         )
     )
     if executor_id is not None:
-        pattern = fr".*\b{executor_id}\b.*"
-        base = base.where(Deal.status.regexp(pattern))
+        base = base.where(Deal.status.contains(str(executor_id)))
 
     tasks = prefetch(base, Deal)
 
@@ -275,7 +276,7 @@ def get_all_deals_with_queued_tasks(executor_id: int | None = None) -> list[Deal
     """Вернуть все сделки, у которых есть задачи в очереди.
 
     При переданном ``executor_id`` возвращаются только сделки, статус которых
-    содержит данный идентификатор.
+    содержит указанный идентификатор как подстроку.
     """
     base = (
         Task.select()
@@ -285,8 +286,7 @@ def get_all_deals_with_queued_tasks(executor_id: int | None = None) -> list[Deal
         )
     )
     if executor_id is not None:
-        pattern = fr".*\b{executor_id}\b.*"
-        base = base.where(Deal.status.regexp(pattern))
+        base = base.where(Deal.status.contains(str(executor_id)))
 
     tasks = prefetch(base, Deal, Client)
 
