@@ -257,7 +257,8 @@ def get_deals_with_queued_tasks(client_id: int, executor_id: int | None = None) 
         )
     )
     if executor_id is not None:
-        base = base.where(Deal.status.contains(str(executor_id)))
+        pattern = fr".*\b{executor_id}\b.*"
+        base = base.where(Deal.status.regexp(pattern))
 
     tasks = prefetch(base, Deal)
 
@@ -284,7 +285,8 @@ def get_all_deals_with_queued_tasks(executor_id: int | None = None) -> list[Deal
         )
     )
     if executor_id is not None:
-        base = base.where(Deal.status.contains(str(executor_id)))
+        pattern = fr".*\b{executor_id}\b.*"
+        base = base.where(Deal.status.regexp(pattern))
 
     tasks = prefetch(base, Deal, Client)
 
