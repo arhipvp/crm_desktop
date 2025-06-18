@@ -231,7 +231,7 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
             logger.info("Выдана задача %s пользователю %s", task.id, user_id)
         return
 
-    deals = ts.get_all_deals_with_queued_tasks()
+    deals = ts.get_all_deals_with_queued_tasks(user_id)
     if not deals:
         return await q.answer("Очередь пуста 💤", show_alert=True)
 
@@ -267,7 +267,7 @@ async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     _p, cid = q.data.split(":")
     cid = int(cid)
 
-    deals = ts.get_deals_with_queued_tasks(cid)
+    deals = ts.get_deals_with_queued_tasks(cid, q.from_user.id)
     if not deals:
         return await q.answer("Нет задач по сделкам", show_alert=True)
 
