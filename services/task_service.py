@@ -241,8 +241,14 @@ def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
         return task
 
 
-def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
-    """Вернуть сделки клиента, у которых есть задачи в очереди."""
+def get_deals_with_queued_tasks(
+    client_id: int, executor_id: int | None = None
+) -> list[Deal]:
+    """Вернуть сделки клиента, у которых есть задачи в очереди.
+
+    Если ``executor_id`` указан, выбираются только сделки, чей статус
+    содержит этот идентификатор как подстроку.
+    """
     base = (
         Task.select()
         .join(Deal)
@@ -252,6 +258,9 @@ def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
             & (Deal.client_id == client_id)
         )
     )
+    if executor_id is not None:
+        base = base.where(Deal.status.contains(str(executor_id)))
+
     tasks = prefetch(base, Deal)
 
     seen: set[int] = set()
@@ -263,8 +272,12 @@ def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
     return deals
 
 
-def get_all_deals_with_queued_tasks() -> list[Deal]:
-    """Вернуть все сделки, у которых есть задачи в очереди."""
+def get_all_deals_with_queued_tasks(executor_id: int | None = None) -> list[Deal]:
+    """Вернуть все сделки, у которых есть задачи в очереди.
+
+    При переданном ``executor_id`` возвращаются только сделки, статус которых
+    содержит указанный идентификатор как подстроку.
+    """
     base = (
         Task.select()
         .join(Deal)
@@ -272,6 +285,9 @@ def get_all_deals_with_queued_tasks() -> list[Deal]:
             (Task.dispatch_state == "queued") & (Task.is_deleted == False)
         )
     )
+    if executor_id is not None:
+        base = base.where(Deal.status.contains(str(executor_id)))
+
     tasks = prefetch(base, Deal, Client)
 
     seen: set[int] = set()
