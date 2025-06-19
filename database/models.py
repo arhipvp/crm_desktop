@@ -123,3 +123,18 @@ class Expense(BaseModel):
     policy = ForeignKeyField(Policy, backref="expenses")
 
 
+# ─────────────────────────── Исполнитель ──────────────────────────
+class Executor(BaseModel):
+    full_name = CharField()
+    tg_id = BigIntegerField(unique=True)
+    is_active = BooleanField(default=True)
+
+
+# ───────────── Связь сделки с исполнителем ─────────────
+class DealExecutor(BaseModel):
+    deal = ForeignKeyField(Deal, backref="executors")
+    executor = ForeignKeyField(Executor, backref="deals")
+    assigned_date = DateField()
+    note = TextField(null=True)
+
+

@@ -9,6 +9,29 @@ import urllib.parse
 from peewee import PostgresqlDatabase, SqliteDatabase
 
 from .db import db  # тот самый Proxy
+from .models import (
+    Client,
+    Deal,
+    Policy,
+    Payment,
+    Income,
+    Task,
+    Expense,
+    Executor,
+    DealExecutor,
+)
+
+ALL_MODELS = [
+    Client,
+    Deal,
+    Policy,
+    Payment,
+    Income,
+    Task,
+    Expense,
+    Executor,
+    DealExecutor,
+]
 
 _DEFAULT_ENV = "DATABASE_URL"
 
