@@ -11,6 +11,7 @@ from ui.forms.client_form import ClientForm
 
 
 def test_main_window_tabs(qtbot):
+    print("debug: open main window")
     window = MainWindow()
     qtbot.addWidget(window)
     assert window.tab_widget.count() == 6
@@ -119,6 +120,7 @@ def test_home_tab_refreshes_on_task_detail_close(qtbot, monkeypatch):
 
 
 def test_home_tab_has_chart(qtbot):
+    print("debug: create HomeTab")
     from ui.views.home_tab import HomeTab
 
     home = HomeTab()
