@@ -33,6 +33,10 @@ class MainMenu(QMenuBar):
         import_policy_action.triggered.connect(self.open_import_policy_json)
         file_menu.addAction(import_policy_action)
 
+        executor_action = QAction("👥 Исполнители…", self)
+        executor_action.triggered.connect(self.open_executors)
+        file_menu.addAction(executor_action)
+
         file_menu.addSeparator()
 
         exit_action = QAction("Выход", self)
@@ -82,6 +86,11 @@ class MainMenu(QMenuBar):
         mw = self.parent()
         if mw and hasattr(mw, "open_import_policy_json"):
             mw.open_import_policy_json()
+
+    def open_executors(self):
+        mw = self.parent()
+        if mw and hasattr(mw, "open_executors"):
+            mw.open_executors()
 
     def open_docs(self):
         import webbrowser
