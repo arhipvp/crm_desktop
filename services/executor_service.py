@@ -33,10 +33,12 @@ def get_executor(tg_id: int) -> Optional[Executor]:
 
 
 def ensure_executor(tg_id: int, full_name: str | None = None) -> Executor:
-    ex, _ = Executor.get_or_create(tg_id=tg_id, defaults={"full_name": full_name or str(tg_id)})
+    ex, _ = Executor.get_or_create(
+        tg_id=tg_id, defaults={"full_name": full_name or str(tg_id)}
+    )
     if full_name and ex.full_name != full_name:
         ex.full_name = full_name
-        ex.save(update_fields=["full_name"])
+        ex.save(only=[Executor.full_name])
     return ex
 
 
@@ -49,7 +51,7 @@ def approve_executor(tg_id: int) -> None:
     ex = ensure_executor(tg_id)
     if not ex.is_active:
         ex.is_active = True
-        ex.save(update_fields=["is_active"])
+        ex.save(only=[Executor.is_active])
         logger.info("Executor %s approved", tg_id)
 
 
