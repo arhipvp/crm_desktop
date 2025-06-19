@@ -4,7 +4,7 @@ import re
 from datetime import date
 from typing import Optional, Iterable, List
 
-from peewee import ModelSelect
+from peewee import ModelSelect, JOIN
 from database.models import Executor, DealExecutor, Deal
 from database.db import db
 
@@ -78,13 +78,25 @@ def get_executor_for_deal(deal_id: int) -> Optional[Executor]:
     return de.executor if de else None
 
 
-def get_deals_for_executor(tg_id: int) -> List[Deal]:
+def get_deals_for_executor(tg_id: int, *, only_with_tasks: bool = False) -> List[Deal]:
     query = (
         Deal.select()
         .join(DealExecutor, on=(Deal.id == DealExecutor.deal))
         .join(Executor)
         .where((Executor.tg_id == tg_id) & (Deal.is_deleted == False))
     )
+
+    if only_with_tasks:
+        from database.models import Task  # локальный импорт во избежание циклов
+        query = (
+            query.join(Task, JOIN.INNER, on=(Deal.id == Task.deal))
+            .where(
+                (Task.is_deleted == False)
+                & (Task.dispatch_state == "queued")
+            )
+            .distinct()
+        )
+
     return list(query)
 
 

@@ -218,9 +218,14 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
                 show_alert=True,
             )
 
-    deals = es.get_deals_for_executor(user_id)
-    if not deals:
-        return await q.answer("Нет назначенных сделок", show_alert=True)
+    deals_with_tasks = es.get_deals_for_executor(user_id, only_with_tasks=True)
+    if not deals_with_tasks:
+        deals_all = es.get_deals_for_executor(user_id)
+        if not deals_all:
+            return await q.answer("Нет назначенных сделок", show_alert=True)
+        return await q.answer("Нет задач по сделкам", show_alert=True)
+
+    deals = deals_with_tasks
 
     buttons = [
         [
