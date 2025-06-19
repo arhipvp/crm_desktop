@@ -110,10 +110,15 @@ class DealDetailView(QDialog):
         # Здесь используем тот же сервис задач
         cnt_tasks = len(get_tasks_by_deal_id(self.instance.id))
 
+        from services import executor_service as es
+        ex = es.get_executor_for_deal(self.instance.id)
+        executor_name = ex.full_name if ex else "—"
+
         for text in [
             f"Полисов: <b>{cnt_policies}</b>",
             f"Платежей: <b>{cnt_payments}</b>",
             f"Задач: <b>{cnt_tasks}</b>",
+            f"Исполнитель: <b>{executor_name}</b>",
         ]:
             lbl = QLabel(text)
             lbl.setTextFormat(Qt.RichText)
@@ -336,6 +341,10 @@ class DealDetailView(QDialog):
         btn_copy = styled_button("📋", tooltip="Скопировать путь к папке")
         btn_copy.clicked.connect(self._copy_folder_path)
         box.addWidget(btn_copy)
+
+        self.btn_exec = styled_button("👤 Исполнитель")
+        self.btn_exec.clicked.connect(self._on_toggle_executor)
+        box.addWidget(self.btn_exec)
         btn_wa = styled_button("💬 WhatsApp")
         btn_wa.clicked.connect(self._open_whatsapp)
         box.addWidget(btn_wa)
@@ -351,6 +360,8 @@ class DealDetailView(QDialog):
             btn_close = styled_button("🔒 Закрыть сделку")
             btn_close.clicked.connect(self._on_close_deal)
             box.addWidget(btn_close)
+
+        self._update_exec_button()
 
     def _on_edit(self):
         form = DealForm(self.instance, parent=self)
@@ -399,6 +410,36 @@ class DealDetailView(QDialog):
             self.instance.drive_folder_path or self.instance.drive_folder_link,
             parent=self,
         )
+
+    def _on_toggle_executor(self):
+        from services import executor_service as es
+        current = es.get_executor_for_deal(self.instance.id)
+        if current:
+            if confirm("Отвязать исполнителя?"):
+                es.unassign_executor(self.instance.id)
+                self._update_exec_button()
+                self._init_kpi_panel()
+            return
+
+        executors = list(es.get_available_executors())
+        items = [f"{ex.full_name} ({ex.tg_id})" for ex in executors]
+        from PySide6.QtWidgets import QInputDialog
+
+        choice, ok = QInputDialog.getItem(self, "Выбор исполнителя", "Исполнитель:", items, 0, False)
+        if ok and choice:
+            idx = items.index(choice)
+            ex = executors[idx]
+            es.assign_executor(self.instance.id, ex.tg_id)
+            self._update_exec_button()
+            self._init_kpi_panel()
+
+    def _update_exec_button(self):
+        from services import executor_service as es
+        ex = es.get_executor_for_deal(self.instance.id)
+        if ex:
+            self.btn_exec.setText(f"Отвязать {ex.full_name}")
+        else:
+            self.btn_exec.setText("Привязать исполнителя")
 
     def _open_whatsapp(self):
         from services.client_service import format_phone_for_whatsapp, open_whatsapp

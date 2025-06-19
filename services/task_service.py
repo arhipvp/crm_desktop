@@ -528,6 +528,45 @@ def get_pending_tasks_page(page: int, per_page: int):
     )
 
 
+def get_queued_tasks_by_deal(deal_id: int) -> list[Task]:
+    """Вернуть задачи в очереди для указанной сделки."""
+    base = (
+        Task.select()
+        .where(
+            (Task.dispatch_state == "queued")
+            & (Task.is_deleted == False)
+            & (Task.deal_id == deal_id)
+        )
+    )
+    return list(prefetch(base, Deal, Policy, Client))
+
+
+def pop_task_by_id(chat_id: int, task_id: int) -> Task | None:
+    """Выдать задачу по id, если она в очереди."""
+    with db.atomic():
+        task = (
+            Task.select()
+            .where(
+                (Task.id == task_id)
+                & (Task.is_deleted == False)
+                & (Task.dispatch_state == "queued")
+            )
+            .first()
+        )
+        if not task:
+            return None
+
+        task.dispatch_state = "sent"
+        task.tg_chat_id = chat_id
+        task.save()
+
+        result = list(prefetch(Task.select().where(Task.id == task.id), Deal, Policy, Client))
+        task = result[0] if result else None
+        if task and task.deal:
+            refresh_deal_drive_link(task.deal)
+        return task
+
+
 def unassign_from_telegram(task_id: int) -> None:
     task = Task.get_by_id(task_id)
     task.dispatch_state = "idle"
