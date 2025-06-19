@@ -167,7 +167,7 @@ def update_client(client: Client, **kwargs) -> Client:
             client.drive_folder_link = new_link
             logger.info("🔗 Обновлена ссылка на Google Drive: %s", new_link)
 
-        client.save(update_fields=["drive_folder_path", "drive_folder_link"])
+        client.save(only=[Client.drive_folder_path, Client.drive_folder_link])
 
     return client
 

@@ -328,7 +328,7 @@ def refresh_deal_drive_link(deal: Deal) -> None:
         link = find_drive_folder(deal_name, parent_id)
         if link:
             deal.drive_folder_link = link
-            deal.save(update_fields=["drive_folder_link"])
+            deal.save(only=[Deal.drive_folder_link])
             logger.info("🔗 Обновлена ссылка сделки на Drive: %s", link)
     except Exception:
         logger.exception("Не удалось обновить ссылку на папку сделки %s", deal.id)

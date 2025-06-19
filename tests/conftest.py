@@ -8,7 +8,17 @@ import pytest
 from playhouse.sqlite_ext import SqliteExtDatabase
 
 from database.db import db as main_db
-from database.models import Client, Deal, Income, Payment, Policy, Task, Expense
+from database.models import (
+    Client,
+    Deal,
+    Income,
+    Payment,
+    Policy,
+    Task,
+    Expense,
+    Executor,
+    DealExecutor,
+)
 
 TEST_DB = SqliteExtDatabase(":memory:")
 
@@ -16,11 +26,11 @@ TEST_DB = SqliteExtDatabase(":memory:")
 @pytest.fixture(autouse=True)
 def test_db():
     main_db.initialize(TEST_DB)
-    main_db.bind([Client, Deal, Policy, Payment, Income, Task, Expense])
+    main_db.bind([Client, Deal, Policy, Payment, Income, Task, Expense, Executor, DealExecutor])
     main_db.connect()
-    main_db.create_tables([Client, Deal, Policy, Payment, Income, Task, Expense])
+    main_db.create_tables([Client, Deal, Policy, Payment, Income, Task, Expense, Executor, DealExecutor])
     yield
-    main_db.drop_tables([Client, Deal, Policy, Payment, Income, Task, Expense])
+    main_db.drop_tables([Client, Deal, Policy, Payment, Income, Task, Expense, Executor, DealExecutor])
     main_db.close()
 
 
