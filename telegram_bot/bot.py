@@ -37,7 +37,6 @@ from telegram.ext import (
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 init_from_env()
 setup_logging()
-es.ensure_executors_from_env()
 
 BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
 if not BOT_TOKEN:
@@ -69,6 +68,8 @@ pending_users: dict[int, tuple[int, str]] = {}
 from services import task_service as ts
 from services import executor_service as es
 from services import client_service as cs
+
+es.ensure_executors_from_env()
 
 
 # ───────────── helpers ─────────────
