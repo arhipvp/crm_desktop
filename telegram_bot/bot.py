@@ -69,6 +69,8 @@ from services import task_service as ts
 from services import executor_service as es
 from services import client_service as cs
 
+es.ensure_executors_from_env()
+
 
 # ───────────── helpers ─────────────
 def fmt_task(t: ts.Task) -> str:
@@ -216,24 +218,9 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
                 show_alert=True,
             )
 
-    current_deal = es.get_assigned_deal(user_id)
-    if current_deal:
-        tasks = ts.pop_all_by_deal(user_id, current_deal)
-        if not tasks:
-            es.clear_deal(user_id)
-            return await q.answer("Задачи закончились", show_alert=True)
-
-        for task in tasks:
-            msg = await q.message.reply_html(
-                fmt_task(task), reply_markup=kb_task(task.id)
-            )
-            ts.link_telegram(task.id, msg.chat_id, msg.message_id)
-            logger.info("Выдана задача %s пользователю %s", task.id, user_id)
-        return
-
-    deals = ts.get_all_deals_with_queued_tasks()
+    deals = es.get_deals_for_executor(user_id)
     if not deals:
-        return await q.answer("Очередь пуста 💤", show_alert=True)
+        return await q.answer("Нет назначенных сделок", show_alert=True)
 
     buttons = [
         [
@@ -246,14 +233,7 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     ]
     kb = InlineKeyboardMarkup(buttons)
 
-    info_lines = []
-    for d in deals:
-        calc = escape(d.calculations) if d.calculations else "журнал пуст"
-        client = d.client.name if d.client else ""
-        info_lines.append(f"<b>{client} — {d.description}</b>\n<pre>{calc}</pre>")
-    info = "\n\n".join(info_lines)
-
-    await q.message.reply_html("Выберите сделку:\n" + info, reply_markup=kb)
+    await q.message.reply_html("Выберите сделку:", reply_markup=kb)
 
 
 async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
@@ -301,18 +281,37 @@ async def h_choose_deal(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     _p, did = q.data.split(":")
     did = int(did)
 
-    es.assign_deal(q.from_user.id, did)
-    tasks = ts.pop_all_by_deal(q.from_user.id, did)
+    tasks = ts.get_queued_tasks_by_deal(did)
     if not tasks:
-        es.clear_deal(q.from_user.id)
-        return await q.answer("Задачи закончились", show_alert=True)
+        return await q.answer("Нет задач", show_alert=True)
 
-    for task in tasks:
-        logger.info("Выдана задача %s пользователю %s", task.id, q.from_user.id)
-        msg = await q.message.reply_html(
-            fmt_task(task), reply_markup=kb_task(task.id)
-        )
-        ts.link_telegram(task.id, msg.chat_id, msg.message_id)
+    buttons = [
+        [InlineKeyboardButton(t.title.split()[0], callback_data=f"task:{t.id}")]
+        for t in tasks
+    ]
+    kb = InlineKeyboardMarkup(buttons)
+
+    await q.message.reply_text("Выберите задачу:", reply_markup=kb)
+
+
+async def h_choose_task(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    if not es.is_approved(q.from_user.id):
+        return await q.answer("⏳ Ожидайте одобрения администратора", show_alert=True)
+
+    _p, tid = q.data.split(":")
+    tid = int(tid)
+
+    task = ts.pop_task_by_id(q.message.chat_id, tid)
+    if not task:
+        return await q.answer("Задача не найдена", show_alert=True)
+
+    msg = await q.message.reply_html(
+        fmt_task(task), reply_markup=kb_task(task.id)
+    )
+    ts.link_telegram(task.id, msg.chat_id, msg.message_id)
 
 
 async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
@@ -464,6 +463,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(h_get, pattern="^get$"))
     app.add_handler(CallbackQueryHandler(h_choose_client, pattern=r"^client:\d+$"))
     app.add_handler(CallbackQueryHandler(h_choose_deal, pattern=r"^deal:\d+$"))
+    app.add_handler(CallbackQueryHandler(h_choose_task, pattern=r"^task:\d+$"))
     app.add_handler(CallbackQueryHandler(h_action, pattern=r"^(done|ret|reply):"))
     app.add_handler(CallbackQueryHandler(h_admin_action, pattern=r"^(accept|info|rework|approve_exec|deny_exec):"))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))

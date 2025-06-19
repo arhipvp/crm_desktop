@@ -5,6 +5,7 @@ import logging
 from PySide6.QtWidgets import QApplication
 
 from database.init import init_from_env
+from services import executor_service as es
 
 init_from_env()
 
@@ -22,6 +23,7 @@ if __name__ == "__main__":
     # ───── инициализация переменных ─────
     dotenv_path = Path(__file__).resolve().parent / ".env"
     load_dotenv(dotenv_path=dotenv_path)
+    es.ensure_executors_from_env()
 
     DATABASE_URL = os.getenv("DATABASE_URL")
     if not DATABASE_URL:
