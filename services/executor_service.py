@@ -4,6 +4,7 @@ import re
 from datetime import date
 from typing import Optional, Iterable, List
 
+from peewee import ModelSelect, JOIN
 from database.models import Executor, DealExecutor, Deal
 from database.db import db
 
@@ -33,8 +34,9 @@ def get_executor(tg_id: int) -> Optional[Executor]:
 
 
 def ensure_executor(tg_id: int, full_name: str | None = None) -> Executor:
-    ex, _ = Executor.get_or_create(
-        tg_id=tg_id, defaults={"full_name": full_name or str(tg_id)}
+    ex, created = Executor.get_or_create(
+        tg_id=tg_id,
+        defaults={"full_name": full_name or str(tg_id), "is_active": False},
     )
     if full_name and ex.full_name != full_name:
         ex.full_name = full_name
@@ -76,16 +78,73 @@ def get_executor_for_deal(deal_id: int) -> Optional[Executor]:
     return de.executor if de else None
 
 
-def get_deals_for_executor(tg_id: int) -> List[Deal]:
+def get_deals_for_executor(tg_id: int, *, only_with_tasks: bool = False) -> List[Deal]:
     query = (
         Deal.select()
         .join(DealExecutor, on=(Deal.id == DealExecutor.deal))
         .join(Executor)
         .where((Executor.tg_id == tg_id) & (Deal.is_deleted == False))
     )
+
+    if only_with_tasks:
+        from database.models import Task  # локальный импорт во избежание циклов
+        query = (
+            query.join(Task, JOIN.INNER, on=(Deal.id == Task.deal))
+            .where(
+                (Task.is_deleted == False)
+                & (Task.dispatch_state == "queued")
+            )
+            .distinct()
+        )
+
     return list(query)
 
 
 def get_available_executors() -> Iterable[Executor]:
     ensure_executors_from_env()
     return Executor.select().where(Executor.is_active == True)
+
+
+def build_executor_query(
+    search_text: str = "",
+    show_inactive: bool = True,
+) -> ModelSelect:
+    """Создать базовый запрос исполнителей с учётом фильтров."""
+    query = Executor.select()
+    if not show_inactive:
+        query = query.where(Executor.is_active == True)
+    if search_text:
+        query = query.where(
+            (Executor.full_name.contains(search_text))
+            | (Executor.tg_id.cast("TEXT").contains(search_text))
+        )
+    return query
+
+
+def get_executors_page(
+    page: int,
+    per_page: int,
+    search_text: str = "",
+    show_inactive: bool = True,
+) -> ModelSelect:
+    query = build_executor_query(search_text, show_inactive)
+    offset = (page - 1) * per_page
+    return query.order_by(Executor.full_name.asc()).limit(per_page).offset(offset)
+
+
+def add_executor(**kwargs) -> Executor:
+    allowed = {"full_name", "tg_id", "is_active"}
+    data = {k: kwargs[k] for k in allowed if k in kwargs}
+    data.setdefault("is_active", True)
+    return Executor.create(**data)
+
+
+def update_executor(executor: Executor, **kwargs) -> Executor:
+    allowed = {"full_name", "tg_id", "is_active"}
+    updates = {k: v for k, v in kwargs.items() if k in allowed}
+    if not updates:
+        return executor
+    for k, v in updates.items():
+        setattr(executor, k, v)
+    executor.save()
+    return executor

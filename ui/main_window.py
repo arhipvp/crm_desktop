@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QTabWidget,
     QStatusBar,
+    QVBoxLayout,
 )
 from utils.screen_utils import get_scaled_size
 
@@ -14,6 +15,7 @@ from ui.views.finance_tab import FinanceTab
 from ui.views.policy_table_view import PolicyTableView
 from ui.views.task_table_view import TaskTableView
 from ui.views.home_tab import HomeTab
+from ui.views.executor_table_view import ExecutorTableView
 
 
 class MainWindow(QMainWindow):
@@ -75,3 +77,12 @@ class MainWindow(QMainWindow):
             dlg = ImportPolicyJsonForm(self)
             if dlg.exec() != QDialog.Accepted:
                 break
+
+    def open_executors(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Исполнители")
+        layout = QVBoxLayout(dlg)
+        view = ExecutorTableView()
+        layout.addWidget(view)
+        dlg.resize(get_scaled_size(600, 400))
+        dlg.exec()

@@ -218,9 +218,18 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
                 show_alert=True,
             )
 
-    deals = es.get_deals_for_executor(user_id)
-    if not deals:
-        return await q.answer("Нет назначенных сделок", show_alert=True)
+    deals_with_tasks = es.get_deals_for_executor(user_id, only_with_tasks=True)
+    if not deals_with_tasks:
+        deals_all = es.get_deals_for_executor(user_id)
+        if not deals_all:
+            await q.answer()
+            await q.message.reply_text("Нет назначенных сделок")
+            return
+        await q.answer()
+        await q.message.reply_text("Нет задач по сделкам")
+        return
+
+    deals = deals_with_tasks
 
     buttons = [
         [
@@ -249,7 +258,9 @@ async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 
     deals = ts.get_deals_with_queued_tasks(cid)
     if not deals:
-        return await q.answer("Нет задач по сделкам", show_alert=True)
+        await q.answer()
+        await q.message.reply_text("Нет задач по сделкам")
+        return
 
     client = cs.get_client_by_id(cid)
     surname = client.name.split()[0] if client and client.name else ""
@@ -283,7 +294,9 @@ async def h_choose_deal(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 
     tasks = ts.get_queued_tasks_by_deal(did)
     if not tasks:
-        return await q.answer("Нет задач", show_alert=True)
+        await q.answer()
+        await q.message.reply_text("Нет задач")
+        return
 
     buttons = [
         [InlineKeyboardButton(t.title.split()[0], callback_data=f"task:{t.id}")]

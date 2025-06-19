@@ -232,8 +232,16 @@ def get_deals_page(
     else:
         query = query.order_by(Deal.start_date.desc())
 
+    from peewee import prefetch
+    from database.models import DealExecutor, Executor
+
     offset = (page - 1) * per_page
-    return query.limit(per_page).offset(offset)
+    page_query = query.limit(per_page).offset(offset)
+    items = list(prefetch(page_query, DealExecutor, Executor))
+    for deal in items:
+        ex = deal.executors[0].executor if getattr(deal, "executors", []) else None
+        setattr(deal, "_executor", ex)
+    return items
 
 
 def get_open_deals_page(page: int = 1, per_page: int = 50) -> ModelSelect:

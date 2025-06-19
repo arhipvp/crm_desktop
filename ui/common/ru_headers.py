@@ -22,4 +22,5 @@ RU_HEADERS = {
     "actual_date": "Факт. дата",
     "commission_source": "Источник комиссии",
     "note": "Комментарий",
+    "executor": "Исполнитель",
 }

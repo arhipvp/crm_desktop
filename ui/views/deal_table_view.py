@@ -1,11 +1,42 @@
 from PySide6.QtCore import Qt
 
+from ui.base.base_table_model import BaseTableModel
+
 from database.models import Deal
 from services.deal_service import build_deal_query, get_deals_page, mark_deal_deleted
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.deal_form import DealForm
 from ui.views.deal_detail_view import DealDetailView
+
+
+class DealTableModel(BaseTableModel):
+    def __init__(self, objects, model_class, parent=None):
+        super().__init__(objects, model_class, parent)
+        self.virtual_fields = ["executor"]
+        self.headers.append("Исполнитель")
+
+    def columnCount(self, parent=None):
+        return len(self.fields) + len(self.virtual_fields)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+        obj = self.objects[index.row()]
+        col = index.column()
+        if col >= len(self.fields):
+            if role == Qt.DisplayRole:
+                ex = getattr(obj, "_executor", None)
+                return ex.full_name if ex else "—"
+            return None
+        return super().data(index, role)
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role != Qt.DisplayRole or orientation != Qt.Horizontal:
+            return None
+        if section < len(self.fields):
+            return super().headerData(section, orientation, role)
+        return self.headers[-1]
 
 
 class DealTableView(BaseTableView):
@@ -58,7 +89,26 @@ class DealTableView(BaseTableView):
         self.set_model_class_and_items(Deal, list(items), total_count=total)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
-        super().set_model_class_and_items(model_class, items, total_count)
+        self.model = DealTableModel(items, model_class)
+        self.proxy_model.setSourceModel(self.model)
+        self.table.setModel(self.proxy_model)
+
+        try:
+            self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
+            self.table.resizeColumnsToContents()
+        except NotImplementedError:
+            pass
+
+        if total_count is not None:
+            self.total_count = total_count
+            self.paginator.update(self.total_count, self.page)
+            self.data_loaded.emit(self.total_count)
+
+        headers = [
+            self.model.headerData(i, Qt.Horizontal)
+            for i in range(self.model.columnCount())
+        ]
+        self.column_filters.set_headers(headers)
 
         # какой столбец сейчас является полем сортировки?
         col = self.get_column_index(self.sort_field)
