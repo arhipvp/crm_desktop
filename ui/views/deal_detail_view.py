@@ -425,11 +425,16 @@ class DealDetailView(QDialog):
         items = [f"{ex.full_name} ({ex.tg_id})" for ex in executors]
         from PySide6.QtWidgets import QInputDialog
 
-        choice, ok = QInputDialog.getItem(self, "Выбор исполнителя", "Исполнитель:", items, 0, False)
+        choice, ok = QInputDialog.getItem(
+            self, "Выбор исполнителя", "Исполнитель:", items, 0, False
+        )
         if ok and choice:
-            idx = items.index(choice)
-            ex = executors[idx]
-            es.assign_executor(self.instance.id, ex.tg_id)
+            import re
+
+            m = re.search(r"(\d+)", choice)
+            if m:
+                tg_id = int(m.group(1))
+                es.assign_executor(self.instance.id, tg_id)
             self._update_exec_button()
             self._init_kpi_panel()
 
