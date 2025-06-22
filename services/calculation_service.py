@@ -68,3 +68,18 @@ def update_calculation(entry: DealCalculation, **kwargs) -> DealCalculation:
         entry.save()
     return entry
 
+
+def get_unique_calculation_field_values(field_name: str) -> list[str]:
+    """Return unique non-null values of a DealCalculation field."""
+    allowed_fields = {"insurance_company", "insurance_type"}
+    if field_name not in allowed_fields:
+        raise ValueError(f"Invalid field: {field_name}")
+    q = (
+        DealCalculation.select(getattr(DealCalculation, field_name))
+        .where(getattr(DealCalculation, field_name).is_null(False))
+        .distinct()
+    )
+    return sorted(
+        {getattr(c, field_name) for c in q if getattr(c, field_name)}
+    )
+

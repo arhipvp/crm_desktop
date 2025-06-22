@@ -185,6 +185,19 @@ class DealDetailView(QDialog):
         self.reminder_date = TypableDateEdit(self.instance.reminder_date)
         form.addRow("Напоминание:", self.reminder_date)
 
+        # Расчёты прямо на вкладке информации
+        from ui.views.calculation_table_view import CalculationTableView
+
+        calc_box = QVBoxLayout()
+        btn_calc = styled_button("➕ Запись", tooltip="Добавить расчёт")
+        btn_calc.clicked.connect(self._on_add_calculation)
+        calc_box.addWidget(btn_calc, alignment=Qt.AlignLeft)
+        self.calc_table = CalculationTableView(parent=self, deal_id=self.instance.id)
+        calc_box.addWidget(self.calc_table)
+        calc_widget = QWidget()
+        calc_widget.setLayout(calc_box)
+        form.addRow("Расчёты:", calc_widget)
+
         # Кнопка сохранения
         btn_save = styled_button(
             "💾 Сохранить изменения", shortcut="Ctrl+Enter"
@@ -194,17 +207,6 @@ class DealDetailView(QDialog):
 
         info.setLayout(form)
         self.tabs.addTab(info, "Информация")
-
-        # 2) Расчёты
-        calc_tab = QWidget()
-        calc_layout = QVBoxLayout(calc_tab)
-        btn_calc = styled_button("➕ Запись", tooltip="Добавить расчёт")
-        btn_calc.clicked.connect(self._on_add_calculation)
-        calc_layout.addWidget(btn_calc, alignment=Qt.AlignLeft)
-        from ui.views.calculation_table_view import CalculationTableView
-        self.calc_table = CalculationTableView(parent=self, deal_id=self.instance.id)
-        calc_layout.addWidget(self.calc_table)
-        self.tabs.addTab(calc_tab, "Расчёты")
 
         # 3) Полисы
 

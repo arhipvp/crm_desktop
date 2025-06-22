@@ -142,14 +142,25 @@ class DealExecutor(BaseModel):
 
 # ─────────────────────────── Расчёт по сделке ──────────────────────────
 class DealCalculation(BaseModel):
-    deal = ForeignKeyField(Deal, backref="calculations")
-    insurance_company = CharField(null=True)
-    insurance_type = CharField(null=True)
-    insured_amount = FloatField(null=True)
-    premium = FloatField(null=True)
-    deductible = FloatField(null=True)
-    note = TextField(null=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    is_deleted = BooleanField(default=False)
+    deal = ForeignKeyField(
+        Deal,
+        backref="calculations",
+        column_name="сделка",
+        object_id_name="deal_id",
+    )
+    insurance_company = CharField(
+        null=True, column_name="страховая_компания"
+    )
+    insurance_type = CharField(
+        null=True, column_name="вид_страхования"
+    )
+    insured_amount = FloatField(
+        null=True, column_name="страховая_сумма"
+    )
+    premium = FloatField(null=True, column_name="страховая_премия")
+    deductible = FloatField(null=True, column_name="франшиза")
+    note = TextField(null=True, column_name="примечание")
+    created_at = DateTimeField(default=datetime.utcnow, column_name="дата_расчета")
+    is_deleted = BooleanField(default=False, column_name="удалено")
 
 

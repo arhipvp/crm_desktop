@@ -1,9 +1,13 @@
 from PySide6.QtWidgets import QLabel
 
 from database.models import DealCalculation
-from services.calculation_service import add_calculation, update_calculation
+from services.calculation_service import (
+    add_calculation,
+    update_calculation,
+    get_unique_calculation_field_values,
+)
 from ui.base.base_edit_form import BaseEditForm
-from ui.common.combo_helpers import create_deal_combobox
+from ui.common.combo_helpers import create_deal_combobox, create_editable_combo
 
 
 class CalculationForm(BaseEditForm):
@@ -23,6 +27,17 @@ class CalculationForm(BaseEditForm):
         self.deal_combo = create_deal_combobox()
         self.fields["deal_id"] = self.deal_combo
         self.form_layout.insertRow(0, QLabel("Сделка:"), self.deal_combo)
+
+        # выпадающие списки со страховщиками и типами
+        companies = get_unique_calculation_field_values("insurance_company")
+        self.company_combo = create_editable_combo(companies)
+        self.fields["insurance_company"] = self.company_combo
+        self.form_layout.addRow("Страховая компания:", self.company_combo)
+
+        types = get_unique_calculation_field_values("insurance_type")
+        self.type_combo = create_editable_combo(types)
+        self.fields["insurance_type"] = self.type_combo
+        self.form_layout.addRow("Вид страхования:", self.type_combo)
 
         if self._deal_id is not None:
             idx = self.deal_combo.findData(self._deal_id)
