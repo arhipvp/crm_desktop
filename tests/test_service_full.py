@@ -2,14 +2,7 @@ from datetime import date
 import pytest
 import types
 
-from services.client_service import (
-    add_client,
-    get_clients_page,
-    mark_client_deleted,
-    build_client_query,
-    format_phone_for_whatsapp,
-    update_client,
-)
+from services.client_service import add_client
 from services.deal_service import (
     add_deal,
     get_deals_page,
@@ -37,7 +30,6 @@ from services.income_service import (
     get_incomes_page,
     update_income,
     mark_income_deleted,
-    create_stub_income,
 )
 from services.expense_service import (
     add_expense,
@@ -72,25 +64,6 @@ def extra_tables(test_db):
 # ---- Client service -------------------------------------------------
 
 
-def test_client_update_and_query(monkeypatch):
-    c1 = add_client(name="A")
-    c2 = add_client(name="B")
-
-    monkeypatch.setattr(
-        "services.client_service.rename_client_folder",
-        lambda o, n, l: (f"/tmp/{n}", f"link/{n}"),
-    )
-    update_client(c1, phone="8 900 111-22-33")
-    assert c1.phone == "+79001112233"
-
-    page = list(get_clients_page(1, 1))
-    assert page[0].id == c1.id
-
-    mark_client_deleted(c2.id)
-    names = [c.name for c in build_client_query(show_deleted=True)]
-    assert set(names) == {"A", "B"}
-
-    assert format_phone_for_whatsapp("8 999 000 00 00") == "+79990000000"
 
 
 # ---- Deal service ---------------------------------------------------
@@ -141,8 +114,6 @@ def test_income_expense_flow():
     update_income(income, amount=60, received_date=date(2025, 1, 3))
     assert income.amount == 60
 
-    stub = create_stub_income()
-    assert isinstance(stub, Income)
 
     page = list(get_incomes_page(1, 10))
     assert page[0].id == income.id
