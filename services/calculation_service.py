@@ -41,3 +41,30 @@ def delete_calculation(entry_id: int) -> None:
     else:
         logger.warning("Calculation entry %s not found", entry_id)
 
+
+def update_calculation(entry: DealCalculation, **kwargs) -> DealCalculation:
+    """Update an existing calculation entry."""
+    allowed = {
+        "insurance_company",
+        "insurance_type",
+        "insured_amount",
+        "premium",
+        "deductible",
+        "note",
+        "deal_id",
+    }
+    updates = {k: v for k, v in kwargs.items() if k in allowed}
+    if "deal_id" in updates:
+        deal = Deal.get_or_none((Deal.id == updates["deal_id"]) & (Deal.is_deleted == False))
+        if not deal:
+            raise ValueError("Deal not found")
+        entry.deal = deal
+        updates.pop("deal_id")
+
+    for key, value in updates.items():
+        setattr(entry, key, value)
+
+    if updates:
+        entry.save()
+    return entry
+
