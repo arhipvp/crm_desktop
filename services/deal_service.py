@@ -125,8 +125,11 @@ def add_deal(**kwargs):
 
 
 def update_deal(deal: Deal, **kwargs):
-    """Обновляет сделку. Если передано ``calculations``,
-    новый текст дописывается над старым с отметкой времени.
+    """Обновляет сделку.
+
+    ``calculations`` теперь трактуется как текст расчёта и сохраняется в
+    таблицу :class:`DealCalculation`. Поле ``Deal.calculations`` используется
+    как журнал событий (например, при закрытии сделки).
     """
 
     allowed_fields = {
@@ -153,14 +156,16 @@ def update_deal(deal: Deal, **kwargs):
             raise ValueError("Клиент не найден.")
         deal.client = client
 
-    # calculations
+    # calculations -> отдельная таблица
     new_calc: str | None = kwargs.get("calculations")
-    # если закрываем сделку — допишем причину в calculations
+
+    # Если закрываем сделку — пишем причину в журнал
     if kwargs.get("is_closed") and kwargs.get("closed_reason"):
         reason = kwargs["closed_reason"]
         ts = now_str()
         auto_note = f"[{ts}]: Сделка закрыта. Причина: {reason}"
-        new_calc = f"{auto_note}\n{new_calc or ''}".strip()
+        old = deal.calculations or ""
+        deal.calculations = f"{auto_note}\n{old}"
 
     # Если нечего обновлять — возвращаем сделку как есть
     if not updates and not new_calc:
@@ -170,13 +175,12 @@ def update_deal(deal: Deal, **kwargs):
     for key, value in updates.items():
         setattr(deal, key, value)
 
-    # Аппендим расчёты
-    if new_calc:
-        ts = now_str()
-        old = deal.calculations or ""
-        deal.calculations = f"[{ts}]: {new_calc}\n{old}"
-
     deal.save()
+
+    # Добавляем расчётную запись
+    if new_calc:
+        from services.calculation_service import add_calculation
+        add_calculation(deal.id, note=new_calc)
     return deal
 
 

@@ -19,6 +19,7 @@ from .models import (
     Expense,
     Executor,
     DealExecutor,
+    DealCalculation,
 )
 
 ALL_MODELS = [
@@ -31,6 +32,7 @@ ALL_MODELS = [
     Expense,
     Executor,
     DealExecutor,
+    DealCalculation,
 ]
 
 _DEFAULT_ENV = "DATABASE_URL"

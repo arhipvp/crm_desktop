@@ -19,6 +19,7 @@ from services.deal_service import (
     get_policies_by_deal_id,
     get_tasks_by_deal_id,
 )
+from services.calculation_service import get_calculations
 from services.policy_service import (
     add_policy,
     get_policies_page,
@@ -102,6 +103,8 @@ def test_deal_update_and_pages():
 
     update_deal(deal, calculations="note", is_closed=True, closed_reason="ok")
     assert "Сделка закрыта" in deal.calculations
+    calcs = list(get_calculations(deal.id))
+    assert calcs and calcs[0].note == "note"
 
     page = list(get_deals_page(1, 10, show_closed=True))
     assert page[0].id == deal.id

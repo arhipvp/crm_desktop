@@ -1,3 +1,4 @@
+from datetime import datetime
 from peewee import *
 
 from database.db import db
@@ -136,5 +137,19 @@ class DealExecutor(BaseModel):
     executor = ForeignKeyField(Executor, backref="deals")
     assigned_date = DateField()
     note = TextField(null=True)
+
+
+
+# ─────────────────────────── Расчёт по сделке ──────────────────────────
+class DealCalculation(BaseModel):
+    deal = ForeignKeyField(Deal, backref="calculations")
+    insurance_company = CharField(null=True)
+    insurance_type = CharField(null=True)
+    insured_amount = FloatField(null=True)
+    premium = FloatField(null=True)
+    deductible = FloatField(null=True)
+    note = TextField(null=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+    is_deleted = BooleanField(default=False)
 
 
