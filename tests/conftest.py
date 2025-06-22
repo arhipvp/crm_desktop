@@ -17,6 +17,7 @@ from database.models import (
     Expense,
     Executor,
     DealExecutor,
+    DealCalculation,
 )
 from database.init import init_from_env
 
@@ -32,7 +33,7 @@ def test_db():
     except Exception:
         use_memory = True
 
-    models = [Client, Deal, Policy, Payment, Income, Task, Expense, Executor, DealExecutor]
+    models = [Client, Deal, Policy, Payment, Income, Task, Expense, Executor, DealExecutor, DealCalculation]
 
     if use_memory:
         main_db.initialize(TEST_DB)

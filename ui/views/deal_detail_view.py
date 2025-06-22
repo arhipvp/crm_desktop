@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QGroupBox,
     QSizePolicy,
     QTabWidget,
     QTextEdit,
@@ -72,7 +73,8 @@ class DealDetailView(QDialog):
         )
         size = get_scaled_size(1200, 800)
         self.resize(size)
-        self.setMinimumSize(640, 480)
+        min_w = max(900, int(size.width() * 0.8))
+        self.setMinimumSize(min_w, 480)
 
         self.layout = QVBoxLayout(self)
 
@@ -134,7 +136,11 @@ class DealDetailView(QDialog):
 
         # 1) Информация
         info = QWidget()
-        form = QFormLayout(info)
+        main_layout = QVBoxLayout(info)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        info_group = QGroupBox("Основная информация")
+        form = QFormLayout()
         form.setVerticalSpacing(2)
         form.setHorizontalSpacing(10)
         form.setLabelAlignment(Qt.AlignRight)
@@ -164,38 +170,59 @@ class DealDetailView(QDialog):
         self.desc_edit.setReadOnly(True)
         form.addRow("Описание:", self.desc_edit)
 
-        # Добавить в расчеты
-        self.calc_append = QTextEdit()
-        self.calc_append.setPlaceholderText("Новая запись…")
-        self.calc_append.setFixedHeight(50)
-        form.addRow("Добавить в расчеты:", self.calc_append)
-
-        # Расчеты — только для чтения
-        self.calc_view = QTextEdit()
-        self.calc_view.setReadOnly(True)
-        self.calc_view.setFixedHeight(140)
-        self.calc_view.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self.calc_view.setPlainText(self.instance.calculations or "—")
-        self._calc_highlighter = _CalcHighlighter(self.calc_view.document())
-        form.addRow("Расчеты:", self.calc_view)
-
         # Напоминание — редактируемая дата
         from ui.common.date_utils import TypableDateEdit
 
         self.reminder_date = TypableDateEdit(self.instance.reminder_date)
         form.addRow("Напоминание:", self.reminder_date)
 
+        info_group.setLayout(form)
+        main_layout.addWidget(info_group)
+
+        # ---- Журнал -------------------------------------------------
+        journal_group = QGroupBox("Журнал")
+        journal_form = QFormLayout()
+
+        self.calc_append = QTextEdit()
+        self.calc_append.setPlaceholderText("Новая запись…")
+        self.calc_append.setFixedHeight(50)
+        journal_form.addRow("Добавить:", self.calc_append)
+
+        self.calc_view = QTextEdit()
+        self.calc_view.setReadOnly(True)
+        self.calc_view.setFixedHeight(140)
+        self.calc_view.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
+        self.calc_view.setPlainText(self.instance.calculations or "—")
+        self._calc_highlighter = _CalcHighlighter(self.calc_view.document())
+        journal_form.addRow("История:", self.calc_view)
+
+        journal_group.setLayout(journal_form)
+        main_layout.addWidget(journal_group)
+
+        # ---- Расчёты ------------------------------------------------
+        from ui.views.calculation_table_view import CalculationTableView
+
+        calc_group = QGroupBox("Расчёты")
+        calc_box = QVBoxLayout()
+        btn_calc = styled_button("➕ Запись", tooltip="Добавить расчёт")
+        btn_calc.clicked.connect(self._on_add_calculation)
+        calc_box.addWidget(btn_calc, alignment=Qt.AlignLeft)
+        self.calc_table = CalculationTableView(parent=self, deal_id=self.instance.id)
+        calc_box.addWidget(self.calc_table)
+        calc_group.setLayout(calc_box)
+        main_layout.addWidget(calc_group)
+
         # Кнопка сохранения
         btn_save = styled_button(
             "💾 Сохранить изменения", shortcut="Ctrl+Enter"
         )
         btn_save.clicked.connect(self._on_inline_save)
-        form.addRow(btn_save)
+        main_layout.addWidget(btn_save, alignment=Qt.AlignRight)
 
-        info.setLayout(form)
+        info.setLayout(main_layout)
         self.tabs.addTab(info, "Информация")
 
-        # 2) Полисы
+        # 3) Полисы
 
         pol_tab = QWidget()
         pol_l = QVBoxLayout(pol_tab)
@@ -480,6 +507,8 @@ class DealDetailView(QDialog):
             )
             self.calc_append.clear()
             self.calc_view.setPlainText(self.instance.calculations or "—")
+            if new_calc_part:
+                self.calc_table.refresh()
         except Exception as e:
             from ui.common.message_boxes import show_error
 
@@ -490,6 +519,13 @@ class DealDetailView(QDialog):
         if form.exec():
             self.task_view.refresh()
             self._init_kpi_panel()
+
+    def _on_add_calculation(self):
+        from ui.forms.calculation_form import CalculationForm
+
+        form = CalculationForm(parent=self, deal_id=self.instance.id)
+        if form.exec():
+            self.calc_table.refresh()
 
     def _on_add_income(self):
         dlg = IncomeForm(parent=self, deal_id=self.instance.id)
