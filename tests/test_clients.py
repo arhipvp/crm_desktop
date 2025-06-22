@@ -1,4 +1,4 @@
-from services.client_service import add_client
+from services.client_service import add_client, update_client
 from database.models import Client
 
 
@@ -24,3 +24,17 @@ def test_add_client_without_name_raises():
     else:
         assert False, "Expected ValueError"
     print("debug: end test_add_client_without_name_raises")
+
+
+def test_update_client_changes_phone_and_folder(monkeypatch):
+    client = add_client(name="Old", phone="8 900 000-00-00")
+    monkeypatch.setattr(
+        "services.client_service.rename_client_folder",
+        lambda o, n, l: (f"/tmp/{n}", f"link/{n}"),
+    )
+    update_client(client, name="New", phone="8 900 111-11-11")
+    client = Client.get_by_id(client.id)
+    assert client.name == "New"
+    assert client.phone == "+79001111111"
+    assert client.drive_folder_path.endswith("New")
+    assert client.drive_folder_link.endswith("New")
