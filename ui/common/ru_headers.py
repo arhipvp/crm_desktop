@@ -23,7 +23,7 @@ RU_HEADERS = {
     "commission_source": "Источник комиссии",
     "note": "Комментарий",
     "executor": "Исполнитель",
-    "insurance_company": "СК",
+    "insurance_company": "Страховая компания",
     "insurance_type": "Вид страхования",
     "insured_amount": "Страховая сумма",
     "premium": "Страховая премия",

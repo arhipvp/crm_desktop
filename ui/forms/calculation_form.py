@@ -51,6 +51,14 @@ class CalculationForm(BaseEditForm):
         if deal_id is not None:
             data["deal_id"] = deal_id
         data.pop("deal", None)
+
+        # сохраняем свободный ввод из комбобоксов
+        data["insurance_company"] = (
+            self.company_combo.currentText().strip() or None
+        )
+        data["insurance_type"] = (
+            self.type_combo.currentText().strip() or None
+        )
         return data
 
     def save_data(self):
