@@ -3,12 +3,15 @@ from PySide6.QtCore import Qt
 from database.models import DealCalculation
 from services.calculation_service import (
     get_calculations,
-    delete_calculation,
+    mark_calculation_deleted,
+    generate_offer_text,
 )
+from services.folder_utils import copy_text_to_clipboard
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.ru_headers import RU_HEADERS
 from ui.common.message_boxes import confirm, show_error
+from ui.common.styled_widgets import styled_button
 from ui.forms.calculation_form import CalculationForm
 
 
@@ -31,6 +34,14 @@ class CalculationTableView(BaseTableView):
     def __init__(self, parent=None, deal_id=None):
         self.deal_id = deal_id
         super().__init__(parent=parent, model_class=DealCalculation, form_class=CalculationForm)
+        # разрешаем выбор нескольких строк
+        self.table.setSelectionMode(self.table.ExtendedSelection)
+        # кнопка формирования предложения
+        self.offer_btn = styled_button(
+            "Предложение", icon="📋", tooltip="Сформировать предложение"
+        )
+        self.offer_btn.clicked.connect(self._on_generate_offer)
+        self.button_row.insertWidget(self.button_row.count() - 1, self.offer_btn)
         self.row_double_clicked.connect(self.edit_selected)
         self.load_data()
 
@@ -56,6 +67,10 @@ class CalculationTableView(BaseTableView):
             return None
         return self.model.get_item(self._source_row(idx))
 
+    def get_selected_multiple(self):
+        indexes = self.table.selectionModel().selectedRows()
+        return [self.model.get_item(self._source_row(i)) for i in indexes]
+
     def add_new(self):
         form = CalculationForm(parent=self, deal_id=self.deal_id)
         if form.exec():
@@ -72,7 +87,14 @@ class CalculationTableView(BaseTableView):
         calc = self.get_selected()
         if calc and confirm("Удалить запись?"):
             try:
-                delete_calculation(calc.id)
+                mark_calculation_deleted(calc.id)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
+
+    def _on_generate_offer(self):
+        calcs = self.get_selected_multiple()
+        if not calcs:
+            return
+        text = generate_offer_text(calcs)
+        copy_text_to_clipboard(text, parent=self)

@@ -22,7 +22,12 @@ from services.dashboard_service import (
     get_upcoming_deal_reminders,
     get_deal_reminder_counts,
 )
-from services.folder_utils import rename_client_folder, open_local_or_web, copy_path_to_clipboard
+from services.folder_utils import (
+    rename_client_folder,
+    open_local_or_web,
+    copy_path_to_clipboard,
+    copy_text_to_clipboard,
+)
 import services.folder_utils as folder_utils
 from services.task_service import add_task, append_note, mark_task_deleted
 from utils import screen_utils, time_utils
@@ -127,6 +132,17 @@ def test_copy_path_to_clipboard(monkeypatch):
     assert msgs['msg']
 
 
+def test_copy_text_to_clipboard(monkeypatch):
+    qmod = types.SimpleNamespace(QGuiApplication=DummyQApp)
+    monkeypatch.setitem(sys.modules, 'PySide6.QtGui', qmod)
+    DummyQApp()
+    msgs = {}
+    monkeypatch.setattr('services.folder_utils._msg', lambda t, parent=None: msgs.setdefault('msg', t))
+    copy_text_to_clipboard('hello')
+    assert DummyQApp._instance.clip.text == 'hello'
+    assert msgs['msg']
+
+
 def test_copy_path_to_clipboard_no_app(monkeypatch):
     class NoApp:
         @staticmethod
@@ -135,6 +151,17 @@ def test_copy_path_to_clipboard_no_app(monkeypatch):
     qmod = types.SimpleNamespace(QGuiApplication=NoApp)
     monkeypatch.setitem(sys.modules, 'PySide6.QtGui', qmod)
     copy_path_to_clipboard('abc')
+
+
+def test_copy_text_to_clipboard_no_app(monkeypatch):
+    class NoApp:
+        @staticmethod
+        def instance():
+            return None
+
+    qmod = types.SimpleNamespace(QGuiApplication=NoApp)
+    monkeypatch.setitem(sys.modules, 'PySide6.QtGui', qmod)
+    copy_text_to_clipboard('abc')
 
 
 def test_dashboard_basic_stats_empty():

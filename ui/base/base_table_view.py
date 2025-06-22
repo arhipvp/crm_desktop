@@ -329,6 +329,10 @@ class BaseTableView(QWidget):
             from services import expense_service
 
             return expense_service
+        if model_class.__name__ == "DealCalculation":
+            from services import calculation_service
+
+            return calculation_service
         if model_class.__name__ == "Client":
             from services import client_service
 

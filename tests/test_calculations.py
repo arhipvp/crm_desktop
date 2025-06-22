@@ -1,7 +1,12 @@
 from datetime import date
 from services.client_service import add_client
 from services.deal_service import add_deal
-from services.calculation_service import add_calculation, get_calculations, delete_calculation
+from services.calculation_service import (
+    add_calculation,
+    get_calculations,
+    mark_calculation_deleted,
+    generate_offer_text,
+)
 from database.models import DealCalculation
 
 
@@ -13,7 +18,11 @@ def test_add_and_delete_calculation():
     calcs = list(get_calculations(deal.id))
     assert calc in calcs
 
-    delete_calculation(calc.id)
+    mark_calculation_deleted(calc.id)
     remaining = list(get_calculations(deal.id))
     assert calc not in remaining
+
+    # Проверим формирование предложения
+    txt = generate_offer_text(calcs)
+    assert "премия" in txt
 
