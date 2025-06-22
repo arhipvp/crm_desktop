@@ -71,9 +71,10 @@ class DealDetailView(QDialog):
         self.setWindowTitle(
             f"Сделка #{deal.id} — {deal.client.name}: {deal.description}"
         )
-        size = get_scaled_size(1000, 700)
+        size = get_scaled_size(1200, 800)
         self.resize(size)
-        self.setMinimumSize(640, 480)
+        min_w = max(900, int(size.width() * 0.8))
+        self.setMinimumSize(min_w, 480)
 
         self.layout = QVBoxLayout(self)
 
