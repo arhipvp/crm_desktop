@@ -24,9 +24,9 @@ from database.models import Expense
 
 @pytest.fixture(autouse=True)
 def extra_tables(test_db):
-    Expense.create_table()
+    if not Expense.table_exists():
+        Expense.create_table()
     yield
-    Expense.drop_table()
 
 
 # ---- Task service ---------------------------------------------------
