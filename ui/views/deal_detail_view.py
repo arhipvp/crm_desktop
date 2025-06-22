@@ -532,7 +532,11 @@ class DealDetailView(QDialog):
             DealDetailView(self.instance).exec()
 
     def _on_import_policy_json(self):
-        dlg = ImportPolicyJsonForm(parent=self)
+        dlg = ImportPolicyJsonForm(
+            parent=self,
+            forced_client=self.instance.client,
+            forced_deal=self.instance,
+        )
         if dlg.exec():
             self._init_tabs()
 
