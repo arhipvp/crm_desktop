@@ -373,7 +373,7 @@ class BaseTableView(QWidget):
         widths = {i: header.sectionSize(i) for i in range(header.count())}
         settings = {
             "sort_column": self.current_sort_column,
-            "sort_order": int(self.current_sort_order),
+            "sort_order": self.current_sort_order.value,
             "column_widths": widths,
         }
         ui_settings.set_table_settings(self.settings_id, settings)
