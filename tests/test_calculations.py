@@ -25,4 +25,6 @@ def test_add_and_delete_calculation():
     # Проверим формирование предложения
     txt = generate_offer_text(calcs)
     assert "премия" in txt
+    assert "руб" in txt
+    assert "entry" not in txt
 

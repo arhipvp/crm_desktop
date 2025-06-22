@@ -102,7 +102,10 @@ def _fmt_num(v: float) -> str:
 def generate_offer_text(calculations: Iterable[DealCalculation]) -> str:
     """Формирует текстовое предложение для клиента по выбранным расчётам."""
     lines: list[str] = []
-    for calc in calculations:
+    sorted_calcs = sorted(
+        list(calculations), key=lambda c: (c.insurance_type or "", c.insurance_company or "")
+    )
+    for calc in sorted_calcs:
         header = ", ".join(
             [
                 str(c)
@@ -112,16 +115,14 @@ def generate_offer_text(calculations: Iterable[DealCalculation]) -> str:
         )
         details = []
         if calc.insured_amount is not None:
-            details.append(f"сумма {_fmt_num(calc.insured_amount)}")
+            details.append(f"сумма {_fmt_num(calc.insured_amount)} руб")
         if calc.premium is not None:
-            details.append(f"премия {_fmt_num(calc.premium)}")
+            details.append(f"премия {_fmt_num(calc.premium)} руб")
         if calc.deductible is not None:
-            details.append(f"франшиза {_fmt_num(calc.deductible)}")
+            details.append(f"франшиза {_fmt_num(calc.deductible)} руб")
         line = header
         if details:
             line += ": " + ", ".join(details)
-        if calc.note:
-            line += f" ({calc.note})"
         lines.append(line)
     return "\n".join(lines)
 
