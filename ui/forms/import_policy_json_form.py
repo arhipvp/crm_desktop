@@ -16,8 +16,10 @@ from ui.forms.policy_form import PolicyForm
 
 
 class ImportPolicyJsonForm(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, forced_client=None, forced_deal=None):
         super().__init__(parent)
+        self._forced_client = forced_client
+        self._forced_deal = forced_deal
         self.setWindowTitle("Импорт полиса из JSON")
         self.setMinimumWidth(500)
 
@@ -71,42 +73,49 @@ class ImportPolicyJsonForm(QDialog):
             QMessageBox.warning(self, "Ошибка", "client_name не должен быть пустым.")
             return
 
-        # Поиск клиента
-        matches = [
-            c for c in get_all_clients() if client_name.lower() in c.name.lower()
-        ]
-
-        if not matches:
-            resp = QMessageBox.question(
-                self,
-                "Клиент не найден",
-                f"Клиент «{client_name}» не найден. Создать нового?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
-            if resp != QMessageBox.Yes:
-                return
-            client = add_client(name=client_name)
-        elif len(matches) == 1:
-            client = matches[0]
+        # Поиск клиента (если не передан принудительно)
+        if self._forced_client is not None:
+            client = self._forced_client
         else:
-            names = [c.name for c in matches]
-            selected_name, ok = QInputDialog.getItem(
-                self,
-                "Выбор клиента",
-                f"Найдено несколько клиентов по имени «{client_name}». Выберите нужного:",
-                names,
-                editable=False,
-            )
-            if not ok:
-                return
-            client = next(c for c in matches if c.name == selected_name)
+            matches = [
+                c for c in get_all_clients() if client_name.lower() in c.name.lower()
+            ]
+
+            if not matches:
+                resp = QMessageBox.question(
+                    self,
+                    "Клиент не найден",
+                    f"Клиент «{client_name}» не найден. Создать нового?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,
+                )
+                if resp != QMessageBox.Yes:
+                    return
+                client = add_client(name=client_name)
+            elif len(matches) == 1:
+                client = matches[0]
+            else:
+                names = [c.name for c in matches]
+                selected_name, ok = QInputDialog.getItem(
+                    self,
+                    "Выбор клиента",
+                    f"Найдено несколько клиентов по имени «{client_name}». Выберите нужного:",
+                    names,
+                    editable=False,
+                )
+                if not ok:
+                    return
+                client = next(c for c in matches if c.name == selected_name)
 
         # Подготовка и запуск формы
         policy_data = data.get("policy", {})
         payments_data = data.get("payments", [])
 
-        form = PolicyForm(forced_client=client, parent=self)
+        form = PolicyForm(
+            forced_client=client,
+            forced_deal=self._forced_deal,
+            parent=self,
+        )
 
         # Заполняем поля из policy
         for key, val in policy_data.items():
@@ -124,6 +133,13 @@ class ImportPolicyJsonForm(QDialog):
                         widget.setDate(dt)
                     except ValueError:
                         pass  # игнорируем ошибки даты
+
+        # В примечание дописываем ФИО страхователя
+        note_widget = form.fields.get("note")
+        if note_widget and client_name:
+            prev = note_widget.text().strip() if hasattr(note_widget, "text") else ""
+            sep = "\n" if prev else ""
+            note_widget.setText(f"{prev}{sep}{client_name}")
 
         # Заполняем черновые платежи
         form._draft_payments = payments_data
