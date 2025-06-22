@@ -18,6 +18,7 @@ from ui.common.paginator import Paginator
 from ui.common.styled_widgets import styled_button
 from ui.common.column_proxy_model import ColumnFilterProxyModel
 from ui.common.column_filter_row import ColumnFilterRow
+from ui import settings as ui_settings
 
 
 class BaseTableView(QWidget):
@@ -59,6 +60,7 @@ class BaseTableView(QWidget):
 
         self.use_inline_details = True  # включить встроенные детали
         self.detail_widget = None
+        self.settings_id = type(self).__name__
 
         self.default_sort_column = 0  # по умолчанию — первый столбец
         self.default_sort_order = Qt.AscendingOrder
@@ -137,6 +139,9 @@ class BaseTableView(QWidget):
         self.table.horizontalHeader().sortIndicatorChanged.connect(
             self._on_sort_indicator_changed
         )
+        self.table.horizontalHeader().sectionResized.connect(
+            self._on_section_resized
+        )
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -174,6 +179,7 @@ class BaseTableView(QWidget):
             for i in range(self.model.columnCount())
         ]
         self.column_filters.set_headers(headers)
+        self.load_table_settings()
 
     def load_data(self):
         if not self.model_class or not self.get_page_func:
@@ -356,3 +362,44 @@ class BaseTableView(QWidget):
         """Сохраняет текущую сортировку таблицы."""
         self.current_sort_column = column
         self.current_sort_order = order
+        self.save_table_settings()
+
+    def _on_section_resized(self, *_):
+        self.save_table_settings()
+
+    def save_table_settings(self):
+        """Сохраняет настройки сортировки и ширины колонок."""
+        header = self.table.horizontalHeader()
+        widths = {i: header.sectionSize(i) for i in range(header.count())}
+        settings = {
+            "sort_column": self.current_sort_column,
+            "sort_order": self.current_sort_order.value,
+            "column_widths": widths,
+        }
+        ui_settings.set_table_settings(self.settings_id, settings)
+
+    def load_table_settings(self):
+        """Применяет сохранённые настройки, если они есть."""
+        header = self.table.horizontalHeader()
+        saved = ui_settings.get_table_settings(self.settings_id)
+        if not saved:
+            return
+        for idx, width in saved.get("column_widths", {}).items():
+            idx = int(idx)
+            if idx < header.count():
+                header.resizeSection(idx, width)
+        column = saved.get("sort_column")
+        order = saved.get("sort_order")
+        if column is not None and order is not None:
+            try:
+                self.table.horizontalHeader().setSortIndicator(
+                    int(column), Qt.SortOrder(order)
+                )
+                self.current_sort_column = int(column)
+                self.current_sort_order = Qt.SortOrder(order)
+            except Exception:
+                pass
+
+    def closeEvent(self, event):
+        self.save_table_settings()
+        super().closeEvent(event)
