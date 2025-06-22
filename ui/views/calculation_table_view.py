@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QAbstractItemView
 
 from database.models import DealCalculation
 from services.calculation_service import (
@@ -35,7 +36,7 @@ class CalculationTableView(BaseTableView):
         self.deal_id = deal_id
         super().__init__(parent=parent, model_class=DealCalculation, form_class=CalculationForm)
         # разрешаем выбор нескольких строк
-        self.table.setSelectionMode(self.table.ExtendedSelection)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         # кнопка формирования предложения
         self.offer_btn = styled_button(
             "Предложение", icon="📋", tooltip="Сформировать предложение"
