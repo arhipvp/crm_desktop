@@ -44,10 +44,16 @@ class CalculationTableView(BaseTableView):
         self.offer_btn.clicked.connect(self._on_generate_offer)
         self.button_row.insertWidget(self.button_row.count() - 1, self.offer_btn)
         self.row_double_clicked.connect(self.edit_selected)
+        self.delete_callback = self.delete_selected
         self.load_data()
 
     def load_data(self):
-        items = list(get_calculations(self.deal_id)) if self.deal_id else []
+        show_deleted = self.filter_controls.is_checked("Показывать удалённые")
+        items = (
+            list(get_calculations(self.deal_id, show_deleted=show_deleted))
+            if self.deal_id
+            else []
+        )
         self.set_model_class_and_items(DealCalculation, items, total_count=len(items))
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
@@ -99,3 +105,13 @@ class CalculationTableView(BaseTableView):
             return
         text = generate_offer_text(calcs)
         copy_text_to_clipboard(text, parent=self)
+        try:
+            from services.client_service import format_phone_for_whatsapp, open_whatsapp
+            from database.models import Deal
+
+            deal = Deal.get_by_id(self.deal_id)
+            phone = deal.client.phone if deal and deal.client else None
+            if phone:
+                open_whatsapp(format_phone_for_whatsapp(phone), message=text)
+        except Exception:
+            pass

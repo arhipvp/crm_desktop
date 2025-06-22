@@ -28,10 +28,11 @@ def add_calculation(deal_id: int, **kwargs) -> DealCalculation:
     return DealCalculation.create(**data)
 
 
-def get_calculations(deal_id: int) -> ModelSelect:
-    return DealCalculation.select().where(
-        (DealCalculation.deal_id == deal_id) & (DealCalculation.is_deleted == False)
-    ).order_by(DealCalculation.created_at.desc())
+def get_calculations(deal_id: int, show_deleted: bool = False) -> ModelSelect:
+    query = DealCalculation.select().where(DealCalculation.deal_id == deal_id)
+    if not show_deleted:
+        query = query.where(DealCalculation.is_deleted == False)
+    return query.order_by(DealCalculation.created_at.desc())
 
 
 def mark_calculation_deleted(entry_id: int) -> None:
@@ -46,6 +47,9 @@ def mark_calculation_deleted(entry_id: int) -> None:
 
 # совместимый алиас на случай устаревших вызовов
 delete_calculation = mark_calculation_deleted
+
+# alias for BaseTableView automatic deletion
+mark_dealcalculation_deleted = mark_calculation_deleted
 
 
 def update_calculation(entry: DealCalculation, **kwargs) -> DealCalculation:
@@ -90,22 +94,32 @@ def get_unique_calculation_field_values(field_name: str) -> list[str]:
     )
 
 
+def _fmt_num(v: float) -> str:
+    """Форматирует число с пробелами между тысячами."""
+    return f"{v:,.0f}".replace(",", " ")
+
+
 def generate_offer_text(calculations: Iterable[DealCalculation]) -> str:
     """Формирует текстовое предложение для клиента по выбранным расчётам."""
     lines: list[str] = []
     for calc in calculations:
-        parts = []
-        if calc.insurance_company:
-            parts.append(str(calc.insurance_company))
-        if calc.insurance_type:
-            parts.append(str(calc.insurance_type))
+        header = ", ".join(
+            [
+                str(c)
+                for c in [calc.insurance_company, calc.insurance_type]
+                if c
+            ]
+        )
+        details = []
         if calc.insured_amount is not None:
-            parts.append(f"сумма {calc.insured_amount:g}")
+            details.append(f"сумма {_fmt_num(calc.insured_amount)}")
         if calc.premium is not None:
-            parts.append(f"премия {calc.premium:g}")
+            details.append(f"премия {_fmt_num(calc.premium)}")
         if calc.deductible is not None:
-            parts.append(f"франшиза {calc.deductible:g}")
-        line = ", ".join(parts)
+            details.append(f"франшиза {_fmt_num(calc.deductible)}")
+        line = header
+        if details:
+            line += ": " + ", ".join(details)
         if calc.note:
             line += f" ({calc.note})"
         lines.append(line)
