@@ -21,6 +21,8 @@ from PySide6.QtGui import (
     QColor,
     QFontDatabase,
     QFont,
+    QShortcut,
+    QKeySequence,
 )
 import re
 
@@ -98,6 +100,7 @@ class DealDetailView(QDialog):
 
         # Быстрые действия
         self._init_actions()
+        self._register_shortcuts()
 
     def _init_kpi_panel(self):
         """(Re)populate the KPI panel without adding new duplicates."""
@@ -426,6 +429,16 @@ class DealDetailView(QDialog):
             box.addWidget(btn_close)
 
         self._update_exec_button()
+
+    def _register_shortcuts(self):
+        """Enable hotkeys for saving with closing and refreshing."""
+        self._sc_save_close = QShortcut(QKeySequence("Ctrl+Shift+Enter"), self)
+        self._sc_save_close.setContext(Qt.WidgetWithChildrenShortcut)
+        self._sc_save_close.activated.connect(self._on_save_and_close)
+
+        self._sc_refresh = QShortcut(QKeySequence("F5"), self)
+        self._sc_refresh.setContext(Qt.WidgetWithChildrenShortcut)
+        self._sc_refresh.activated.connect(self._on_refresh)
 
     def _on_edit(self):
         form = DealForm(self.instance, parent=self)
