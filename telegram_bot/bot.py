@@ -215,7 +215,10 @@ def fmt_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:
 async def h_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     logger.info("/start from %s", update.effective_user.id)
     kb = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("📥 Получить задачу", callback_data="get")]]
+        [
+            [InlineKeyboardButton("📥 Получить задачу", callback_data="get")],
+            [InlineKeyboardButton("📋 Мои задачи", callback_data="tasks")],
+        ]
     )
     await update.message.reply_text(
         "Привет! Я бот CRM. Нажми кнопку, чтобы взять следующую задачу.",
@@ -543,6 +546,19 @@ async def h_show_tasks(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     lines = [f"#{t.id} {t.title} (до {t.due_date:%d.%m.%Y})" for t in tasks]
     await update.message.reply_text("\n".join(lines))
 
+async def h_show_tasks_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+    user_id = q.from_user.id
+    if not es.is_approved(user_id):
+        return await q.message.reply_text("⏳ Ожидайте одобрения администратора")
+    tasks = ts.get_incomplete_tasks_for_executor(user_id)
+    if not tasks:
+        await q.message.reply_text("Нет незавершенных задач")
+        return
+    lines = [f"#{t.id} {t.title} (до {t.due_date:%d.%m.%Y})" for t in tasks]
+    await q.message.reply_text("\n".join(lines))
+
 
 # ───────────── main ─────────────
 def main() -> None:
@@ -556,6 +572,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(h_action, pattern=r"^(done|ret|reply):"))
     app.add_handler(CallbackQueryHandler(h_admin_action, pattern=r"^(accept|info|rework|approve_exec|deny_exec):"))
     app.add_handler(CallbackQueryHandler(h_task_button, pattern=r"^(task_done|calc|question):"))
+    app.add_handler(CallbackQueryHandler(h_show_tasks_button, pattern="^tasks$"))
     app.add_handler(CommandHandler("tasks", h_show_tasks))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))

@@ -93,7 +93,6 @@ class TaskTableView(BaseTableView):
                 if not ex:
                     raise RuntimeError("исполнитель не привязан")
                 send_task(t, ex.tg_id)
-                update_task(t, is_done=True)
                 sent += 1
             except Exception as exc:
                 skipped += 1

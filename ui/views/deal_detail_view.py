@@ -468,10 +468,8 @@ class DealDetailView(QDialog):
                 show_error("Исполнитель не привязан")
                 return
             from services import telegram_service as tg_s
-            from services import task_service as ts
             try:
                 tg_s.send_task(task, ex.tg_id)
-                ts.update_task(task, is_done=True)
             except Exception as exc:
                 from ui.common.message_boxes import show_error
                 show_error(str(exc))
