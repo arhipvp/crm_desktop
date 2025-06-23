@@ -142,7 +142,7 @@ class DealExecutor(BaseModel):
 
 # ─────────────────────────── Расчёт по сделке ──────────────────────────
 class DealCalculation(BaseModel):
-    deal = ForeignKeyField(Deal, backref="calculations")
+    deal = ForeignKeyField(Deal, backref="calc_entries")
     insurance_company = CharField(null=True)
     insurance_type = CharField(null=True)
     insured_amount = FloatField(null=True)
