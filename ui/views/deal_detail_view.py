@@ -26,6 +26,7 @@ import re
 
 from database.models import Task
 from services.deal_service import (
+    get_deal_by_id,
     get_next_deal,
     get_policies_by_deal_id,
     get_prev_deal,
@@ -220,12 +221,23 @@ class DealDetailView(QDialog):
         calc_group.setLayout(calc_box)
         main_layout.addWidget(calc_group)
 
-        # Кнопка сохранения
+        # Кнопки сохранения и обновления
         btn_save = styled_button(
             "💾 Сохранить изменения", shortcut="Ctrl+Enter"
         )
         btn_save.clicked.connect(self._on_inline_save)
-        main_layout.addWidget(btn_save, alignment=Qt.AlignRight)
+        btn_save_close = styled_button(
+            "💾 Сохранить и закрыть", shortcut="Ctrl+Shift+Enter"
+        )
+        btn_save_close.clicked.connect(self._on_save_and_close)
+        btn_refresh = styled_button("🔄 Обновить", shortcut="F5")
+        btn_refresh.clicked.connect(self._on_refresh)
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_row.addWidget(btn_save)
+        btn_row.addWidget(btn_save_close)
+        btn_row.addWidget(btn_refresh)
+        main_layout.addLayout(btn_row)
 
         info.setLayout(main_layout)
         self.tabs.addTab(info, "Информация")
@@ -560,6 +572,20 @@ class DealDetailView(QDialog):
             from ui.common.message_boxes import show_error
 
             show_error(str(e))
+
+    def _on_save_and_close(self):
+        self._on_inline_save()
+        self.accept()
+
+    def _on_refresh(self):
+        fresh = get_deal_by_id(self.instance.id)
+        if fresh:
+            self.instance = fresh
+            self.setWindowTitle(
+                f"Сделка #{fresh.id} — {fresh.client.name}: {fresh.description}"
+            )
+            self._init_kpi_panel()
+            self._init_tabs()
 
     def _on_task_double_clicked(self, task):
         form = TaskForm(task, parent=self)
