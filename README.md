@@ -50,13 +50,9 @@ pip install -r requirements.txt
 
 ## Запуск Telegram‑бота
 
-Для работы бота необходимы переменные `DATABASE_URL` и `TG_BOT_TOKEN`.
-Бот можно запустить локально:
-
-```bash
-python telegram_bot/bot.py
-```
-
+Бот работает только внутри Docker‑контейнера. Перед запуском создайте
+`telegram_bot/.env` и укажите в нём переменные `DATABASE_URL` и
+`TG_BOT_TOKEN`.
 
 ## Docker Compose
 
@@ -69,7 +65,7 @@ POSTGRES_USER=crm_user
 POSTGRES_PASSWORD=crm_pass
 ```
 
-Также создайте `telegram_bot/.env`:
+`telegram_bot/.env` пример:
 
 ```env
 DATABASE_URL=postgres://crm_user:crm_pass@db:5432/crm
