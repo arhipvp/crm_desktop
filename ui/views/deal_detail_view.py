@@ -461,8 +461,20 @@ class DealDetailView(QDialog):
             task = getattr(form, "saved_instance", None)
             if not task:
                 return
+            from services import executor_service as es
+            ex = es.get_executor_for_deal(self.instance.id)
+            if not ex:
+                from ui.common.message_boxes import show_error
+                show_error("Исполнитель не привязан")
+                return
+            from services import telegram_service as tg_s
             from services import task_service as ts
-            ts.queue_task(task.id)
+            try:
+                tg_s.send_task(task, ex.tg_id)
+                ts.update_task(task, is_done=True)
+            except Exception as exc:
+                from ui.common.message_boxes import show_error
+                show_error(str(exc))
             if hasattr(self, "task_view"):
                 self.task_view.refresh()
             self._init_kpi_panel()

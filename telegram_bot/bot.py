@@ -209,24 +209,6 @@ def fmt_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:
     return text, kb
 
 
-async def job_dispatch_tasks(ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    """Регулярно проверять базу и отправлять задачи исполнителям."""
-    tasks = ts.get_all_queued_tasks()
-    for task in tasks:
-        if not task.deal_id:
-            continue
-        ex = es.get_executor_for_deal(task.deal_id)
-        if not ex:
-            continue
-        text, kb = fmt_exec_task(task)
-        msg = await ctx.bot.send_message(
-            ex.tg_id,
-            text,
-            reply_markup=kb,
-            parse_mode=constants.ParseMode.HTML,
-        )
-        ts.link_telegram(task.id, msg.chat_id, msg.message_id)
-        ts.update_task(task, is_done=True)
 
 
 # ───────────── handlers ─────────────
@@ -412,7 +394,9 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     tid = int(tid)
 
     if action == "accept":
-        ts.mark_done(tid)
+        task = ts.Task.get_or_none(ts.Task.id == tid)
+        if task and not task.is_done:
+            ts.mark_done(tid)
         await q.message.edit_text(
             "✅ Задача подтверждена", parse_mode=constants.ParseMode.HTML
         )
@@ -463,7 +447,9 @@ async def h_task_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     tid = int(tid)
 
     if action == "task_done":
-        ts.mark_done(tid)
+        task = ts.Task.get_or_none(ts.Task.id == tid)
+        if task and not task.is_done:
+            ts.mark_done(tid)
         await q.message.edit_text(
             "✅ Задача выполнена", parse_mode=constants.ParseMode.HTML
         )
@@ -573,9 +559,6 @@ def main() -> None:
     app.add_handler(CommandHandler("tasks", h_show_tasks))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))
-
-    # запуск периодического опроса БД
-    app.job_queue.run_repeating(job_dispatch_tasks, interval=10, first=5)
 
     logger.info("Telegram‑бот запущен внутри контейнера…")
     app.run_polling(allowed_updates=["message", "callback_query"])

@@ -8,7 +8,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
 from database.models import Task
-from services.task_service import build_task_query, get_tasks_page, queue_task
+from services.task_service import build_task_query, get_tasks_page, update_task
+from services.telegram_service import send_task
 from ui.base.base_table_view import BaseTableView
 from ui.common.delegates import StatusDelegate
 from ui.common.filter_controls import FilterControls
@@ -53,13 +54,13 @@ class TaskTableView(BaseTableView):
         self.send_btn = styled_button(
             "Отправить",
             icon="📤",
-            tooltip="Поставить выбранные задачи в очередь Telegram",
+            tooltip="Отправить выбранные задачи исполнителю",
             shortcut="Ctrl+Shift+S",
         )
         idx_stretch = self.button_row.count() - 1
         self.button_row.insertWidget(idx_stretch, self.send_btn)
         self.send_btn.setEnabled(False)
-        self.send_btn.clicked.connect(self._queue_selected_tasks_to_telegram)
+        self.send_btn.clicked.connect(self._send_selected_tasks)
 
         sel = self.table.selectionModel()
         sel.selectionChanged.connect(self._update_actions_state)
@@ -80,22 +81,27 @@ class TaskTableView(BaseTableView):
             if index.isValid()
         ]
 
-    def _queue_selected_tasks_to_telegram(self):
+    def _send_selected_tasks(self):
         tasks = self._selected_tasks()
         if not tasks:
             return
         sent, skipped = 0, 0
         for t in tasks:
             try:
-                queue_task(t.id)
+                from services import executor_service as es
+                ex = es.get_executor_for_deal(t.deal_id) if t.deal_id else None
+                if not ex:
+                    raise RuntimeError("исполнитель не привязан")
+                send_task(t, ex.tg_id)
+                update_task(t, is_done=True)
                 sent += 1
             except Exception as exc:
                 skipped += 1
-                logger.debug("[queue_task] failed for %s: %s", t.id, exc)
+                logger.debug("[send_task] failed for %s: %s", t.id, exc)
         QMessageBox.information(
             self,
             "Telegram",
-            f"В очередь помещено: {sent}\nОшибок: {skipped}",
+            f"Отправлено: {sent}\nОшибок: {skipped}",
         )
         self.refresh()
 
