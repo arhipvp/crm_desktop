@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
 from database.models import Task
-from services.task_service import build_task_query, get_tasks_page, queue_task
+from services.task_service import build_task_query, get_tasks_page, queue_task, update_task
 from ui.base.base_table_view import BaseTableView
 from ui.common.delegates import StatusDelegate
 from ui.common.filter_controls import FilterControls
@@ -59,7 +59,7 @@ class TaskTableView(BaseTableView):
         idx_stretch = self.button_row.count() - 1
         self.button_row.insertWidget(idx_stretch, self.send_btn)
         self.send_btn.setEnabled(False)
-        self.send_btn.clicked.connect(self._queue_selected_tasks_to_telegram)
+        self.send_btn.clicked.connect(self._send_selected_tasks)
 
         sel = self.table.selectionModel()
         sel.selectionChanged.connect(self._update_actions_state)
@@ -80,7 +80,7 @@ class TaskTableView(BaseTableView):
             if index.isValid()
         ]
 
-    def _queue_selected_tasks_to_telegram(self):
+    def _send_selected_tasks(self):
         tasks = self._selected_tasks()
         if not tasks:
             return

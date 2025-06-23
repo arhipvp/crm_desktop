@@ -541,6 +541,16 @@ def get_queued_tasks_by_deal(deal_id: int) -> list[Task]:
     return list(prefetch(base, Deal, Policy, Client))
 
 
+def get_all_queued_tasks() -> list[Task]:
+    """Вернуть все задачи в состоянии ``queued`` с предзагрузкой связей."""
+    base = (
+        Task.select()
+        .where((Task.dispatch_state == "queued") & (Task.is_deleted == False))
+        .order_by(Task.queued_at.asc())
+    )
+    return list(prefetch(base, Deal, Policy, Client))
+
+
 def pop_task_by_id(chat_id: int, task_id: int) -> Task | None:
     """Выдать задачу по id, если она в очереди."""
     with db.atomic():
@@ -586,3 +596,22 @@ def get_tasks_by_deal(deal_id: int) -> list[Task]:
         list[Task]: Список задач сделки.
     """
     return Task.select().where((Task.deal_id == deal_id) & (Task.is_deleted == False))
+
+
+def get_incomplete_tasks_for_executor(tg_id: int) -> list[Task]:
+    """Вернуть невыполненные задачи по сделкам исполнителя."""
+    from services import executor_service as es
+
+    deals = es.get_deals_for_executor(tg_id)
+    if not deals:
+        return []
+    deal_ids = [d.id for d in deals]
+    base = (
+        Task.select()
+        .where(
+            (Task.deal_id.in_(deal_ids))
+            & (Task.is_deleted == False)
+            & (Task.is_done == False)
+        )
+    )
+    return list(prefetch(base, Deal, Client))

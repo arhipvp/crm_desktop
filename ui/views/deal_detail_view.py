@@ -199,6 +199,10 @@ class DealDetailView(QDialog):
         journal_group.setLayout(journal_form)
         main_layout.addWidget(journal_group)
 
+        self.btn_exec_task = styled_button("📤 Новая задача исполнителю")
+        self.btn_exec_task.clicked.connect(self._on_new_exec_task)
+        main_layout.addWidget(self.btn_exec_task, alignment=Qt.AlignLeft)
+
         # ---- Расчёты ------------------------------------------------
         from ui.views.calculation_table_view import CalculationTableView
 
@@ -328,6 +332,7 @@ class DealDetailView(QDialog):
         btn_add_task.clicked.connect(self._on_add_task)
         vbox.addWidget(btn_add_task, alignment=Qt.AlignLeft)
 
+
         # Подгружаем ТОЛЬКО задачи этой сделки
         from services.task_service import get_tasks_by_deal
 
@@ -444,6 +449,30 @@ class DealDetailView(QDialog):
                 form.deal_combo.setCurrentIndex(idx)
         if form.exec():
             self.task_view.refresh()  # загрузит только задачи сделки
+            self._init_kpi_panel()
+
+    def _on_new_exec_task(self):
+        form = TaskForm(parent=self, forced_deal=self.instance)
+        if hasattr(form, "deal_combo"):
+            idx = form.deal_combo.findData(self.instance.id)
+            if idx >= 0:
+                form.deal_combo.setCurrentIndex(idx)
+        if form.exec():
+            task = getattr(form, "saved_instance", None)
+            if not task:
+                return
+            from services import executor_service as es
+            ex = es.get_executor_for_deal(self.instance.id)
+            if not ex:
+                from ui.common.message_boxes import show_error
+                show_error("Исполнитель не привязан")
+            else:
+                from services import telegram_service as tg_s
+                tg_s.send_exec_task(task, ex.tg_id)
+                from services.task_service import update_task
+                update_task(task, is_done=True)
+            if hasattr(self, "task_view"):
+                self.task_view.refresh()
             self._init_kpi_panel()
 
     def _open_folder(self):
