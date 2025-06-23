@@ -539,9 +539,46 @@ async def h_show_tasks_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     await q.message.reply_text("\n".join(lines))
 
 
+async def send_pending_tasks(_ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отправить исполнителям задачи из очереди."""
+    tasks = ts.get_all_queued_tasks()
+    for t in tasks:
+        if not t.deal_id:
+            continue
+        ex = es.get_executor_for_deal(t.deal_id)
+        if not ex or not es.is_approved(ex.tg_id):
+            continue
+        popped = ts.pop_task_by_id(ex.tg_id, t.id)
+        if not popped:
+            continue
+        msg = await _ctx.bot.send_message(
+            chat_id=ex.tg_id,
+            text=fmt_task(popped),
+            reply_markup=kb_task(popped.id),
+            parse_mode=constants.ParseMode.HTML,
+        )
+        ts.link_telegram(popped.id, msg.chat_id, msg.message_id)
+
+
 # ───────────── main ─────────────
+async def _start_dispatcher(app: Application) -> None:
+    """Schedule periodic sending of pending tasks."""
+    if app.job_queue:
+        app.job_queue.run_repeating(send_pending_tasks, interval=60)
+    else:
+        import asyncio, types
+
+        async def loop() -> None:
+            ctx = types.SimpleNamespace(bot=app.bot)
+            while True:
+                await send_pending_tasks(ctx)
+                await asyncio.sleep(60)
+
+        app.create_task(loop())
+
+
 def main() -> None:
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(_start_dispatcher).build()
 
     app.add_handler(CommandHandler("start", h_start))
     app.add_handler(CallbackQueryHandler(h_get, pattern="^get$"))

@@ -467,10 +467,8 @@ class DealDetailView(QDialog):
                 from ui.common.message_boxes import show_error
                 show_error("Исполнитель не привязан")
             else:
-                from services import telegram_service as tg_s
-                tg_s.send_exec_task(task, ex.tg_id)
-                from services.task_service import update_task
-                update_task(task, is_done=True)
+                from services.task_service import queue_task
+                queue_task(task.id)
             if hasattr(self, "task_view"):
                 self.task_view.refresh()
             self._init_kpi_panel()

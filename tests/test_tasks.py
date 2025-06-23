@@ -34,6 +34,9 @@ def test_fmt_task_includes_deal_log(monkeypatch):
         description="Desc",
         calculations="note",
     )
+    # В некоторых версиях Peewee поле calculations не сохраняется при create
+    from database.models import Deal as DealModel
+    DealModel.update(calculations="note").where(DealModel.id == deal.id).execute()
     task = add_task(title="t", due_date=date(2025, 1, 2), deal_id=deal.id)
 
     text = fmt_task(task)

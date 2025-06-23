@@ -36,7 +36,9 @@ def format_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:
 def send_exec_task(t: ts.Task, tg_id: int) -> None:
     """Отправить задачу исполнителю и связать её с сообщением."""
     if not _bot:
-        raise RuntimeError("TG_BOT_TOKEN not configured")
+        import logging
+        logging.getLogger(__name__).warning("TG_BOT_TOKEN not configured")
+        return
     text, kb = format_exec_task(t)
     msg = _bot.send_message(
         chat_id=tg_id,
