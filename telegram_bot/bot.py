@@ -33,6 +33,14 @@ from telegram.ext import (
     filters,
 )
 
+
+def _parse_float(text: str) -> float | None:
+    """Преобразовать ввод пользователя в число."""
+    try:
+        return float(text.replace(" ", "").replace(",", "."))
+    except ValueError:
+        return None
+
 # ───────────── env ─────────────
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 init_from_env()
@@ -63,6 +71,8 @@ logger = logging.getLogger(__name__)
 # Храним чат исполнителя и его имя для уведомлений.
 pending_accept: dict[int, tuple[int, str]] = {}
 pending_users: dict[int, tuple[int, str]] = {}
+# Ожидаемые шаги добавления расчёта
+pending_calc: dict[int, dict] = {}
 
 # ───────────── imports из core ─────────────
 from services import task_service as ts
@@ -121,6 +131,7 @@ def kb_task(tid: int) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton("✅ Выполнить", callback_data=f"done:{tid}"),
                 InlineKeyboardButton("💬 Ответить", callback_data=f"reply:{tid}"),
+                InlineKeyboardButton("➕ Расчёт", callback_data=f"calc:{tid}"),
                 InlineKeyboardButton("🔄 Вернуть", callback_data=f"ret:{tid}"),
             ]
         ]
@@ -343,14 +354,11 @@ async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     tid = int(tid)
 
     if action == "done":
-        ts.unassign_from_telegram(tid)
+        ts.mark_done(tid)
         await q.message.edit_text(
-            "✅ Задача скрыта из очереди", parse_mode=constants.ParseMode.HTML
+            "✅ Задача выполнена", parse_mode=constants.ParseMode.HTML
         )
-        user_name = q.from_user.full_name or ("@" + q.from_user.username) if q.from_user.username else str(q.from_user.id)
-        pending_accept[tid] = (q.message.chat_id, user_name)
-        await notify_admin(_ctx.bot, tid, executor=user_name)
-        logger.info("Task %s marked done, awaiting admin", tid)
+        logger.info("Task %s marked done by executor", tid)
 
     elif action == "ret":
         ts.return_to_queue(tid)
@@ -441,15 +449,74 @@ async def h_task_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
             reply_markup=ForceReply(selective=True),
         )
     elif action == "calc":
+        pending_calc[q.from_user.id] = {"tid": tid, "step": 0, "data": {}}
         await q.message.reply_text(
-            f"Введите расчёт для задачи #{tid}:",
+            f"Страховая компания для расчёта #{tid}:",
             reply_markup=ForceReply(selective=True),
         )
 
 
 async def h_text(update: Update, _ctx):
+    user_id = update.effective_user.id
+    if user_id in pending_calc:
+        state = pending_calc[user_id]
+        step = state.get("step", 0)
+        data = state.setdefault("data", {})
+        text = update.message.text.strip()
+        if step == 0:
+            data["insurance_company"] = text or None
+            state["step"] = 1
+            await update.message.reply_text(
+                "Вид страхования:", reply_markup=ForceReply(selective=True)
+            )
+            return
+        if step == 1:
+            data["insurance_type"] = text or None
+            state["step"] = 2
+            await update.message.reply_text(
+                "Страховая сумма (руб, опционально):",
+                reply_markup=ForceReply(selective=True),
+            )
+            return
+        if step == 2:
+            data["insured_amount"] = _parse_float(text)
+            state["step"] = 3
+            await update.message.reply_text(
+                "Премия (руб, опционально):",
+                reply_markup=ForceReply(selective=True),
+            )
+            return
+        if step == 3:
+            data["premium"] = _parse_float(text)
+            state["step"] = 4
+            await update.message.reply_text(
+                "Франшиза (руб, опционально):",
+                reply_markup=ForceReply(selective=True),
+            )
+            return
+        if step == 4:
+            data["deductible"] = _parse_float(text)
+            state["step"] = 5
+            await update.message.reply_text(
+                "Примечание:", reply_markup=ForceReply(selective=True)
+            )
+            return
+        if step == 5:
+            data["note"] = text or None
+            tid = state.get("tid")
+            pending_calc.pop(user_id, None)
+            task = ts.Task.get_or_none(ts.Task.id == tid)
+            if task and task.deal_id:
+                calc_s.add_calculation(task.deal_id, **data)
+                await update.message.reply_text("Расчёт сохранён 👍")
+                logger.info("Calculation added for %s", tid)
+            else:
+                await update.message.reply_text("⚠️ Сделка не найдена")
+            return
+
     if not update.message.reply_to_message:
         return
+
     reply_txt = update.message.reply_to_message.text_html or ""
     m = re.search(r"#(\d+)", reply_txt)
     if not m:
@@ -463,20 +530,12 @@ async def h_text(update: Update, _ctx):
         if update.effective_user.username
         else str(update.effective_user.id)
     )
-    if "Введите расчёт" in reply_txt:
-        task = ts.Task.get_or_none(ts.Task.id == tid)
-        if task and task.deal_id:
-            calc_s.add_calculation(task.deal_id, note=update.message.text)
-            await update.message.reply_text("Расчёт сохранён 👍")
-            logger.info("Calculation added for %s", tid)
-        else:
-            await update.message.reply_text("⚠️ Сделка не найдена")
-    else:
-        ts.append_note(tid, f"[TG {stamp}] {user_name}: {update.message.text}")
-        await update.message.reply_text("Комментарий сохранён 👍")
-        logger.info("Note added to %s", tid)
-        if update.message.chat_id != ADMIN_CHAT_ID:
-            await notify_admin(_ctx.bot, tid, update.message.text, executor=user_name)
+
+    ts.append_note(tid, f"[TG {stamp}] {user_name}: {update.message.text}")
+    await update.message.reply_text("Комментарий сохранён 👍")
+    logger.info("Note added to %s", tid)
+    if update.message.chat_id != ADMIN_CHAT_ID:
+        await notify_admin(_ctx.bot, tid, update.message.text, executor=user_name)
 
 
 async def h_file(update: Update, _ctx):
