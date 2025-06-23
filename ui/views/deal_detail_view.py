@@ -204,7 +204,11 @@ class DealDetailView(QDialog):
 
         calc_group = QGroupBox("Расчёты")
         calc_box = QVBoxLayout()
-        btn_calc = styled_button("➕ Запись", tooltip="Добавить расчёт")
+        btn_calc = styled_button(
+            "➕ Запись",
+            tooltip="Добавить расчёт",
+            shortcut="Ctrl+Shift+A",
+        )
         btn_calc.clicked.connect(self._on_add_calculation)
         calc_box.addWidget(btn_calc, alignment=Qt.AlignLeft)
         self.calc_table = CalculationTableView(parent=self, deal_id=self.instance.id)
@@ -274,7 +278,11 @@ class DealDetailView(QDialog):
         income_tab = QWidget()
         income_layout = QVBoxLayout(income_tab)
 
-        btn_income = styled_button("➕ Доход", tooltip="Добавить доход")
+        btn_income = styled_button(
+            "➕ Доход",
+            tooltip="Добавить доход",
+            shortcut="Ctrl+Alt+I",
+        )
         btn_income.clicked.connect(self._on_add_income)
         has_payments = len(get_payments_by_deal_id(self.instance.id)) > 0
         btn_income.setEnabled(has_payments)
@@ -293,7 +301,11 @@ class DealDetailView(QDialog):
 
         expense_tab = QWidget()
         expense_layout = QVBoxLayout(expense_tab)
-        btn_expense = styled_button("➕ Расход", tooltip="Добавить расход")
+        btn_expense = styled_button(
+            "➕ Расход",
+            tooltip="Добавить расход",
+            shortcut="Ctrl+Alt+X",
+        )
         btn_expense.clicked.connect(self._on_add_expense)
         expense_layout.addWidget(btn_expense, alignment=Qt.AlignLeft)
 
@@ -308,7 +320,11 @@ class DealDetailView(QDialog):
         task_tab = QWidget()
         vbox = QVBoxLayout(task_tab)
 
-        btn_add_task = styled_button("➕ Задача", tooltip="Добавить задачу")
+        btn_add_task = styled_button(
+            "➕ Задача",
+            tooltip="Добавить задачу",
+            shortcut="Ctrl+Alt+T",
+        )
         btn_add_task.clicked.connect(self._on_add_task)
         vbox.addWidget(btn_add_task, alignment=Qt.AlignLeft)
 
@@ -358,33 +374,37 @@ class DealDetailView(QDialog):
 
     def _init_actions(self):
         box = QHBoxLayout()
+        box.setSpacing(6)
         box.addStretch()
         btn_edit = styled_button("✏️ Редактировать", shortcut="Ctrl+E")
         btn_edit.clicked.connect(self._on_edit)
         box.addWidget(btn_edit)
-        btn_folder = styled_button("📂 Папка")
+        btn_folder = styled_button("📂 Папка", shortcut="Ctrl+O")
         btn_folder.clicked.connect(self._open_folder)
         box.addWidget(btn_folder)
-        btn_copy = styled_button("📋", tooltip="Скопировать путь к папке")
+        btn_copy = styled_button(
+            "📋",
+            tooltip="Скопировать путь к папке",
+            shortcut="Ctrl+Shift+C",
+        )
         btn_copy.clicked.connect(self._copy_folder_path)
         box.addWidget(btn_copy)
 
-        self.btn_exec = styled_button("👤 Исполнитель")
+        self.btn_exec = styled_button("👤 Исполнитель", shortcut="Ctrl+Shift+E")
         self.btn_exec.clicked.connect(self._on_toggle_executor)
         box.addWidget(self.btn_exec)
-        btn_wa = styled_button("💬 WhatsApp")
+        btn_wa = styled_button("💬 WhatsApp", shortcut="Ctrl+Shift+W")
         btn_wa.clicked.connect(self._open_whatsapp)
         box.addWidget(btn_wa)
-        btn_prev = styled_button("◀ Назад")
+        btn_prev = styled_button("◀ Назад", shortcut="Alt+Left")
         btn_prev.clicked.connect(self._on_prev_deal)
         box.addWidget(btn_prev)
-
-        btn_next = styled_button("▶ Далее")
+        btn_next = styled_button("▶ Далее", shortcut="Alt+Right")
         btn_next.clicked.connect(self._on_next_deal)
         box.addWidget(btn_next)
         self.layout.addLayout(box)
         if not self.instance.is_closed:
-            btn_close = styled_button("🔒 Закрыть сделку")
+            btn_close = styled_button("🔒 Закрыть сделку", shortcut="Ctrl+Shift+L")
             btn_close.clicked.connect(self._on_close_deal)
             box.addWidget(btn_close)
 
@@ -503,7 +523,7 @@ class DealDetailView(QDialog):
                 self.instance,
                 status=status or None,
                 reminder_date=reminder,
-                calculations=new_calc_part or None,
+                journal_entry=new_calc_part or None,
             )
             self.calc_append.clear()
             self.calc_view.setPlainText(self.instance.calculations or "—")

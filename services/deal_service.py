@@ -124,12 +124,12 @@ def add_deal(**kwargs):
 # ──────────────────────────── Обновление ─────────────────────────────
 
 
-def update_deal(deal: Deal, **kwargs):
+def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
     """Обновляет сделку.
 
-    ``calculations`` теперь трактуется как текст расчёта и сохраняется в
-    таблицу :class:`DealCalculation`. Поле ``Deal.calculations`` используется
-    как журнал событий (например, при закрытии сделки).
+    Параметр ``journal_entry`` добавляет запись в журнал ``Deal.calculations``.
+    Передаваемый ``calculations`` трактуется как текст расчёта и сохраняется в
+    таблицу :class:`DealCalculation`.
     """
 
     allowed_fields = {
@@ -158,6 +158,7 @@ def update_deal(deal: Deal, **kwargs):
 
     # calculations -> отдельная таблица
     new_calc: str | None = kwargs.get("calculations")
+    new_note: str | None = journal_entry
 
     # Если закрываем сделку — пишем причину в журнал
     if kwargs.get("is_closed") and kwargs.get("closed_reason"):
@@ -167,8 +168,15 @@ def update_deal(deal: Deal, **kwargs):
         old = deal.calculations or ""
         deal.calculations = f"{auto_note}\n{old}"
 
+    # Добавляем произвольную запись в журнал
+    if new_note:
+        ts = now_str()
+        entry = f"[{ts}]: {new_note}"
+        old = deal.calculations or ""
+        deal.calculations = f"{entry}\n{old}" if old else entry
+
     # Если нечего обновлять — возвращаем сделку как есть
-    if not updates and not new_calc:
+    if not updates and not new_calc and not new_note:
         return deal
 
     # Применяем простые обновления

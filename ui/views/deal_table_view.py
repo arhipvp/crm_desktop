@@ -42,8 +42,8 @@ class DealTableModel(BaseTableModel):
 class DealTableView(BaseTableView):
     def __init__(self, parent=None):
         checkboxes = {
-            "Показывать удалённые": self.refresh,
-            "Показать закрытые": self.refresh,
+            "Показывать удалённые": self.on_filter_changed,
+            "Показать закрытые": self.on_filter_changed,
         }
         super().__init__(
             parent=parent,
