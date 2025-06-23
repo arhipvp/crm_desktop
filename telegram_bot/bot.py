@@ -581,8 +581,11 @@ async def h_show_tasks(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     if not tasks:
         await update.message.reply_text("Нет незавершенных задач")
         return
-    lines = [f"#{t.id} {t.title} (до {t.due_date:%d.%m.%Y})" for t in tasks]
-    await update.message.reply_text("\n".join(lines))
+    for t in tasks:
+        msg = await update.message.reply_html(
+            fmt_task(t), reply_markup=kb_task(t.id)
+        )
+        ts.link_telegram(t.id, msg.chat_id, msg.message_id)
 
 async def h_show_tasks_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -594,8 +597,11 @@ async def h_show_tasks_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     if not tasks:
         await q.message.reply_text("Нет незавершенных задач")
         return
-    lines = [f"#{t.id} {t.title} (до {t.due_date:%d.%m.%Y})" for t in tasks]
-    await q.message.reply_text("\n".join(lines))
+    for t in tasks:
+        msg = await q.message.reply_html(
+            fmt_task(t), reply_markup=kb_task(t.id)
+        )
+        ts.link_telegram(t.id, msg.chat_id, msg.message_id)
 
 
 async def send_pending_tasks(_ctx: ContextTypes.DEFAULT_TYPE) -> None:
