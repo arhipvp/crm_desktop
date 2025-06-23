@@ -186,6 +186,49 @@ async def notify_admin_user(bot, uid: int, name: str):
     await bot.send_message(ADMIN_CHAT_ID, text, reply_markup=kb_user(uid))
 
 
+def fmt_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:
+    """Сформировать текст и клавиатуру для новой задачи исполнителю."""
+    lines = [f"<b>{t.title.upper()}</b>", f"#{t.id}"]
+    d = getattr(t, "deal", None)
+    if d and d.client:
+        lines.append(f"{d.client.name}, {d.description}")
+        folder = d.drive_folder_path or d.drive_folder_link
+        if folder:
+            lines.append(folder)
+    if t.note:
+        lines.append(t.note.strip())
+    text = "\n".join(lines)
+
+    kb = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("Добавить расчёт", callback_data=f"calc:{t.id}")],
+            [InlineKeyboardButton("Выполнить", callback_data=f"task_done:{t.id}")],
+            [InlineKeyboardButton("Написать вопрос", callback_data=f"question:{t.id}")],
+        ]
+    )
+    return text, kb
+
+
+async def job_dispatch_tasks(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Регулярно проверять базу и отправлять задачи исполнителям."""
+    tasks = ts.get_all_queued_tasks()
+    for task in tasks:
+        if not task.deal_id:
+            continue
+        ex = es.get_executor_for_deal(task.deal_id)
+        if not ex:
+            continue
+        text, kb = fmt_exec_task(task)
+        msg = await ctx.bot.send_message(
+            ex.tg_id,
+            text,
+            reply_markup=kb,
+            parse_mode=constants.ParseMode.HTML,
+        )
+        ts.link_telegram(task.id, msg.chat_id, msg.message_id)
+        ts.update_task(task, is_done=True)
+
+
 # ───────────── handlers ─────────────
 async def h_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     logger.info("/start from %s", update.effective_user.id)
@@ -530,6 +573,9 @@ def main() -> None:
     app.add_handler(CommandHandler("tasks", h_show_tasks))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))
+
+    # запуск периодического опроса БД
+    app.job_queue.run_repeating(job_dispatch_tasks, interval=10, first=5)
 
     logger.info("Telegram‑бот запущен внутри контейнера…")
     app.run_polling(allowed_updates=["message", "callback_query"])

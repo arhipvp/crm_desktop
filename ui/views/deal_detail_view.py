@@ -461,23 +461,11 @@ class DealDetailView(QDialog):
             task = getattr(form, "saved_instance", None)
             if not task:
                 return
-            from services import executor_service as es
-            ex = es.get_executor_for_deal(self.instance.id)
-            if not ex:
-                from ui.common.message_boxes import show_error
-                show_error("Исполнитель не назначен")
-                return
-            from services import telegram_service as tg
             from services import task_service as ts
-            try:
-                tg.send_task(task, ex.tg_id)
-                ts.update_task(task, is_done=True)
-                if hasattr(self, "task_view"):
-                    self.task_view.refresh()
-                self._init_kpi_panel()
-            except Exception as exc:
-                from ui.common.message_boxes import show_error
-                show_error(str(exc))
+            ts.queue_task(task.id)
+            if hasattr(self, "task_view"):
+                self.task_view.refresh()
+            self._init_kpi_panel()
 
     def _open_folder(self):
         open_folder(
