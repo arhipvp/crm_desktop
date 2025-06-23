@@ -8,8 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
 from database.models import Task
-from services.task_service import build_task_query, get_tasks_page, update_task
-from services.telegram_service import send_task
+from services.task_service import build_task_query, get_tasks_page, queue_task, update_task
 from ui.base.base_table_view import BaseTableView
 from ui.common.delegates import StatusDelegate
 from ui.common.filter_controls import FilterControls
@@ -54,7 +53,7 @@ class TaskTableView(BaseTableView):
         self.send_btn = styled_button(
             "Отправить",
             icon="📤",
-            tooltip="Отправить выбранные задачи исполнителю",
+            tooltip="Поставить выбранные задачи в очередь Telegram",
             shortcut="Ctrl+Shift+S",
         )
         idx_stretch = self.button_row.count() - 1
@@ -88,19 +87,15 @@ class TaskTableView(BaseTableView):
         sent, skipped = 0, 0
         for t in tasks:
             try:
-                from services import executor_service as es
-                ex = es.get_executor_for_deal(t.deal_id) if t.deal_id else None
-                if not ex:
-                    raise RuntimeError("исполнитель не привязан")
-                send_task(t, ex.tg_id)
+                queue_task(t.id)
                 sent += 1
             except Exception as exc:
                 skipped += 1
-                logger.debug("[send_task] failed for %s: %s", t.id, exc)
+                logger.debug("[queue_task] failed for %s: %s", t.id, exc)
         QMessageBox.information(
             self,
             "Telegram",
-            f"Отправлено: {sent}\nОшибок: {skipped}",
+            f"В очередь помещено: {sent}\nОшибок: {skipped}",
         )
         self.refresh()
 

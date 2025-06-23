@@ -8,6 +8,7 @@ Telegram‑бот для очереди задач CRM_desktop.
 from database.init import init_from_env
 
 import os
+import asyncio
 import re
 import datetime as _dt
 from utils.time_utils import now_str
@@ -207,6 +208,26 @@ def fmt_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:
         ]
     )
     return text, kb
+
+
+async def dispatch_loop(app: Application) -> None:
+    """Периодически отправлять задачи из очереди исполнителям."""
+    while True:
+        tasks = ts.get_all_queued_tasks()
+        for t in tasks:
+            ex = es.get_executor_for_deal(t.deal_id) if t.deal_id else None
+            if not ex:
+                continue
+            text, kb = fmt_exec_task(t)
+            msg = await app.bot.send_message(
+                chat_id=ex.tg_id,
+                text=text,
+                reply_markup=kb,
+                parse_mode=constants.ParseMode.HTML,
+            )
+            ts.link_telegram(t.id, msg.chat_id, msg.message_id)
+            ts.update_task(t, dispatch_state="sent")
+        await asyncio.sleep(10)
 
 
 
@@ -576,6 +597,8 @@ def main() -> None:
     app.add_handler(CommandHandler("tasks", h_show_tasks))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))
+
+    app.create_task(dispatch_loop(app))
 
     logger.info("Telegram‑бот запущен внутри контейнера…")
     app.run_polling(allowed_updates=["message", "callback_query"])
