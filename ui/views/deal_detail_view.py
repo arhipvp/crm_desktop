@@ -199,6 +199,10 @@ class DealDetailView(QDialog):
         journal_group.setLayout(journal_form)
         main_layout.addWidget(journal_group)
 
+        self.btn_exec_task = styled_button("📤 Новая задача исполнителю")
+        self.btn_exec_task.clicked.connect(self._on_new_exec_task)
+        main_layout.addWidget(self.btn_exec_task, alignment=Qt.AlignLeft)
+
         # ---- Расчёты ------------------------------------------------
         from ui.views.calculation_table_view import CalculationTableView
 
@@ -328,10 +332,6 @@ class DealDetailView(QDialog):
         btn_add_task.clicked.connect(self._on_add_task)
         vbox.addWidget(btn_add_task, alignment=Qt.AlignLeft)
 
-        self.btn_send_task = styled_button("📤 Отправить задачу исполнителю")
-        self.btn_send_task.clicked.connect(self._on_send_task)
-        self.btn_send_task.setEnabled(False)
-        vbox.addWidget(self.btn_send_task, alignment=Qt.AlignLeft)
 
         # Подгружаем ТОЛЬКО задачи этой сделки
         from services.task_service import get_tasks_by_deal
@@ -348,9 +348,7 @@ class DealDetailView(QDialog):
         sel = task_view.table.selectionModel()
         if sel:
             sel.selectionChanged.connect(task_view._update_actions_state)
-            sel.selectionChanged.connect(self._update_send_task_button)
             task_view._update_actions_state()
-        self._update_send_task_button()
 
         task_view.table.setSortingEnabled(True)
         task_view.row_double_clicked.connect(self._on_task_double_clicked)
@@ -453,6 +451,34 @@ class DealDetailView(QDialog):
             self.task_view.refresh()  # загрузит только задачи сделки
             self._init_kpi_panel()
 
+    def _on_new_exec_task(self):
+        form = TaskForm(parent=self, forced_deal=self.instance)
+        if hasattr(form, "deal_combo"):
+            idx = form.deal_combo.findData(self.instance.id)
+            if idx >= 0:
+                form.deal_combo.setCurrentIndex(idx)
+        if form.exec():
+            task = getattr(form, "saved_instance", None)
+            if not task:
+                return
+            from services import executor_service as es
+            ex = es.get_executor_for_deal(self.instance.id)
+            if not ex:
+                from ui.common.message_boxes import show_error
+                show_error("Исполнитель не назначен")
+                return
+            from services import telegram_service as tg
+            from services import task_service as ts
+            try:
+                tg.send_task(task, ex.tg_id)
+                ts.update_task(task, is_done=True)
+                if hasattr(self, "task_view"):
+                    self.task_view.refresh()
+                self._init_kpi_panel()
+            except Exception as exc:
+                from ui.common.message_boxes import show_error
+                show_error(str(exc))
+
     def _open_folder(self):
         open_folder(
             self.instance.drive_folder_path or self.instance.drive_folder_link,
@@ -546,32 +572,6 @@ class DealDetailView(QDialog):
         if form.exec():
             self.task_view.refresh()
             self._init_kpi_panel()
-
-    def _update_send_task_button(self, *_):
-        sel = self.task_view.table.selectionModel()
-        has_sel = bool(sel.selectedRows()) if sel else False
-        self.btn_send_task.setEnabled(has_sel)
-
-    def _on_send_task(self):
-        task = self.task_view.get_selected()
-        if not task:
-            return
-        from services import executor_service as es
-        ex = es.get_executor_for_deal(self.instance.id)
-        if not ex:
-            from ui.common.message_boxes import show_error
-            show_error("Исполнитель не назначен")
-            return
-        from services import telegram_service as tg
-        from services import task_service as ts
-        try:
-            tg.send_task(task, ex.tg_id)
-            ts.update_task(task, is_done=True)
-            self.task_view.refresh()
-            self._init_kpi_panel()
-        except Exception as exc:
-            from ui.common.message_boxes import show_error
-            show_error(str(exc))
 
     def _on_add_calculation(self):
         from ui.forms.calculation_form import CalculationForm
