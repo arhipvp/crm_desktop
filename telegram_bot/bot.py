@@ -561,8 +561,24 @@ async def send_pending_tasks(_ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 # ───────────── main ─────────────
+async def _start_dispatcher(app: Application) -> None:
+    """Schedule periodic sending of pending tasks."""
+    if app.job_queue:
+        app.job_queue.run_repeating(send_pending_tasks, interval=60)
+    else:
+        import asyncio, types
+
+        async def loop() -> None:
+            ctx = types.SimpleNamespace(bot=app.bot)
+            while True:
+                await send_pending_tasks(ctx)
+                await asyncio.sleep(60)
+
+        app.create_task(loop())
+
+
 def main() -> None:
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).post_init(_start_dispatcher).build()
 
     app.add_handler(CommandHandler("start", h_start))
     app.add_handler(CallbackQueryHandler(h_get, pattern="^get$"))
@@ -576,8 +592,6 @@ def main() -> None:
     app.add_handler(CommandHandler("tasks", h_show_tasks))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))
-
-    app.job_queue.run_repeating(send_pending_tasks, interval=60)
 
     logger.info("Telegram‑бот запущен внутри контейнера…")
     app.run_polling(allowed_updates=["message", "callback_query"])
