@@ -8,7 +8,11 @@ logger = logging.getLogger(__name__)
 def confirm(text: str, title="Подтверждение") -> bool:
     return (
         QMessageBox.question(
-            None, title, text, QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            None,
+            title,
+            text,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
         )
         == QMessageBox.Yes
     )

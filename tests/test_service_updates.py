@@ -16,8 +16,14 @@ def test_update_deal_and_mark_deleted(monkeypatch):
         lambda *a, **k: ("/tmp/deal", "link"),
     )
     deal = add_deal(client_id=client.id, start_date="2025-01-01", description="D")
-    update_deal(deal, calculations="note", is_closed=True, closed_reason="ok")
+    update_deal(
+        deal,
+        journal_entry="note",
+        is_closed=True,
+        closed_reason="ok",
+    )
     assert "Сделка закрыта" in deal.calculations
+    assert "note" in deal.calculations
     mark_deal_deleted(deal.id)
     assert get_deal_by_id(deal.id) is None
 

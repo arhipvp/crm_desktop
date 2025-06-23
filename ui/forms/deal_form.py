@@ -79,8 +79,12 @@ class DealForm(BaseEditForm):
 
         # Если пользователь ничего не написал в Calculations — удаляем ключ,
         # чтобы update_deal не затирал существующие записи в БД.
-        if not data.get("calculations"):
+        note = data.get("calculations")
+        if not note:
             data.pop("calculations", None)
+        else:
+            data.pop("calculations")
+            data["journal_entry"] = note
 
         return data
 
@@ -99,7 +103,8 @@ class DealForm(BaseEditForm):
                 ):
                     return None
         if self.instance:
-            if all(getattr(self.instance, k) == v for k, v in data.items()):
+            cmp = {k: v for k, v in data.items() if k != "journal_entry"}
+            if all(getattr(self.instance, k) == v for k, v in cmp.items()) and "journal_entry" not in data:
                 return self.instance  # нет изменений
             return update_deal(self.instance, **data)
 
