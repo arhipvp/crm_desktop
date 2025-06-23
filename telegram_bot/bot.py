@@ -68,6 +68,7 @@ pending_users: dict[int, tuple[int, str]] = {}
 from services import task_service as ts
 from services import executor_service as es
 from services import client_service as cs
+from services import calculation_service as calc_s
 
 es.ensure_executors_from_env()
 
@@ -411,10 +412,35 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         logger.info("Executor %s denied", tid)
 
 
+async def h_task_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    action, tid = q.data.split(":")
+    tid = int(tid)
+
+    if action == "task_done":
+        ts.mark_done(tid)
+        await q.message.edit_text(
+            "✅ Задача выполнена", parse_mode=constants.ParseMode.HTML
+        )
+    elif action == "question":
+        await q.message.reply_text(
+            f"Напишите вопрос по задаче #{tid}:",
+            reply_markup=ForceReply(selective=True),
+        )
+    elif action == "calc":
+        await q.message.reply_text(
+            f"Введите расчёт для задачи #{tid}:",
+            reply_markup=ForceReply(selective=True),
+        )
+
+
 async def h_text(update: Update, _ctx):
     if not update.message.reply_to_message:
         return
-    m = re.search(r"#(\d+)", update.message.reply_to_message.text_html or "")
+    reply_txt = update.message.reply_to_message.text_html or ""
+    m = re.search(r"#(\d+)", reply_txt)
     if not m:
         return
     tid = int(m.group(1))
@@ -426,11 +452,20 @@ async def h_text(update: Update, _ctx):
         if update.effective_user.username
         else str(update.effective_user.id)
     )
-    ts.append_note(tid, f"[TG {stamp}] {user_name}: {update.message.text}")
-    await update.message.reply_text("Комментарий сохранён 👍")
-    logger.info("Note added to %s", tid)
-    if update.message.chat_id != ADMIN_CHAT_ID:
-        await notify_admin(_ctx.bot, tid, update.message.text, executor=user_name)
+    if "Введите расчёт" in reply_txt:
+        task = ts.Task.get_or_none(ts.Task.id == tid)
+        if task and task.deal_id:
+            calc_s.add_calculation(task.deal_id, note=update.message.text)
+            await update.message.reply_text("Расчёт сохранён 👍")
+            logger.info("Calculation added for %s", tid)
+        else:
+            await update.message.reply_text("⚠️ Сделка не найдена")
+    else:
+        ts.append_note(tid, f"[TG {stamp}] {user_name}: {update.message.text}")
+        await update.message.reply_text("Комментарий сохранён 👍")
+        logger.info("Note added to %s", tid)
+        if update.message.chat_id != ADMIN_CHAT_ID:
+            await notify_admin(_ctx.bot, tid, update.message.text, executor=user_name)
 
 
 async def h_file(update: Update, _ctx):
@@ -468,6 +503,18 @@ async def h_file(update: Update, _ctx):
     logger.info("Saved file to %s", dest)
 
 
+async def h_show_tasks(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not es.is_approved(user_id):
+        return await update.message.reply_text("⏳ Ожидайте одобрения администратора")
+    tasks = ts.get_incomplete_tasks_for_executor(user_id)
+    if not tasks:
+        await update.message.reply_text("Нет незавершенных задач")
+        return
+    lines = [f"#{t.id} {t.title} (до {t.due_date:%d.%m.%Y})" for t in tasks]
+    await update.message.reply_text("\n".join(lines))
+
+
 # ───────────── main ─────────────
 def main() -> None:
     app = Application.builder().token(BOT_TOKEN).build()
@@ -479,6 +526,8 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(h_choose_task, pattern=r"^task:\d+$"))
     app.add_handler(CallbackQueryHandler(h_action, pattern=r"^(done|ret|reply):"))
     app.add_handler(CallbackQueryHandler(h_admin_action, pattern=r"^(accept|info|rework|approve_exec|deny_exec):"))
+    app.add_handler(CallbackQueryHandler(h_task_button, pattern=r"^(task_done|calc|question):"))
+    app.add_handler(CommandHandler("tasks", h_show_tasks))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO, h_file))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, h_text))
 
