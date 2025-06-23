@@ -44,8 +44,7 @@ def test_db():
 
     yield
 
-    if use_memory:
-        main_db.drop_tables(models)
+    # Memory database is ephemeral, so explicit drop is unnecessary
 
     if not main_db.is_closed():
         main_db.close()
