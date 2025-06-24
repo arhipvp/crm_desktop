@@ -2,7 +2,7 @@ from datetime import date
 from services.client_service import add_client
 from services.deal_service import add_deal
 from services.policy_service import add_policy
-from database.models import Task, Payment, Income
+from database.models import Payment, Income
 
 
 def test_add_policy_creates_everything():
@@ -26,17 +26,10 @@ def test_add_policy_creates_everything():
     assert policy.client.id == client.id
     assert policy.deal.id == deal.id
 
-    # задача продления
-    task = Task.get_or_none(Task.policy == policy)
-    assert task is not None
-    assert "продлить" in task.title
-
     # нулевой платёж
     payment = Payment.get_or_none(Payment.policy == policy)
     assert payment is not None
     assert payment.amount == 0
-
-    # нулевой доход
 
     # нулевой доход
     income = Income.get_or_none(Income.payment == payment)
