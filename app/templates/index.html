@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>CRM Web</title>
+</head>
+<body>
+<h1>Клиенты</h1>
+<form action="/clients" method="post">
+    <input type="text" name="name" placeholder="Имя" required>
+    <input type="text" name="phone" placeholder="Телефон">
+    <input type="email" name="email" placeholder="Email">
+    <button type="submit">Добавить</button>
+</form>
+<ul>
+{% for client in clients %}
+    <li>{{client.id}} - {{client.name}} {{client.phone or ''}}</li>
+{% else %}
+    <li>Нет клиентов</li>
+{% endfor %}
+</ul>
+</body>
+</html>
