@@ -65,6 +65,9 @@ class BaseEditForm(QDialog):
         if self.instance:
             self.fill_from_obj(self.instance)
         self._create_button_panel()
+        # Размеры формы определяем по содержимому
+        self.adjustSize()
+        self.setMinimumHeight(self.height())
 
     # ------------------------------------------------------------------
     # UI helpers
