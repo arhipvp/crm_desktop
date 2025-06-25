@@ -10,6 +10,7 @@ from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.folder_utils import create_policy_folder, open_folder
 from services.payment_service import add_payment
+from services.task_service import add_task
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +207,22 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
         logger.error("❌ Ошибка при создании или открытии папки полиса: %s", e)
 
     # ────────── Автоматические действия ──────────
-    # Задача продления полиса больше не создаётся автоматически
+    # Добавляем напоминание о продлении за 30 дней до окончания
+    if policy.start_date and policy.end_date:
+        try:
+            add_task(
+                title="продлить полис",
+                due_date=policy.end_date - timedelta(days=30),
+                policy_id=policy.id,
+                is_done=False,
+                deal_id=policy.deal_id,
+            )
+            logger.info(
+                "📝 Добавлена задача продления для полиса #%s за 30 дней до его окончания",
+                policy.policy_number,
+            )
+        except Exception as e:
+            logger.error("❌ Ошибка при добавлении задачи продления: %s", e)
 
     # ----------- Платежи ----------
 
