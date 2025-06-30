@@ -1,6 +1,7 @@
 """Сервис управления платежами."""
 
 import logging
+from datetime import date
 
 from peewee import JOIN, ModelSelect  # обязательно
 from peewee import fn
@@ -105,6 +106,27 @@ def mark_payment_deleted(payment_id: int):
         payment.save()
     else:
         logger.warning("❗ Платёж с id=%s не найден для удаления", payment_id)
+
+
+def mark_payments_paid(payment_ids: list[int], paid_date: date | None = None) -> int:
+    """Массово отметить платежи как оплаченные.
+
+    Args:
+        payment_ids: Список идентификаторов платежей.
+        paid_date: Дата фактической оплаты. Если не указана,
+            используется ``02.01.1900``.
+
+    Returns:
+        int: Количество обновлённых записей.
+    """
+    if not payment_ids:
+        return 0
+    paid_date = paid_date or date(1900, 1, 2)
+    return (
+        Payment.update(actual_payment_date=paid_date)
+        .where(Payment.id.in_(payment_ids))
+        .execute()
+    )
 
 
 # ─────────────────────────── Добавление ───────────────────────────

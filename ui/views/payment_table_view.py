@@ -3,16 +3,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QAbstractItemView
 
 from database.models import Payment
 from services.payment_service import (
     build_payment_query,
     get_payments_page,
     mark_payment_deleted,
+    mark_payments_paid,
 )
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
+from ui.common.styled_widgets import styled_button
 from ui.forms.payment_form import PaymentForm
 from ui.views.payment_detail_view import PaymentDetailView
 
@@ -31,6 +34,18 @@ class PaymentTableView(BaseTableView):
         )
         self.model_class = Payment  # или Client, Policy и т.д.
         self.form_class = PaymentForm
+        # разрешаем множественный выбор для массовых действий
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
+        # кнопка массового подтверждения оплаты
+        self.mark_paid_btn = styled_button(
+            "Отметить оплаченным",
+            icon="✅",
+            tooltip="Пометить выбранные платежи",
+        )
+        self.mark_paid_btn.clicked.connect(self._on_mark_paid)
+        self.button_row.insertWidget(self.button_row.count() - 1, self.mark_paid_btn)
+
         self.row_double_clicked.connect(self.open_detail)
         self.load_data()
 
@@ -66,6 +81,10 @@ class PaymentTableView(BaseTableView):
             return None
         return self.model.get_item(idx.row())
 
+    def get_selected_multiple(self):
+        indexes = self.table.selectionModel().selectedRows()
+        return [self.model.get_item(i.row()) for i in indexes]
+
     def add_new(self):
         form = PaymentForm()
         if form.exec():
@@ -85,6 +104,18 @@ class PaymentTableView(BaseTableView):
         if confirm(f"Удалить платёж на {payment.amount} ₽?"):
             try:
                 mark_payment_deleted(payment.id)
+                self.refresh()
+            except Exception as e:
+                show_error(str(e))
+
+    def _on_mark_paid(self):
+        payments = self.get_selected_multiple()
+        if not payments:
+            return
+        if confirm(f"Отметить {len(payments)} платеж(ей) оплаченными?"):
+            try:
+                ids = [p.id for p in payments]
+                mark_payments_paid(ids)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
