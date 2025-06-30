@@ -67,6 +67,38 @@ def get_policy_by_number(policy_number: str):
     return Policy.get_or_none(Policy.policy_number == policy_number)
 
 
+def _check_duplicate_policy(policy_number: str, client_id: int, deal_id: int | None, data: dict, *, exclude_id: int | None = None) -> None:
+    """Проверить наличие дубликата и, если найден, поднять ``ValueError``.
+
+    Сравниваются ключевые поля полиса. Если все совпадают - сообщение сообщает
+    об идентичности, иначе перечисляются отличающиеся поля.
+    """
+
+    if not policy_number:
+        return
+
+    cond = Policy.policy_number == policy_number
+    if exclude_id is not None:
+        cond &= Policy.id != exclude_id
+
+    existing = Policy.get_or_none(cond)
+    if not existing:
+        return
+
+    fields_to_compare = {
+        "client_id": client_id,
+        "deal_id": deal_id,
+        **data,
+    }
+
+    diffs = [fname for fname, val in fields_to_compare.items() if getattr(existing, fname) != val]
+
+    if not diffs:
+        raise ValueError("Такой полис уже найден. Все данные совпадают.")
+    diff_str = ", ".join(diffs)
+    raise ValueError(f"Такой полис уже найден. Отличаются поля: {diff_str}")
+
+
 def get_policies_page(
     page,
     per_page,
@@ -185,6 +217,14 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
     if start_date and end_date and end_date < start_date:
         raise ValueError("Дата окончания полиса не может быть меньше даты начала.")
 
+    # ────────── Проверка дубликата ──────────
+    _check_duplicate_policy(
+        clean_data.get("policy_number"),
+        client.id,
+        deal.id if deal else None,
+        clean_data,
+    )
+
     # ────────── Создание полиса ──────────
     policy = Policy.create(client=client, deal=deal, is_deleted=False, **clean_data)
     logger.info(
@@ -272,6 +312,7 @@ def update_policy(policy: Policy, **kwargs):
         raise ValueError("Поле 'end_date' обязательно для заполнения.")
     if start_date and end_date and end_date < start_date:
         raise ValueError("Дата окончания полиса не может быть меньше даты начала.")
+
     # ... дальше стандартная логика ...
 
     for key, value in kwargs.items():
@@ -284,6 +325,18 @@ def update_policy(policy: Policy, **kwargs):
             updates[key] = value
         elif key == "contractor":
             updates[key] = None
+
+    # ────────── Проверка дубликата ──────────
+    new_number = updates.get("policy_number", policy.policy_number)
+    new_deal_id = (
+        updates.get("deal").id if updates.get("deal") else updates.get("deal_id", policy.deal_id)
+    )
+    compare_data = {
+        f: updates.get(f, getattr(policy, f))
+        for f in allowed_fields
+        if f not in {"deal", "deal_id"}
+    }
+    _check_duplicate_policy(new_number, policy.client_id, new_deal_id, compare_data, exclude_id=policy.id)
 
     if not updates:
         logger.info("ℹ️ update_policy: нет изменений для полиса #%s", policy.id)

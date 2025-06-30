@@ -1,3 +1,4 @@
+import logging
 from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
     QDateEdit,
@@ -28,6 +29,9 @@ from ui.common.combo_helpers import (
     set_selected_by_id,
 )
 from ui.common.date_utils import add_year_minus_one_day
+from ui.common.message_boxes import show_error
+
+logger = logging.getLogger(__name__)
 
 
 class PolicyForm(BaseEditForm):
@@ -211,6 +215,22 @@ class PolicyForm(BaseEditForm):
             )
 
         return policy
+
+    def save(self):
+        try:
+            saved = self.save_data()
+            if saved:
+                self.saved_instance = saved
+                self.accept()
+        except ValueError as e:
+            show_error(str(e))
+        except Exception:
+            logger.exception("❌ Ошибка при сохранении в %s", self.__class__.__name__)
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.critical(
+                self, "Ошибка", f"Не удалось сохранить {self.entity_name}."
+            )
 
     def on_start_date_changed(self, qdate: QDate):
         if not (self.end_date_edit and qdate.isValid()):
