@@ -90,7 +90,14 @@ def update_expense(expense: Expense, **kwargs):
     Returns:
         Expense: Обновлённый расход.
     """
-    allowed_fields = {"payment", "payment_id", "amount", "expense_type", "expense_date"}
+    allowed_fields = {
+        "payment",
+        "payment_id",
+        "amount",
+        "expense_type",
+        "expense_date",
+        "note",
+    }
 
     updates = {}
 
