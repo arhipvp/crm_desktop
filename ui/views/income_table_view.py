@@ -24,7 +24,13 @@ class IncomeTableModel(BaseTableModel):
         self.fields = []  # отключаем стандартные поля модели
 
         self.virtual_fields = self.VIRTUAL_FIELDS
-        self.headers = ["Полис", "Клиент", "Сумма комиссии", "Дата получения"]
+        self.headers = [
+            "Полис",
+            "Клиент",
+            "Дата начала",
+            "Сумма комиссии",
+            "Дата получения",
+        ]
 
     def columnCount(self, parent=None):
         return len(self.headers)
@@ -46,9 +52,19 @@ class IncomeTableModel(BaseTableModel):
         elif col == 1:
             return policy.client.name if policy and policy.client else "—"
         elif col == 2:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+            return (
+                policy.start_date.strftime("%d.%m.%Y")
+                if policy and policy.start_date
+                else "—"
+            )
         elif col == 3:
-            return obj.received_date.strftime("%d.%m.%Y") if obj.received_date else "—"
+            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+        elif col == 4:
+            return (
+                obj.received_date.strftime("%d.%m.%Y")
+                if obj.received_date
+                else "—"
+            )
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if role != Qt.DisplayRole or orientation != Qt.Horizontal:
@@ -71,7 +87,7 @@ class IncomeTableView(BaseTableView):
             checkbox_map=checkbox_map,
         )
         self.deal_id = deal_id
-        self.default_sort_column = 6
+        self.default_sort_column = 4
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order

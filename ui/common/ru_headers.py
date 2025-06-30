@@ -28,4 +28,5 @@ RU_HEADERS = {
     "insured_amount": "Страховая сумма",
     "premium": "Страховая премия",
     "deductible": "Франшиза",
+    "start_date": "Начало",
 }
