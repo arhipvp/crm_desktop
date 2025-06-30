@@ -5,10 +5,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QAbstractItemView
 
 from database.models import Task
-from services.task_service import build_task_query, get_tasks_page, queue_task, update_task
+from services.task_service import (
+    build_task_query,
+    get_tasks_page,
+    queue_task,
+    update_task,
+    mark_task_deleted,
+)
+from ui.common.message_boxes import confirm, show_error
 from ui.base.base_table_view import BaseTableView
 from ui.common.delegates import StatusDelegate
 from ui.common.filter_controls import FilterControls
@@ -61,6 +68,10 @@ class TaskTableView(BaseTableView):
         self.send_btn.setEnabled(False)
         self.send_btn.clicked.connect(self._send_selected_tasks)
 
+        # разрешаем множественный выбор и массовое удаление
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.delete_callback = self.delete_selected
+
         sel = self.table.selectionModel()
         sel.selectionChanged.connect(self._update_actions_state)
         self.load_data()
@@ -97,6 +108,34 @@ class TaskTableView(BaseTableView):
             "Telegram",
             f"В очередь помещено: {sent}\nОшибок: {skipped}",
         )
+        self.refresh()
+
+    def delete_selected(self):
+        tasks = self._selected_tasks()
+        if not tasks:
+            return
+        msg = (
+            f"Удалить {len(tasks)} задач?"
+            if len(tasks) > 1
+            else f"Удалить задачу №{tasks[0].id}?"
+        )
+        if not confirm(msg):
+            return
+        errors = 0
+        for t in tasks:
+            try:
+                mark_task_deleted(t.id)
+            except Exception as exc:
+                errors += 1
+                logger.debug("[delete_task] failed for %s: %s", t.id, exc)
+        if errors:
+            show_error(f"Ошибок: {errors}")
+        else:
+            QMessageBox.information(
+                self,
+                "Задачи удалены",
+                f"Удалено: {len(tasks)}",
+            )
         self.refresh()
 
     def get_filters(self) -> dict:

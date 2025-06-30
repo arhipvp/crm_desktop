@@ -144,3 +144,28 @@ def test_menu_backup_runs(qtbot, monkeypatch):
 
     assert called.get("run")
     assert called.get("msg")
+
+
+def test_task_table_mass_delete(qtbot, monkeypatch):
+    from datetime import date
+    from services.task_service import add_task
+    from ui.views.task_table_view import TaskTableView
+
+    t1 = add_task(title="a", due_date=date.today())
+    t2 = add_task(title="b", due_date=date.today())
+
+    view = TaskTableView()
+    qtbot.addWidget(view)
+
+    monkeypatch.setattr(view, "_selected_tasks", lambda: [t1, t2])
+    monkeypatch.setattr("ui.views.task_table_view.confirm", lambda text: True)
+    called = []
+    monkeypatch.setattr(
+        "ui.views.task_table_view.mark_task_deleted", lambda tid: called.append(tid)
+    )
+    monkeypatch.setattr(
+        "ui.views.task_table_view.QMessageBox.information", lambda *a, **k: None
+    )
+
+    view.delete_selected()
+    assert called == [t1.id, t2.id]
