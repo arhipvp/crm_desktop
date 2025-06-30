@@ -275,11 +275,15 @@ def update_policy(policy: Policy, **kwargs):
     # ... дальше стандартная логика ...
 
     for key, value in kwargs.items():
-        if key in allowed_fields and value not in ("", None):
-            if key == "deal_id" and not kwargs.get("deal"):
-                value = get_deal_by_id(value)
-                key = "deal"
+        if key not in allowed_fields:
+            continue
+        if key == "deal_id" and not kwargs.get("deal"):
+            value = get_deal_by_id(value)
+            key = "deal"
+        if value not in ("", None):
             updates[key] = value
+        elif key == "contractor":
+            updates[key] = None
 
     if not updates:
         logger.info("ℹ️ update_policy: нет изменений для полиса #%s", policy.id)
