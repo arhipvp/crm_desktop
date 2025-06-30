@@ -60,8 +60,9 @@ def test_update_income_and_expense(monkeypatch):
     mark_income_deleted(income.id)
     assert Income.get_by_id(income.id).is_deleted
     expense = add_expense(payment_id=payment.id, amount=30, expense_type="agent")
-    update_expense(expense, amount=40)
+    update_expense(expense, amount=40, note="upd")
     assert expense.amount == 40
+    assert expense.note == "upd"
     mark_expense_deleted(expense.id)
     assert Expense.get_by_id(expense.id).is_deleted
 
