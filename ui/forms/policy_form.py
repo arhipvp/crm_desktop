@@ -11,6 +11,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from services.folder_utils import open_folder
+from ui.common.styled_widgets import styled_button
+
 from database.models import Policy
 from services.policy_service import (
     add_policy,
@@ -58,6 +61,40 @@ class PolicyForm(BaseEditForm):
         super().set_instance(instance)
         if instance and hasattr(instance, "deal_id"):
             set_selected_by_id(self.deal_combo, instance.deal_id)
+
+    def _create_button_panel(self):
+        btns = QHBoxLayout()
+        self.save_btn = styled_button(
+            "Сохранить", icon="💾", role="primary", shortcut="Ctrl+S"
+        )
+        self.save_btn.setDefault(True)
+        self.cancel_btn = styled_button("Отмена", icon="❌", shortcut="Esc")
+
+        self.save_btn.clicked.connect(self.save)
+        self.cancel_btn.clicked.connect(self.reject)
+
+        btns.addStretch()
+        if self.instance and (
+            getattr(self.instance, "drive_folder_path", None)
+            or getattr(self.instance, "drive_folder_link", None)
+        ):
+            folder_btn = styled_button("📂 Папка", tooltip="Открыть папку полиса")
+            folder_btn.clicked.connect(self._open_folder)
+            btns.addWidget(folder_btn)
+
+        btns.addWidget(self.save_btn)
+        btns.addWidget(self.cancel_btn)
+        self.layout.addLayout(btns)
+
+    def _open_folder(self):
+        if not self.instance:
+            return
+        path = (
+            getattr(self.instance, "drive_folder_path", None)
+            or getattr(self.instance, "drive_folder_link", None)
+        )
+        if path:
+            open_folder(path, parent=self)
 
     # ---------- построение формы ----------
     def build_custom_fields(self):
