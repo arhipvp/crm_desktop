@@ -171,8 +171,12 @@ class TaskTableView(BaseTableView):
 
         self._update_actions_state()
 
+        # Колонка с заголовком должна быть видимой
+        # Скрываем первый столбец только если это ``id``
         if self.table.model() and self.table.model().columnCount() > 0:
-            self.table.setColumnHidden(0, True)
+            first_field = self.model.fields[0].name if self.model else None
+            if first_field == "id":
+                self.table.setColumnHidden(0, True)
 
         if self.model:
             idx_title = self.model.fields.index(Task.title)
