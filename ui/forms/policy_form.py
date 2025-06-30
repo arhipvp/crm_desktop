@@ -20,7 +20,9 @@ from services.policy_service import (
     add_policy,
     get_unique_policy_field_values,
     update_policy,
+    DuplicatePolicyError,
 )
+from ui.forms.policy_merge_dialog import PolicyMergeDialog
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import (
     create_client_combobox,
@@ -192,8 +194,8 @@ class PolicyForm(BaseEditForm):
         return data
 
     # ---------- сохранение ----------
-    def save_data(self):
-        data = self.collect_data()
+    def save_data(self, data=None):
+        data = data or self.collect_data()
         if not data.get("end_date"):
             from PySide6.QtWidgets import QMessageBox
 
@@ -217,10 +219,18 @@ class PolicyForm(BaseEditForm):
         return policy
 
     def save(self):
+        data = self.collect_data()
         try:
-            saved = self.save_data()
+            saved = self.save_data(data)
             if saved:
                 self.saved_instance = saved
+                self.accept()
+        except DuplicatePolicyError as e:
+            dlg = PolicyMergeDialog(e.existing_policy, data, parent=self)
+            if dlg.exec() == dlg.Accepted:
+                merged = dlg.get_merged_data()
+                update_policy(e.existing_policy, **merged)
+                self.saved_instance = e.existing_policy
                 self.accept()
         except ValueError as e:
             show_error(str(e))

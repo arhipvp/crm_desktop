@@ -178,13 +178,6 @@ def add_payment(**kwargs):
         except Exception as e:
             logger.error("❌ Ошибка при добавлении расхода: %s", e)
 
-    # Автоматическая задача
-    #    add_task(
-    #        title="проверить оплату",
-    #        due_date=payment.payment_date,
-    #        policy_id=policy.id
-    #    )
-
     return payment
 
 

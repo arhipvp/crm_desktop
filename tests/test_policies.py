@@ -1,7 +1,7 @@
 from datetime import date
 from services.client_service import add_client
 from services.deal_service import add_deal
-from services.policy_service import add_policy, update_policy
+from services.policy_service import add_policy, update_policy, DuplicatePolicyError
 from database.models import Payment, Income
 
 
@@ -70,12 +70,12 @@ def test_add_policy_duplicate_same_data():
             start_date=date(2025, 1, 1),
             end_date=date(2025, 12, 31),
         )
-    except ValueError as e:
+    except DuplicatePolicyError as e:
         msg = str(e)
         assert "Такой полис уже найден" in msg
         assert "совпадают" in msg
     else:
-        assert False, "Expected ValueError"
+        assert False, "Expected DuplicatePolicyError"
 
 
 def test_update_policy_duplicate_fields():
@@ -95,8 +95,8 @@ def test_update_policy_duplicate_fields():
 
     try:
         update_policy(p2, policy_number="UD1")
-    except ValueError as e:
+    except DuplicatePolicyError as e:
         msg = str(e)
         assert "Такой полис уже найден" in msg
     else:
-        assert False, "Expected ValueError"
+        assert False, "Expected DuplicatePolicyError"

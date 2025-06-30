@@ -13,6 +13,22 @@ from services.payment_service import add_payment
 
 logger = logging.getLogger(__name__)
 
+# ─────────────────────────── Исключения ───────────────────────────
+
+
+class DuplicatePolicyError(ValueError):
+    """Ошибка, возникающая при попытке создать полис с существующим номером."""
+
+    def __init__(self, existing_policy: Policy, diff_fields: list[str]):
+        msg = "Такой полис уже найден."
+        if diff_fields:
+            msg += " Отличаются поля: " + ", ".join(diff_fields)
+        else:
+            msg += " Все данные совпадают."
+        super().__init__(msg)
+        self.existing_policy = existing_policy
+        self.diff_fields = diff_fields
+
 # ───────────────────────── базовые CRUD ─────────────────────────
 
 
@@ -91,12 +107,12 @@ def _check_duplicate_policy(policy_number: str, client_id: int, deal_id: int | N
         **data,
     }
 
-    diffs = [fname for fname, val in fields_to_compare.items() if getattr(existing, fname) != val]
+    diffs = [
+        fname for fname, val in fields_to_compare.items()
+        if getattr(existing, fname) != val
+    ]
 
-    if not diffs:
-        raise ValueError("Такой полис уже найден. Все данные совпадают.")
-    diff_str = ", ".join(diffs)
-    raise ValueError(f"Такой полис уже найден. Отличаются поля: {diff_str}")
+    raise DuplicatePolicyError(existing, diffs)
 
 
 def get_policies_page(
