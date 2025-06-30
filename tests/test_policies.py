@@ -1,7 +1,7 @@
 from datetime import date
 from services.client_service import add_client
 from services.deal_service import add_deal
-from services.policy_service import add_policy
+from services.policy_service import add_policy, update_policy
 from database.models import Payment, Income
 
 
@@ -52,3 +52,51 @@ def test_first_payment_paid():
     assert payment.actual_payment_date == payment.payment_date
     income = Income.get(Income.payment == payment)
     assert income.received_date is None
+
+
+def test_add_policy_duplicate_same_data():
+    client = add_client(name="Dup")
+    add_policy(
+        client_id=client.id,
+        policy_number="DUP123",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    try:
+        add_policy(
+            client_id=client.id,
+            policy_number="DUP123",
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 12, 31),
+        )
+    except ValueError as e:
+        msg = str(e)
+        assert "Такой полис уже найден" in msg
+        assert "совпадают" in msg
+    else:
+        assert False, "Expected ValueError"
+
+
+def test_update_policy_duplicate_fields():
+    client = add_client(name="UpdDup")
+    p1 = add_policy(
+        client_id=client.id,
+        policy_number="UD1",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+    p2 = add_policy(
+        client_id=client.id,
+        policy_number="UD2",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    try:
+        update_policy(p2, policy_number="UD1")
+    except ValueError as e:
+        msg = str(e)
+        assert "Такой полис уже найден" in msg
+    else:
+        assert False, "Expected ValueError"
