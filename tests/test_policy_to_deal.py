@@ -14,6 +14,9 @@ def test_add_deal_from_policy(monkeypatch):
         policy_number="P123",
         start_date=date(2025, 1, 1),
         end_date=date(2025, 12, 31),
+        insurance_type="ОСАГО",
+        vehicle_brand="VW",
+        vehicle_model="Polo",
     )
 
     called = {}
@@ -29,3 +32,5 @@ def test_add_deal_from_policy(monkeypatch):
     assert policy.deal_id == deal.id
     assert policy.drive_folder_link == "/tmp/new"
     assert called['args'][0] == "/tmp/policy"
+    assert deal.description == "ОСАГО VW Polo"
+    assert deal.reminder_date == date.today()
