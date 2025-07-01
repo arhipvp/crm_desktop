@@ -345,6 +345,8 @@ def refresh_deal_drive_link(deal: Deal) -> None:
     try:
         deal_name = sanitize_name(f"Сделка - {deal.description}")
         parent_id = extract_folder_id(client_link)
+        if not parent_id:
+            return
         link = find_drive_folder(deal_name, parent_id)
         if link:
             deal.drive_folder_link = link

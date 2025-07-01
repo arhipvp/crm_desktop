@@ -95,6 +95,8 @@ logger.info("☁️ Загрузка в Google Drive…")
 
 folder_url = create_drive_folder(DRIVE_FOLDER_NAME)
 folder_id = extract_folder_id(folder_url)
+if not folder_id:
+    raise RuntimeError("Не удалось получить ID папки для бэкапа")
 
 if os.path.exists(SQL_PATH):
     upload_to_drive(SQL_PATH, folder_id)
