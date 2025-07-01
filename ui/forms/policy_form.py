@@ -1,6 +1,7 @@
 import logging
 from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
+    QDialog,
     QDateEdit,
     QGroupBox,
     QHBoxLayout,
@@ -227,7 +228,7 @@ class PolicyForm(BaseEditForm):
                 self.accept()
         except DuplicatePolicyError as e:
             dlg = PolicyMergeDialog(e.existing_policy, data, parent=self)
-            if dlg.exec() == dlg.Accepted:
+            if dlg.exec() == QDialog.Accepted:
                 merged = dlg.get_merged_data()
                 updated = update_policy(e.existing_policy, **merged)
                 self.saved_instance = updated
