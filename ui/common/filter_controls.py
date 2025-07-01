@@ -5,6 +5,8 @@ from datetime import date
 from PySide6.QtCore import QDate
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
+from ui import settings as ui_settings
+
 from ui.common.checkbox_filters import CheckboxFilters
 from ui.common.date_utils import OptionalDateEdit
 from ui.common.search_box import SearchBox
@@ -32,6 +34,8 @@ class FilterControls(QWidget):
         Универсальная функция, вызываемая при изменении фильтров (дата/чекбоксы).
     parent : QWidget, optional
         Родительский виджет.
+    settings_name : str, optional
+        Имя секции в файле настроек для сохранения фильтров.
     """
 
     def __init__(
@@ -44,9 +48,11 @@ class FilterControls(QWidget):
         date_filter_field: str | None = None,
         on_filter=None,
         parent=None,
+        settings_name: str | None = None,
     ):
         super().__init__(parent)
         extra_widgets = extra_widgets or []
+        self._settings_name = settings_name
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -98,6 +104,10 @@ class FilterControls(QWidget):
 
         layout.addStretch()
 
+        if self._settings_name:
+            self._restore_saved_filters()
+            self._connect_save_signals()
+
     def get_search_text(self) -> str:
         """Возвращает текст из поля поиска (без пробелов)."""
         return self._search.get_text().strip()
@@ -146,3 +156,53 @@ class FilterControls(QWidget):
         self._date_to.clear()
         if hasattr(self, "_date_edit"):
             self._date_edit.clear()
+
+    # ------------------------------------------------------------------
+    # Persistence helpers
+    # ------------------------------------------------------------------
+    def _restore_saved_filters(self):
+        data = ui_settings.get_table_filters(self._settings_name)
+        if not data:
+            return
+        search = data.get("search")
+        if search:
+            self._search.set_text(search)
+        if self._cbx:
+            self._cbx.set_bulk(data.get("checkboxes", {}))
+        dates = data.get("dates", {})
+        if self._date_filter_field and self._date_filter_field in dates:
+            d1_str, d2_str = dates.get(self._date_filter_field, [None, None])
+            d1 = date.fromisoformat(d1_str) if d1_str else None
+            d2 = date.fromisoformat(d2_str) if d2_str else None
+            if d1:
+                self._date_from.setDate(QDate(d1.year, d1.month, d1.day))
+            if d2:
+                self._date_to.setDate(QDate(d2.year, d2.month, d2.day))
+
+    def _collect_filters_for_save(self) -> dict:
+        data = self.get_all_filters()
+        dates = {}
+        for field, rng in data.get("dates", {}).items():
+            d1, d2 = rng
+            dates[field] = [
+                d1.isoformat() if isinstance(d1, date) else None,
+                d2.isoformat() if isinstance(d2, date) else None,
+            ]
+        data["dates"] = dates
+        return data
+
+    def _save_current_filters(self):
+        if not self._settings_name:
+            return
+        ui_settings.set_table_filters(self._settings_name, self._collect_filters_for_save())
+
+    def _connect_save_signals(self):
+        self._search.search_input.textChanged.connect(self._save_current_filters)
+        self._date_from.dateChanged.connect(self._save_current_filters)
+        self._date_to.dateChanged.connect(self._save_current_filters)
+        if hasattr(self, "_date_edit"):
+            self._date_edit.dateChanged.connect(self._save_current_filters)
+        if self._cbx:
+            for cb in self._cbx.checkboxes.values():
+                cb.stateChanged.connect(self._save_current_filters)
+

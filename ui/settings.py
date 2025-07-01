@@ -37,3 +37,30 @@ def set_table_settings(name: str, settings: dict) -> None:
     tables = data.setdefault("tables", {})
     tables[name] = settings
     _save_data(data)
+
+
+def get_table_filters(name: str) -> dict:
+    """Возвращает сохранённые фильтры для таблицы."""
+    data = _load_data()
+    return data.get("table_filters", {}).get(name, {})
+
+
+def set_table_filters(name: str, filters: dict) -> None:
+    """Сохраняет фильтры таблицы."""
+    data = _load_data()
+    table_filters = data.setdefault("table_filters", {})
+    table_filters[name] = filters
+    _save_data(data)
+
+
+def get_app_settings() -> dict:
+    """Возвращает общие настройки приложения."""
+    data = _load_data()
+    return data.get("app", {})
+
+
+def set_app_settings(settings: dict) -> None:
+    """Сохраняет общие настройки приложения."""
+    data = _load_data()
+    data["app"] = settings
+    _save_data(data)

@@ -167,3 +167,17 @@ def test_task_table_mass_delete(qtbot, monkeypatch):
 
     view.delete_selected()
     assert called == [t1.id, t2.id]
+
+
+def test_menu_open_settings(qtbot, monkeypatch):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    called = {}
+
+    monkeypatch.setattr(
+        "ui.forms.settings_dialog.SettingsDialog.exec",
+        lambda self: called.setdefault("exec", True),
+    )
+
+    window.menu_bar.open_settings()
+    assert called.get("exec")

@@ -1,4 +1,10 @@
-from services.client_service import add_client, update_client, mark_clients_deleted
+from services.client_service import (
+    add_client,
+    update_client,
+    mark_client_deleted,
+    restore_client,
+    mark_clients_deleted,
+)
 from database.models import Client
 
 
@@ -47,3 +53,11 @@ def test_mark_clients_deleted():
     mark_clients_deleted([c1.id, c2.id])
     assert Client.get_by_id(c1.id).is_deleted is True
     assert Client.get_by_id(c2.id).is_deleted is True
+
+
+def test_restore_client():
+    c = add_client(name="Del")
+    mark_client_deleted(c.id)
+    assert Client.get_by_id(c.id).is_deleted
+    restore_client(c.id)
+    assert not Client.get_by_id(c.id).is_deleted
