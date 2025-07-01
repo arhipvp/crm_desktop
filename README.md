@@ -17,10 +17,13 @@
 ```env
 DATABASE_URL=sqlite:///crm.db
 TG_BOT_TOKEN=000000:telegram-bot-token
+ADMIN_CHAT_ID=123456789  # Telegram ID администратора для уведомлений
 APPROVED_EXECUTOR_IDS=111,222  # Telegram ID разрешённых исполнителей
 GOOGLE_DRIVE_LOCAL_ROOT=/path/to/drive
 GOOGLE_CREDENTIALS=credentials.json
 ```
+
+Переменная `ADMIN_CHAT_ID` задаёт Telegram‑ID администратора, которому бот отправляет уведомления.
 
 ## Подготовка окружения
 
