@@ -207,6 +207,17 @@ def mark_client_deleted(client_id: int):
         logger.warning("❗ Клиент с id=%s не найден для удаления", client_id)
 
 
+def mark_clients_deleted(client_ids: list[int]) -> int:
+    """Массово помечает клиентов удалёнными."""
+    if not client_ids:
+        return 0
+    return (
+        Client.update(is_deleted=True)
+        .where(Client.id.in_(client_ids))
+        .execute()
+    )
+
+
 # ─────────────────────── WhatsApp интеграция ─────────────────────────
 
 
