@@ -1,5 +1,3 @@
-# ui/views/policy_table_view.py
-
 from database.models import Policy
 from services.policy_service import (
     build_policy_query,
@@ -7,13 +5,14 @@ from services.policy_service import (
     mark_policy_deleted,
     mark_policy_renewed,
     mark_policies_renewed,
+    mark_policies_deleted,
 )
+from PySide6.QtWidgets import QAbstractItemView
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.policy_form import PolicyForm
 from ui.views.policy_detail_view import PolicyDetailView
 from ui.common.styled_widgets import styled_button
-from PySide6.QtWidgets import QAbstractItemView
 
 
 class PolicyTableView(BaseTableView):
@@ -27,18 +26,18 @@ class PolicyTableView(BaseTableView):
             checkbox_map=checkbox_map,
             **kwargs,
         )
-        # разрешаем множественный выбор для массовых действий
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setSortingEnabled(True)
         self.table.horizontalHeader().sectionClicked.connect(self.on_section_clicked)
-        # self.row_double_clicked.connect(self.open_detail)
+
         self.order_by = "start_date"
         self.order_dir = "asc"
-        # кнопка «Полис продлен (без привязки)»
+
         self.mark_renewed_btn = styled_button("Полис продлен (без привязки)")
         idx = self.button_row.count() - 1
         self.button_row.insertWidget(idx, self.mark_renewed_btn)
         self.mark_renewed_btn.clicked.connect(self._on_mark_renewed)
+
         self.load_data()
 
     def get_filters(self) -> dict:
@@ -47,15 +46,12 @@ class PolicyTableView(BaseTableView):
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
             "include_renewed": self.filter_controls.is_checked("Показывать продленное"),
         }
-        if getattr(self, "deal_id", None) is not None:
+        if self.deal_id is not None:
             filters["deal_id"] = self.deal_id
         return filters
 
     def load_data(self):
-        # 1) читаем фильтры
         filters = self.get_filters()
-
-        # 2) получаем страницу и общее количество
         items = get_policies_page(
             self.page,
             self.per_page,
@@ -63,10 +59,7 @@ class PolicyTableView(BaseTableView):
             order_dir=self.order_dir,
             **filters,
         )
-
         total = build_policy_query(**filters).count()
-
-        # 3) обновляем модель и пагинатор
         self.set_model_class_and_items(Policy, list(items), total_count=total)
 
     def get_selected(self):
@@ -77,7 +70,9 @@ class PolicyTableView(BaseTableView):
 
     def get_selected_multiple(self):
         indexes = self.table.selectionModel().selectedRows()
-        return [self.model.get_item(i.row()) for i in indexes]
+        return [
+            self.model.get_item(self.proxy_model.mapToSource(i).row()) for i in indexes
+        ]
 
     def add_new(self):
         form = PolicyForm()
@@ -92,12 +87,20 @@ class PolicyTableView(BaseTableView):
                 self.refresh()
 
     def delete_selected(self):
-        policy = self.get_selected()
-        if not policy:
+        policies = self.get_selected_multiple()
+        if not policies:
             return
-        if confirm(f"Удалить полис {policy.policy_number}?"):
+        if len(policies) == 1:
+            message = f"Удалить полис {policies[0].policy_number}?"
+        else:
+            message = f"Удалить {len(policies)} полис(ов)?"
+        if confirm(message):
             try:
-                mark_policy_deleted(policy.id)
+                if len(policies) == 1:
+                    mark_policy_deleted(policies[0].id)
+                else:
+                    ids = [p.id for p in policies]
+                    mark_policies_deleted(ids)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
@@ -127,17 +130,11 @@ class PolicyTableView(BaseTableView):
             dlg.exec()
 
     def on_section_clicked(self, logicalIndex):
-        # Получаем имя поля по номеру колонки
-        field = self.model.fields[
-            logicalIndex
-        ].name  # или self.model._fields[logicalIndex]
+        field = self.model.fields[logicalIndex].name
         if not hasattr(Policy, field):
-            # Например, если столбец виртуальный, сортировать не получится
             return
-        # Определяем направление сортировки
         order = self.table.horizontalHeader().sortIndicatorOrder()
-        order_dir = "desc" if order == 1 else "asc"
+        self.order_dir = "desc" if order == 1 else "asc"
         self.order_by = field
-        self.order_dir = order_dir
-        self.page = 1  # сбрасываем страницу
+        self.page = 1
         self.load_data()

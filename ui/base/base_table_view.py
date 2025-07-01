@@ -27,6 +27,11 @@ class BaseTableView(QWidget):
     row_double_clicked = Signal(object)  # объект строки по двойному клику
     data_loaded = Signal(int)  # сигнал о загрузке данных (количество)
 
+    def _on_filter_controls_changed(self, *args, **kwargs):
+        """Безопасно обрабатывает изменение фильтров во время инициализации."""
+        if hasattr(self, "filter_controls"):
+            self.on_filter_changed(*args, **kwargs)
+
     def __init__(
         self,
         parent=None,
@@ -94,9 +99,9 @@ class BaseTableView(QWidget):
         )
 
         self.filter_controls = FilterControls(
-            search_callback=self.on_filter_changed,
+            search_callback=self._on_filter_controls_changed,
             checkbox_map=checkbox_map,
-            on_filter=self.on_filter_changed,
+            on_filter=self._on_filter_controls_changed,
             settings_name=self.settings_id,
         )
 
