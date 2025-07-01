@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QHBoxLayout,
 )
+from PySide6.QtCore import Qt
 
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
@@ -35,7 +36,9 @@ class PolicyMergeDialog(QDialog):
                 continue
             row = self.table.rowCount()
             self.table.insertRow(row)
-            self.table.setItem(row, 0, QTableWidgetItem(self._prettify_field(field)))
+            item = QTableWidgetItem(self._prettify_field(field))
+            item.setData(Qt.UserRole, field)
+            self.table.setItem(row, 0, item)
             self.table.setItem(
                 row,
                 1,
@@ -93,7 +96,10 @@ class PolicyMergeDialog(QDialog):
     def get_merged_data(self) -> dict:
         data = {}
         for row in range(self.table.rowCount()):
-            field = self.table.item(row, 0).text()
+            item = self.table.item(row, 0)
+            field = item.data(Qt.UserRole) if item is not None else None
+            if not field:
+                continue
             widget = self.table.cellWidget(row, 2)
             value = widget.text().strip()
             data[field] = value or None
