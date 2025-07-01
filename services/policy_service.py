@@ -237,8 +237,9 @@ def mark_policies_renewed(policy_ids: list[int]) -> int:
 def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
     """
     Создаёт новый полис с привязкой к клиенту и (опционально) сделке.
-    Обязательно принимает хотя бы один платёж (payments),
-    если не передан — создаёт авто-нулевой платёж на дату начала.
+    Требует указать номер полиса и хотя бы один платёж (payments).
+    Если список платежей не передан, создаётся авто-нулевой платёж
+    на дату начала.
     """
     # ────────── Клиент ──────────
     client = kwargs.get("client") or get_client_by_id(kwargs.get("client_id"))
@@ -271,6 +272,10 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
         for field in allowed_fields
         if field in kwargs and kwargs[field] not in ("", None)
     }
+
+    # Обязателен номер полиса
+    if not clean_data.get("policy_number"):
+        raise ValueError("Поле 'policy_number' обязательно для заполнения.")
 
     # Проверка: дата окончания обязательна
     start_date = clean_data.get("start_date")
@@ -399,6 +404,9 @@ def update_policy(policy: Policy, **kwargs):
         for f in allowed_fields
         if f not in {"deal", "deal_id"}
     }
+
+    if not new_number:
+        raise ValueError("Поле 'policy_number' обязательно для заполнения.")
     _check_duplicate_policy(new_number, policy.client_id, new_deal_id, compare_data, exclude_id=policy.id)
 
     if not updates:
