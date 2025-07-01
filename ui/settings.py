@@ -32,8 +32,22 @@ def get_table_settings(name: str) -> dict:
     return data.get("tables", {}).get(name, {})
 
 
+def get_table_filters(name: str) -> dict:
+    """Возвращает сохранённые фильтры для таблицы."""
+    data = _load_data()
+    return data.get("table_filters", {}).get(name, {})
+
+
 def set_table_settings(name: str, settings: dict) -> None:
     data = _load_data()
     tables = data.setdefault("tables", {})
     tables[name] = settings
+    _save_data(data)
+
+
+def set_table_filters(name: str, filters: dict) -> None:
+    """Сохраняет фильтры таблицы."""
+    data = _load_data()
+    table_filters = data.setdefault("table_filters", {})
+    table_filters[name] = filters
     _save_data(data)

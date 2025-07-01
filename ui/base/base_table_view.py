@@ -91,6 +91,7 @@ class BaseTableView(QWidget):
             search_callback=self.on_filter_changed,
             checkbox_map=checkbox_map,
             on_filter=self.on_filter_changed,
+            settings_name=self.settings_id,
         )
 
         self.left_layout.addWidget(self.filter_controls)
