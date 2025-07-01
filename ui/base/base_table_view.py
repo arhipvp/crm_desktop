@@ -6,6 +6,7 @@ from PySide6.QtCore import QDate, Qt, Signal, QSortFilterProxyModel
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
+    QMenu,
     QSplitter,
     QTableView,
     QVBoxLayout,
@@ -19,6 +20,7 @@ from ui.common.styled_widgets import styled_button
 from ui.common.column_proxy_model import ColumnFilterProxyModel
 from ui.common.column_filter_row import ColumnFilterRow
 from ui import settings as ui_settings
+from services.folder_utils import open_folder
 
 
 class BaseTableView(QWidget):
@@ -145,6 +147,8 @@ class BaseTableView(QWidget):
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setAlternatingRowColors(True)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._on_table_menu)
         self.left_layout.addWidget(self.table)
         self.column_filters = ColumnFilterRow()
         self.column_filters.filter_changed.connect(self._on_column_filter_changed)
@@ -361,6 +365,31 @@ class BaseTableView(QWidget):
         if not index.isValid():
             return None
         return self.model.get_item(self._source_row(index))
+
+    def open_selected_folder(self):
+        """Открыть связанную папку для выбранной строки."""
+        obj = self.get_selected_object()
+        if not obj:
+            return
+        path = getattr(obj, "drive_folder_path", None) or getattr(
+            obj, "drive_folder_link", None
+        )
+        if path:
+            open_folder(path, parent=self)
+
+    def _on_table_menu(self, pos):
+        index = self.table.indexAt(pos)
+        if not index.isValid():
+            return
+        self.table.selectRow(index.row())
+        menu = QMenu(self)
+        act_open = menu.addAction("Открыть/редактировать")
+        act_delete = menu.addAction("Удалить")
+        act_folder = menu.addAction("Открыть папку")
+        act_open.triggered.connect(self._on_edit)
+        act_delete.triggered.connect(self._on_delete)
+        act_folder.triggered.connect(self.open_selected_folder)
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
         """Сохраняет текущую сортировку таблицы."""
