@@ -173,6 +173,17 @@ def mark_policy_deleted(policy_id: int):
         logger.warning("❗ Полис с id=%s не найден для удаления", policy_id)
 
 
+def mark_policies_deleted(policy_ids: list[int]) -> int:
+    """Массово помечает полисы удалёнными."""
+    if not policy_ids:
+        return 0
+    return (
+        Policy.update(is_deleted=True)
+        .where(Policy.id.in_(policy_ids))
+        .execute()
+    )
+
+
 def mark_policy_renewed(policy_id: int):
     """Пометить полис как продлённый без привязки к новому."""
     policy = Policy.get_or_none(Policy.id == policy_id)

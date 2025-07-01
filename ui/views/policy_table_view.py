@@ -6,7 +6,9 @@ from services.policy_service import (
     get_policies_page,
     mark_policy_deleted,
     mark_policy_renewed,
+    mark_policies_deleted,
 )
+from PySide6.QtWidgets import QAbstractItemView
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.policy_form import PolicyForm
@@ -26,6 +28,7 @@ class PolicyTableView(BaseTableView):
             **kwargs,
         )
         self.table.setSortingEnabled(True)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.horizontalHeader().sectionClicked.connect(self.on_section_clicked)
         # self.row_double_clicked.connect(self.open_detail)
         self.order_by = "start_date"
@@ -71,6 +74,12 @@ class PolicyTableView(BaseTableView):
             return None
         return self.model.get_item(idx.row())
 
+    def get_selected_multiple(self):
+        indexes = self.table.selectionModel().selectedRows()
+        return [
+            self.model.get_item(self.proxy_model.mapToSource(i).row()) for i in indexes
+        ]
+
     def add_new(self):
         form = PolicyForm()
         if form.exec():
@@ -84,12 +93,20 @@ class PolicyTableView(BaseTableView):
                 self.refresh()
 
     def delete_selected(self):
-        policy = self.get_selected()
-        if not policy:
+        policies = self.get_selected_multiple()
+        if not policies:
             return
-        if confirm(f"Удалить полис {policy.policy_number}?"):
+        if len(policies) == 1:
+            message = f"Удалить полис {policies[0].policy_number}?"
+        else:
+            message = f"Удалить {len(policies)} полис(ов)?"
+        if confirm(message):
             try:
-                mark_policy_deleted(policy.id)
+                if len(policies) == 1:
+                    mark_policy_deleted(policies[0].id)
+                else:
+                    ids = [p.id for p in policies]
+                    mark_policies_deleted(ids)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
