@@ -1,28 +1,28 @@
 import os
 import sys
 import logging
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# ───── Загрузка переменных окружения ─────
+dotenv_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=dotenv_path)
 
 from PySide6.QtWidgets import QApplication
 
 from database.init import init_from_env
 from services import executor_service as es
-
-init_from_env()
-
-from pathlib import Path
-
-from dotenv import load_dotenv
-
 from ui.main_window import MainWindow
 from utils.logging_config import setup_logging
 
+# ───── Инициализация базы данных и логирования ─────
+init_from_env()
 setup_logging()
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    # ───── инициализация переменных ─────
-    dotenv_path = Path(__file__).resolve().parent / ".env"
-    load_dotenv(dotenv_path=dotenv_path)
+    # ───── Проверка и подготовка окружения ─────
     es.ensure_executors_from_env()
 
     DATABASE_URL = os.getenv("DATABASE_URL")
