@@ -1,128 +1,63 @@
-from datetime import date
-from services.client_service import add_client
-from services.deal_service import add_deal
-from services.policy_service import (
-    add_policy,
-    update_policy,
-    DuplicatePolicyError,
-    mark_policies_deleted,
+from services.client_service import (
+    add_client,
+    update_client,
+    mark_client_deleted,
+    restore_client,
+    mark_clients_deleted,
 )
-from database.models import Payment, Income, Policy
+from database.models import Client
 
 
-def test_add_policy_creates_everything():
-    client = add_client(name="Тестовый клиент")
-    deal = add_deal(
-        client_id=client.id, start_date=date(2025, 1, 1), description="ОСАГО для VW"
+def test_add_valid_client():
+    client = add_client(
+        name="Иван Иванов", phone="8 (999) 123-45-67", email="ivan@test.com"
     )
-
-    policy = add_policy(
-        client_id=client.id,
-        deal_id=deal.id,
-        policy_number="ABC123456",
-        insurance_company="Тестовая страховая",
-        insurance_type="ОСАГО",
-        start_date=date(2025, 1, 1),
-        end_date=date(2025, 12, 31),
-    )
-
-    assert policy.id is not None
-    assert policy.policy_number == "ABC123456"
-    assert policy.client.id == client.id
-    assert policy.deal.id == deal.id
-
-    # нулевой платёж
-    payment = Payment.get_or_none(Payment.policy == policy)
-    assert payment is not None
-    assert payment.amount == 0
-
-    # нулевой доход
-    income = Income.get_or_none(Income.payment == payment)
-    assert income is not None
-    assert income.amount == 0
+    assert client.id is not None
+    assert client.name == "Иван Иванов"
+    assert client.phone == "+79991234567"
+    assert client.email == "ivan@test.com"
+    assert Client.select().count() == 1
 
 
-def test_first_payment_paid():
-    client = add_client(name="Клиент")
-    policy = add_policy(
-        client_id=client.id,
-        policy_number="FP123",
-        start_date=date(2025, 1, 1),
-        end_date=date(2025, 12, 31),
-        payments=[{"amount": 1000, "payment_date": date(2025, 1, 1)}],
-        first_payment_paid=True,
-    )
-
-    payment = Payment.get(Payment.policy == policy)
-    assert payment.actual_payment_date == payment.payment_date
-    income = Income.get(Income.payment == payment)
-    assert income.received_date is None
+def test_add_client_name_normalization():
+    client = add_client(name="иВАНОВ иВАН иВАНОВИЧ")
+    assert client.name == "Иванов Иван Иванович"
 
 
-def test_add_policy_duplicate_same_data():
-    client = add_client(name="Dup")
-    add_policy(
-        client_id=client.id,
-        policy_number="DUP123",
-        start_date=date(2025, 1, 1),
-        end_date=date(2025, 12, 31),
-    )
-
+def test_add_client_without_name_raises():
     try:
-        add_policy(
-            client_id=client.id,
-            policy_number="DUP123",
-            start_date=date(2025, 1, 1),
-            end_date=date(2025, 12, 31),
-        )
-    except DuplicatePolicyError as e:
-        msg = str(e)
-        assert "Такой полис уже найден" in msg
-        assert "совпадают" in msg
+        add_client(phone="123")
+    except ValueError as e:
+        assert "Поле 'name'" in str(e)
     else:
-        assert False, "Expected DuplicatePolicyError"
+        assert False, "Expected ValueError"
 
 
-def test_update_policy_duplicate_fields():
-    client = add_client(name="UpdDup")
-    p1 = add_policy(
-        client_id=client.id,
-        policy_number="UD1",
-        start_date=date(2025, 1, 1),
-        end_date=date(2025, 12, 31),
+def test_update_client_changes_phone_and_folder(monkeypatch):
+    client = add_client(name="Old", phone="8 900 000-00-00")
+    monkeypatch.setattr(
+        "services.client_service.rename_client_folder",
+        lambda o, n, l: (f"/tmp/{n}", f"link/{n}"),
     )
-    p2 = add_policy(
-        client_id=client.id,
-        policy_number="UD2",
-        start_date=date(2025, 1, 1),
-        end_date=date(2025, 12, 31),
-    )
-
-    try:
-        update_policy(p2, policy_number="UD1")
-    except DuplicatePolicyError as e:
-        msg = str(e)
-        assert "Такой полис уже найден" in msg
-    else:
-        assert False, "Expected DuplicatePolicyError"
+    update_client(client, name="nEW", phone="8 900 111-11-11")
+    client = Client.get_by_id(client.id)
+    assert client.name == "New"
+    assert client.phone == "+79001111111"
+    assert client.drive_folder_path.endswith("New")
+    assert client.drive_folder_link.endswith("New")
 
 
-def test_mark_policies_deleted():
-    client = add_client(name="Bulk")
-    p1 = add_policy(
-        client_id=client.id,
-        policy_number="B1",
-        start_date=date(2025, 1, 1),
-        end_date=date(2025, 12, 31),
-    )
-    p2 = add_policy(
-        client_id=client.id,
-        policy_number="B2",
-        start_date=date(2025, 1, 1),
-        end_date=date(2025, 12, 31),
-    )
+def test_mark_clients_deleted():
+    c1 = add_client(name="C1")
+    c2 = add_client(name="C2")
+    mark_clients_deleted([c1.id, c2.id])
+    assert Client.get_by_id(c1.id).is_deleted is True
+    assert Client.get_by_id(c2.id).is_deleted is True
 
-    mark_policies_deleted([p1.id, p2.id])
 
-    assert Policy.get_by_id(p1.id).is_deleted is True
-    assert Policy.get_by_id(p2.id).is_deleted is True
+def test_restore_client():
+    c = add_client(name="Del")
+    mark_client_deleted(c.id)
+    assert Client.get_by_id(c.id).is_deleted
+    restore_client(c.id)
+    assert not Client.get_by_id(c.id).is_deleted
