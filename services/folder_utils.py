@@ -60,9 +60,12 @@ def sanitize_name(name: str) -> str:
     return name.rstrip(" .")  # убираем завершающие пробелы/точки
 
 
-def extract_folder_id(link: str) -> str:
+def extract_folder_id(link: str | None) -> str | None:
+    """Извлечь идентификатор папки из ссылки Google Drive."""
+
     if not link:
         return None
+
     return link.rstrip("/").split("/")[-1]
 
 
@@ -216,11 +219,12 @@ def create_deal_folder(
     web_link: Optional[str] = None
     if client_drive_link and Credentials is not None:
         parent_id = extract_folder_id(client_drive_link)
-        try:
-            web_link = create_drive_folder(deal_name, parent_id)
-            logger.info("☁️  Drive-папка сделки: %s", web_link)
-        except Exception:
-            logger.exception("Не удалось создать папку сделки на Drive")
+        if parent_id:
+            try:
+                web_link = create_drive_folder(deal_name, parent_id)
+                logger.info("☁️  Drive-папка сделки: %s", web_link)
+            except Exception:
+                logger.exception("Не удалось создать папку сделки на Drive")
 
     return local_path, web_link
 
@@ -384,11 +388,12 @@ def rename_client_folder(old_name: str, new_name: str, drive_link: str | None):
         try:
             service = get_drive_service()
             file_id = extract_folder_id(drive_link)
-            service.files().update(
-                fileId=file_id,
-                body={"name": new_name},
-                fields="id",  # ничего лишнего не запрашиваем
-            ).execute()
+            if file_id:
+                service.files().update(
+                    fileId=file_id,
+                    body={"name": new_name},
+                    fields="id",  # ничего лишнего не запрашиваем
+                ).execute()
             # ссылка вида .../folders/<id> остаётся валидной → можно вернуть как есть
         except Exception:
             logger.exception("Не удалось переименовать папку клиента на Drive")
