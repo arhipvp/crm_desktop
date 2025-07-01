@@ -11,6 +11,7 @@ from services.policy_service import (
     add_policy,
     mark_policy_deleted,
     mark_policy_renewed,
+    apply_policy_filters,
 )
 from services.payment_service import add_payment, apply_payment_filters
 from services.expense_service import add_expense, apply_expense_filters
@@ -349,3 +350,26 @@ def test_get_expiring_policies_filters(monkeypatch):
     assert p1 in pols
     assert p2 not in pols
     assert p3 not in pols
+
+
+def test_apply_policy_filters_without_deal_only():
+    client = add_client(name='POL')
+    p1 = add_policy(
+        client_id=client.id,
+        policy_number='ND1',
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 10),
+    )
+    deal = add_deal(client_id=client.id, start_date=date(2025, 1, 1), description='D')
+    p2 = add_policy(
+        client_id=client.id,
+        deal_id=deal.id,
+        policy_number='D1',
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 10),
+    )
+
+    q = apply_policy_filters(Policy.select().join(Client), without_deal_only=True)
+    res = list(q)
+    assert p1 in res
+    assert p2 not in res

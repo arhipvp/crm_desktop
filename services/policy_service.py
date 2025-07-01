@@ -125,6 +125,7 @@ def get_policies_page(
     order_by="start_date",
     order_dir="asc",
     include_renewed=True,
+    without_deal_only=False,
     **filters,
 ):
     """Получить страницу полисов с указанными фильтрами.
@@ -139,6 +140,7 @@ def get_policies_page(
         order_by: Поле сортировки.
         order_dir: Направление сортировки.
         include_renewed: Показывать продлённые полисы.
+        without_deal_only: Только полисы без сделки.
 
     Returns:
         ModelSelect: Отфильтрованная выборка полисов.
@@ -149,6 +151,7 @@ def get_policies_page(
         deal_id=deal_id,
         client_id=client_id,
         include_renewed=include_renewed,
+        without_deal_only=without_deal_only,
         **filters,
     )
     # Выбираем поле сортировки
@@ -447,6 +450,7 @@ def apply_policy_filters(
     deal_id: int | None = None,
     client_id: int | None = None,
     include_renewed: bool = True,
+    without_deal_only: bool = False,
 ):
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
@@ -458,6 +462,8 @@ def apply_policy_filters(
         query = query.where(
             (Policy.renewed_to.is_null(True)) | (Policy.renewed_to == "")
         )
+    if without_deal_only:
+        query = query.where(Policy.deal_id.is_null(True))
     if search_text:
         query = query.where(
             (Policy.policy_number.contains(search_text))
@@ -472,8 +478,10 @@ def build_policy_query(
     deal_id: int | None = None,
     client_id: int | None = None,
     include_renewed: bool = True,
+    without_deal_only: bool = False,
     **filters,
 ):
+    """Сформировать запрос для выборки полисов с фильтрами."""
     query = Policy.select(Policy, Client).join(Client)
     return apply_policy_filters(
         query,
@@ -482,6 +490,7 @@ def build_policy_query(
         deal_id,
         client_id,
         include_renewed,
+        without_deal_only,
     )
 
 
