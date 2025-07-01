@@ -330,7 +330,12 @@ def test_get_expiring_policies_filters(monkeypatch):
         end_date=date(2025, 1, 5),
         open_folder=lambda *_: None,
     )
+    monkeypatch.setattr(
+        "services.folder_utils.rename_policy_folder",
+        lambda *a, **k: (f"/tmp/{a[4]}", None),
+    )
     mark_policy_deleted(p2.id)
+    assert Policy.get_by_id(p2.id).policy_number.endswith("deleted")
     p3 = add_policy(
         client_id=client.id,
         policy_number='Z3',
