@@ -34,7 +34,13 @@ from services.folder_utils import (
     copy_text_to_clipboard,
 )
 import services.folder_utils as folder_utils
-from services.task_service import add_task, append_note, mark_task_deleted
+from services.task_service import (
+    add_task,
+    append_note,
+    mark_task_deleted,
+    get_incomplete_tasks_for_executor,
+)
+from services.executor_service import assign_executor
 from utils import screen_utils, time_utils
 from database.models import Expense, Income, Payment, Task, Client, Deal, Policy
 
@@ -373,3 +379,20 @@ def test_apply_policy_filters_without_deal_only():
     res = list(q)
     assert p1 in res
     assert p2 not in res
+
+
+def test_get_incomplete_tasks_for_executor_policy():
+    client = add_client(name='Exec')
+    deal = add_deal(client_id=client.id, start_date=date(2025, 1, 1), description='D')
+    policy = add_policy(
+        client_id=client.id,
+        deal_id=deal.id,
+        policy_number='P',
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 10),
+    )
+    assign_executor(deal_id=deal.id, tg_id=123)
+    task = add_task(title='T', due_date=date.today(), policy_id=policy.id)
+
+    tasks = get_incomplete_tasks_for_executor(123)
+    assert task in tasks

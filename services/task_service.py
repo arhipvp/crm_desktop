@@ -606,12 +606,24 @@ def get_incomplete_tasks_for_executor(tg_id: int) -> list[Task]:
     if not deals:
         return []
     deal_ids = [d.id for d in deals]
+
+    # Полисы могут быть связаны со сделкой, даже если сама задача создана
+    # только для полиса. Поэтому дополнительно выбираем задачи, у которых
+    # ``policy.deal_id`` относится к нужному исполнителю.
+    policy_subq = (
+        Policy.select(Policy.id)
+        .where(Policy.deal_id.in_(deal_ids))
+    )
+
     base = (
         Task.select()
         .where(
-            (Task.deal_id.in_(deal_ids))
+            (
+                (Task.deal_id.in_(deal_ids)) |
+                (Task.policy_id.in_(policy_subq))
+            )
             & (Task.is_deleted == False)
             & (Task.is_done == False)
         )
     )
-    return list(prefetch(base, Deal, Client))
+    return list(prefetch(base, Deal, Client, Policy))
