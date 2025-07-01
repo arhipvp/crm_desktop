@@ -19,23 +19,12 @@ CLIENT_ALLOWED_FIELDS = {"name", "phone", "email", "is_company", "note"}
 
 
 def get_all_clients() -> ModelSelect:
-    """Вернуть выборку всех активных клиентов.
-
-    Returns:
-        ModelSelect: Peewee-выборка клиентов без пометки удаления.
-    """
+    """Вернуть выборку всех активных клиентов."""
     return Client.select().where(Client.is_deleted == False)
 
 
 def get_client_by_id(client_id: int) -> Client | None:
-    """Получить клиента по его идентификатору.
-
-    Args:
-        client_id: Идентификатор клиента.
-
-    Returns:
-        Client | None: Объект клиента или ``None``, если не найден.
-    """
+    """Получить клиента по его идентификатору."""
     return Client.get_or_none((Client.id == client_id) & (Client.is_deleted == False))
 
 
@@ -45,17 +34,7 @@ def get_clients_page(
     search_text: str = "",
     show_deleted: bool = False,
 ) -> ModelSelect:
-    """Получить страницу клиентов с учётом фильтров.
-
-    Args:
-        page: Номер страницы, начиная с 1.
-        per_page: Количество записей на странице.
-        search_text: Текст для поиска по имени, телефону и т.д.
-        show_deleted: Учитывать ли помеченных удалёнными.
-
-    Returns:
-        ModelSelect: Отфильтрованная выборка клиентов.
-    """
+    """Получить страницу клиентов с учётом фильтров."""
     query = Client.select()
     query = apply_client_filters(query, search_text, show_deleted)
 
@@ -67,15 +46,7 @@ def get_clients_page(
 
 
 def add_client(**kwargs) -> Client:
-    """Создать и вернуть нового клиента.
-
-    Args:
-        **kwargs: Поля клиента ``name``, ``phone``, ``email`` и пр.
-
-    Returns:
-        Client: Созданный объект клиента.
-    """
-
+    """Создать и вернуть нового клиента."""
     allowed_fields = CLIENT_ALLOWED_FIELDS
 
     clean_data = {
@@ -91,14 +62,11 @@ def add_client(**kwargs) -> Client:
     name = normalize_full_name(name)
     clean_data["name"] = name
 
-    # нормализуем телефон, если он пришёл
     if "phone" in clean_data:
         try:
             clean_data["phone"] = normalize_phone(clean_data["phone"])
         except ValueError as e:
-            logger.warning(
-                "⚠️ Ошибка нормализации телефона '%s': %s", clean_data["phone"], e
-            )
+            logger.warning("⚠️ Ошибка нормализации телефона '%s': %s", clean_data["phone"], e)
             raise
 
     clean_data["is_deleted"] = False
@@ -121,58 +89,34 @@ def add_client(**kwargs) -> Client:
 
 
 def update_client(client: Client, **kwargs) -> Client:
-    """Обновить данные клиента и переименовать папку при смене имени.
+    """Обновить данные клиента и переименовать папку при смене имени."""
+    updates = {k: v for k, v in kwargs.items() if k in CLIENT_ALLOWED_FIELDS and v not in ("", None)}
 
-    Args:
-        client: Объект клиента для изменения.
-        **kwargs: Обновляемые поля клиента.
-
-    Returns:
-        Client: Обновлённый объект клиента.
-    """
-
-    allowed = CLIENT_ALLOWED_FIELDS
-
-    updates = {k: v for k, v in kwargs.items() if k in allowed and v not in ("", None)}
-
-    # нормализуем ФИО
     if "name" in updates:
         updates["name"] = normalize_full_name(updates["name"])
-
-    # нормализуем телефон
     if "phone" in updates:
         updates["phone"] = normalize_phone(updates["phone"])
 
-    # если нечего менять — сразу выходим
     if not updates:
         return client
+
     logger.info("✏️ Обновление клиента #%s: %s", client.id, updates)
 
-    # --- переименование папки клиента ---
     old_name = client.name
     new_name = updates.get("name", old_name)
 
-    # применяем обновления к объекту
     for k, v in updates.items():
         setattr(client, k, v)
-
-    # сохраняем все поля разом
     client.save()
 
-    # если имя изменилось — переименовываем папку
     if old_name != new_name:
-        new_path, new_link = rename_client_folder(
-            old_name, new_name, client.drive_folder_link
-        )
-
+        new_path, new_link = rename_client_folder(old_name, new_name, client.drive_folder_link)
         if new_path and new_path != client.drive_folder_path:
             client.drive_folder_path = new_path
             logger.info("📁 Обновлён локальный путь клиента: %s", new_path)
-
         if new_link and new_link != client.drive_folder_link:
             client.drive_folder_link = new_link
             logger.info("🔗 Обновлена ссылка на Google Drive: %s", new_link)
-
         client.save(only=[Client.drive_folder_path, Client.drive_folder_link])
 
     return client
@@ -205,6 +149,17 @@ def mark_client_deleted(client_id: int):
         client.save()
     else:
         logger.warning("❗ Клиент с id=%s не найден для удаления", client_id)
+
+
+def mark_clients_deleted(client_ids: list[int]) -> int:
+    """Массово помечает клиентов удалёнными."""
+    if not client_ids:
+        return 0
+    return (
+        Client.update(is_deleted=True)
+        .where(Client.id.in_(client_ids))
+        .execute()
+    )
 
 
 def restore_client(client_id: int):
@@ -242,6 +197,4 @@ def open_whatsapp(phone: str, message: str | None = None) -> None:
 def build_client_query(search_text: str = "", show_deleted: bool = False):
     """Создаёт выборку клиентов с учётом фильтров."""
     query = Client.select()
-    query = apply_client_filters(query, search_text, show_deleted)
-
-    return query
+    return apply_client_filters(query, search_text, show_deleted)
