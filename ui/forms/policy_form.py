@@ -31,7 +31,7 @@ from ui.common.combo_helpers import (
     set_selected_by_id,
 )
 from ui.common.date_utils import add_year_minus_one_day
-from ui.common.message_boxes import show_error
+from ui.common.message_boxes import show_error, show_info
 
 logger = logging.getLogger(__name__)
 
@@ -229,8 +229,15 @@ class PolicyForm(BaseEditForm):
             dlg = PolicyMergeDialog(e.existing_policy, data, parent=self)
             if dlg.exec() == dlg.Accepted:
                 merged = dlg.get_merged_data()
-                update_policy(e.existing_policy, **merged)
-                self.saved_instance = e.existing_policy
+                updated = update_policy(e.existing_policy, **merged)
+                self.saved_instance = updated
+                show_info("Полис успешно объединён.")
+                path = (
+                    getattr(updated, "drive_folder_path", None)
+                    or getattr(updated, "drive_folder_link", None)
+                )
+                if path:
+                    open_folder(path, parent=self)
                 self.accept()
         except ValueError as e:
             show_error(str(e))
