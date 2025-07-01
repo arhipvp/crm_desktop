@@ -53,6 +53,7 @@ class TaskTableView(BaseTableView):
             },
             on_filter=self.on_filter_changed,
             search_placeholder="Поиск…",
+            settings_name=self.settings_id,
         )
         self.left_layout.insertWidget(0, self.filter_controls)
 
