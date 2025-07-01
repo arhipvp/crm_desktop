@@ -37,3 +37,16 @@ def set_table_settings(name: str, settings: dict) -> None:
     tables = data.setdefault("tables", {})
     tables[name] = settings
     _save_data(data)
+
+
+def get_app_settings() -> dict:
+    """Возвращает общие настройки приложения."""
+    data = _load_data()
+    return data.get("app", {})
+
+
+def set_app_settings(settings: dict) -> None:
+    """Сохраняет общие настройки приложения."""
+    data = _load_data()
+    data["app"] = settings
+    _save_data(data)

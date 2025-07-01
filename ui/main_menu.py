@@ -37,6 +37,10 @@ class MainMenu(QMenuBar):
         executor_action.triggered.connect(self.open_executors)
         file_menu.addAction(executor_action)
 
+        settings_action = QAction("Настройки…", self)
+        settings_action.triggered.connect(self.open_settings)
+        file_menu.addAction(settings_action)
+
         file_menu.addSeparator()
 
         exit_action = QAction("Выход", self)
@@ -91,6 +95,16 @@ class MainMenu(QMenuBar):
         mw = self.parent()
         if mw and hasattr(mw, "open_executors"):
             mw.open_executors()
+
+    def open_settings(self):
+        mw = self.parent()
+        if mw and hasattr(mw, "open_settings"):
+            mw.open_settings()
+        else:
+            from ui.forms.settings_dialog import SettingsDialog
+
+            dlg = SettingsDialog(self)
+            dlg.exec()
 
     def open_docs(self):
         import webbrowser

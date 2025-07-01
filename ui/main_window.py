@@ -86,3 +86,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(view)
         dlg.resize(get_scaled_size(600, 400))
         dlg.exec()
+
+    def open_settings(self):
+        from ui.forms.settings_dialog import SettingsDialog
+
+        dlg = SettingsDialog(self)
+        dlg.exec()
