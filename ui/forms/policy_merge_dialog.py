@@ -7,7 +7,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QHBoxLayout,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QDate
+import peewee
 
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
@@ -102,6 +103,27 @@ class PolicyMergeDialog(QDialog):
             if not field:
                 continue
             widget = self.table.cellWidget(row, 2)
-            value = widget.text().strip()
-            data[field] = value or None
+            text = widget.text().strip()
+            if text == "":
+                data[field] = None
+                continue
+
+            model_field = Policy._meta.fields.get(field)
+
+            if isinstance(model_field, (peewee.IntegerField, peewee.AutoField, peewee.ForeignKeyField)):
+                try:
+                    data[field] = int(text)
+                except ValueError:
+                    data[field] = None
+            elif isinstance(model_field, peewee.FloatField):
+                try:
+                    data[field] = float(text.replace(",", "."))
+                except ValueError:
+                    data[field] = None
+            elif isinstance(model_field, peewee.DateField):
+                qd = QDate.fromString(text, "dd.MM.yyyy")
+                data[field] = qd.toPython() if qd.isValid() else None
+            else:
+                data[field] = text
+
         return data
