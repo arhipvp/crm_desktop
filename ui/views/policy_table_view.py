@@ -18,7 +18,10 @@ from ui.common.styled_widgets import styled_button
 class PolicyTableView(BaseTableView):
     def __init__(self, parent=None, deal_id=None, **kwargs):
         self.deal_id = deal_id
-        checkbox_map = {"Показывать продленное": self.on_filter_changed}
+        checkbox_map = {
+            "Показывать продленное": self.on_filter_changed,
+            "Показать полисы без сделок": self.on_filter_changed,
+        }
         super().__init__(
             parent=parent,
             model_class=Policy,
@@ -50,6 +53,7 @@ class PolicyTableView(BaseTableView):
             "search_text": self.filter_controls.get_search_text(),
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
             "include_renewed": self.filter_controls.is_checked("Показывать продленное"),
+            "without_deal_only": self.filter_controls.is_checked("Показать полисы без сделок"),
         }
         if self.deal_id is not None:
             filters["deal_id"] = self.deal_id
