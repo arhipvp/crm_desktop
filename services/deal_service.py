@@ -169,6 +169,9 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
         "client_id",
     }
 
+    old_client_name = deal.client.name if deal.client_id else None
+    old_desc = deal.description
+
     # Собираем простые обновления (кроме calculations)
     updates: dict = {
         key: kwargs[key]
@@ -212,6 +215,25 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
 
     deal.save()
 
+    # Переименование папки при изменении описания или клиента
+    new_client_name = deal.client.name if deal.client_id else None
+    new_desc = deal.description
+    if (
+        (old_client_name and new_client_name and old_client_name != new_client_name)
+        or old_desc != new_desc
+    ):
+        try:
+            from services.folder_utils import rename_deal_folder
+
+            new_path, _ = rename_deal_folder(
+                old_client_name or "", old_desc, new_client_name or "", new_desc, deal.drive_folder_link
+            )
+            if new_path and new_path != deal.drive_folder_path:
+                deal.drive_folder_path = new_path
+                deal.save(only=[Deal.drive_folder_path, Deal.drive_folder_link])
+        except Exception:
+            logger.exception("Не удалось переименовать папку сделки")
+
     # Добавляем расчётную запись
     if new_calc:
         from services.calculation_service import add_calculation
@@ -227,6 +249,24 @@ def mark_deal_deleted(deal_id: int):
     if deal:
         deal.is_deleted = True
         deal.save()
+        try:
+            from services.folder_utils import rename_deal_folder
+
+            new_desc = f"{deal.description} deleted"
+            new_path, _ = rename_deal_folder(
+                deal.client.name,
+                deal.description,
+                deal.client.name,
+                new_desc,
+                deal.drive_folder_link,
+            )
+            deal.description = new_desc
+            deal.drive_folder_path = new_path
+            deal.save(
+                only=[Deal.description, Deal.drive_folder_path, Deal.is_deleted]
+            )
+        except Exception:
+            logger.exception("Не удалось пометить папку сделки удалённой")
     else:
         logger.warning("❗ Сделка с id=%s не найдена для удаления", deal_id)
 

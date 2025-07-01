@@ -147,6 +147,22 @@ def mark_client_deleted(client_id: int):
     if client:
         client.is_deleted = True
         client.save()
+        try:
+            from services.folder_utils import rename_client_folder
+
+            new_name = f"{client.name} deleted"
+            new_path, new_link = rename_client_folder(
+                client.name, new_name, client.drive_folder_link
+            )
+            client.name = new_name
+            client.drive_folder_path = new_path
+            if new_link:
+                client.drive_folder_link = new_link
+            client.save(
+                only=[Client.name, Client.drive_folder_path, Client.drive_folder_link, Client.is_deleted]
+            )
+        except Exception:
+            logger.exception("Не удалось пометить папку клиента удалённой")
     else:
         logger.warning("❗ Клиент с id=%s не найден для удаления", client_id)
 
@@ -155,11 +171,15 @@ def mark_clients_deleted(client_ids: list[int]) -> int:
     """Массово помечает клиентов удалёнными."""
     if not client_ids:
         return 0
-    return (
-        Client.update(is_deleted=True)
-        .where(Client.id.in_(client_ids))
-        .execute()
-    )
+
+    count = 0
+    for cid in client_ids:
+        before = Client.get_or_none(Client.id == cid)
+        if before and not before.is_deleted:
+            mark_client_deleted(cid)
+            count += 1
+
+    return count
 
 
 def restore_client(client_id: int):

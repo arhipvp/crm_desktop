@@ -55,6 +55,18 @@ def test_mark_clients_deleted():
     assert Client.get_by_id(c2.id).is_deleted is True
 
 
+def test_mark_client_deleted_renames_folder(monkeypatch):
+    c = add_client(name="Cl")
+    monkeypatch.setattr(
+        "services.folder_utils.rename_client_folder",
+        lambda o, n, l: (f"/tmp/{n}", l),
+    )
+    mark_client_deleted(c.id)
+    c = Client.get_by_id(c.id)
+    assert c.name.endswith("deleted")
+    assert c.drive_folder_path.endswith("deleted")
+
+
 def test_restore_client():
     c = add_client(name="Del")
     mark_client_deleted(c.id)

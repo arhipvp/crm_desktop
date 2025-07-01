@@ -169,6 +169,27 @@ def mark_policy_deleted(policy_id: int):
     if policy:
         policy.is_deleted = True
         policy.save()
+        try:
+            from services.folder_utils import rename_policy_folder
+
+            new_number = f"{policy.policy_number} deleted"
+            new_path, _ = rename_policy_folder(
+                policy.client.name,
+                policy.policy_number,
+                policy.deal.description if policy.deal_id else None,
+                policy.client.name,
+                new_number,
+                policy.deal.description if policy.deal_id else None,
+                policy.drive_folder_link,
+            )
+            policy.policy_number = new_number
+            if new_path:
+                policy.drive_folder_link = new_path
+            policy.save(
+                only=[Policy.policy_number, Policy.drive_folder_link, Policy.is_deleted]
+            )
+        except Exception:
+            logger.exception("Не удалось пометить папку полиса удалённой")
     else:
         logger.warning("❗ Полис с id=%s не найден для удаления", policy_id)
 
@@ -177,11 +198,15 @@ def mark_policies_deleted(policy_ids: list[int]) -> int:
     """Массово помечает полисы удалёнными."""
     if not policy_ids:
         return 0
-    return (
-        Policy.update(is_deleted=True)
-        .where(Policy.id.in_(policy_ids))
-        .execute()
-    )
+
+    count = 0
+    for pid in policy_ids:
+        before = Policy.get_or_none(Policy.id == pid)
+        if before and not before.is_deleted:
+            mark_policy_deleted(pid)
+            count += 1
+
+    return count
 
 
 def mark_policy_renewed(policy_id: int):

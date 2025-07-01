@@ -406,6 +406,101 @@ def rename_client_folder(old_name: str, new_name: str, drive_link: str | None):
     return new_path, drive_link
 
 
+def rename_deal_folder(
+    old_client_name: str,
+    old_description: str,
+    new_client_name: str,
+    new_description: str,
+    drive_link: str | None,
+):
+    """Переименовать или переместить папку сделки."""
+
+    old_path = os.path.join(
+        GOOGLE_DRIVE_LOCAL_ROOT,
+        sanitize_name(old_client_name),
+        sanitize_name(f"Сделка - {old_description}"),
+    )
+    new_path = os.path.join(
+        GOOGLE_DRIVE_LOCAL_ROOT,
+        sanitize_name(new_client_name),
+        sanitize_name(f"Сделка - {new_description}"),
+    )
+
+    try:
+        os.makedirs(os.path.dirname(new_path), exist_ok=True)
+        if os.path.isdir(old_path):
+            if not os.path.isdir(new_path):
+                os.rename(old_path, new_path)
+        else:
+            os.makedirs(new_path, exist_ok=True)
+    except Exception:
+        logger.exception("Не удалось переименовать локальную папку сделки")
+
+    if drive_link:
+        try:
+            service = get_drive_service()
+            file_id = extract_folder_id(drive_link)
+            if file_id:
+                service.files().update(
+                    fileId=file_id,
+                    body={"name": sanitize_name(f"Сделка - {new_description}")},
+                    fields="id",
+                ).execute()
+        except Exception:
+            logger.exception("Не удалось переименовать папку сделки на Drive")
+
+    return new_path, drive_link
+
+
+def rename_policy_folder(
+    old_client_name: str,
+    old_policy_number: str,
+    old_deal_desc: str | None,
+    new_client_name: str,
+    new_policy_number: str,
+    new_deal_desc: str | None,
+    drive_link: str | None,
+):
+    """Переименовать папку полиса."""
+
+    parts_old = [GOOGLE_DRIVE_LOCAL_ROOT, sanitize_name(old_client_name)]
+    if old_deal_desc:
+        parts_old.append(sanitize_name(f"Сделка - {old_deal_desc}"))
+    parts_old.append(sanitize_name(f"Полис - {old_policy_number}"))
+    old_path = os.path.join(*parts_old)
+
+    parts_new = [GOOGLE_DRIVE_LOCAL_ROOT, sanitize_name(new_client_name)]
+    if new_deal_desc:
+        parts_new.append(sanitize_name(f"Сделка - {new_deal_desc}"))
+    parts_new.append(sanitize_name(f"Полис - {new_policy_number}"))
+    new_path = os.path.join(*parts_new)
+
+    try:
+        os.makedirs(os.path.dirname(new_path), exist_ok=True)
+        if os.path.isdir(old_path):
+            if not os.path.isdir(new_path):
+                os.rename(old_path, new_path)
+        else:
+            os.makedirs(new_path, exist_ok=True)
+    except Exception:
+        logger.exception("Не удалось переименовать локальную папку полиса")
+
+    if drive_link:
+        try:
+            service = get_drive_service()
+            file_id = extract_folder_id(drive_link)
+            if file_id:
+                service.files().update(
+                    fileId=file_id,
+                    body={"name": sanitize_name(f"Полис - {new_policy_number}")},
+                    fields="id",
+                ).execute()
+        except Exception:
+            logger.exception("Не удалось переименовать папку полиса на Drive")
+
+    return new_path, drive_link
+
+
 def move_policy_folder_to_deal(
     policy_path: str | None,
     client_name: str,

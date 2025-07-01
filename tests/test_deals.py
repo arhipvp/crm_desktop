@@ -1,6 +1,6 @@
-from services.deal_service import add_deal, get_deals_by_client_id
-from services.client_service import add_client
-from database.models import Task
+from services.deal_service import add_deal, get_deals_by_client_id, update_deal, mark_deal_deleted
+from services.client_service import add_client, mark_client_deleted
+from database.models import Task, Deal
 
 
 def test_add_deal_creates_deal_without_tasks():
@@ -44,3 +44,38 @@ def test_add_deal_creates_folder(monkeypatch):
     assert called['args'][0] == "Clientfolder"
     assert deal.drive_folder_path == "/tmp/deal_path"
     assert deal.drive_folder_link == "http://link"
+
+
+def test_update_deal_changes_folder(monkeypatch):
+    c1 = add_client(name="C1")
+    c2 = add_client(name="C2")
+    deal = add_deal(client_id=c1.id, start_date="2025-01-01", description="Old")
+
+    called = {}
+
+    def fake_rename(old_c, old_d, new_c, new_d, link):
+        called["args"] = (old_c, old_d, new_c, new_d)
+        return f"/tmp/{new_c}_{new_d}", link
+
+    monkeypatch.setattr("services.folder_utils.rename_deal_folder", fake_rename)
+
+    update_deal(deal, client_id=c2.id, description="New")
+    deal = get_deals_by_client_id(c2.id)[0]
+
+    assert called["args"] == ("C1", "Old", "C2", "New")
+    assert deal.drive_folder_path == "/tmp/C2_New"
+
+
+def test_mark_deal_deleted_renames_folder(monkeypatch):
+    client = add_client(name="DelClient")
+    deal = add_deal(client_id=client.id, start_date="2025-01-01", description="D1")
+
+    monkeypatch.setattr(
+        "services.folder_utils.rename_deal_folder",
+        lambda oc, od, nc, nd, link: (f"/tmp/{nd}", link),
+    )
+
+    mark_deal_deleted(deal.id)
+    deal = Deal.get_by_id(deal.id)
+    assert deal.description.endswith("deleted")
+    assert deal.drive_folder_path.endswith("deleted")
