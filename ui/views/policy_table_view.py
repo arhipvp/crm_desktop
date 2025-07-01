@@ -38,6 +38,11 @@ class PolicyTableView(BaseTableView):
         self.button_row.insertWidget(idx, self.mark_renewed_btn)
         self.mark_renewed_btn.clicked.connect(self._on_mark_renewed)
 
+        self.make_deal_btn = styled_button("Сделать сделку из полиса")
+        idx = self.button_row.count() - 1
+        self.button_row.insertWidget(idx, self.make_deal_btn)
+        self.make_deal_btn.clicked.connect(self._on_make_deal)
+
         self.load_data()
 
     def get_filters(self) -> dict:
@@ -120,6 +125,21 @@ class PolicyTableView(BaseTableView):
                 ids = [p.id for p in policies]
                 mark_policies_renewed(ids)
             self.refresh()
+        except Exception as e:
+            show_error(str(e))
+
+    def _on_make_deal(self):
+        policy = self.get_selected()
+        if not policy:
+            return
+        try:
+            from services.deal_service import add_deal_from_policy
+            from ui.views.deal_detail_view import DealDetailView
+
+            deal = add_deal_from_policy(policy)
+            self.refresh()
+            dlg = DealDetailView(deal, parent=self)
+            dlg.exec()
         except Exception as e:
             show_error(str(e))
 

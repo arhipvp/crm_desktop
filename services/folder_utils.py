@@ -7,6 +7,7 @@ import logging
 # services/folder_utils.py
 import os
 import re
+import shutil
 import subprocess
 import sys
 import webbrowser
@@ -403,3 +404,45 @@ def rename_client_folder(old_name: str, new_name: str, drive_link: str | None):
             logger.exception("Не удалось переименовать папку клиента на Drive")
 
     return new_path, drive_link
+
+
+def move_policy_folder_to_deal(
+    policy_path: str | None,
+    client_name: str,
+    deal_description: str,
+) -> str | None:
+    """Переместить папку полиса в папку сделки.
+
+    Parameters
+    ----------
+    policy_path: str | None
+        Текущий путь к папке полиса.
+    client_name: str
+        Имя клиента для формирования иерархии.
+    deal_description: str
+        Описание сделки.
+
+    Returns
+    -------
+    str | None
+        Новый путь к папке или ``None`` при ошибке.
+    """
+
+    if not policy_path:
+        return None
+
+    policy_name = os.path.basename(policy_path.rstrip("/\\"))
+    client_name = sanitize_name(client_name)
+    deal_name = sanitize_name(f"Сделка - {deal_description}")
+    dest_dir = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, client_name, deal_name)
+    os.makedirs(dest_dir, exist_ok=True)
+    new_path = os.path.join(dest_dir, policy_name)
+
+    try:
+        shutil.move(policy_path, new_path)
+        logger.info("📁 Папка полиса перемещена: %s", new_path)
+    except Exception:
+        logger.exception("Не удалось переместить папку полиса")
+        return None
+
+    return new_path
