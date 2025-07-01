@@ -20,6 +20,7 @@ TG_BOT_TOKEN=000000:telegram-bot-token
 APPROVED_EXECUTOR_IDS=111,222  # Telegram ID разрешённых исполнителей
 GOOGLE_DRIVE_LOCAL_ROOT=/path/to/drive
 GOOGLE_CREDENTIALS=credentials.json
+GOOGLE_ROOT_FOLDER_ID=1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm
 ```
 
 ## Подготовка окружения
