@@ -76,7 +76,15 @@ def get_expiring_policies(limit: int = 10) -> list[Policy]:
     """Полисы, срок действия которых скоро заканчивается."""
     base = (
         Policy.select()
-        .where((Policy.is_deleted == False) & (Policy.end_date.is_null(False)))
+        .where(
+            (Policy.is_deleted == False)
+            & (Policy.end_date.is_null(False))
+            & (
+                Policy.renewed_to.is_null(True)
+                | (Policy.renewed_to == "")
+                | (Policy.renewed_to == "Нет")
+            )
+        )
         .order_by(Policy.end_date.asc())
         .limit(limit)
     )
