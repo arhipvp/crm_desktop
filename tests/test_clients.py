@@ -15,6 +15,11 @@ def test_add_valid_client():
     print("debug: end test_add_valid_client")
 
 
+def test_add_client_name_normalization():
+    client = add_client(name="иВАНОВ иВАН иВАНОВИЧ")
+    assert client.name == "Иванов Иван Иванович"
+
+
 def test_add_client_without_name_raises():
     print("debug: start test_add_client_without_name_raises")
     try:
@@ -32,7 +37,7 @@ def test_update_client_changes_phone_and_folder(monkeypatch):
         "services.client_service.rename_client_folder",
         lambda o, n, l: (f"/tmp/{n}", f"link/{n}"),
     )
-    update_client(client, name="New", phone="8 900 111-11-11")
+    update_client(client, name="nEW", phone="8 900 111-11-11")
     client = Client.get_by_id(client.id)
     assert client.name == "New"
     assert client.phone == "+79001111111"

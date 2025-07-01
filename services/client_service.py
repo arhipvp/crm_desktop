@@ -8,7 +8,7 @@ from peewee import ModelSelect
 
 from database.models import Client, db
 from services.folder_utils import create_client_drive_folder, rename_client_folder
-from services.validators import normalize_phone
+from services.validators import normalize_phone, normalize_full_name
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,8 @@ def add_client(**kwargs) -> Client:
     if not name:
         logger.warning("❌ Попытка создать клиента без имени")
         raise ValueError("Поле 'name' обязательно для клиента")
+    name = normalize_full_name(name)
+    clean_data["name"] = name
 
     # нормализуем телефон, если он пришёл
     if "phone" in clean_data:
@@ -132,6 +134,10 @@ def update_client(client: Client, **kwargs) -> Client:
     allowed = CLIENT_ALLOWED_FIELDS
 
     updates = {k: v for k, v in kwargs.items() if k in allowed and v not in ("", None)}
+
+    # нормализуем ФИО
+    if "name" in updates:
+        updates["name"] = normalize_full_name(updates["name"])
 
     # нормализуем телефон
     if "phone" in updates:
