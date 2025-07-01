@@ -1,8 +1,13 @@
 from datetime import date
 from services.client_service import add_client
 from services.deal_service import add_deal
-from services.policy_service import add_policy, update_policy, DuplicatePolicyError
-from database.models import Payment, Income
+from services.policy_service import (
+    add_policy,
+    update_policy,
+    mark_policies_renewed,
+    DuplicatePolicyError,
+)
+from database.models import Payment, Income, Policy
 
 
 def test_add_policy_creates_everything():
@@ -100,3 +105,24 @@ def test_update_policy_duplicate_fields():
         assert "Такой полис уже найден" in msg
     else:
         assert False, "Expected DuplicatePolicyError"
+
+
+def test_mark_policies_renewed():
+    client = add_client(name="BulkPol")
+    p1 = add_policy(
+        client_id=client.id,
+        policy_number="B1",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+        open_folder=lambda *_: None,
+    )
+    p2 = add_policy(
+        client_id=client.id,
+        policy_number="B2",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+        open_folder=lambda *_: None,
+    )
+    mark_policies_renewed([p1.id, p2.id])
+    assert bool(Policy.get_by_id(p1.id).renewed_to)
+    assert bool(Policy.get_by_id(p2.id).renewed_to)

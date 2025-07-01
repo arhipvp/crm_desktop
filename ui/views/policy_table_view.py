@@ -6,12 +6,14 @@ from services.policy_service import (
     get_policies_page,
     mark_policy_deleted,
     mark_policy_renewed,
+    mark_policies_renewed,
 )
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.policy_form import PolicyForm
 from ui.views.policy_detail_view import PolicyDetailView
 from ui.common.styled_widgets import styled_button
+from PySide6.QtWidgets import QAbstractItemView
 
 
 class PolicyTableView(BaseTableView):
@@ -25,6 +27,8 @@ class PolicyTableView(BaseTableView):
             checkbox_map=checkbox_map,
             **kwargs,
         )
+        # разрешаем множественный выбор для массовых действий
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setSortingEnabled(True)
         self.table.horizontalHeader().sectionClicked.connect(self.on_section_clicked)
         # self.row_double_clicked.connect(self.open_detail)
@@ -71,6 +75,10 @@ class PolicyTableView(BaseTableView):
             return None
         return self.model.get_item(idx.row())
 
+    def get_selected_multiple(self):
+        indexes = self.table.selectionModel().selectedRows()
+        return [self.model.get_item(i.row()) for i in indexes]
+
     def add_new(self):
         form = PolicyForm()
         if form.exec():
@@ -95,11 +103,19 @@ class PolicyTableView(BaseTableView):
                 show_error(str(e))
 
     def _on_mark_renewed(self):
-        policy = self.get_selected()
-        if not policy:
+        policies = self.get_selected_multiple()
+        if not policies:
             return
         try:
-            mark_policy_renewed(policy.id)
+            if len(policies) == 1:
+                mark_policy_renewed(policies[0].id)
+            else:
+                if not confirm(
+                    f"Отметить {len(policies)} полис(ов) продлёнными?"
+                ):
+                    return
+                ids = [p.id for p in policies]
+                mark_policies_renewed(ids)
             self.refresh()
         except Exception as e:
             show_error(str(e))

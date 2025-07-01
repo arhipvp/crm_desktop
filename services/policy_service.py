@@ -184,6 +184,17 @@ def mark_policy_renewed(policy_id: int):
         logger.warning("❗ Полис с id=%s не найден для продления", policy_id)
 
 
+def mark_policies_renewed(policy_ids: list[int]) -> int:
+    """Массово пометить полисы как продлённые без привязки к новому."""
+    if not policy_ids:
+        return 0
+    return (
+        Policy.update(renewed_to=True)
+        .where(Policy.id.in_(policy_ids))
+        .execute()
+    )
+
+
 # ─────────────────────────── Добавление ───────────────────────────
 
 
