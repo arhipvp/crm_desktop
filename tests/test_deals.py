@@ -41,6 +41,6 @@ def test_add_deal_creates_folder(monkeypatch):
         description="My Deal",
     )
 
-    assert called['args'][0] == "ClientFolder"
+    assert called['args'][0] == "Clientfolder"
     assert deal.drive_folder_path == "/tmp/deal_path"
     assert deal.drive_folder_link == "http://link"

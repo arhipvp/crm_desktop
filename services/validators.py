@@ -22,3 +22,20 @@ def normalize_phone(phone: str) -> str:
             f"Неверный формат телефона: ожидается 10 цифр, получили {len(digits)}"
         )
     return f"+{digits}"
+
+
+def normalize_full_name(name: str) -> str:
+    """Нормализует ФИО: каждая часть с заглавной буквы.
+
+    Args:
+        name: Исходное ФИО.
+
+    Returns:
+        str: ФИО в формате ``Иванов Иван Иванович``.
+    """
+    parts = re.split(r"\s+", name.strip())
+
+    def norm(word: str) -> str:
+        return "-".join(p.capitalize() for p in word.split("-") if p)
+
+    return " ".join(norm(p) for p in parts if p)
