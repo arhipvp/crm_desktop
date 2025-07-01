@@ -21,7 +21,8 @@ class PolicyMergeDialog(QDialog):
         self.existing = existing
         self.new_data = new_data
         self.setWindowTitle("Объединение полиса")
-        self.setMinimumWidth(500)
+        # окно объединения было довольно узким, увеличиваем стандартный размер
+        self.setMinimumSize(640, 400)
 
         layout = QVBoxLayout(self)
         self.table = QTableWidget(0, 4)
