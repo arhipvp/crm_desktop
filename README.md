@@ -35,7 +35,16 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
-2. Установите зависимости:
+2. **Только для Linux:** перед установкой зависимостей выполните:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libegl1 libgl1
+```
+
+Эти библиотеки необходимы для корректной работы `PySide6` и автотестов.
+
+3. Установите зависимости:
 
 ```bash
 pip install -r requirements.txt
@@ -43,7 +52,7 @@ pip install -r requirements.txt
 
 Файл `requirements.txt` уже содержит пакеты Google API (`google-api-python-client`, `google-auth`, `google-auth-oauthlib`) и Qt-библиотеку `PySide6`.
 
-3. Скопируйте `.env.example` в `.env` и укажите свои значения.
+4. Скопируйте `.env.example` в `.env` и укажите свои значения.
 
 ## Запуск приложения
 
