@@ -157,7 +157,11 @@ class DealDetailView(QDialog):
             return lbl
 
         form.addRow("ID:", tight_label(str(self.instance.id)))
-        form.addRow("Клиент:", tight_label(f"<b>{self.instance.client.name}</b>"))
+        client_html = f"<b>{self.instance.client.name}</b>"
+        note = self.instance.client.note
+        if note:
+            client_html += f" <span style='color:red'>{note}</span>"
+        form.addRow("Клиент:", tight_label(client_html))
         form.addRow("Телефон:", tight_label(self.instance.client.phone or "—"))
 
         start_label = tight_label(format_date(self.instance.start_date))
