@@ -121,6 +121,33 @@ def add_deal(**kwargs):
         return deal
 
 
+def add_deal_from_policy(policy: Policy) -> Deal:
+    """Создаёт сделку на основе полиса и привязывает полис к ней."""
+
+    deal = add_deal(
+        client_id=policy.client_id,
+        start_date=policy.start_date,
+        description=f"Из полиса {policy.policy_number}",
+    )
+
+    try:
+        from services.folder_utils import move_policy_folder_to_deal
+
+        new_path = move_policy_folder_to_deal(
+            policy.drive_folder_link,
+            policy.client.name,
+            deal.description,
+        )
+        if new_path:
+            policy.drive_folder_link = new_path
+    except Exception:
+        logger.exception("Не удалось переместить папку полиса")
+
+    policy.deal = deal
+    policy.save()
+    return deal
+
+
 # ──────────────────────────── Обновление ─────────────────────────────
 
 
