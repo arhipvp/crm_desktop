@@ -7,7 +7,11 @@ import pytest
 
 from services.client_service import add_client
 from services.deal_service import add_deal
-from services.policy_service import add_policy
+from services.policy_service import (
+    add_policy,
+    mark_policy_deleted,
+    mark_policy_renewed,
+)
 from services.payment_service import add_payment, apply_payment_filters
 from services.expense_service import add_expense, apply_expense_filters
 from services.income_service import add_income, create_stub_income, apply_income_filters
@@ -308,3 +312,35 @@ def test_append_and_delete_task():
     assert 'x' in Task.get_by_id(task.id).note
     mark_task_deleted(task.id)
     assert Task.get_by_id(task.id).is_deleted
+
+
+def test_get_expiring_policies_filters(monkeypatch):
+    client = add_client(name='Z')
+    p1 = add_policy(
+        client_id=client.id,
+        policy_number='Z1',
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 10),
+        open_folder=lambda *_: None,
+    )
+    p2 = add_policy(
+        client_id=client.id,
+        policy_number='Z2',
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 5),
+        open_folder=lambda *_: None,
+    )
+    mark_policy_deleted(p2.id)
+    p3 = add_policy(
+        client_id=client.id,
+        policy_number='Z3',
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 7),
+        open_folder=lambda *_: None,
+    )
+    mark_policy_renewed(p3.id)
+
+    pols = get_expiring_policies()
+    assert p1 in pols
+    assert p2 not in pols
+    assert p3 not in pols
