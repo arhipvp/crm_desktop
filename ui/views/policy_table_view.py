@@ -10,6 +10,7 @@ from services.policy_service import (
 from PySide6.QtWidgets import QAbstractItemView
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
+from ui.common.search_dialog import SearchDialog
 from ui.forms.policy_form import PolicyForm
 from ui.views.policy_detail_view import PolicyDetailView
 from ui.common.styled_widgets import styled_button
@@ -42,6 +43,11 @@ class PolicyTableView(BaseTableView):
         idx = self.button_row.count() - 1
         self.button_row.insertWidget(idx, self.make_deal_btn)
         self.make_deal_btn.clicked.connect(self._on_make_deal)
+
+        self.link_deal_btn = styled_button("Привязать к сделке")
+        idx = self.button_row.count() - 1
+        self.button_row.insertWidget(idx, self.link_deal_btn)
+        self.link_deal_btn.clicked.connect(self._on_link_deal)
 
         self.load_data()
 
@@ -140,6 +146,29 @@ class PolicyTableView(BaseTableView):
             self.refresh()
             dlg = DealDetailView(deal, parent=self)
             dlg.exec()
+        except Exception as e:
+            show_error(str(e))
+
+    def _on_link_deal(self):
+        policy = self.get_selected()
+        if not policy:
+            return
+        try:
+            from services.deal_service import get_all_deals
+            from services.policy_service import update_policy
+
+            deals = list(get_all_deals())
+            if not deals:
+                show_error("Нет доступных сделок")
+                return
+
+            labels = [f"{d.client.name} - {d.description}" for d in deals]
+            dlg = SearchDialog(labels, parent=self)
+            if dlg.exec() and dlg.selected_index:
+                idx = labels.index(dlg.selected_index)
+                deal = deals[idx]
+                update_policy(policy, deal_id=deal.id)
+                self.refresh()
         except Exception as e:
             show_error(str(e))
 
