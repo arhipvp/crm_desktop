@@ -8,6 +8,7 @@ from __future__ import annotations
 • Типизация и мелкие правки PEP 8.
 """
 import logging
+from datetime import date
 from utils.time_utils import now_str
 
 from peewee import ModelSelect  # если ещё не импортирован
@@ -124,10 +125,21 @@ def add_deal(**kwargs):
 def add_deal_from_policy(policy: Policy) -> Deal:
     """Создаёт сделку на основе полиса и привязывает полис к ней."""
 
+    parts = []
+    if policy.insurance_type:
+        parts.append(policy.insurance_type)
+    if policy.vehicle_brand:
+        brand = policy.vehicle_brand
+        if policy.vehicle_model:
+            brand += f" {policy.vehicle_model}"
+        parts.append(brand)
+    description = " ".join(parts).strip() or f"Из полиса {policy.policy_number}"
+
     deal = add_deal(
         client_id=policy.client_id,
         start_date=policy.start_date,
-        description=f"Из полиса {policy.policy_number}",
+        description=description,
+        reminder_date=date.today(),
     )
 
     try:
