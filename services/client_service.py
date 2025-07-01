@@ -207,6 +207,17 @@ def mark_client_deleted(client_id: int):
         logger.warning("❗ Клиент с id=%s не найден для удаления", client_id)
 
 
+def restore_client(client_id: int):
+    """Снимает пометку удаления с клиента."""
+    client = Client.get_or_none(Client.id == client_id)
+    if client:
+        client.is_deleted = False
+        client.save()
+        logger.info("✅ Клиент %s восстановлен", client_id)
+    else:
+        logger.warning("❗ Клиент с id=%s не найден для восстановления", client_id)
+
+
 # ─────────────────────── WhatsApp интеграция ─────────────────────────
 
 

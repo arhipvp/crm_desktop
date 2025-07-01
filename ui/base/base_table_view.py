@@ -38,6 +38,8 @@ class BaseTableView(QWidget):
         can_add=True,
         edit_callback=None,
         delete_callback=None,
+        can_restore=True,
+        restore_callback=None,
         filter_func=None,
         custom_actions=None,
         detail_view_class=None,
@@ -54,6 +56,8 @@ class BaseTableView(QWidget):
         self.can_add = can_add
         self.edit_callback = edit_callback
         self.delete_callback = delete_callback
+        self.can_restore = can_restore
+        self.restore_callback = restore_callback
         self.filter_func = filter_func
         self.custom_actions = custom_actions or []
         self.detail_view_class = detail_view_class
@@ -119,6 +123,13 @@ class BaseTableView(QWidget):
         self.delete_btn.clicked.connect(self._on_delete)
         self.button_row.addWidget(self.delete_btn)
         self.delete_btn.setVisible(self.can_delete)
+
+        self.restore_btn = styled_button(
+            "Восстановить", icon="♻️", shortcut="Ctrl+R"
+        )
+        self.restore_btn.clicked.connect(self._on_restore)
+        self.button_row.addWidget(self.restore_btn)
+        self.restore_btn.setVisible(self.can_restore)
 
         self.refresh_btn = styled_button(
             "Обновить", icon="🔄", tooltip="Обновить список", shortcut="F5"
@@ -265,6 +276,12 @@ class BaseTableView(QWidget):
         elif self.can_delete:
             self.delete_selected_default()
 
+    def _on_restore(self):
+        if hasattr(self, "restore_callback") and self.restore_callback:
+            self.restore_callback()
+        elif self.can_restore:
+            self.restore_selected_default()
+
     def edit_selected_default(self):
         index = self.table.currentIndex()
         if not index.isValid():
@@ -301,6 +318,29 @@ class BaseTableView(QWidget):
                 self.refresh()
             except Exception as e:
                 logger.exception("❌ Ошибка при удалении объекта")
+                show_error(str(e))
+
+    def restore_selected_default(self):
+        from ui.common.message_boxes import confirm, show_error
+
+        index = self.table.currentIndex()
+        if not index.isValid():
+            return
+        obj = self.model.get_item(self._source_row(index))
+
+        if confirm(
+            f"Восстановить {self.model_class.__name__} №{getattr(obj, 'id', '')}?"
+        ):
+            try:
+                svc = self._get_service_for_model(self.model_class)
+                restore_func = getattr(
+                    svc, f"restore_{self.model_class.__name__.lower()}", None
+                )
+                if restore_func:
+                    restore_func(obj.id)
+                self.refresh()
+            except Exception as e:
+                logger.exception("❌ Ошибка при восстановлении объекта")
                 show_error(str(e))
 
     def _get_service_for_model(self, model_class):

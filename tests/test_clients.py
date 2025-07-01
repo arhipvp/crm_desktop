@@ -1,4 +1,4 @@
-from services.client_service import add_client, update_client
+from services.client_service import add_client, update_client, mark_client_deleted, restore_client
 from database.models import Client
 
 
@@ -39,3 +39,11 @@ def test_update_client_changes_phone_and_folder(monkeypatch):
     assert client.phone == "+79001111111"
     assert client.drive_folder_path.endswith("New")
     assert client.drive_folder_link.endswith("New")
+
+
+def test_restore_client():
+    c = add_client(name="Del")
+    mark_client_deleted(c.id)
+    assert Client.get_by_id(c.id).is_deleted
+    restore_client(c.id)
+    assert not Client.get_by_id(c.id).is_deleted
