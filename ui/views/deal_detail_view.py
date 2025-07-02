@@ -386,6 +386,13 @@ class DealDetailView(QDialog):
         header.setSectionResizeMode(QHeaderView.Interactive)
 
         try:
+            idx_title = tv.model.fields.index(Task.title)
+            tv.table.setColumnWidth(idx_title, 200)
+            tv.table.setColumnHidden(idx_title, False)
+        except ValueError:
+            pass
+
+        try:
             idx_deal = tv.model.fields.index(Task.deal)
             tv.table.setColumnHidden(idx_deal, True)
         except ValueError:
