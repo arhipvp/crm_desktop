@@ -81,6 +81,7 @@ class DealDetailView(QDialog):
         self.setMinimumSize(min_w, 480)
 
         self.layout = QVBoxLayout(self)
+        self._shortcuts: list[QShortcut] = []
 
         # Заголовок
         header = QLabel(f"<h1>Сделка #{deal.id}</h1>")
@@ -223,6 +224,7 @@ class DealDetailView(QDialog):
             shortcut="Ctrl+Shift+A",
         )
         btn_calc.clicked.connect(self._on_add_calculation)
+        self._add_shortcut("Ctrl+Shift+A", self._on_add_calculation)
         calc_box.addWidget(btn_calc, alignment=Qt.AlignLeft)
         self.calc_table = CalculationTableView(parent=self, deal_id=self.instance.id)
         calc_box.addWidget(self.calc_table)
@@ -234,6 +236,7 @@ class DealDetailView(QDialog):
             "💾 Сохранить изменения", shortcut="Ctrl+Enter"
         )
         btn_save.clicked.connect(self._on_inline_save)
+        self._add_shortcut("Ctrl+Enter", self._on_inline_save)
         btn_save_close = styled_button(
             "💾 Сохранить и закрыть", shortcut="Ctrl+Shift+Enter"
         )
@@ -258,6 +261,7 @@ class DealDetailView(QDialog):
         hlayout = QHBoxLayout()
         btn_pol = styled_button("➕ Полис", tooltip="Добавить полис", shortcut="Ctrl+N")
         btn_pol.clicked.connect(self._on_add_policy)
+        self._add_shortcut("Ctrl+N", self._on_add_policy)
         hlayout.addWidget(btn_pol)
 
         btn_import = styled_button(
@@ -285,6 +289,7 @@ class DealDetailView(QDialog):
             "➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+Shift+N"
         )
         btn_pay.clicked.connect(self._on_add_payment)
+        self._add_shortcut("Ctrl+Shift+N", self._on_add_payment)
         payments = list(get_payments_by_deal_id(self.instance.id))
 
         pay_view = PaymentTableView(
@@ -308,6 +313,7 @@ class DealDetailView(QDialog):
             shortcut="Ctrl+Alt+I",
         )
         btn_income.clicked.connect(self._on_add_income)
+        self._add_shortcut("Ctrl+Alt+I", self._on_add_income)
         has_payments = len(get_payments_by_deal_id(self.instance.id)) > 0
         btn_income.setEnabled(has_payments)
         if not has_payments:
@@ -331,6 +337,7 @@ class DealDetailView(QDialog):
             shortcut="Ctrl+Alt+X",
         )
         btn_expense.clicked.connect(self._on_add_expense)
+        self._add_shortcut("Ctrl+Alt+X", self._on_add_expense)
         expense_layout.addWidget(btn_expense, alignment=Qt.AlignLeft)
 
         expense_view = ExpenseTableView(parent=self, deal_id=self.instance.id)
@@ -350,6 +357,7 @@ class DealDetailView(QDialog):
             shortcut="Ctrl+Alt+T",
         )
         btn_add_task.clicked.connect(self._on_add_task)
+        self._add_shortcut("Ctrl+Alt+T", self._on_add_task)
         vbox.addWidget(btn_add_task, alignment=Qt.AlignLeft)
 
 
@@ -410,9 +418,11 @@ class DealDetailView(QDialog):
         box.addStretch()
         btn_edit = styled_button("✏️ Редактировать", shortcut="Ctrl+E")
         btn_edit.clicked.connect(self._on_edit)
+        self._add_shortcut("Ctrl+E", self._on_edit)
         box.addWidget(btn_edit)
         btn_folder = styled_button("📂 Папка", shortcut="Ctrl+O")
         btn_folder.clicked.connect(self._open_folder)
+        self._add_shortcut("Ctrl+O", self._open_folder)
         box.addWidget(btn_folder)
         btn_copy = styled_button(
             "📋",
@@ -420,37 +430,44 @@ class DealDetailView(QDialog):
             shortcut="Ctrl+Shift+C",
         )
         btn_copy.clicked.connect(self._copy_folder_path)
+        self._add_shortcut("Ctrl+Shift+C", self._copy_folder_path)
         box.addWidget(btn_copy)
 
         self.btn_exec = styled_button("👤 Исполнитель", shortcut="Ctrl+Shift+E")
         self.btn_exec.clicked.connect(self._on_toggle_executor)
+        self._add_shortcut("Ctrl+Shift+E", self._on_toggle_executor)
         box.addWidget(self.btn_exec)
         btn_wa = styled_button("💬 WhatsApp", shortcut="Ctrl+Shift+W")
         btn_wa.clicked.connect(self._open_whatsapp)
+        self._add_shortcut("Ctrl+Shift+W", self._open_whatsapp)
         box.addWidget(btn_wa)
         btn_prev = styled_button("◀ Назад", shortcut="Alt+Left")
         btn_prev.clicked.connect(self._on_prev_deal)
+        self._add_shortcut("Alt+Left", self._on_prev_deal)
         box.addWidget(btn_prev)
         btn_next = styled_button("▶ Далее", shortcut="Alt+Right")
         btn_next.clicked.connect(self._on_next_deal)
+        self._add_shortcut("Alt+Right", self._on_next_deal)
         box.addWidget(btn_next)
         self.layout.addLayout(box)
         if not self.instance.is_closed:
             btn_close = styled_button("🔒 Закрыть сделку", shortcut="Ctrl+Shift+L")
             btn_close.clicked.connect(self._on_close_deal)
+            self._add_shortcut("Ctrl+Shift+L", self._on_close_deal)
             box.addWidget(btn_close)
 
         self._update_exec_button()
 
+    def _add_shortcut(self, seq: str, callback):
+        sc = QShortcut(QKeySequence(seq), self)
+        sc.setContext(Qt.WidgetWithChildrenShortcut)
+        sc.activated.connect(callback)
+        self._shortcuts.append(sc)
+
     def _register_shortcuts(self):
         """Enable hotkeys for saving with closing and refreshing."""
-        self._sc_save_close = QShortcut(QKeySequence("Ctrl+Shift+Enter"), self)
-        self._sc_save_close.setContext(Qt.WidgetWithChildrenShortcut)
-        self._sc_save_close.activated.connect(self._on_save_and_close)
-
-        self._sc_refresh = QShortcut(QKeySequence("F5"), self)
-        self._sc_refresh.setContext(Qt.WidgetWithChildrenShortcut)
-        self._sc_refresh.activated.connect(self._on_refresh)
+        self._add_shortcut("Ctrl+Shift+Enter", self._on_save_and_close)
+        self._add_shortcut("F5", self._on_refresh)
 
     def _on_edit(self):
         form = DealForm(self.instance, parent=self)
