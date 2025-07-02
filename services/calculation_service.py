@@ -99,6 +99,25 @@ def _fmt_num(v: float) -> str:
     return f"{v:,.0f}".replace(",", " ")
 
 
+def format_calculation(calc: DealCalculation) -> str:
+    """Вернуть строку с параметрами расчёта."""
+    header_parts = [p for p in (calc.insurance_company, calc.insurance_type) if p]
+    header = ", ".join(header_parts) if header_parts else "-"
+    details: list[str] = []
+    if calc.insured_amount is not None:
+        details.append(f"сумма {_fmt_num(calc.insured_amount)} руб")
+    if calc.premium is not None:
+        details.append(f"премия {_fmt_num(calc.premium)} руб")
+    if calc.deductible is not None:
+        details.append(f"франшиза {_fmt_num(calc.deductible)} руб")
+    line = header
+    if details:
+        line += ": " + ", ".join(details)
+    if calc.note:
+        line += f" — {calc.note}"
+    return line
+
+
 def generate_offer_text(calculations: Iterable[DealCalculation]) -> str:
     """Формирует текстовое предложение для клиента по выбранным расчётам."""
     lines: list[str] = []
