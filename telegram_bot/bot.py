@@ -504,12 +504,6 @@ async def h_text(update: Update, _ctx):
                 await update.message.reply_text(f"⚠️ Ошибка сохранения: {e}")
                 continue
             saved.append(calc)
-            deal = get_deal_by_id(task.deal_id)
-            if deal:
-                entry = f"[{now_str()}]: {calc_s.format_calculation(calc)}"
-                old = deal.calculations or ""
-                deal.calculations = f"{entry}\n{old}" if old else entry
-                deal.save()
         if saved:
             lines = ["Расчёты сохранены:"] + [calc_s.format_calculation(c) for c in saved]
             await update.message.reply_text("\n".join(lines) + " 👍")
