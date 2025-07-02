@@ -104,6 +104,7 @@ from services import task_service as ts
 from services import executor_service as es
 from services import client_service as cs
 from services import calculation_service as calc_s
+from services.deal_service import get_deal_by_id
 
 es.ensure_executors_from_env()
 
@@ -486,13 +487,26 @@ async def h_text(update: Update, _ctx):
         if not task or not task.deal_id:
             await update.message.reply_text("⚠️ Сделка не найдена")
             return
-        count = 0
+        saved: list[calc_s.DealCalculation] = []
         for line in lines:
             data = _parse_calc_line(line)
-            calc_s.add_calculation(task.deal_id, **data)
-            count += 1
-        await update.message.reply_text(f"Расчётов сохранено: {count} 👍")
-        logger.info("Calculations added for %s count %s", tid, count)
+            try:
+                calc = calc_s.add_calculation(task.deal_id, **data)
+            except Exception as e:  # pragma: no cover - log unexpected
+                logger.exception("Failed to add calculation for %s", tid)
+                await update.message.reply_text(f"⚠️ Ошибка сохранения: {e}")
+                continue
+            saved.append(calc)
+            deal = get_deal_by_id(task.deal_id)
+            if deal:
+                entry = f"[{now_str()}]: {calc_s.format_calculation(calc)}"
+                old = deal.calculations or ""
+                deal.calculations = f"{entry}\n{old}" if old else entry
+                deal.save()
+        if saved:
+            lines = ["Расчёты сохранены:"] + [calc_s.format_calculation(c) for c in saved]
+            await update.message.reply_text("\n".join(lines) + " 👍")
+            logger.info("Calculations added for %s count %s", tid, len(saved))
         return
 
     if not update.message.reply_to_message:
