@@ -5,6 +5,15 @@ import os
 from logging.handlers import RotatingFileHandler
 
 
+class PeeweeFilter(logging.Filter):
+    """Фильтрует SELECT-запросы peewee."""
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401 - short doc
+        """True, если сообщение не начинается с ``SELECT``."""
+        msg = str(record.getMessage())
+        return not msg.lstrip().startswith("('SELECT")
+
+
 def setup_logging() -> None:
     """Настраивает вывод логов в консоль и файл ``logs/crm.log``."""
     logs_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
@@ -34,3 +43,7 @@ def setup_logging() -> None:
     )
 
     logging.getLogger().setLevel(logging.DEBUG)
+
+    # Скрываем SELECT-запросы от peewee
+    peewee_logger = logging.getLogger("peewee")
+    peewee_logger.addFilter(PeeweeFilter())
