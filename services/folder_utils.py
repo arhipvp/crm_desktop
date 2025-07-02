@@ -222,10 +222,15 @@ def create_deal_folder(
     logger.info("📂  Ожидаемый путь сделки: %s", local_path)
 
     # -------- создаём локальную папку (как у полиса)
-    try:
-        os.makedirs(local_path, exist_ok=True)
-    except Exception:
-        logger.exception("Не удалось создать папку сделки локально")
+    if os.path.isdir(local_path):
+        logger.info("📂 Папка сделки уже существует: %s", local_path)
+    else:
+        _msg(f"Папка сделки не найдена и будет создана:\n{local_path}", None)
+        try:
+            os.makedirs(local_path, exist_ok=True)
+            logger.info("📁 Создана папка сделки: %s", local_path)
+        except Exception:
+            logger.exception("Не удалось создать папку сделки локально")
 
     # -------- облако более не создаётся автоматически
     return local_path, None
@@ -428,8 +433,13 @@ def rename_deal_folder(
         if os.path.isdir(old_path):
             if not os.path.isdir(new_path):
                 os.rename(old_path, new_path)
+                logger.info("📂 Папка сделки перемещена: %s → %s", old_path, new_path)
+            else:
+                logger.info("📂 Папка сделки уже в нужном месте: %s", new_path)
         else:
+            _msg(f"Папка сделки не найдена: {old_path}\nСоздаю новую.", None)
             os.makedirs(new_path, exist_ok=True)
+            logger.info("📁 Создана новая папка сделки: %s", new_path)
     except Exception:
         logger.exception("Не удалось переименовать локальную папку сделки")
 
