@@ -200,13 +200,14 @@ def create_deal_folder(
     *,
     client_drive_link: str | None,  # ← ссылка на ПАПКУ КЛИЕНТА
 ) -> Tuple[str, Optional[str]]:
-    """
-    Создаёт папку сделки на диске и (если есть client_drive_link)
-    подпапку «Сделка - …» в уже существующей папке клиента на Google Drive.
+    """Создать папку сделки только локально.
+
+    Папка на Google Drive больше не создаётся автоматически.
 
     Returns
     -------
-    (local_path, web_link or None)
+    Tuple[str, Optional[str]]
+        Путь к созданной локальной папке и ``None`` вместо ссылки.
     """
     # -------- название папки сделки
     deal_name = sanitize_name(f"Сделка - {deal_description}")
@@ -220,18 +221,14 @@ def create_deal_folder(
 
     logger.info("📂  Ожидаемый путь сделки: %s", local_path)
 
-    # -------- облако: только если передали ссылку клиента
-    web_link: Optional[str] = None
-    if client_drive_link and Credentials is not None:
-        parent_id = extract_folder_id(client_drive_link)
-        if parent_id:
-            try:
-                web_link = create_drive_folder(deal_name, parent_id)
-                logger.info("☁️  Drive-папка сделки: %s", web_link)
-            except Exception:
-                logger.exception("Не удалось создать папку сделки на Drive")
+    # -------- создаём локальную папку (как у полиса)
+    try:
+        os.makedirs(local_path, exist_ok=True)
+    except Exception:
+        logger.exception("Не удалось создать папку сделки локально")
 
-    return local_path, web_link
+    # -------- облако более не создаётся автоматически
+    return local_path, None
 
 
 def create_policy_folder(
