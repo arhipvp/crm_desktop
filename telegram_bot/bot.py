@@ -490,6 +490,13 @@ async def h_text(update: Update, _ctx):
         saved: list[calc_s.DealCalculation] = []
         for line in lines:
             data = _parse_calc_line(line)
+            if not data.get("insurance_company") or data.get("premium") is None:
+                await update.message.reply_text(
+                    "⚠️ Расчёт не сохранён: укажите страховую компанию и премию.\n"
+                    "Формат: Страховая компания, вид страхования, страховая сумма, "
+                    "страховая премия, франшиза, комментарий."
+                )
+                continue
             try:
                 calc = calc_s.add_calculation(task.deal_id, **data)
             except Exception as e:  # pragma: no cover - log unexpected
