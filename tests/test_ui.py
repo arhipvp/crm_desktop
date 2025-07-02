@@ -169,6 +169,29 @@ def test_task_table_mass_delete(qtbot, monkeypatch):
     assert called == [t1.id, t2.id]
 
 
+def test_task_table_notify(qtbot, monkeypatch):
+    from datetime import date
+    from services.task_service import add_task
+    from ui.views.task_table_view import TaskTableView
+
+    t = add_task(title="n", due_date=date.today())
+
+    view = TaskTableView()
+    qtbot.addWidget(view)
+
+    monkeypatch.setattr(view, "_selected_tasks", lambda: [t])
+    captured = {}
+    monkeypatch.setattr(
+        "ui.views.task_table_view.notify_task", lambda tid: captured.setdefault("tid", tid)
+    )
+    monkeypatch.setattr(
+        "ui.views.task_table_view.QMessageBox.information", lambda *a, **k: None
+    )
+
+    view._notify_selected_tasks()
+    assert captured.get("tid") == t.id
+
+
 def test_menu_open_settings(qtbot, monkeypatch):
     window = MainWindow()
     qtbot.addWidget(window)

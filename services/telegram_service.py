@@ -2,12 +2,14 @@ import os
 from dotenv import load_dotenv
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, constants
 from services import task_service as ts
+import logging
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
 
 _bot = Bot(BOT_TOKEN) if BOT_TOKEN else None
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 0)
 
 
 def format_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:
@@ -47,4 +49,14 @@ def send_exec_task(t: ts.Task, tg_id: int) -> None:
         parse_mode=constants.ParseMode.HTML,
     )
     ts.link_telegram(t.id, msg.chat_id, msg.message_id)
+
+
+def notify_admin(text: str) -> None:
+    """Отправить текстовое уведомление администратору."""
+    if not _bot or not ADMIN_CHAT_ID:
+        return
+    try:
+        _bot.send_message(ADMIN_CHAT_ID, text, parse_mode=constants.ParseMode.HTML)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Failed to notify admin: %s", exc)
 
