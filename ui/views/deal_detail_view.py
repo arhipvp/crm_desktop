@@ -125,7 +125,7 @@ class DealDetailView(QDialog):
             f"Полисов: <b>{cnt_policies}</b>",
             f"Платежей: <b>{cnt_payments}</b>",
             f"Задач: <b>{cnt_tasks}</b>",
-            f"Исполнитель: <b>{executor_name}</b>",
+            f"<span style='color:red; font-weight:bold'>Исполнитель: {executor_name}</span>",
         ]:
             lbl = QLabel(text)
             lbl.setTextFormat(Qt.RichText)
