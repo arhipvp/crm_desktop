@@ -36,10 +36,35 @@ from telegram.ext import (
 
 def _parse_float(text: str) -> float | None:
     """Преобразовать ввод пользователя в число."""
+    if not text:
+        return None
+    text = (
+        text.lower()
+        .replace("руб", "")
+        .replace("р.", "")
+        .replace("р", "")
+    )
+    text = text.replace(" ", "").replace("\u00a0", "").replace(",", ".")
     try:
-        return float(text.replace(" ", "").replace(",", "."))
+        return float(text)
     except ValueError:
         return None
+
+
+def _parse_calc_line(line: str) -> dict:
+    """Преобразовать строку расчёта в словарь полей."""
+    parts = [p.strip() for p in line.split(",")]
+    while len(parts) < 6:
+        parts.append("")
+    company, ins_type, insured_amount, premium, deductible, note = parts[:6]
+    return {
+        "insurance_company": company or None,
+        "insurance_type": ins_type or None,
+        "insured_amount": _parse_float(insured_amount),
+        "premium": _parse_float(premium),
+        "deductible": _parse_float(deductible),
+        "note": note or None,
+    }
 
 # ───────────── env ─────────────
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
@@ -71,8 +96,8 @@ logger = logging.getLogger(__name__)
 # Храним чат исполнителя и его имя для уведомлений.
 pending_accept: dict[int, tuple[int, str]] = {}
 pending_users: dict[int, tuple[int, str]] = {}
-# Ожидаемые шаги добавления расчёта
-pending_calc: dict[int, dict] = {}
+# Ожидаем ввод расчёта одной строкой
+pending_calc: dict[int, int] = {}
 
 # ───────────── imports из core ─────────────
 from services import task_service as ts
@@ -449,9 +474,12 @@ async def h_task_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
             reply_markup=ForceReply(selective=True),
         )
     elif action == "calc":
-        pending_calc[q.from_user.id] = {"tid": tid, "step": 0, "data": {}}
+        pending_calc[q.from_user.id] = tid
         await q.message.reply_text(
-            f"Страховая компания для расчёта #{tid}:",
+            f"Введите расчёт для задачи #{tid} в формате:\n"
+            "Страховая компания, вид страхования, страховая сумма, "
+            "страховая премия, франшиза, комментарий.\n"
+            "Можно отправить несколько строк, каждый расчёт с новой строки.",
             reply_markup=ForceReply(selective=True),
         )
 
@@ -459,60 +487,20 @@ async def h_task_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 async def h_text(update: Update, _ctx):
     user_id = update.effective_user.id
     if user_id in pending_calc:
-        state = pending_calc[user_id]
-        step = state.get("step", 0)
-        data = state.setdefault("data", {})
-        text = update.message.text.strip()
-        if step == 0:
-            data["insurance_company"] = text or None
-            state["step"] = 1
-            await update.message.reply_text(
-                "Вид страхования:", reply_markup=ForceReply(selective=True)
-            )
+        tid = pending_calc.pop(user_id)
+        lines = [l.strip() for l in update.message.text.splitlines() if l.strip()]
+        task = ts.Task.get_or_none(ts.Task.id == tid)
+        if not task or not task.deal_id:
+            await update.message.reply_text("⚠️ Сделка не найдена")
             return
-        if step == 1:
-            data["insurance_type"] = text or None
-            state["step"] = 2
-            await update.message.reply_text(
-                "Страховая сумма (руб, опционально):",
-                reply_markup=ForceReply(selective=True),
-            )
-            return
-        if step == 2:
-            data["insured_amount"] = _parse_float(text)
-            state["step"] = 3
-            await update.message.reply_text(
-                "Премия (руб, опционально):",
-                reply_markup=ForceReply(selective=True),
-            )
-            return
-        if step == 3:
-            data["premium"] = _parse_float(text)
-            state["step"] = 4
-            await update.message.reply_text(
-                "Франшиза (руб, опционально):",
-                reply_markup=ForceReply(selective=True),
-            )
-            return
-        if step == 4:
-            data["deductible"] = _parse_float(text)
-            state["step"] = 5
-            await update.message.reply_text(
-                "Примечание:", reply_markup=ForceReply(selective=True)
-            )
-            return
-        if step == 5:
-            data["note"] = text or None
-            tid = state.get("tid")
-            pending_calc.pop(user_id, None)
-            task = ts.Task.get_or_none(ts.Task.id == tid)
-            if task and task.deal_id:
-                calc_s.add_calculation(task.deal_id, **data)
-                await update.message.reply_text("Расчёт сохранён 👍")
-                logger.info("Calculation added for %s", tid)
-            else:
-                await update.message.reply_text("⚠️ Сделка не найдена")
-            return
+        count = 0
+        for line in lines:
+            data = _parse_calc_line(line)
+            calc_s.add_calculation(task.deal_id, **data)
+            count += 1
+        await update.message.reply_text(f"Расчётов сохранено: {count} 👍")
+        logger.info("Calculations added for %s count %s", tid, count)
+        return
 
     if not update.message.reply_to_message:
         return
