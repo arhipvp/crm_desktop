@@ -12,6 +12,7 @@ from services.task_service import (
     build_task_query,
     get_tasks_page,
     queue_task,
+    notify_task,
     update_task,
     mark_task_deleted,
 )
@@ -69,6 +70,15 @@ class TaskTableView(BaseTableView):
         self.send_btn.setEnabled(False)
         self.send_btn.clicked.connect(self._send_selected_tasks)
 
+        self.remind_btn = styled_button(
+            "Напомнить",
+            icon="🔔",
+            tooltip="Напомнить исполнителю о задаче",
+        )
+        self.button_row.insertWidget(idx_stretch, self.remind_btn)
+        self.remind_btn.setEnabled(False)
+        self.remind_btn.clicked.connect(self._notify_selected_tasks)
+
         # разрешаем множественный выбор и массовое удаление
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.delete_callback = self.delete_selected
@@ -81,6 +91,7 @@ class TaskTableView(BaseTableView):
         has_sel = bool(self.table.selectionModel().selectedRows())
         self.edit_btn.setEnabled(has_sel)
         self.send_btn.setEnabled(has_sel)
+        self.remind_btn.setEnabled(has_sel)
 
     def _selected_tasks(self) -> list[Task]:
         if not self.model:
@@ -109,6 +120,18 @@ class TaskTableView(BaseTableView):
             "Telegram",
             f"В очередь помещено: {sent}\nОшибок: {skipped}",
         )
+        self.refresh()
+
+    def _notify_selected_tasks(self):
+        tasks = self._selected_tasks()
+        if not tasks:
+            return
+        for t in tasks:
+            try:
+                notify_task(t.id)
+            except Exception as exc:
+                logger.debug("[notify_task] failed for %s: %s", t.id, exc)
+        QMessageBox.information(self, "Напоминание", "Запрос отправлен")
         self.refresh()
 
     def delete_selected(self):

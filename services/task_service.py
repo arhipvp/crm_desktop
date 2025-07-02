@@ -69,6 +69,12 @@ def add_task(**kwargs):
         "📝 Создана задача #%s: '%s' (due %s)", task.id, task.title, task.due_date
     )
 
+    try:
+        from services.telegram_service import notify_admin
+        notify_admin(f"🆕 Создана задача #{task.id}: {task.title}")
+    except Exception:
+        logger.debug("Failed to notify admin about new task", exc_info=True)
+
     return task
 
 
@@ -171,6 +177,11 @@ def queue_task(task_id: int):
         t.queued_at = _dt.datetime.utcnow()
         t.save()
         logger.info("📤 Задача #%s поставлена в очередь", t.id)
+        try:
+            from services.telegram_service import notify_admin
+            notify_admin(f"📤 Задача #{t.id} поставлена в очередь")
+        except Exception:
+            logger.debug("Failed to notify admin", exc_info=True)
     else:
         logger.info(
             "⏭ Задача #%s не поставлена в очередь: состояние %s", t.id, t.dispatch_state
@@ -398,6 +409,22 @@ def return_to_queue(task_id: int):
         t.queued_at = _dt.datetime.utcnow()
         t.save()
         logger.info("↩ Задача #%s возвращена в очередь", t.id)
+        try:
+            from services.telegram_service import notify_admin
+            notify_admin(f"↩ Задача #{t.id} возвращена в очередь")
+        except Exception:
+            logger.debug("Failed to notify admin", exc_info=True)
+
+
+def notify_task(task_id: int) -> None:
+    """Переотправить уведомление исполнителю по задаче."""
+    t = Task.get_or_none(Task.id == task_id, Task.is_deleted == False)
+    if not t or t.is_done:
+        return
+    if t.dispatch_state == "sent":
+        return_to_queue(task_id)
+    elif t.dispatch_state == "idle":
+        queue_task(task_id)
 
 
 def link_telegram(task_id: int, chat_id: int, msg_id: int):
@@ -424,6 +451,11 @@ def mark_done(task_id: int, note: str | None = None) -> None:
 
     full_note = note if note is not None else task.note
     update_task(task, is_done=True, note=full_note)
+    try:
+        from services.telegram_service import notify_admin
+        notify_admin(f"✅ Задача #{task.id} выполнена")
+    except Exception:
+        logger.debug("Failed to notify admin", exc_info=True)
 
 
 def append_note(task_id: int, text: str):
@@ -434,6 +466,11 @@ def append_note(task_id: int, text: str):
         t.note = ((t.note + "\n") if t.note else "") + text
         t.save()
         logger.info("🗒 К задаче #%s добавлена заметка", t.id)
+        try:
+            from services.telegram_service import notify_admin
+            notify_admin(f"📝 Обновление по задаче #{t.id}: {text}")
+        except Exception:
+            logger.debug("Failed to notify admin", exc_info=True)
 
 
 # ─────────────────────── постраничный вывод ─────────────────────

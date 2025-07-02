@@ -39,6 +39,7 @@ from services.task_service import (
     append_note,
     mark_task_deleted,
     get_incomplete_tasks_for_executor,
+    notify_task,
 )
 from services.executor_service import assign_executor
 from utils import screen_utils, time_utils
@@ -319,6 +320,17 @@ def test_append_and_delete_task():
     assert 'x' in Task.get_by_id(task.id).note
     mark_task_deleted(task.id)
     assert Task.get_by_id(task.id).is_deleted
+
+
+def test_notify_task_transitions():
+    t1 = add_task(title='n1', due_date=date.today())
+    notify_task(t1.id)
+    assert Task.get_by_id(t1.id).dispatch_state == 'queued'
+
+    t2 = add_task(title='n2', due_date=date.today(), dispatch_state='sent', tg_chat_id=123)
+    notify_task(t2.id)
+    res = Task.get_by_id(t2.id)
+    assert res.dispatch_state == 'queued' and res.tg_chat_id is None
 
 
 def test_get_expiring_policies_filters(monkeypatch):
