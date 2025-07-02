@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+import os
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -26,7 +27,7 @@ from PySide6.QtGui import (
 )
 import re
 
-from database.models import Task
+from database.models import Task, Deal
 from services.deal_service import (
     get_deal_by_id,
     get_next_deal,
@@ -503,10 +504,25 @@ class DealDetailView(QDialog):
             self._init_kpi_panel()
 
     def _open_folder(self):
-        open_folder(
-            self.instance.drive_folder_path or self.instance.drive_folder_link,
-            parent=self,  # QWidget, чтобы показывались QMessageBox-ы
-        )
+        path = self.instance.drive_folder_path or self.instance.drive_folder_link
+        if self.instance.drive_folder_path and not os.path.isdir(self.instance.drive_folder_path):
+            from ui.common.message_boxes import confirm
+            from services.folder_utils import create_deal_folder
+
+            if confirm("Папка не найдена. Создать новую?"):
+                new_path, link = create_deal_folder(
+                    self.instance.client.name,
+                    self.instance.description,
+                    client_drive_link=self.instance.client.drive_folder_link,
+                )
+                self.instance.drive_folder_path = new_path
+                self.instance.drive_folder_link = link
+                self.instance.save(only=[Deal.drive_folder_path, Deal.drive_folder_link])
+                path = new_path or link
+            else:
+                return
+
+        open_folder(path, parent=self)  # QWidget, чтобы показывались QMessageBox-ы
 
     def _copy_folder_path(self):
         copy_path_to_clipboard(
