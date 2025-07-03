@@ -23,6 +23,7 @@ GOOGLE_DRIVE_LOCAL_ROOT=/path/to/drive
 GOOGLE_CREDENTIALS=credentials.json
 GOOGLE_ROOT_FOLDER_ID=1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm
 OPENAI_API_KEY=sk-example
+OPENAI_BASE_URL=https://api.openai.com/v1  # например, https://api.together.xyz/v1
 ```
 
 Переменная `ADMIN_CHAT_ID` задаёт Telegram‑ID администратора, которому бот отправляет уведомления.
