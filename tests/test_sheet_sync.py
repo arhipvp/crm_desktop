@@ -37,3 +37,44 @@ def test_sync_updates_existing(monkeypatch):
 
     updated = get_all_tasks()[0]
     assert updated.note == "new"
+
+
+def test_sync_calculations(monkeypatch):
+    from services.calculation_service import get_calculations
+    from services.client_service import add_client
+    from services.deal_service import add_deal
+
+    client = add_client(name="C")
+    deal = add_deal(client_id=client.id, start_date=date(2025, 1, 1), description="D")
+
+    data = [
+        [
+            "deal_id",
+            "insurance_company",
+            "insurance_type",
+            "insured_amount",
+            "premium",
+            "deductible",
+            "note",
+        ],
+        [str(deal.id), "СК", "КАСКО", "1000", "10", "0", ""],
+    ]
+
+    monkeypatch.setattr(sheets_service, "read_sheet", lambda sid, rn: data)
+
+    cleared = {}
+
+    def fake_clear(sid, start, end):
+        cleared["start"] = start
+        cleared["end"] = end
+
+    monkeypatch.setattr(sheets_service, "clear_rows", fake_clear)
+    monkeypatch.setenv("GOOGLE_SHEETS_CALCULATIONS_ID", "x")
+    monkeypatch.setattr(sheets_service, "GOOGLE_SHEETS_CALCULATIONS_ID", "x", raising=False)
+
+    added = sheets_service.sync_calculations_from_sheet()
+
+    calcs = list(get_calculations(deal.id))
+    assert added == 1
+    assert len(calcs) == 1
+    assert cleared["start"] == 2 and cleared["end"] == 2
