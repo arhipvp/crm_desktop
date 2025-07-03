@@ -1,4 +1,4 @@
-python-telegram-bot>=20.8,<21.0
+python-telegram-bot==22.0
 python-dotenv>=1.0
 peewee>=3.17
 psycopg2-binary>=2.9
