@@ -36,7 +36,7 @@ from services.deal_service import (
     get_tasks_by_deal_id,
     update_deal,
 )
-from services.folder_utils import open_folder, copy_path_to_clipboard
+from services.folder_utils import open_folder, copy_path_to_clipboard, move_file_to_folder
 from services.payment_service import get_payments_by_deal_id
 from services.policy_service import get_policies_by_deal_id
 from ui.common.date_utils import format_date
@@ -737,7 +737,7 @@ class DealDetailView(QDialog):
             show_error(str(e))
             return
 
-        for data in results:
+        for src, data in zip(files, results):
             json_text = _json.dumps(data, ensure_ascii=False, indent=2)
             dlg = ImportPolicyJsonForm(
                 parent=self,
@@ -746,6 +746,9 @@ class DealDetailView(QDialog):
                 json_text=json_text,
             )
             if dlg.exec():
+                policy = getattr(dlg, "imported_policy", None)
+                if policy and policy.drive_folder_link:
+                    move_file_to_folder(src, policy.drive_folder_link)
                 self._init_tabs()
 
 

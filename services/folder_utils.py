@@ -548,3 +548,35 @@ def move_policy_folder_to_deal(
         return None
 
     return new_path
+
+
+def move_file_to_folder(file_path: str, folder_path: str) -> str | None:
+    """Переместить файл в указанную папку.
+
+    Parameters
+    ----------
+    file_path: str
+        Исходный путь к файлу.
+    folder_path: str
+        Назначение, куда переместить файл.
+
+    Returns
+    -------
+    str | None
+        Новый путь файла или ``None`` при ошибке.
+    """
+
+    if not file_path or not os.path.isfile(file_path):
+        return None
+
+    os.makedirs(folder_path, exist_ok=True)
+    dest = os.path.join(folder_path, os.path.basename(file_path))
+
+    try:
+        shutil.move(file_path, dest)
+        logger.info("📄 Файл полиса перемещён: %s", dest)
+    except Exception:
+        logger.exception("Не удалось переместить файл полиса")
+        return None
+
+    return dest

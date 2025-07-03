@@ -1,5 +1,10 @@
 import os
-from services.folder_utils import create_deal_folder, rename_deal_folder, sanitize_name
+from services.folder_utils import (
+    create_deal_folder,
+    rename_deal_folder,
+    sanitize_name,
+    move_file_to_folder,
+)
 
 
 def test_create_deal_folder_local(tmp_path, monkeypatch):
@@ -62,3 +67,15 @@ def test_rename_deal_folder_missing(tmp_path, monkeypatch):
     assert new_path == str(expected)
     assert os.path.isdir(new_path)
     assert link is None
+
+
+def test_move_file_to_folder(tmp_path):
+    src = tmp_path / "file.txt"
+    src.write_text("data")
+    dest = tmp_path / "dest"
+
+    new_path = move_file_to_folder(str(src), str(dest))
+
+    assert new_path == str(dest / "file.txt")
+    assert not src.exists()
+    assert (dest / "file.txt").read_text() == "data"
