@@ -1,3 +1,4 @@
+import logging
 import pytest
 from types import SimpleNamespace
 
@@ -58,3 +59,16 @@ def test_process_policy_files_with_ai_retry_fail(monkeypatch, tmp_path):
 
     msg = str(exc.value)
     assert "bad1" in msg and "bad2" in msg and "bad3" in msg
+
+
+def test_process_policy_files_logs_chat(monkeypatch, tmp_path, caplog):
+    file_path = tmp_path / "p.txt"
+    file_path.write_text("dummy")
+    client = DummyClient(['{"a":1}'])
+    monkeypatch.setattr(ai.openai, "OpenAI", lambda api_key=None, base_url=None: client)
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+
+    with caplog.at_level(logging.INFO):
+        ai.process_policy_files_with_ai([str(file_path)])
+
+    assert any("OpenAI conversation for" in r.message for r in caplog.records)
