@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_CREDENTIALS", "credentials.json")
 GOOGLE_SHEETS_TASKS_ID = os.getenv("GOOGLE_SHEETS_TASKS_ID")
+GOOGLE_SHEETS_CALCULATIONS_ID = os.getenv("GOOGLE_SHEETS_CALCULATIONS_ID")
 
 
 @lru_cache(maxsize=1)
@@ -63,6 +64,13 @@ def tasks_sheet_url() -> str | None:
     return f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEETS_TASKS_ID}"
 
 
+def calculations_sheet_url() -> str | None:
+    """Ссылка на таблицу расчётов из переменной окружения."""
+    if not GOOGLE_SHEETS_CALCULATIONS_ID:
+        return None
+    return f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEETS_CALCULATIONS_ID}"
+
+
 def fetch_tasks() -> list[dict]:
     """Считать задачи из таблицы и вернуть список словарей."""
     if not GOOGLE_SHEETS_TASKS_ID:
@@ -78,6 +86,30 @@ def fetch_tasks() -> list[dict]:
     return data
 
 
+def fetch_calculations() -> list[dict]:
+    """Считать расчёты из таблицы и вернуть список словарей."""
+    if not GOOGLE_SHEETS_CALCULATIONS_ID:
+        return []
+    rows = read_sheet(GOOGLE_SHEETS_CALCULATIONS_ID, "A1:Z")
+    if not rows:
+        return []
+    headers = [h.strip().lower() for h in rows[0]]
+    data: list[dict] = []
+    for raw in rows[1:]:
+        item = {h: (raw[i] if i < len(raw) else "") for i, h in enumerate(headers)}
+        data.append(item)
+    return data
+
+
+def clear_rows(spreadsheet_id: str, start: int, end: int) -> None:
+    """Очистить строки в указанном диапазоне (включительно)."""
+    service = get_service()
+    rng = f"A{start}:Z{end}"
+    service.spreadsheets().values().clear(
+        spreadsheetId=spreadsheet_id, range=rng, body={}
+    ).execute()
+
+
 def _parse_date(value: str) -> date | None:
     value = value.strip()
     if not value:
@@ -91,6 +123,17 @@ def _parse_date(value: str) -> date | None:
             return date(int(y), int(m), int(d))
         except Exception:
             return None
+
+
+def _to_float(value: str | None) -> float | None:
+    """Попытаться преобразовать строку в число."""
+    if value is None:
+        return None
+    value = value.replace(" ", "").replace(",", ".")
+    try:
+        return float(value)
+    except Exception:
+        return None
 
 
 def sync_tasks_from_sheet() -> int:
@@ -109,4 +152,34 @@ def sync_tasks_from_sheet() -> int:
         else:
             add_task(title=title, due_date=due, note=note)
             added += 1
+    return added
+
+
+def sync_calculations_from_sheet() -> int:
+    """Синхронизировать расчёты из Google Sheets с локальной БД."""
+    from services.calculation_service import add_calculation
+
+    rows = fetch_calculations()
+    if not rows:
+        return 0
+    added = 0
+    for item in rows:
+        try:
+            deal_id = int(item.get("deal_id", 0))
+        except Exception:
+            continue
+        params = {
+            "insurance_company": item.get("insurance_company"),
+            "insurance_type": item.get("insurance_type"),
+            "insured_amount": _to_float(item.get("insured_amount")),
+            "premium": _to_float(item.get("premium")),
+            "deductible": _to_float(item.get("deductible")),
+            "note": item.get("note"),
+        }
+        try:
+            add_calculation(deal_id, **params)
+            added += 1
+        except Exception:
+            logger.exception("Failed to add calculation for %s", deal_id)
+    clear_rows(GOOGLE_SHEETS_CALCULATIONS_ID, 2, len(rows) + 1)
     return added

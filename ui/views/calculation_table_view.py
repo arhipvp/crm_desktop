@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QAbstractItemView
 
@@ -88,6 +92,15 @@ class CalculationTableView(BaseTableView):
     def get_selected_multiple(self):
         indexes = self.table.selectionModel().selectedRows()
         return [self.model.get_item(self._source_row(i)) for i in indexes]
+
+    def refresh(self):
+        try:
+            from services.sheets_service import sync_calculations_from_sheet
+
+            sync_calculations_from_sheet()
+        except Exception:
+            logger.debug("Sheets sync failed", exc_info=True)
+        super().refresh()
 
     def add_new(self):
         form = CalculationForm(parent=self, deal_id=self.deal_id)

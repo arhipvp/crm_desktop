@@ -23,6 +23,7 @@ GOOGLE_DRIVE_LOCAL_ROOT=/path/to/drive
 GOOGLE_CREDENTIALS=credentials.json
 GOOGLE_ROOT_FOLDER_ID=1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm
 GOOGLE_SHEETS_TASKS_ID=1AbCdEfGh  # ID таблицы задач Google Sheets
+GOOGLE_SHEETS_CALCULATIONS_ID=1AbCdEfGh  # ID таблицы расчётов Google Sheets
 OPENAI_API_KEY=sk-example
 OPENAI_BASE_URL=https://api.openai.com/v1  # например, https://api.together.xyz/v1
 OPENAI_MODEL=gpt-4o  # например, gpt-3.5-turbo
