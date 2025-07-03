@@ -30,6 +30,13 @@ class CalculationTableModel(BaseTableModel):
         ]
         self.headers = [RU_HEADERS.get(f.name, f.name) for f in self.fields]
 
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role != Qt.DisplayRole or orientation != Qt.Horizontal:
+            return None
+        if 0 <= section < len(self.headers):
+            return self.headers[section]
+        return super().headerData(section, orientation, role)
+
 
 class CalculationTableView(BaseTableView):
     def __init__(self, parent=None, deal_id=None):
@@ -45,6 +52,10 @@ class CalculationTableView(BaseTableView):
         self.button_row.insertWidget(self.button_row.count() - 1, self.offer_btn)
         self.row_double_clicked.connect(self.edit_selected)
         self.delete_callback = self.delete_selected
+        self.default_sort_column = len(CalculationTableModel([], DealCalculation).fields) - 1
+        self.default_sort_order = Qt.DescendingOrder
+        self.current_sort_column = self.default_sort_column
+        self.current_sort_order = self.default_sort_order
         self.load_data()
 
     def load_data(self):

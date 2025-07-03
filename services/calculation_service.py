@@ -2,6 +2,8 @@ from datetime import datetime
 import logging
 from typing import Iterable
 from peewee import ModelSelect
+import os
+import pandas as pd
 
 from database.models import Deal, DealCalculation
 
@@ -26,6 +28,10 @@ def add_calculation(deal_id: int, **kwargs) -> DealCalculation:
     data["deal"] = deal
     data["is_deleted"] = False
     entry = DealCalculation.create(**data)
+    try:
+        export_calculations_excel(deal_id)
+    except Exception:
+        logger.debug("Failed to export calculations", exc_info=True)
     try:
         from services.telegram_service import notify_admin
         msg = f"➕ Расчёт по сделке #{deal_id}: {format_calculation(entry)}"
@@ -83,6 +89,10 @@ def update_calculation(entry: DealCalculation, **kwargs) -> DealCalculation:
 
     if updates:
         entry.save()
+        try:
+            export_calculations_excel(entry.deal_id)
+        except Exception:
+            logger.debug("Failed to export calculations", exc_info=True)
     return entry
 
 
@@ -151,4 +161,34 @@ def generate_offer_text(calculations: Iterable[DealCalculation]) -> str:
             line += ": " + ", ".join(details)
         lines.append(line)
     return "\n".join(lines)
+
+
+def export_calculations_excel(deal_id: int) -> str:
+    """Экспортировать расчёты сделки в Excel и вернуть путь к файлу."""
+    deal = Deal.get_or_none(Deal.id == deal_id)
+    if not deal:
+        raise ValueError("Deal not found")
+
+    folder = deal.drive_folder_path
+    if not folder:
+        raise ValueError("Deal folder not set")
+
+    calcs = list(get_calculations(deal_id))
+    data = [
+        {
+            "Страховая компания": c.insurance_company,
+            "Вид страхования": c.insurance_type,
+            "Страховая сумма": c.insured_amount,
+            "Премия": c.premium,
+            "Франшиза": c.deductible,
+            "Комментарий": c.note,
+            "Создано": c.created_at,
+        }
+        for c in calcs
+    ]
+    df = pd.DataFrame(data)
+    file_name = f"calculations_{deal_id}.xlsx"
+    path = os.path.join(folder, file_name)
+    df.to_excel(path, index=False)
+    return path
 
