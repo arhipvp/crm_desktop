@@ -22,6 +22,7 @@ APPROVED_EXECUTOR_IDS=111,222  # Telegram ID разрешённых исполн
 GOOGLE_DRIVE_LOCAL_ROOT=/path/to/drive
 GOOGLE_CREDENTIALS=credentials.json
 GOOGLE_ROOT_FOLDER_ID=1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm
+OPENAI_API_KEY=sk-example
 ```
 
 Переменная `ADMIN_CHAT_ID` задаёт Telegram‑ID администратора, которому бот отправляет уведомления.
