@@ -664,9 +664,16 @@ class DealDetailView(QDialog):
         try:
             from services.sheets_service import sync_calculations_from_sheet
 
-            sync_calculations_from_sheet()
-        except Exception:
-            logger.debug("Sheets sync failed", exc_info=True)
+            added = sync_calculations_from_sheet()
+            if added:
+                from ui.common.message_boxes import show_info
+
+                show_info(f"Добавлено расчётов: {added}")
+        except Exception as e:  # noqa: BLE001
+            logger.exception("Sheets sync failed")
+            from ui.common.message_boxes import show_error
+
+            show_error(str(e))
 
         fresh = get_deal_by_id(self.instance.id)
         if fresh:

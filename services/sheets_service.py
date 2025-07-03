@@ -157,10 +157,15 @@ def sync_tasks_from_sheet() -> int:
 
 def sync_calculations_from_sheet() -> int:
     """Синхронизировать расчёты из Google Sheets с локальной БД."""
+    logger.debug("Starting calculations sync")
+    if not GOOGLE_SHEETS_CALCULATIONS_ID:
+        logger.debug("GOOGLE_SHEETS_CALCULATIONS_ID is not set")
+        return 0
     from services.calculation_service import add_calculation
     from database.models import DealCalculation
 
     rows = fetch_calculations()
+    logger.debug("Fetched %s rows from sheet", len(rows))
     if not rows:
         return 0
     added = 0
@@ -194,4 +199,5 @@ def sync_calculations_from_sheet() -> int:
             added += 1
         except Exception:
             logger.exception("Failed to add calculation for %s", deal_id)
+    logger.debug("Added %s calculations from sheet", added)
     return added
