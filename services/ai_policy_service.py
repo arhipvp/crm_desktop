@@ -99,6 +99,14 @@ payments
 
 logger = logging.getLogger(__name__)
 
+# Number of attempts to get a valid JSON response from the model
+MAX_ATTEMPTS = 3
+
+# Additional instruction sent to the model when JSON parsing fails
+REMINDER = (
+    "Ответ должен содержать только один валидный JSON без каких-либо пояснений."
+)
+
 
 def _read_text(path: str) -> str:
     """Extract text from a PDF or text file."""
@@ -155,19 +163,30 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
             {"role": "system", "content": PROMPT},
             {"role": "user", "content": text[:16000]},
         ]
-        try:
-            resp = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0,
-            )
-        except Exception as e:
-            raise RuntimeError(f"OpenAI request failed for {path}: {e}") from e
+        for attempt in range(MAX_ATTEMPTS):
+            try:
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=0,
+                )
+            except Exception as e:
+                raise RuntimeError(f"OpenAI request failed for {path}: {e}") from e
 
-        answer = resp.choices[0].message.content
-        try:
-            data = _extract_json_from_answer(answer)
-        except Exception as e:
-            raise ValueError(f"Failed to parse JSON for {path}: {e}") from e
-        results.append(data)
+            answer = resp.choices[0].message.content
+            messages.append({"role": "assistant", "content": answer})
+            try:
+                data = _extract_json_from_answer(answer)
+            except Exception as e:
+                if attempt == MAX_ATTEMPTS - 1:
+                    transcript = "\n".join(
+                        f"{m['role']}: {m['content']}" for m in messages
+                    )
+                    raise ValueError(
+                        f"Failed to parse JSON for {path}: {e}\nConversation:\n{transcript}"
+                    ) from e
+                messages.append({"role": "user", "content": REMINDER})
+                continue
+            results.append(data)
+            break
     return results
