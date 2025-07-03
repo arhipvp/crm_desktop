@@ -116,19 +116,17 @@ def fmt_task(t: ts.Task) -> str:
 
     d = getattr(t, "deal", None)
     if d:
-        lines.append(f"\n🔗 <b>Сделка #{d.id}</b>")
+        desc = f" — {d.description.strip()}" if d.description else ""
+        lines.append(f"\n🔗 <b>Сделка #{d.id}</b>{desc}")
         if d.start_date:
             lines.append(f"📅 Дата: {d.start_date.strftime('%d.%m.%Y')}")
-        if d.description:
-            lines.append(f"📝 {d.description.strip()}")
 
         c = getattr(d, "client", None)
         if c:
             lines.append(f"👤 Клиент: {c.name}")
-            if d.drive_folder_link:
-                lines.append(f'<a href="{d.drive_folder_link}">📂 Папка сделки</a>')
-            elif c.drive_folder_link:
-                lines.append(f'<a href="{c.drive_folder_link}">📂 Папка клиента</a>')
+            folder = d.drive_folder_path or c.drive_folder_path
+            if folder:
+                lines.append(f"📂 {folder}")
 
         lines.append("\n<b>Журнал:</b>")
         if d.calculations:
