@@ -270,6 +270,12 @@ class DealDetailView(QDialog):
         btn_import.clicked.connect(self._on_import_policy_json)
         hlayout.addWidget(btn_import)
 
+        btn_ai = styled_button(
+            "🤖 Обработать с ИИ", tooltip="Распознать файлы полисов"
+        )
+        btn_ai.clicked.connect(self._on_process_policies_ai)
+        hlayout.addWidget(btn_ai)
+
         hlayout.addStretch()
         pol_l.addLayout(hlayout)
 
@@ -705,6 +711,42 @@ class DealDetailView(QDialog):
         )
         if dlg.exec():
             self._init_tabs()
+
+    def _on_process_policies_ai(self):
+        from ui.common.message_boxes import show_error
+        from PySide6.QtWidgets import QFileDialog
+        import json as _json
+        try:
+            start_dir = self.instance.drive_folder_path or os.path.expanduser("~")
+        except Exception:
+            start_dir = os.path.expanduser("~")
+
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Выберите файлы полисов",
+            start_dir,
+            "Документы (*.pdf *.jpg *.jpeg *.png *.txt);;Все файлы (*)",
+        )
+        if not files:
+            return
+        try:
+            from services.ai_policy_service import process_policy_files_with_ai
+
+            results = process_policy_files_with_ai(files)
+        except Exception as e:
+            show_error(str(e))
+            return
+
+        for data in results:
+            json_text = _json.dumps(data, ensure_ascii=False, indent=2)
+            dlg = ImportPolicyJsonForm(
+                parent=self,
+                forced_client=self.instance.client,
+                forced_deal=self.instance,
+                json_text=json_text,
+            )
+            if dlg.exec():
+                self._init_tabs()
 
 
 class CloseDealDialog(QDialog):

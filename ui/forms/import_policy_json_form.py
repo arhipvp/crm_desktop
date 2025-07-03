@@ -16,7 +16,7 @@ from ui.forms.policy_form import PolicyForm
 
 
 class ImportPolicyJsonForm(QDialog):
-    def __init__(self, parent=None, *, forced_client=None, forced_deal=None):
+    def __init__(self, parent=None, *, forced_client=None, forced_deal=None, json_text=None):
         super().__init__(parent)
         self._forced_client = forced_client
         self._forced_deal = forced_deal
@@ -29,6 +29,8 @@ class ImportPolicyJsonForm(QDialog):
         self.text_edit.setPlaceholderText(
             '{\n  "client_name": "Иванов Иван",\n  "policy": { ... },\n  "payments": [ ... ]\n}'
         )
+        if json_text:
+            self.text_edit.setPlainText(json_text)
         layout.addWidget(self.text_edit)
 
         # Кнопки внизу
