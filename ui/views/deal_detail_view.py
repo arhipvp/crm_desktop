@@ -44,6 +44,7 @@ from ui.common.message_boxes import confirm
 from ui.common.styled_widgets import styled_button
 from utils.screen_utils import get_scaled_size
 from ui.forms.deal_form import DealForm
+from ui.forms.client_form import ClientForm
 from ui.forms.import_policy_json_form import ImportPolicyJsonForm
 from ui.forms.income_form import IncomeForm
 from ui.forms.payment_form import PaymentForm
@@ -426,6 +427,12 @@ class DealDetailView(QDialog):
         btn_edit.clicked.connect(self._on_edit)
         self._add_shortcut("Ctrl+E", self._on_edit)
         box.addWidget(btn_edit)
+        btn_edit_client = styled_button(
+            "📝 Клиент", tooltip="Редактировать клиента", shortcut="Ctrl+Shift+K"
+        )
+        btn_edit_client.clicked.connect(self._on_edit_client)
+        self._add_shortcut("Ctrl+Shift+K", self._on_edit_client)
+        box.addWidget(btn_edit_client)
         btn_folder = styled_button("📂 Папка", shortcut="Ctrl+O")
         btn_folder.clicked.connect(self._open_folder)
         self._add_shortcut("Ctrl+O", self._open_folder)
@@ -479,6 +486,16 @@ class DealDetailView(QDialog):
         form = DealForm(self.instance, parent=self)
         if form.exec():
             self._init_kpi_panel()
+            self._init_tabs()
+
+    def _on_edit_client(self):
+        form = ClientForm(self.instance.client, parent=self)
+        if form.exec():
+            # Refresh deal instance to update client info in UI
+            self.instance.client = form.instance
+            self.setWindowTitle(
+                f"Сделка #{self.instance.id} — {self.instance.client.name}: {self.instance.description}"
+            )
             self._init_tabs()
 
     def _on_add_policy(self):
