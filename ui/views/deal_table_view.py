@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 
 from ui.base.base_table_model import BaseTableModel
 
@@ -23,6 +24,8 @@ class DealTableModel(BaseTableModel):
         if not index.isValid():
             return None
         obj = self.objects[index.row()]
+        if role == Qt.ForegroundRole and getattr(obj, "_executor", None):
+            return QColor("red")
         col = index.column()
         if col >= len(self.fields):
             if role == Qt.DisplayRole:
