@@ -6,7 +6,7 @@ from typing import List
 import openai
 from PyPDF2 import PdfReader
 
-PROMPT = """Ты — ассистент, отвечающий за импорт данных из страховых полисов в CRM. На основе загруженного документа (PDF, скан или текст) необходимо сформировать один JSON строго по следующему шаблону:
+DEFAULT_PROMPT = """Ты — ассистент, отвечающий за импорт данных из страховых полисов в CRM. На основе загруженного документа (PDF, скан или текст) необходимо сформировать один JSON строго по следующему шаблону:
 {
   "client_name": "Тестовый клиент",
   "policy": {
@@ -97,6 +97,11 @@ payments
  Нет null, -, N/A и прочего
 """
 
+
+def _get_prompt() -> str:
+    """Return system prompt for policy recognition."""
+    return os.getenv("AI_POLICY_PROMPT", DEFAULT_PROMPT)
+
 logger = logging.getLogger(__name__)
 
 
@@ -166,7 +171,7 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
     for path in paths:
         text = _read_text(path)
         messages = [
-            {"role": "system", "content": PROMPT},
+            {"role": "system", "content": _get_prompt()},
             {"role": "user", "content": text[:16000]},
         ]
         for attempt in range(MAX_ATTEMPTS):
