@@ -61,14 +61,6 @@ def test_sync_calculations(monkeypatch):
     ]
 
     monkeypatch.setattr(sheets_service, "read_sheet", lambda sid, rn: data)
-
-    cleared = {}
-
-    def fake_clear(sid, start, end):
-        cleared["start"] = start
-        cleared["end"] = end
-
-    monkeypatch.setattr(sheets_service, "clear_rows", fake_clear)
     monkeypatch.setenv("GOOGLE_SHEETS_CALCULATIONS_ID", "x")
     monkeypatch.setattr(sheets_service, "GOOGLE_SHEETS_CALCULATIONS_ID", "x", raising=False)
 
@@ -77,4 +69,9 @@ def test_sync_calculations(monkeypatch):
     calcs = list(get_calculations(deal.id))
     assert added == 1
     assert len(calcs) == 1
-    assert cleared["start"] == 2 and cleared["end"] == 2
+
+    # повторный запуск не должен создавать дубликаты
+    added_again = sheets_service.sync_calculations_from_sheet()
+    calcs_again = list(get_calculations(deal.id))
+    assert added_again == 0
+    assert len(calcs_again) == 1

@@ -158,6 +158,7 @@ def sync_tasks_from_sheet() -> int:
 def sync_calculations_from_sheet() -> int:
     """Синхронизировать расчёты из Google Sheets с локальной БД."""
     from services.calculation_service import add_calculation
+    from database.models import DealCalculation
 
     rows = fetch_calculations()
     if not rows:
@@ -176,10 +177,21 @@ def sync_calculations_from_sheet() -> int:
             "deductible": _to_float(item.get("deductible")),
             "note": item.get("note"),
         }
+        exists = DealCalculation.get_or_none(
+            (DealCalculation.deal_id == deal_id)
+            & (DealCalculation.insurance_company == params["insurance_company"])
+            & (DealCalculation.insurance_type == params["insurance_type"])
+            & (DealCalculation.insured_amount == params["insured_amount"])
+            & (DealCalculation.premium == params["premium"])
+            & (DealCalculation.deductible == params["deductible"])
+            & (DealCalculation.note == params["note"])
+            & (DealCalculation.is_deleted == False)
+        )
+        if exists:
+            continue
         try:
             add_calculation(deal_id, **params)
             added += 1
         except Exception:
             logger.exception("Failed to add calculation for %s", deal_id)
-    clear_rows(GOOGLE_SHEETS_CALCULATIONS_ID, 2, len(rows) + 1)
     return added
