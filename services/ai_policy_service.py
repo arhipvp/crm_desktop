@@ -127,7 +127,8 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
     if not api_key:
         raise ValueError("OPENAI_API_KEY is not set")
 
-    client = openai.OpenAI(api_key=api_key)
+    base_url = os.getenv("OPENAI_BASE_URL")
+    client = openai.OpenAI(api_key=api_key, base_url=base_url)
     results: List[dict] = []
     for path in paths:
         text = _read_text(path)
