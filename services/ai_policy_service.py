@@ -128,6 +128,7 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
         raise ValueError("OPENAI_API_KEY is not set")
 
     base_url = os.getenv("OPENAI_BASE_URL")
+    model = os.getenv("OPENAI_MODEL", "gpt-4o")
     client = openai.OpenAI(api_key=api_key, base_url=base_url)
     results: List[dict] = []
     for path in paths:
@@ -138,7 +139,7 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
         ]
         try:
             resp = client.chat.completions.create(
-                model="gpt-4o",
+                model=model,
                 messages=messages,
                 temperature=0,
             )
