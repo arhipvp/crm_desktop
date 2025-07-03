@@ -1,5 +1,8 @@
 from datetime import date, timedelta
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -658,6 +661,13 @@ class DealDetailView(QDialog):
         self.accept()
 
     def _on_refresh(self):
+        try:
+            from services.sheets_service import sync_calculations_from_sheet
+
+            sync_calculations_from_sheet()
+        except Exception:
+            logger.debug("Sheets sync failed", exc_info=True)
+
         fresh = get_deal_by_id(self.instance.id)
         if fresh:
             self.instance = fresh

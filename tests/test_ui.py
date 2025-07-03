@@ -204,3 +204,29 @@ def test_menu_open_settings(qtbot, monkeypatch):
 
     window.menu_bar.open_settings()
     assert called.get("exec")
+
+
+def test_deal_detail_refresh_syncs_sheet(qtbot, monkeypatch):
+    from datetime import date
+    from services.client_service import add_client
+    from services.deal_service import add_deal
+    from ui.views.deal_detail_view import DealDetailView
+
+    client = add_client(name="C")
+    deal = add_deal(client_id=client.id, start_date=date(2025, 1, 1), description="D")
+
+    called = {}
+
+    def fake_sync():
+        called["ok"] = True
+
+    monkeypatch.setattr(
+        "services.sheets_service.sync_calculations_from_sheet", fake_sync
+    )
+
+    dlg = DealDetailView(deal)
+    qtbot.addWidget(dlg)
+
+    dlg._on_refresh()
+
+    assert called.get("ok")
