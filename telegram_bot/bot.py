@@ -163,7 +163,6 @@ def kb_task(tid: int) -> InlineKeyboardMarkup:
                 InlineKeyboardButton("✅ Выполнить", callback_data=f"done:{tid}"),
                 InlineKeyboardButton("💬 Ответить", callback_data=f"reply:{tid}"),
                 InlineKeyboardButton("➕ Расчёт", callback_data=f"calc:{tid}"),
-                InlineKeyboardButton("🔄 Вернуть", callback_data=f"ret:{tid}"),
             ]
         ]
     )
@@ -383,13 +382,6 @@ async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
             "✅ Задача выполнена", parse_mode=constants.ParseMode.HTML
         )
         logger.info("Task %s marked done by executor", tid)
-
-    elif action == "ret":
-        ts.return_to_queue(tid)
-        await q.message.edit_text(
-            "🔄 <i>Задача возвращена в очередь</i>", parse_mode=constants.ParseMode.HTML
-        )
-        logger.info("Task %s returned to queue", tid)
 
     elif action == "reply":
         await q.message.reply_text(
@@ -651,7 +643,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(h_choose_client, pattern=r"^client:\d+$"))
     app.add_handler(CallbackQueryHandler(h_choose_deal, pattern=r"^deal:\d+$"))
     app.add_handler(CallbackQueryHandler(h_choose_task, pattern=r"^task:\d+$"))
-    app.add_handler(CallbackQueryHandler(h_action, pattern=r"^(done|ret|reply):"))
+    app.add_handler(CallbackQueryHandler(h_action, pattern=r"^(done|reply):"))
     app.add_handler(CallbackQueryHandler(h_admin_action, pattern=r"^(accept|info|rework|approve_exec|deny_exec):"))
     app.add_handler(CallbackQueryHandler(h_task_button, pattern=r"^(task_done|calc|question):"))
     app.add_handler(CallbackQueryHandler(h_show_tasks_button, pattern="^tasks$"))
