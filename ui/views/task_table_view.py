@@ -22,7 +22,7 @@ from ui.common.delegates import StatusDelegate
 from ui.common.filter_controls import FilterControls
 from ui.common.styled_widgets import styled_button
 from ui.forms.task_form import TaskForm
-from ui.views import task_detail_view
+from ui.views.task_detail_view import TaskDetailView
 
 
 class TaskTableView(BaseTableView):
@@ -33,7 +33,7 @@ class TaskTableView(BaseTableView):
             parent=parent,
             model_class=Task,
             form_class=TaskForm,
-            detail_view_class=task_detail_view,
+            detail_view_class=TaskDetailView,
         )
         self.sort_field = "due_date"
         self.sort_order = "asc"
