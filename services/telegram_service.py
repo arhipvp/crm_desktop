@@ -21,6 +21,20 @@ def format_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:
         folder = d.drive_folder_path or d.drive_folder_link
         if folder:
             lines.append(folder)
+        try:
+            from services.calculation_service import export_calculations_excel
+
+            file_path = export_calculations_excel(d.id)
+            file_name = os.path.basename(file_path)
+            if d.drive_folder_link:
+                file_link = f"{d.drive_folder_link}/{file_name}"
+                lines.append(f'<a href="{file_link}">📊 Файл расчётов</a>')
+            else:
+                lines.append(file_path)
+        except Exception:
+            logging.getLogger(__name__).debug(
+                "Failed to attach calculations file", exc_info=True
+            )
     if t.note:
         lines.append(t.note.strip())
     text = "\n".join(lines)
