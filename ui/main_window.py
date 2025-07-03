@@ -92,3 +92,9 @@ class MainWindow(QMainWindow):
 
         dlg = SettingsDialog(self)
         dlg.exec()
+
+    def open_ai_consultant(self):
+        from ui.forms.ai_consultant_dialog import AiConsultantDialog
+
+        dlg = AiConsultantDialog(self)
+        dlg.exec()

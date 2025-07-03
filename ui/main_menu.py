@@ -59,6 +59,10 @@ class MainMenu(QMenuBar):
         docs_action.triggered.connect(self.open_docs)
         help_menu.addAction(docs_action)
 
+        consultant_action = QAction("🤖 AI-консультант…", self)
+        consultant_action.triggered.connect(self.open_ai_consultant)
+        help_menu.addAction(consultant_action)
+
     def export_to_csv(self):
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Сохранить как CSV", "", "CSV Files (*.csv)"
@@ -104,6 +108,16 @@ class MainMenu(QMenuBar):
             from ui.forms.settings_dialog import SettingsDialog
 
             dlg = SettingsDialog(self)
+            dlg.exec()
+
+    def open_ai_consultant(self):
+        mw = self.parent()
+        if mw and hasattr(mw, "open_ai_consultant"):
+            mw.open_ai_consultant()
+        else:
+            from ui.forms.ai_consultant_dialog import AiConsultantDialog
+
+            dlg = AiConsultantDialog(self)
             dlg.exec()
 
     def open_docs(self):
