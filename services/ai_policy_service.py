@@ -99,6 +99,12 @@ payments
 
 logger = logging.getLogger(__name__)
 
+
+def _log_conversation(path: str, messages: List[dict]) -> None:
+    """Log conversation with OpenAI for debugging."""
+    transcript = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
+    logger.info("OpenAI conversation for %s:\n%s", path, transcript)
+
 # Number of attempts to get a valid JSON response from the model
 MAX_ATTEMPTS = 3
 
@@ -179,6 +185,7 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
                 data = _extract_json_from_answer(answer)
             except Exception as e:
                 if attempt == MAX_ATTEMPTS - 1:
+                    _log_conversation(path, messages)
                     transcript = "\n".join(
                         f"{m['role']}: {m['content']}" for m in messages
                     )
@@ -187,6 +194,7 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
                     ) from e
                 messages.append({"role": "user", "content": REMINDER})
                 continue
+            _log_conversation(path, messages)
             results.append(data)
             break
     return results
