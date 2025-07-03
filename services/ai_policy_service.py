@@ -118,6 +118,24 @@ def _read_text(path: str) -> str:
             return f.read().decode("utf-8", "ignore")
 
 
+def _extract_json_from_answer(answer: str) -> dict:
+    """Return the first JSON object found in the given answer."""
+    try:
+        return json.loads(answer)
+    except Exception:
+        try:
+            start = answer.index("{")
+        except ValueError as exc:
+            raise ValueError("No JSON object found") from exc
+
+        decoder = json.JSONDecoder()
+        try:
+            obj, _ = decoder.raw_decode(answer[start:])
+            return obj
+        except Exception as exc:
+            raise ValueError(f"Failed to parse JSON: {exc}") from exc
+
+
 def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
     """Send policy files to OpenAI and return parsed JSON data."""
     if not paths:
@@ -148,13 +166,8 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
 
         answer = resp.choices[0].message.content
         try:
-            data = json.loads(answer)
-        except Exception:
-            try:
-                start = answer.index("{")
-                end = answer.rindex("}") + 1
-                data = json.loads(answer[start:end])
-            except Exception as e:
-                raise ValueError(f"Failed to parse JSON for {path}: {e}") from e
+            data = _extract_json_from_answer(answer)
+        except Exception as e:
+            raise ValueError(f"Failed to parse JSON for {path}: {e}") from e
         results.append(data)
     return results
