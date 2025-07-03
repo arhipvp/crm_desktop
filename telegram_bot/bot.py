@@ -148,6 +148,11 @@ def fmt_task(t: ts.Task) -> str:
     if t.note:
         lines.append(f"\n📝 {t.note.strip()}")
 
+    from services.sheets_service import tasks_sheet_url
+    url = tasks_sheet_url()
+    if url:
+        lines.append(f"\n<a href=\"{url}\">📊 Таблица задач</a>")
+
     return "\n".join(lines)
 
 

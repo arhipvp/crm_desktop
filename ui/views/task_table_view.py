@@ -170,6 +170,13 @@ class TaskTableView(BaseTableView):
         }
 
     def refresh(self):
+        try:
+            from services.sheets_service import sync_tasks_from_sheet
+
+            sync_tasks_from_sheet()
+        except Exception:
+            logger.debug("Sheets sync failed", exc_info=True)
+
         self.load_data()
 
     def load_data(self) -> None:
