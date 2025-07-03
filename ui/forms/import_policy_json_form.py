@@ -20,6 +20,7 @@ class ImportPolicyJsonForm(QDialog):
         super().__init__(parent)
         self._forced_client = forced_client
         self._forced_deal = forced_deal
+        self.imported_policy = None
         self.setWindowTitle("Импорт полиса из JSON")
         self.setMinimumWidth(500)
 
@@ -162,5 +163,6 @@ class ImportPolicyJsonForm(QDialog):
                     pass
             form.add_payment_row(pay)
 
-        form.exec()
-        self.accept()
+        if form.exec():
+            self.imported_policy = getattr(form, "saved_instance", None)
+            self.accept()
