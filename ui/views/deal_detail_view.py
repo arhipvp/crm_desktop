@@ -280,6 +280,12 @@ class DealDetailView(QDialog):
         btn_ai.clicked.connect(self._on_process_policies_ai)
         hlayout.addWidget(btn_ai)
 
+        btn_ai_text = styled_button(
+            "🤖 Из текста", tooltip="Распознать текст полиса"
+        )
+        btn_ai_text.clicked.connect(self._on_process_policy_text_ai)
+        hlayout.addWidget(btn_ai_text)
+
         hlayout.addStretch()
         pol_l.addLayout(hlayout)
 
@@ -784,6 +790,17 @@ class DealDetailView(QDialog):
                 if policy and policy.drive_folder_link:
                     move_file_to_folder(src, policy.drive_folder_link)
                 self._init_tabs()
+
+    def _on_process_policy_text_ai(self):
+        from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
+
+        dlg = AiPolicyTextDialog(
+            parent=self,
+            forced_client=self.instance.client,
+            forced_deal=self.instance,
+        )
+        if dlg.exec():
+            self._init_tabs()
 
 
 class CloseDealDialog(QDialog):
