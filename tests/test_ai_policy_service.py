@@ -72,3 +72,37 @@ def test_process_policy_files_logs_chat(monkeypatch, tmp_path, caplog):
         ai.process_policy_files_with_ai([str(file_path)])
 
     assert any("OpenAI conversation for" in r.message for r in caplog.records)
+
+
+def test_process_policy_text_with_ai_retry_success(monkeypatch):
+    client = DummyClient(["oops", '{"a":1}'])
+    monkeypatch.setattr(ai.openai, "OpenAI", lambda api_key=None, base_url=None: client)
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+
+    result = ai.process_policy_text_with_ai("dummy")
+
+    assert result == {"a": 1}
+    assert len(client.calls) == 2
+
+
+def test_process_policy_text_with_ai_retry_fail(monkeypatch):
+    client = DummyClient(["bad1", "bad2", "bad3"])
+    monkeypatch.setattr(ai.openai, "OpenAI", lambda api_key=None, base_url=None: client)
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+
+    with pytest.raises(ValueError) as exc:
+        ai.process_policy_text_with_ai("dummy")
+
+    msg = str(exc.value)
+    assert "bad1" in msg and "bad2" in msg and "bad3" in msg
+
+
+def test_process_policy_text_logs_chat(monkeypatch, caplog):
+    client = DummyClient(['{"a":1}'])
+    monkeypatch.setattr(ai.openai, "OpenAI", lambda api_key=None, base_url=None: client)
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+
+    with caplog.at_level(logging.INFO):
+        ai.process_policy_text_with_ai("dummy")
+
+    assert any("OpenAI conversation for" in r.message for r in caplog.records)

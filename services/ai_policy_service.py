@@ -203,3 +203,49 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
             results.append(data)
             break
     return results
+
+
+def process_policy_text_with_ai(text: str) -> dict:
+    """Send raw text of a policy to OpenAI and return parsed JSON data."""
+    if not text:
+        return {}
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is not set")
+
+    base_url = os.getenv("OPENAI_BASE_URL")
+    model = os.getenv("OPENAI_MODEL", "gpt-4o")
+    client = openai.OpenAI(api_key=api_key, base_url=base_url)
+    messages = [
+        {"role": "system", "content": _get_prompt()},
+        {"role": "user", "content": text[:16000]},
+    ]
+    for attempt in range(MAX_ATTEMPTS):
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0,
+            )
+        except Exception as e:
+            raise RuntimeError(f"OpenAI request failed: {e}") from e
+
+        answer = resp.choices[0].message.content
+        messages.append({"role": "assistant", "content": answer})
+        try:
+            data = _extract_json_from_answer(answer)
+        except Exception as e:
+            if attempt == MAX_ATTEMPTS - 1:
+                _log_conversation("text", messages)
+                transcript = "\n".join(
+                    f"{m['role']}: {m['content']}" for m in messages
+                )
+                raise ValueError(
+                    f"Failed to parse JSON: {e}\nConversation:\n{transcript}"
+                ) from e
+            messages.append({"role": "user", "content": REMINDER})
+            continue
+        _log_conversation("text", messages)
+        return data
+
