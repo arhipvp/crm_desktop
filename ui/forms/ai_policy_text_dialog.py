@@ -43,11 +43,17 @@ class AiPolicyTextDialog(QDialog):
             return
         self.process_btn.setEnabled(False)
         try:
-            data = process_policy_text_with_ai(text)
+            data, conversation = process_policy_text_with_ai(text)
         except Exception as exc:
             QMessageBox.critical(self, "Ошибка", str(exc))
             self.process_btn.setEnabled(True)
             return
+
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Диалог с ИИ")
+        msg.setText("Распознавание выполнено. Полный диалог см. в деталях.")
+        msg.setDetailedText(conversation)
+        msg.exec()
 
         json_text = json.dumps(data, ensure_ascii=False, indent=2)
         form = ImportPolicyJsonForm(

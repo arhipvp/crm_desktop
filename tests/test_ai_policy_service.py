@@ -41,9 +41,10 @@ def test_process_policy_files_with_ai_retry_success(monkeypatch, tmp_path):
     monkeypatch.setattr(ai.openai, "OpenAI", lambda api_key=None, base_url=None: client)
     monkeypatch.setenv("OPENAI_API_KEY", "x")
 
-    result = ai.process_policy_files_with_ai([str(file_path)])
+    result, convs = ai.process_policy_files_with_ai([str(file_path)])
 
     assert result == [{"a": 1}]
+    assert len(convs) == 1
     assert len(client.calls) == 2
 
 
@@ -69,9 +70,10 @@ def test_process_policy_files_logs_chat(monkeypatch, tmp_path, caplog):
     monkeypatch.setenv("OPENAI_API_KEY", "x")
 
     with caplog.at_level(logging.INFO):
-        ai.process_policy_files_with_ai([str(file_path)])
+        _, convs = ai.process_policy_files_with_ai([str(file_path)])
 
     assert any("OpenAI conversation for" in r.message for r in caplog.records)
+    assert len(convs) == 1
 
 
 def test_process_policy_text_with_ai_retry_success(monkeypatch):
@@ -79,9 +81,10 @@ def test_process_policy_text_with_ai_retry_success(monkeypatch):
     monkeypatch.setattr(ai.openai, "OpenAI", lambda api_key=None, base_url=None: client)
     monkeypatch.setenv("OPENAI_API_KEY", "x")
 
-    result = ai.process_policy_text_with_ai("dummy")
+    result, conv = ai.process_policy_text_with_ai("dummy")
 
     assert result == {"a": 1}
+    assert conv
     assert len(client.calls) == 2
 
 
@@ -103,6 +106,7 @@ def test_process_policy_text_logs_chat(monkeypatch, caplog):
     monkeypatch.setenv("OPENAI_API_KEY", "x")
 
     with caplog.at_level(logging.INFO):
-        ai.process_policy_text_with_ai("dummy")
+        _, conv = ai.process_policy_text_with_ai("dummy")
 
     assert any("OpenAI conversation for" in r.message for r in caplog.records)
+    assert conv

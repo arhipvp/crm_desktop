@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QHeaderView,
+    QMessageBox,
 )
 from PySide6.QtGui import (
     QSyntaxHighlighter,
@@ -772,12 +773,19 @@ class DealDetailView(QDialog):
         try:
             from services.ai_policy_service import process_policy_files_with_ai
 
-            results = process_policy_files_with_ai(files)
+            results, conversations = process_policy_files_with_ai(files)
         except Exception as e:
             show_error(str(e))
             return
 
-        for src, data in zip(files, results):
+        for src, data, conv in zip(files, results, conversations):
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Диалог с ИИ")
+            fname = os.path.basename(src)
+            msg.setText(f"Распознавание файла {fname} завершено. Полный диалог см. в деталях.")
+            msg.setDetailedText(conv)
+            msg.exec()
+
             json_text = _json.dumps(data, ensure_ascii=False, indent=2)
             dlg = ImportPolicyJsonForm(
                 parent=self,
