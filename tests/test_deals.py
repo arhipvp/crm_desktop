@@ -1,5 +1,5 @@
 from services.deal_service import add_deal, get_deals_by_client_id, update_deal, mark_deal_deleted
-from services.client_service import add_client, mark_client_deleted
+from services.client_service import add_client, update_client, mark_client_deleted
 from database.models import Task, Deal
 
 
@@ -79,3 +79,27 @@ def test_mark_deal_deleted_renames_folder(monkeypatch):
     deal = Deal.get_by_id(deal.id)
     assert deal.description.endswith("deleted")
     assert deal.drive_folder_path.endswith("deleted")
+
+
+def test_update_client_renames_deal_folders(monkeypatch):
+    client = add_client(name="Old")
+    deal = add_deal(client_id=client.id, start_date="2025-01-01", description="D")
+
+    monkeypatch.setattr(
+        "services.client_service.rename_client_folder",
+        lambda o, n, l: (f"/tmp/{n}", l),
+    )
+
+    called = {}
+
+    def fake_rename(old_c, old_d, new_c, new_d, link):
+        called["args"] = (old_c, old_d, new_c, new_d)
+        return f"/tmp/{new_c}_{new_d}", link
+
+    monkeypatch.setattr("services.folder_utils.rename_deal_folder", fake_rename)
+
+    update_client(client, name="New")
+
+    deal = Deal.get_by_id(deal.id)
+    assert called["args"] == ("Old", "D", "New", "D")
+    assert deal.drive_folder_path == "/tmp/New_D"

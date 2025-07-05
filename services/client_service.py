@@ -6,7 +6,7 @@ import urllib.parse
 import webbrowser
 from peewee import ModelSelect
 
-from database.models import Client, db
+from database.models import Client, Deal, db
 from services.folder_utils import create_client_drive_folder, rename_client_folder
 from services.validators import normalize_phone, normalize_full_name
 
@@ -110,7 +110,9 @@ def update_client(client: Client, **kwargs) -> Client:
     client.save()
 
     if old_name != new_name:
-        new_path, new_link = rename_client_folder(old_name, new_name, client.drive_folder_link)
+        new_path, new_link = rename_client_folder(
+            old_name, new_name, client.drive_folder_link
+        )
         if new_path and new_path != client.drive_folder_path:
             client.drive_folder_path = new_path
             logger.info("📁 Обновлён локальный путь клиента: %s", new_path)
@@ -118,6 +120,26 @@ def update_client(client: Client, **kwargs) -> Client:
             client.drive_folder_link = new_link
             logger.info("🔗 Обновлена ссылка на Google Drive: %s", new_link)
         client.save(only=[Client.drive_folder_path, Client.drive_folder_link])
+
+        # переименовываем папки всех сделок клиента
+        try:
+            from services.folder_utils import rename_deal_folder
+
+            for deal in client.deals:
+                new_deal_path, _ = rename_deal_folder(
+                    old_name,
+                    deal.description,
+                    new_name,
+                    deal.description,
+                    deal.drive_folder_link,
+                )
+                if new_deal_path and new_deal_path != deal.drive_folder_path:
+                    deal.drive_folder_path = new_deal_path
+                    deal.save(only=[Deal.drive_folder_path])
+        except Exception:
+            logger.exception(
+                "Не удалось переименовать папки сделок при смене имени клиента"
+            )
 
     return client
 
