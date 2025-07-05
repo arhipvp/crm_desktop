@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import List
+from typing import List, Tuple
 
 import openai
 from PyPDF2 import PdfReader
@@ -105,10 +105,11 @@ def _get_prompt() -> str:
 logger = logging.getLogger(__name__)
 
 
-def _log_conversation(path: str, messages: List[dict]) -> None:
-    """Log conversation with OpenAI for debugging."""
+def _log_conversation(path: str, messages: List[dict]) -> str:
+    """Log conversation with OpenAI for debugging and return transcript."""
     transcript = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
     logger.info("OpenAI conversation for %s:\n%s", path, transcript)
+    return transcript
 
 # Number of attempts to get a valid JSON response from the model
 MAX_ATTEMPTS = 3
@@ -155,10 +156,10 @@ def _extract_json_from_answer(answer: str) -> dict:
             raise ValueError(f"Failed to parse JSON: {exc}") from exc
 
 
-def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
-    """Send policy files to OpenAI and return parsed JSON data."""
+def process_policy_files_with_ai(paths: List[str]) -> Tuple[List[dict], List[str]]:
+    """Send policy files to OpenAI and return parsed JSON data and transcripts."""
     if not paths:
-        return []
+        return [], []
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -168,6 +169,7 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
     model = os.getenv("OPENAI_MODEL", "gpt-4o")
     client = openai.OpenAI(api_key=api_key, base_url=base_url)
     results: List[dict] = []
+    conversations: List[str] = []
     for path in paths:
         text = _read_text(path)
         messages = [
@@ -190,25 +192,23 @@ def process_policy_files_with_ai(paths: List[str]) -> List[dict]:
                 data = _extract_json_from_answer(answer)
             except Exception as e:
                 if attempt == MAX_ATTEMPTS - 1:
-                    _log_conversation(path, messages)
-                    transcript = "\n".join(
-                        f"{m['role']}: {m['content']}" for m in messages
-                    )
+                    transcript = _log_conversation(path, messages)
                     raise ValueError(
                         f"Failed to parse JSON for {path}: {e}\nConversation:\n{transcript}"
                     ) from e
                 messages.append({"role": "user", "content": REMINDER})
                 continue
-            _log_conversation(path, messages)
+            transcript = _log_conversation(path, messages)
             results.append(data)
+            conversations.append(transcript)
             break
-    return results
+    return results, conversations
 
 
-def process_policy_text_with_ai(text: str) -> dict:
-    """Send raw text of a policy to OpenAI and return parsed JSON data."""
+def process_policy_text_with_ai(text: str) -> Tuple[dict, str]:
+    """Send raw text of a policy to OpenAI and return parsed JSON data and transcript."""
     if not text:
-        return {}
+        return {}, ""
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -237,15 +237,12 @@ def process_policy_text_with_ai(text: str) -> dict:
             data = _extract_json_from_answer(answer)
         except Exception as e:
             if attempt == MAX_ATTEMPTS - 1:
-                _log_conversation("text", messages)
-                transcript = "\n".join(
-                    f"{m['role']}: {m['content']}" for m in messages
-                )
+                transcript = _log_conversation("text", messages)
                 raise ValueError(
                     f"Failed to parse JSON: {e}\nConversation:\n{transcript}"
                 ) from e
             messages.append({"role": "user", "content": REMINDER})
             continue
-        _log_conversation("text", messages)
-        return data
+        transcript = _log_conversation("text", messages)
+        return data, transcript
 
