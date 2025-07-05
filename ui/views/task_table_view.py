@@ -41,7 +41,7 @@ class TaskTableView(BaseTableView):
         self.table.setItemDelegate(StatusDelegate(self.table))
         self.table.verticalHeader().setVisible(False)  # убираем нумерацию строк
         self.table.horizontalHeader().sectionClicked.connect(self.on_sort_requested)
-        self.edit_btn.clicked.connect(self.edit_selected)
+        # Кнопка «Редактировать» должна сразу открывать форму задачи
 
         # ────────────────── Панель фильтров ──────────────────
         self.left_layout.removeWidget(self.filter_controls)
@@ -295,6 +295,10 @@ class TaskTableView(BaseTableView):
             form = TaskForm(task, parent=self)
             if form.exec():
                 self.refresh()
+
+    def _on_edit(self):
+        """Обработчик кнопки «Редактировать»."""
+        self.edit_selected()
 
     def open_detail(self, obj=None):
         if obj is None:
