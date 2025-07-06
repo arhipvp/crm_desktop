@@ -90,8 +90,10 @@ class TaskTableView(BaseTableView):
     def _update_actions_state(self, *_):
         has_sel = bool(self.table.selectionModel().selectedRows())
         self.edit_btn.setEnabled(has_sel)
-        self.send_btn.setEnabled(has_sel)
-        self.remind_btn.setEnabled(has_sel)
+        if hasattr(self, "send_btn"):
+            self.send_btn.setEnabled(has_sel)
+        if hasattr(self, "remind_btn"):
+            self.remind_btn.setEnabled(has_sel)
 
     def _selected_tasks(self) -> list[Task]:
         if not self.model:
