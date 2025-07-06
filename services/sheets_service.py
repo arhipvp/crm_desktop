@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import logging
+import re
 from functools import lru_cache
 from datetime import date
 
@@ -129,9 +130,14 @@ def _to_float(value: str | None) -> float | None:
     """Попытаться преобразовать строку в число."""
     if value is None:
         return None
-    value = value.replace(" ", "").replace(",", ".")
+    cleaned = value.replace(" ", "")
+    # извлечь первую группу цифр с возможной десятичной точкой
+    match = re.search(r"[-+]?\d*[\.,]?\d+", cleaned)
+    if not match:
+        return None
+    number = match.group(0).replace(",", ".")
     try:
-        return float(value)
+        return float(number)
     except Exception:
         return None
 
