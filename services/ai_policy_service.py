@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 
 import openai
 from PyPDF2 import PdfReader
@@ -156,52 +156,95 @@ def _extract_json_from_answer(answer: str) -> dict:
             raise ValueError(f"Failed to parse JSON: {exc}") from exc
 
 
+class AiPolicyError(ValueError):
+    """Raised when the model fails to produce valid JSON."""
+
+    def __init__(self, message: str, messages: List[dict], transcript: str):
+        super().__init__(message)
+        self.messages = messages
+        self.transcript = transcript
+
+
+def _chat(messages: List[dict], progress_cb: Callable[[str, str], None] | None = None) -> str:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY is not set")
+    base_url = os.getenv("OPENAI_BASE_URL")
+    model = os.getenv("OPENAI_MODEL", "gpt-4o")
+    client = openai.OpenAI(api_key=api_key, base_url=base_url)
+
+    if progress_cb:
+        stream = client.chat.completions.create(
+            model=model, messages=messages, temperature=0, stream=True
+        )
+        parts: List[str] = []
+        for chunk in stream:
+            part = chunk.choices[0].delta.content or ""
+            if part:
+                parts.append(part)
+                progress_cb("assistant", part)
+        return "".join(parts)
+    resp = client.chat.completions.create(
+        model=model, messages=messages, temperature=0
+    )
+    return resp.choices[0].message.content
+
+
+def recognize_policy_interactive(
+    text: str,
+    *,
+    messages: List[dict] | None = None,
+    progress_cb: Callable[[str, str], None] | None = None,
+) -> Tuple[dict, str, List[dict]]:
+    """Recognize policy and return JSON, transcript and messages.
+
+    If ``messages`` передан, диалог продолжается с них.
+    """
+    if messages is None:
+        messages = [
+            {"role": "system", "content": _get_prompt()},
+            {"role": "user", "content": text[:16000]},
+        ]
+    if progress_cb:
+        for m in messages:
+            progress_cb(m["role"], m["content"])
+
+    for attempt in range(MAX_ATTEMPTS):
+        answer = _chat(messages, progress_cb)
+        messages.append({"role": "assistant", "content": answer})
+        try:
+            data = _extract_json_from_answer(answer)
+        except Exception as exc:
+            if attempt == MAX_ATTEMPTS - 1:
+                transcript = _log_conversation("text", messages)
+                raise AiPolicyError(
+                    f"Failed to parse JSON: {exc}", messages, transcript
+                ) from exc
+            if progress_cb:
+                progress_cb("user", REMINDER)
+            messages.append({"role": "user", "content": REMINDER})
+            continue
+        transcript = _log_conversation("text", messages)
+        return data, transcript, messages
+
+
 def process_policy_files_with_ai(paths: List[str]) -> Tuple[List[dict], List[str]]:
     """Send policy files to OpenAI and return parsed JSON data and transcripts."""
     if not paths:
         return [], []
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set")
-
-    base_url = os.getenv("OPENAI_BASE_URL")
-    model = os.getenv("OPENAI_MODEL", "gpt-4o")
-    client = openai.OpenAI(api_key=api_key, base_url=base_url)
     results: List[dict] = []
     conversations: List[str] = []
     for path in paths:
         text = _read_text(path)
-        messages = [
-            {"role": "system", "content": _get_prompt()},
-            {"role": "user", "content": text[:16000]},
-        ]
-        for attempt in range(MAX_ATTEMPTS):
-            try:
-                resp = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=0,
-                )
-            except Exception as e:
-                raise RuntimeError(f"OpenAI request failed for {path}: {e}") from e
-
-            answer = resp.choices[0].message.content
-            messages.append({"role": "assistant", "content": answer})
-            try:
-                data = _extract_json_from_answer(answer)
-            except Exception as e:
-                if attempt == MAX_ATTEMPTS - 1:
-                    transcript = _log_conversation(path, messages)
-                    raise ValueError(
-                        f"Failed to parse JSON for {path}: {e}\nConversation:\n{transcript}"
-                    ) from e
-                messages.append({"role": "user", "content": REMINDER})
-                continue
-            transcript = _log_conversation(path, messages)
-            results.append(data)
-            conversations.append(transcript)
-            break
+        try:
+            data, transcript, _ = recognize_policy_interactive(text)
+        except AiPolicyError as exc:
+            raise ValueError(
+                f"Failed to parse JSON for {path}: {exc}\nConversation:\n{exc.transcript}"
+            ) from exc
+        results.append(data)
+        conversations.append(transcript)
     return results, conversations
 
 
@@ -210,39 +253,9 @@ def process_policy_text_with_ai(text: str) -> Tuple[dict, str]:
     if not text:
         return {}, ""
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set")
-
-    base_url = os.getenv("OPENAI_BASE_URL")
-    model = os.getenv("OPENAI_MODEL", "gpt-4o")
-    client = openai.OpenAI(api_key=api_key, base_url=base_url)
-    messages = [
-        {"role": "system", "content": _get_prompt()},
-        {"role": "user", "content": text[:16000]},
-    ]
-    for attempt in range(MAX_ATTEMPTS):
-        try:
-            resp = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0,
-            )
-        except Exception as e:
-            raise RuntimeError(f"OpenAI request failed: {e}") from e
-
-        answer = resp.choices[0].message.content
-        messages.append({"role": "assistant", "content": answer})
-        try:
-            data = _extract_json_from_answer(answer)
-        except Exception as e:
-            if attempt == MAX_ATTEMPTS - 1:
-                transcript = _log_conversation("text", messages)
-                raise ValueError(
-                    f"Failed to parse JSON: {e}\nConversation:\n{transcript}"
-                ) from e
-            messages.append({"role": "user", "content": REMINDER})
-            continue
-        transcript = _log_conversation("text", messages)
-        return data, transcript
+    try:
+        data, transcript, _ = recognize_policy_interactive(text)
+    except AiPolicyError as exc:
+        raise ValueError(f"Failed to parse JSON: {exc}\nConversation:\n{exc.transcript}") from exc
+    return data, transcript
 
