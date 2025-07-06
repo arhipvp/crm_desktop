@@ -83,8 +83,13 @@ class DealForm(BaseEditForm):
         if not note:
             data.pop("calculations", None)
         else:
-            data.pop("calculations")
-            data["journal_entry"] = note
+            if self.instance:
+                data.pop("calculations")
+                data["journal_entry"] = note
+            else:
+                # при создании сделки передаём значение как ``calculations``,
+                # чтобы сервис добавил отметку времени
+                pass
 
         return data
 
