@@ -2,6 +2,7 @@
 
 import logging
 import re
+from difflib import SequenceMatcher
 import urllib.parse
 import webbrowser
 from peewee import ModelSelect
@@ -13,6 +14,17 @@ from services.validators import normalize_phone, normalize_full_name
 logger = logging.getLogger(__name__)
 
 CLIENT_ALLOWED_FIELDS = {"name", "phone", "email", "is_company", "note"}
+
+
+class DuplicatePhoneError(ValueError):
+    """Raised when trying to use a phone that already exists."""
+
+    def __init__(self, phone: str, existing: Client):
+        super().__init__(
+            f"Телефон {phone} уже указан у клиента '{existing.name}'"
+        )
+        self.phone = phone
+        self.existing = existing
 
 
 # ──────────────────────────── Получение ─────────────────────────────
@@ -28,6 +40,15 @@ def get_client_by_id(client_id: int) -> Client | None:
     return Client.get_or_none((Client.id == client_id) & (Client.is_deleted == False))
 
 
+def get_client_by_phone(phone: str) -> Client | None:
+    """Найти клиента по номеру телефона."""
+    try:
+        phone = normalize_phone(phone)
+    except ValueError:
+        return None
+    return Client.get_or_none((Client.phone == phone) & (Client.is_deleted == False))
+
+
 def get_clients_page(
     page: int,
     per_page: int,
@@ -40,6 +61,35 @@ def get_clients_page(
 
     offset = (page - 1) * per_page
     return query.order_by(Client.name.asc()).limit(per_page).offset(offset)
+
+
+def find_similar_clients(name: str, threshold: float = 0.7) -> list[Client]:
+    """Return active clients with a name similar to *name*."""
+
+    def _normalize_tokens(n: str) -> list[str]:
+        return sorted(normalize_full_name(n).lower().split())
+
+    tokens = _normalize_tokens(name)
+    search_str = " ".join(tokens)
+    candidates = Client.select().where(Client.is_deleted == False)
+    result = []
+    for client in candidates:
+        cand_str = " ".join(_normalize_tokens(client.name))
+        ratio = SequenceMatcher(None, search_str, cand_str).ratio()
+        if ratio >= threshold:
+            result.append(client)
+    return result
+
+
+def _check_duplicate_phone(phone: str, *, exclude_id: int | None = None) -> None:
+    if not phone:
+        return
+    cond = (Client.phone == phone) & (Client.is_deleted == False)
+    if exclude_id is not None:
+        cond &= Client.id != exclude_id
+    existing = Client.get_or_none(cond)
+    if existing:
+        raise DuplicatePhoneError(phone, existing)
 
 
 # ──────────────────────────── Добавление ─────────────────────────────
@@ -65,6 +115,7 @@ def add_client(**kwargs) -> Client:
     if "phone" in clean_data:
         try:
             clean_data["phone"] = normalize_phone(clean_data["phone"])
+            _check_duplicate_phone(clean_data["phone"])
         except ValueError as e:
             logger.warning("⚠️ Ошибка нормализации телефона '%s': %s", clean_data["phone"], e)
             raise
@@ -96,6 +147,7 @@ def update_client(client: Client, **kwargs) -> Client:
         updates["name"] = normalize_full_name(updates["name"])
     if "phone" in updates:
         updates["phone"] = normalize_phone(updates["phone"])
+        _check_duplicate_phone(updates["phone"], exclude_id=client.id)
 
     if not updates:
         return client

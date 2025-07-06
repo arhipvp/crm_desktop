@@ -4,6 +4,8 @@ from services.client_service import (
     mark_client_deleted,
     restore_client,
     mark_clients_deleted,
+    find_similar_clients,
+    DuplicatePhoneError,
 )
 from database.models import Client
 
@@ -73,3 +75,30 @@ def test_restore_client():
     assert Client.get_by_id(c.id).is_deleted
     restore_client(c.id)
     assert not Client.get_by_id(c.id).is_deleted
+
+
+def test_find_similar_clients():
+    c1 = add_client(name="Иванов Иван")
+    matches = find_similar_clients("Иван Иванович Иванов")
+    assert c1 in matches
+
+
+def test_add_client_duplicate_phone_raises():
+    add_client(name="First", phone="8 900 000-00-00")
+    try:
+        add_client(name="Second", phone="8 900 000-00-00")
+    except DuplicatePhoneError as e:
+        assert "у клиента" in str(e)
+    else:
+        assert False, "Expected DuplicatePhoneError"
+
+
+def test_update_client_duplicate_phone_raises():
+    c1 = add_client(name="A", phone="8 900 111-11-11")
+    c2 = add_client(name="B", phone="8 900 222-22-22")
+    try:
+        update_client(c2, phone="8 900 111-11-11")
+    except DuplicatePhoneError:
+        pass
+    else:
+        assert False, "Expected DuplicatePhoneError"
