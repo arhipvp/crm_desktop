@@ -80,7 +80,9 @@ class DealDetailView(QDialog):
         self.setWindowTitle(
             f"Сделка #{deal.id} — {deal.client.name}: {deal.description}"
         )
-        size = get_scaled_size(1200, 800)
+        # Базовый размер окна немного увеличен,
+        # чтобы блок расчётов помещался без ручного растягивания.
+        size = get_scaled_size(1600, 900)
         self.resize(size)
         min_w = max(900, int(size.width() * 0.8))
         self.setMinimumSize(min_w, 480)
