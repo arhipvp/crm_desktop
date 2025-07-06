@@ -60,7 +60,9 @@ class ExpenseTableModel(BaseTableModel):
 class ExpenseTableView(BaseTableView):
     def __init__(self, parent=None, deal_id=None):
         checkbox_map = {
-            "Показывать выплаченные": self.load_data,
+            # используем безопасный обработчик, чтобы избежать
+            # вызова load_data до завершения инициализации
+            "Показывать выплаченные": self._on_filter_controls_changed,
         }
         self.deal_id = deal_id
         super().__init__(parent=parent, checkbox_map=checkbox_map)
