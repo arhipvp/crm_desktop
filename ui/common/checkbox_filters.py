@@ -1,3 +1,4 @@
+from PySide6.QtCore import QSignalBlocker
 from PySide6.QtWidgets import QCheckBox, QWidget, QHBoxLayout
 
 
@@ -51,4 +52,7 @@ class CheckboxFilters(QWidget):
         """Установить несколько флагов сразу."""
         for label, value in states.items():
             if label in self.checkboxes:
-                self.checkboxes[label].setChecked(value)
+                box = self.checkboxes[label]
+                blocker = QSignalBlocker(box)
+                box.setChecked(value)
+                del blocker
