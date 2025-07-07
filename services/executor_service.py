@@ -83,7 +83,11 @@ def get_deals_for_executor(tg_id: int, *, only_with_tasks: bool = False) -> List
         Deal.select()
         .join(DealExecutor, on=(Deal.id == DealExecutor.deal))
         .join(Executor)
-        .where((Executor.tg_id == tg_id) & (Deal.is_deleted == False))
+        .where(
+            (Executor.tg_id == tg_id)
+            & (Deal.is_deleted == False)
+            & (Deal.is_closed == False)
+        )
     )
 
     if only_with_tasks:

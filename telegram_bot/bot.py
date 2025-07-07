@@ -274,7 +274,11 @@ async def h_show_deals(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     buttons = []
     for d in deals:
         tasks_count = len(ts.get_queued_tasks_by_deal(d.id))
-        text = f"{(d.client.name.split()[0] + ' ') if d.client and d.client.name else ''}{d.description.split()[0]}"
+        text = (
+            f"#{d.id} "
+            f"{(d.client.name.split()[0] + ' ') if d.client and d.client.name else ''}"
+            f"{d.description.split()[0]}"
+        )
         text += f" ({tasks_count})"
         buttons.append(
             [InlineKeyboardButton(text, callback_data=f"deal:{d.id}")]
