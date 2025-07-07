@@ -635,6 +635,19 @@ def get_tasks_by_deal(deal_id: int) -> list[Task]:
     return Task.select().where((Task.deal_id == deal_id) & (Task.is_deleted == False))
 
 
+def get_incomplete_tasks_by_deal(deal_id: int) -> list[Task]:
+    """Получить невыполненные задачи сделки с предзагрузкой связей."""
+    base = (
+        Task.select()
+        .where(
+            (Task.deal_id == deal_id)
+            & (Task.is_deleted == False)
+            & (Task.is_done == False)
+        )
+    )
+    return list(prefetch(base, Deal, Policy, Client))
+
+
 def get_incomplete_tasks_for_executor(tg_id: int) -> list[Task]:
     """Вернуть невыполненные задачи по сделкам исполнителя."""
     from services import executor_service as es
