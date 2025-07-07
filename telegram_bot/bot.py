@@ -273,7 +273,7 @@ async def h_show_deals(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 
     buttons = []
     for d in deals:
-        tasks_count = len(ts.get_queued_tasks_by_deal(d.id))
+        tasks_count = len(ts.get_incomplete_tasks_by_deal(d.id))
         text = (
             f"#{d.id} "
             f"{(d.client.name.split()[0] + ' ') if d.client and d.client.name else ''}"
@@ -336,7 +336,7 @@ async def h_choose_deal(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     _p, did = q.data.split(":")
     did = int(did)
 
-    tasks = ts.get_queued_tasks_by_deal(did)
+    tasks = ts.get_incomplete_tasks_by_deal(did)
     if not tasks:
         await q.answer()
         await q.message.reply_text("Нет задач")
