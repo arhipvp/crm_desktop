@@ -40,11 +40,15 @@ from services.deal_service import (
     get_tasks_by_deal_id,
     update_deal,
 )
-from services.folder_utils import open_folder, copy_path_to_clipboard, move_file_to_folder
+from services.folder_utils import (
+    open_folder,
+    copy_path_to_clipboard,
+    move_file_to_folder,
+)
 from services.payment_service import get_payments_by_deal_id
 from services.policy_service import get_policies_by_deal_id
 from ui.common.date_utils import format_date
-from ui.common.message_boxes import confirm
+from ui.common.message_boxes import confirm, show_info
 from ui.common.styled_widgets import styled_button
 from utils.screen_utils import get_scaled_size
 from ui.forms.deal_form import DealForm
@@ -128,6 +132,7 @@ class DealDetailView(QDialog):
         cnt_tasks = len(get_tasks_by_deal_id(self.instance.id))
 
         from services import executor_service as es
+
         ex = es.get_executor_for_deal(self.instance.id)
         executor_name = ex.full_name if ex else "—"
 
@@ -241,9 +246,7 @@ class DealDetailView(QDialog):
         main_layout.addWidget(calc_group)
 
         # Кнопки сохранения и обновления
-        btn_save = styled_button(
-            "💾 Сохранить изменения", shortcut="Ctrl+Enter"
-        )
+        btn_save = styled_button("💾 Сохранить изменения", shortcut="Ctrl+Enter")
         btn_save.clicked.connect(self._on_inline_save)
         self._add_shortcut("Ctrl+Enter", self._on_inline_save)
         btn_save_close = styled_button(
@@ -279,15 +282,11 @@ class DealDetailView(QDialog):
         btn_import.clicked.connect(self._on_import_policy_json)
         hlayout.addWidget(btn_import)
 
-        btn_ai = styled_button(
-            "🤖 Обработать с ИИ", tooltip="Распознать файлы полисов"
-        )
+        btn_ai = styled_button("🤖 Обработать с ИИ", tooltip="Распознать файлы полисов")
         btn_ai.clicked.connect(self._on_process_policies_ai)
         hlayout.addWidget(btn_ai)
 
-        btn_ai_text = styled_button(
-            "🤖 Из текста", tooltip="Распознать текст полиса"
-        )
+        btn_ai_text = styled_button("🤖 Из текста", tooltip="Распознать текст полиса")
         btn_ai_text.clicked.connect(self._on_process_policy_text_ai)
         hlayout.addWidget(btn_ai_text)
 
@@ -380,7 +379,6 @@ class DealDetailView(QDialog):
         btn_add_task.clicked.connect(self._on_add_task)
         self._add_shortcut("Ctrl+Alt+T", self._on_add_task)
         vbox.addWidget(btn_add_task, alignment=Qt.AlignLeft)
-
 
         # Подгружаем ТОЛЬКО задачи этой сделки
         from services.task_service import get_tasks_by_deal
@@ -553,12 +551,15 @@ class DealDetailView(QDialog):
             if not task:
                 return
             from services import executor_service as es
+
             ex = es.get_executor_for_deal(self.instance.id)
             if not ex:
                 from ui.common.message_boxes import show_error
+
                 show_error("Исполнитель не привязан")
             else:
                 from services.task_service import queue_task
+
                 queue_task(task.id)
             if hasattr(self, "task_view"):
                 self.task_view.refresh()
@@ -566,7 +567,9 @@ class DealDetailView(QDialog):
 
     def _open_folder(self):
         path = self.instance.drive_folder_path or self.instance.drive_folder_link
-        if self.instance.drive_folder_path and not os.path.isdir(self.instance.drive_folder_path):
+        if self.instance.drive_folder_path and not os.path.isdir(
+            self.instance.drive_folder_path
+        ):
             from ui.common.message_boxes import confirm
             from services.folder_utils import create_deal_folder
 
@@ -578,7 +581,9 @@ class DealDetailView(QDialog):
                 )
                 self.instance.drive_folder_path = new_path
                 self.instance.drive_folder_link = link
-                self.instance.save(only=[Deal.drive_folder_path, Deal.drive_folder_link])
+                self.instance.save(
+                    only=[Deal.drive_folder_path, Deal.drive_folder_link]
+                )
                 path = new_path or link
             else:
                 return
@@ -627,6 +632,18 @@ class DealDetailView(QDialog):
         """Qt drag enter handler."""
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
+            self._orig_style = self.styleSheet()
+            self.setStyleSheet(
+                self._orig_style + "; border: 2px dashed #4CAF50;"
+                if self._orig_style
+                else "border: 2px dashed #4CAF50;"
+            )
+
+    def dragLeaveEvent(self, event):  # noqa: D401 - Qt override
+        """Qt drag leave handler."""
+        if hasattr(self, "_orig_style"):
+            self.setStyleSheet(self._orig_style)
+        event.accept()
 
     def dropEvent(self, event):  # noqa: D401 - Qt override
         """Qt drop handler."""
@@ -634,10 +651,14 @@ class DealDetailView(QDialog):
         if urls:
             files = [u.toLocalFile() for u in urls]
             self._handle_dropped_files(files)
+            show_info(f"Добавлено файлов: {len(files)}")
             event.acceptProposedAction()
+        if hasattr(self, "_orig_style"):
+            self.setStyleSheet(self._orig_style)
 
     def _on_toggle_executor(self):
         from services import executor_service as es
+
         current = es.get_executor_for_deal(self.instance.id)
         if current:
             if confirm("Отвязать исполнителя?"):
@@ -665,6 +686,7 @@ class DealDetailView(QDialog):
 
     def _update_exec_button(self):
         from services import executor_service as es
+
         ex = es.get_executor_for_deal(self.instance.id)
         if ex:
             self.btn_exec.setText(f"Отвязать {ex.full_name}")
@@ -806,6 +828,7 @@ class DealDetailView(QDialog):
         from ui.common.message_boxes import show_error
         from PySide6.QtWidgets import QFileDialog
         import json as _json
+
         try:
             start_dir = self.instance.drive_folder_path or os.path.expanduser("~")
         except Exception:
@@ -831,7 +854,9 @@ class DealDetailView(QDialog):
             msg = QMessageBox(self)
             msg.setWindowTitle("Диалог с ИИ")
             fname = os.path.basename(src)
-            msg.setText(f"Распознавание файла {fname} завершено. Полный диалог см. в деталях.")
+            msg.setText(
+                f"Распознавание файла {fname} завершено. Полный диалог см. в деталях."
+            )
             msg.setDetailedText(conv)
             msg.exec()
 
