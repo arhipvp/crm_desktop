@@ -79,7 +79,7 @@ def test_restore_client():
 
 def test_find_similar_clients():
     c1 = add_client(name="Иванов Иван")
-    matches = find_similar_clients("Иван Иванович Иванов")
+    matches = find_similar_clients("Иванов Иван Иванович")
     assert c1 in matches
 
 

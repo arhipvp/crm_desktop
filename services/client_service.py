@@ -2,7 +2,6 @@
 
 import logging
 import re
-from difflib import SequenceMatcher
 import urllib.parse
 import webbrowser
 from peewee import ModelSelect
@@ -63,21 +62,26 @@ def get_clients_page(
     return query.order_by(Client.name.asc()).limit(per_page).offset(offset)
 
 
-def find_similar_clients(name: str, threshold: float = 0.7) -> list[Client]:
-    """Return active clients with a name similar to *name*."""
+def find_similar_clients(name: str) -> list[Client]:
+    """Return active clients with a name matching *name* by full name or
+    by first two components (usually фамилия + имя)."""
 
-    def _normalize_tokens(n: str) -> list[str]:
-        return sorted(normalize_full_name(n).lower().split())
+    norm = normalize_full_name(name)
+    tokens = norm.split()
+    search_first_two = " ".join(tokens[:2]) if tokens else ""
 
-    tokens = _normalize_tokens(name)
-    search_str = " ".join(tokens)
-    candidates = Client.select().where(Client.is_deleted == False)
     result = []
-    for client in candidates:
-        cand_str = " ".join(_normalize_tokens(client.name))
-        ratio = SequenceMatcher(None, search_str, cand_str).ratio()
-        if ratio >= threshold:
+    for client in Client.select().where(Client.is_deleted == False):
+        client_norm = normalize_full_name(client.name)
+        if client_norm == norm:
             result.append(client)
+            continue
+
+        client_tokens = client_norm.split()
+        client_first_two = " ".join(client_tokens[:2]) if client_tokens else ""
+        if search_first_two and client_first_two == search_first_two:
+            result.append(client)
+
     return result
 
 
