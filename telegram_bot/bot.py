@@ -234,21 +234,21 @@ async def h_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     logger.info("/start from %s", update.effective_user.id)
     kb = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("📥 Получить задачу", callback_data="get")],
+            [InlineKeyboardButton("📂 Мои сделки", callback_data="deals")],
             [InlineKeyboardButton("📋 Мои задачи", callback_data="tasks")],
         ]
     )
     await update.message.reply_text(
-        "Привет! Я бот CRM. Нажми кнопку, чтобы взять следующую задачу.",
+        "Привет! Я бот CRM. Нажмите кнопку, чтобы посмотреть свои сделки.",
         reply_markup=kb,
     )
 
 
-async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
+async def h_show_deals(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     logger.info("Action '%s' from %s", q.data, q.from_user.id)
-    logger.info("%s requested tasks", q.from_user.id)
+    logger.info("%s requested deals", q.from_user.id)
 
     user_id = q.from_user.id
     user_name = q.from_user.full_name or ("@" + q.from_user.username) if q.from_user.username else str(user_id)
@@ -271,15 +271,15 @@ async def h_get(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         await q.message.reply_text("Нет назначенных сделок")
         return
 
-    buttons = [
-        [
-            InlineKeyboardButton(
-                f"{(d.client.name.split()[0] + ' ') if d.client and d.client.name else ''}{d.description.split()[0]}",
-                callback_data=f"deal:{d.id}",
-            )
-        ]
-        for d in deals
-    ]
+    buttons = []
+    for d in deals:
+        tasks_count = len(ts.get_queued_tasks_by_deal(d.id))
+        text = f"{(d.client.name.split()[0] + ' ') if d.client and d.client.name else ''}{d.description.split()[0]}"
+        text += f" ({tasks_count})"
+        buttons.append(
+            [InlineKeyboardButton(text, callback_data=f"deal:{d.id}")]
+        )
+    
     kb = InlineKeyboardMarkup(buttons)
 
     await q.message.reply_html("Выберите сделку:", reply_markup=kb)
@@ -637,7 +637,7 @@ def main() -> None:
     app = Application.builder().token(BOT_TOKEN).post_init(_start_dispatcher).build()
 
     app.add_handler(CommandHandler("start", h_start))
-    app.add_handler(CallbackQueryHandler(h_get, pattern="^get$"))
+    app.add_handler(CallbackQueryHandler(h_show_deals, pattern="^deals$"))
     app.add_handler(CallbackQueryHandler(h_choose_client, pattern=r"^client:\d+$"))
     app.add_handler(CallbackQueryHandler(h_choose_deal, pattern=r"^deal:\d+$"))
     app.add_handler(CallbackQueryHandler(h_choose_task, pattern=r"^task:\d+$"))
