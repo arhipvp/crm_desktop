@@ -41,7 +41,6 @@ def format_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:
 
     kb = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("Добавить расчёт", callback_data=f"calc:{t.id}")],
             [InlineKeyboardButton("Выполнить", callback_data=f"task_done:{t.id}")],
             [InlineKeyboardButton("Написать вопрос", callback_data=f"question:{t.id}")],
         ]

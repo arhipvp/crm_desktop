@@ -160,7 +160,6 @@ def kb_task(tid: int) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton("✅ Выполнить", callback_data=f"done:{tid}"),
                 InlineKeyboardButton("💬 Ответить", callback_data=f"reply:{tid}"),
-                InlineKeyboardButton("➕ Расчёт", callback_data=f"calc:{tid}"),
             ]
         ]
     )
