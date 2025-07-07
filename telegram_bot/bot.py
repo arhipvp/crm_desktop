@@ -154,6 +154,15 @@ def fmt_task(t: ts.Task) -> str:
     return "\n".join(lines)
 
 
+def fmt_task_short(t: ts.Task) -> str:
+    """Краткое описание задачи: заголовок и сделка."""
+    d = getattr(t, "deal", None)
+    if d:
+        desc = d.description.strip() if d.description else ""
+        return f"• {t.title.strip()} — #{d.id} {desc}"
+    return f"• {t.title.strip()}"
+
+
 def kb_task(tid: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
@@ -592,11 +601,9 @@ async def h_show_tasks_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     if not tasks:
         await q.message.reply_text("Нет незавершенных задач")
         return
-    for t in tasks:
-        msg = await q.message.reply_html(
-            fmt_task(t), reply_markup=kb_task(t.id)
-        )
-        ts.link_telegram(t.id, msg.chat_id, msg.message_id)
+
+    lines = [fmt_task_short(t) for t in tasks]
+    await q.message.reply_text("\n".join(lines))
 
 
 async def send_pending_tasks(_ctx: ContextTypes.DEFAULT_TYPE) -> None:
