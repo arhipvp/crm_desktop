@@ -704,3 +704,17 @@ def get_incomplete_tasks_for_executor(tg_id: int) -> list[Task]:
         )
     )
     return list(prefetch(base, Deal, Client, Policy))
+
+
+def get_incomplete_task(task_id: int) -> Task | None:
+    """Вернуть невыполненную задачу с предзагрузкой связей."""
+    base = (
+        Task.select()
+        .where(
+            (Task.id == task_id)
+            & (Task.is_deleted == False)
+            & (Task.is_done == False)
+        )
+    )
+    result = list(prefetch(base, Deal, Policy, Client))
+    return result[0] if result else None
