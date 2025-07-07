@@ -29,10 +29,6 @@ def add_calculation(deal_id: int, **kwargs) -> DealCalculation:
     data["is_deleted"] = False
     entry = DealCalculation.create(**data)
     try:
-        export_calculations_excel(deal_id)
-    except Exception:
-        logger.debug("Failed to export calculations", exc_info=True)
-    try:
         from services.telegram_service import notify_admin
         msg = f"➕ Расчёт по сделке #{deal_id}: {format_calculation(entry)}"
         notify_admin(msg)
@@ -89,10 +85,6 @@ def update_calculation(entry: DealCalculation, **kwargs) -> DealCalculation:
 
     if updates:
         entry.save()
-        try:
-            export_calculations_excel(entry.deal_id)
-        except Exception:
-            logger.debug("Failed to export calculations", exc_info=True)
     return entry
 
 
