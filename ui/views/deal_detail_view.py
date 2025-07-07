@@ -77,6 +77,8 @@ class DealDetailView(QDialog):
     def __init__(self, deal, parent=None):
         super().__init__(parent)
         self.instance = deal
+        # Enable drag-and-drop for files
+        self.setAcceptDrops(True)
         self.setWindowTitle(
             f"Сделка #{deal.id} — {deal.client.name}: {deal.description}"
         )
@@ -588,6 +590,51 @@ class DealDetailView(QDialog):
             self.instance.drive_folder_path or self.instance.drive_folder_link,
             parent=self,
         )
+
+    # --- Drag and drop support -------------------------------------------------
+
+    def _ensure_local_folder(self) -> str | None:
+        """Ensure local deal folder exists and return its path."""
+        path = self.instance.drive_folder_path
+        if path and os.path.isdir(path):
+            return path
+
+        from services.folder_utils import create_deal_folder
+        from ui.common.message_boxes import confirm
+
+        if confirm("Папка не найдена. Создать новую?"):
+            new_path, link = create_deal_folder(
+                self.instance.client.name,
+                self.instance.description,
+                client_drive_link=self.instance.client.drive_folder_link,
+            )
+            self.instance.drive_folder_path = new_path
+            self.instance.drive_folder_link = link
+            self.instance.save(only=[Deal.drive_folder_path, Deal.drive_folder_link])
+            return new_path
+
+        return None
+
+    def _handle_dropped_files(self, files: list[str]) -> None:
+        """Move dropped files into the deal folder."""
+        dest = self._ensure_local_folder()
+        if not dest:
+            return
+        for src in files:
+            move_file_to_folder(src, dest)
+
+    def dragEnterEvent(self, event):  # noqa: D401 - Qt override
+        """Qt drag enter handler."""
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):  # noqa: D401 - Qt override
+        """Qt drop handler."""
+        urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
+        if urls:
+            files = [u.toLocalFile() for u in urls]
+            self._handle_dropped_files(files)
+            event.acceptProposedAction()
 
     def _on_toggle_executor(self):
         from services import executor_service as es
