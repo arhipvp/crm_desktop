@@ -567,12 +567,20 @@ def get_pending_tasks_page(page: int, per_page: int):
 
 def get_queued_tasks_by_deal(deal_id: int) -> list[Task]:
     """Вернуть задачи в очереди для указанной сделки."""
+    policy_subq = (
+        Policy.select(Policy.id)
+        .where(Policy.deal_id == deal_id)
+    )
+
     base = (
         Task.select()
         .where(
             (Task.dispatch_state == "queued")
             & (Task.is_deleted == False)
-            & (Task.deal_id == deal_id)
+            & (
+                (Task.deal_id == deal_id)
+                | (Task.policy_id.in_(policy_subq))
+            )
         )
     )
     return list(prefetch(base, Deal, Policy, Client))
@@ -632,15 +640,34 @@ def get_tasks_by_deal(deal_id: int) -> list[Task]:
     Returns:
         list[Task]: Список задач сделки.
     """
-    return Task.select().where((Task.deal_id == deal_id) & (Task.is_deleted == False))
+    policy_subq = (
+        Policy.select(Policy.id)
+        .where(Policy.deal_id == deal_id)
+    )
+
+    return Task.select().where(
+        (
+            (Task.deal_id == deal_id)
+            | (Task.policy_id.in_(policy_subq))
+        )
+        & (Task.is_deleted == False)
+    )
 
 
 def get_incomplete_tasks_by_deal(deal_id: int) -> list[Task]:
     """Получить невыполненные задачи сделки с предзагрузкой связей."""
+    policy_subq = (
+        Policy.select(Policy.id)
+        .where(Policy.deal_id == deal_id)
+    )
+
     base = (
         Task.select()
         .where(
-            (Task.deal_id == deal_id)
+            (
+                (Task.deal_id == deal_id)
+                | (Task.policy_id.in_(policy_subq))
+            )
             & (Task.is_deleted == False)
             & (Task.is_done == False)
         )
