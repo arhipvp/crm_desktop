@@ -248,6 +248,18 @@ def process_policy_files_with_ai(paths: List[str]) -> Tuple[List[dict], List[str
     return results, conversations
 
 
+def process_policy_bundle_with_ai(paths: List[str]) -> Tuple[dict, str]:
+    """Send multiple files as a single policy to OpenAI.
+
+    The contents of all files are concatenated and processed as one policy.
+    """
+    if not paths:
+        return {}, ""
+
+    text = "\n".join(_read_text(p) for p in paths)
+    return process_policy_text_with_ai(text)
+
+
 def process_policy_text_with_ai(text: str) -> Tuple[dict, str]:
     """Send raw text of a policy to OpenAI and return parsed JSON data and transcript."""
     if not text:

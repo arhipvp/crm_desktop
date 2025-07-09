@@ -110,3 +110,21 @@ def test_process_policy_text_logs_chat(monkeypatch, caplog):
 
     assert any("OpenAI conversation for" in r.message for r in caplog.records)
     assert conv
+
+
+def test_process_policy_bundle_with_ai_combines(monkeypatch, tmp_path):
+    file1 = tmp_path / "a.txt"
+    file2 = tmp_path / "b.txt"
+    file1.write_text("foo")
+    file2.write_text("bar")
+    client = DummyClient(['{"x":1}'])
+    monkeypatch.setattr(ai.openai, "OpenAI", lambda api_key=None, base_url=None: client)
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+
+    result, conv = ai.process_policy_bundle_with_ai([str(file1), str(file2)])
+
+    assert result == {"x": 1}
+    assert conv
+    assert len(client.calls) == 1
+    sent = client.calls[0][1]["content"]
+    assert "foo" in sent and "bar" in sent
