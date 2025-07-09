@@ -8,6 +8,7 @@ from services.policy_service import (
     mark_policies_deleted,
 )
 from PySide6.QtWidgets import QAbstractItemView
+from PySide6.QtCore import Qt
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.common.search_dialog import SearchDialog
@@ -30,6 +31,7 @@ class PolicyTableView(BaseTableView):
             checkbox_map=checkbox_map,
             **kwargs,
         )
+        self.setAcceptDrops(True)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setSortingEnabled(True)
         self.table.horizontalHeader().sectionClicked.connect(self.on_section_clicked)
@@ -203,3 +205,33 @@ class PolicyTableView(BaseTableView):
         self.order_by = field
         self.page = 1
         self.load_data()
+
+    # --- Drag and drop support -------------------------------------------------
+
+    def dragEnterEvent(self, event):  # noqa: D401 - Qt override
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            self._orig_style = self.styleSheet()
+            self.setStyleSheet(
+                self._orig_style + "; border: 2px dashed #4CAF50;"
+                if self._orig_style
+                else "border: 2px dashed #4CAF50;"
+            )
+
+    def dragLeaveEvent(self, event):  # noqa: D401 - Qt override
+        if hasattr(self, "_orig_style"):
+            self.setStyleSheet(self._orig_style)
+        event.accept()
+
+    def dropEvent(self, event):  # noqa: D401 - Qt override
+        urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
+        if urls:
+            file_path = urls[0].toLocalFile()
+            from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
+
+            dlg = AiPolicyTextDialog(parent=self, file_path=file_path)
+            if dlg.exec():
+                self.refresh()
+            event.acceptProposedAction()
+        if hasattr(self, "_orig_style"):
+            self.setStyleSheet(self._orig_style)
