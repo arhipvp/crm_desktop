@@ -825,53 +825,15 @@ class DealDetailView(QDialog):
             self._init_tabs()
 
     def _on_process_policies_ai(self):
-        from ui.common.message_boxes import show_error
-        from PySide6.QtWidgets import QFileDialog
-        import json as _json
+        from ui.forms.ai_policy_files_dialog import AiPolicyFilesDialog
 
-        try:
-            start_dir = self.instance.drive_folder_path or os.path.expanduser("~")
-        except Exception:
-            start_dir = os.path.expanduser("~")
-
-        files, _ = QFileDialog.getOpenFileNames(
-            self,
-            "Выберите файлы полисов",
-            start_dir,
-            "Документы (*.pdf *.jpg *.jpeg *.png *.txt);;Все файлы (*)",
+        dlg = AiPolicyFilesDialog(
+            parent=self,
+            forced_client=self.instance.client,
+            forced_deal=self.instance,
         )
-        if not files:
-            return
-        try:
-            from services.ai_policy_service import process_policy_files_with_ai
-
-            results, conversations = process_policy_files_with_ai(files)
-        except Exception as e:
-            show_error(str(e))
-            return
-
-        for src, data, conv in zip(files, results, conversations):
-            msg = QMessageBox(self)
-            msg.setWindowTitle("Диалог с ИИ")
-            fname = os.path.basename(src)
-            msg.setText(
-                f"Распознавание файла {fname} завершено. Полный диалог см. в деталях."
-            )
-            msg.setDetailedText(conv)
-            msg.exec()
-
-            json_text = _json.dumps(data, ensure_ascii=False, indent=2)
-            dlg = ImportPolicyJsonForm(
-                parent=self,
-                forced_client=self.instance.client,
-                forced_deal=self.instance,
-                json_text=json_text,
-            )
-            if dlg.exec():
-                policy = getattr(dlg, "imported_policy", None)
-                if policy and policy.drive_folder_link:
-                    move_file_to_folder(src, policy.drive_folder_link)
-                self._init_tabs()
+        if dlg.exec():
+            self._init_tabs()
 
     def _on_process_policy_text_ai(self):
         from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
