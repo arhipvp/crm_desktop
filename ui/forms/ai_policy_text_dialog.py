@@ -43,14 +43,31 @@ class _Worker(QThread):
 
 
 class AiPolicyTextDialog(QDialog):
-    def __init__(self, parent=None, *, forced_client=None, forced_deal=None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        forced_client=None,
+        forced_deal=None,
+        file_path: str | None = None,
+    ):
         super().__init__(parent)
         self.forced_client = forced_client
         self.forced_deal = forced_deal
+        self.file_path = file_path
         self.setWindowTitle("Распознавание полиса из текста")
         self.setMinimumWidth(500)
 
         layout = QVBoxLayout(self)
+
+        self.setAcceptDrops(True)
+
+        self.file_edit = QLineEdit(self)
+        self.file_edit.setPlaceholderText("Перетащите файл полиса сюда")
+        self.file_edit.setReadOnly(True)
+        if self.file_path:
+            self.file_edit.setText(self.file_path)
+        layout.addWidget(self.file_edit)
 
         self.text_edit = QTextEdit(self)
         self.text_edit.setPlaceholderText("Вставьте текст полиса...")
@@ -98,6 +115,18 @@ class AiPolicyTextDialog(QDialog):
         self._worker.start()
 
     # ------------------------------------------------------------------
+    def dragEnterEvent(self, event):  # noqa: D401 - Qt override
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):  # noqa: D401 - Qt override
+        urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
+        if urls:
+            self.file_path = urls[0].toLocalFile()
+            self.file_edit.setText(self.file_path)
+            event.acceptProposedAction()
+
+    # ------------------------------------------------------------------
     def on_process(self):
         if self._worker:
             # отправка дополнительного сообщения
@@ -111,10 +140,17 @@ class AiPolicyTextDialog(QDialog):
             self._start_worker()
             return
 
-        text = self.text_edit.toPlainText().strip()
-        if not text:
-            QMessageBox.warning(self, "Ошибка", "Вставьте текст полиса.")
-            return
+        if self.file_path:
+            from services.ai_policy_service import _read_text
+
+            text = _read_text(self.file_path)
+        else:
+            text = self.text_edit.toPlainText().strip()
+            if not text:
+                QMessageBox.warning(
+                    self, "Ошибка", "Вставьте текст полиса или выберите файл."
+                )
+                return
 
         self.conv_edit.clear()
         self._messages = [
@@ -149,6 +185,14 @@ class AiPolicyTextDialog(QDialog):
             json_text=json_text,
         )
         if form.exec():
+            policy = getattr(form, "imported_policy", None)
+            if policy and self.file_path:
+                from services.folder_utils import move_file_to_folder, open_folder
+
+                dest = policy.drive_folder_link or policy.drive_folder_path
+                if dest:
+                    move_file_to_folder(self.file_path, dest)
+                    open_folder(dest, parent=self)
             self.accept()
         else:
             self.process_btn.setEnabled(True)
