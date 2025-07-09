@@ -52,6 +52,11 @@ class PolicyTableView(BaseTableView):
         self.button_row.insertWidget(idx, self.link_deal_btn)
         self.link_deal_btn.clicked.connect(self._on_link_deal)
 
+        self.ai_btn = styled_button("🤖 Загрузить через ИИ")
+        idx = self.button_row.count() - 1
+        self.button_row.insertWidget(idx, self.ai_btn)
+        self.ai_btn.clicked.connect(self._on_ai_import)
+
         self.load_data()
 
     def get_filters(self) -> dict:
@@ -175,6 +180,13 @@ class PolicyTableView(BaseTableView):
                 self.refresh()
         except Exception as e:
             show_error(str(e))
+
+    def _on_ai_import(self):
+        from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
+
+        dlg = AiPolicyTextDialog(parent=self)
+        if dlg.exec():
+            self.refresh()
 
     def open_detail(self, _=None):
         policy = self.get_selected()
