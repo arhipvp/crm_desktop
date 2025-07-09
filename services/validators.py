@@ -39,3 +39,14 @@ def normalize_full_name(name: str) -> str:
         return "-".join(p.capitalize() for p in word.split("-") if p)
 
     return " ".join(norm(p) for p in parts if p)
+
+
+def normalize_company_name(name: str) -> str:
+    """Нормализует название страховой компании с заглавной буквы."""
+
+    parts = re.split(r"\s+", name.strip())
+
+    def norm(word: str) -> str:
+        return "-".join(p.capitalize() for p in word.split("-") if p)
+
+    return " ".join(norm(p) for p in parts if p)

@@ -17,6 +17,7 @@ except Exception:  # noqa: BLE001
 
 from database.models import Task
 from services.task_service import add_task, update_task
+from services.validators import normalize_company_name
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,7 @@ def _to_float(value: str | None) -> float | None:
     """Попытаться преобразовать строку в число."""
     if value is None:
         return None
-    cleaned = value.replace(" ", "")
+    cleaned = re.sub(r"\s+", "", value)
     # извлечь первую группу цифр с возможной десятичной точкой
     match = re.search(r"[-+]?\d*[\.,]?\d+", cleaned)
     if not match:
@@ -181,7 +182,11 @@ def sync_calculations_from_sheet() -> int:
         except Exception:
             continue
         params = {
-            "insurance_company": item.get("insurance_company"),
+            "insurance_company": normalize_company_name(
+                item.get("insurance_company", "")
+            )
+            if item.get("insurance_company")
+            else None,
             "insurance_type": item.get("insurance_type"),
             "insured_amount": _to_float(item.get("insured_amount")),
             "premium": _to_float(item.get("premium")),
