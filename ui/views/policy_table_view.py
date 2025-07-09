@@ -244,35 +244,34 @@ class PolicyTableView(BaseTableView):
                 from PySide6.QtWidgets import QMessageBox
                 import os
                 import json as _json
-                from services.ai_policy_service import process_policy_files_with_ai
+                from services.ai_policy_service import process_policy_bundle_with_ai
                 from ui.forms.import_policy_json_form import ImportPolicyJsonForm
                 from ui.common.message_boxes import show_error
 
                 try:
-                    results, conversations = process_policy_files_with_ai(files)
+                    data, conv = process_policy_bundle_with_ai(files)
                 except Exception as e:  # pragma: no cover - network errors
                     show_error(str(e))
                     return
 
-                for src, data, conv in zip(files, results, conversations):
-                    msg = QMessageBox(self)
-                    msg.setWindowTitle("Диалог с ИИ")
-                    msg.setText(
-                        f"Распознавание файла {os.path.basename(src)} завершено. "
-                        "Полный диалог см. в деталях."
-                    )
-                    msg.setDetailedText(conv)
-                    msg.exec()
+                msg = QMessageBox(self)
+                msg.setWindowTitle("Диалог с ИИ")
+                msg.setText(
+                    "Распознавание файлов завершено. Полный диалог см. в деталях."
+                )
+                msg.setDetailedText(conv)
+                msg.exec()
 
-                    json_text = _json.dumps(data, ensure_ascii=False, indent=2)
-                    dlg = ImportPolicyJsonForm(parent=self, json_text=json_text)
-                    if dlg.exec():
-                        policy = getattr(dlg, "imported_policy", None)
-                        if policy and policy.drive_folder_link:
-                            from services.folder_utils import move_file_to_folder
+                json_text = _json.dumps(data, ensure_ascii=False, indent=2)
+                dlg = ImportPolicyJsonForm(parent=self, json_text=json_text)
+                if dlg.exec():
+                    policy = getattr(dlg, "imported_policy", None)
+                    if policy and policy.drive_folder_link:
+                        from services.folder_utils import move_file_to_folder
 
+                        for src in files:
                             move_file_to_folder(src, policy.drive_folder_link)
-                        self.refresh()
+                    self.refresh()
             event.acceptProposedAction()
         if hasattr(self, "_orig_style"):
             self.setStyleSheet(self._orig_style)
