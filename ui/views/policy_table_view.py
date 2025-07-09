@@ -184,11 +184,58 @@ class PolicyTableView(BaseTableView):
             show_error(str(e))
 
     def _on_ai_import(self):
+        """Import policies using AI from one or multiple files."""
         from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        import os
+        import json as _json
+        from services.ai_policy_service import process_policy_files_with_ai
+        from ui.forms.import_policy_json_form import ImportPolicyJsonForm
+        from ui.common.message_boxes import show_error
 
-        dlg = AiPolicyTextDialog(parent=self)
-        if dlg.exec():
-            self.refresh()
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Выберите файлы полисов (можно несколько)",
+            os.path.expanduser("~"),
+            "Документы (*.pdf *.jpg *.jpeg *.png *.txt);;Все файлы (*)",
+        )
+        if not files:
+            dlg = AiPolicyTextDialog(parent=self)
+            if dlg.exec():
+                self.refresh()
+            return
+
+        if len(files) == 1:
+            dlg = AiPolicyTextDialog(parent=self, file_path=files[0])
+            if dlg.exec():
+                self.refresh()
+            return
+
+        try:
+            results, conversations = process_policy_files_with_ai(files)
+        except Exception as e:  # pragma: no cover - network errors
+            show_error(str(e))
+            return
+
+        for src, data, conv in zip(files, results, conversations):
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Диалог с ИИ")
+            msg.setText(
+                f"Распознавание файла {os.path.basename(src)} завершено. "
+                "Полный диалог см. в деталях."
+            )
+            msg.setDetailedText(conv)
+            msg.exec()
+
+            json_text = _json.dumps(data, ensure_ascii=False, indent=2)
+            dlg = ImportPolicyJsonForm(parent=self, json_text=json_text)
+            if dlg.exec():
+                policy = getattr(dlg, "imported_policy", None)
+                if policy and policy.drive_folder_link:
+                    from services.folder_utils import move_file_to_folder
+
+                    move_file_to_folder(src, policy.drive_folder_link)
+                self.refresh()
 
     def open_detail(self, _=None):
         policy = self.get_selected()
@@ -226,12 +273,46 @@ class PolicyTableView(BaseTableView):
     def dropEvent(self, event):  # noqa: D401 - Qt override
         urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
         if urls:
-            file_path = urls[0].toLocalFile()
-            from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
+            files = [u.toLocalFile() for u in urls]
+            if len(files) == 1:
+                from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
 
-            dlg = AiPolicyTextDialog(parent=self, file_path=file_path)
-            if dlg.exec():
-                self.refresh()
+                dlg = AiPolicyTextDialog(parent=self, file_path=files[0])
+                if dlg.exec():
+                    self.refresh()
+            else:
+                from PySide6.QtWidgets import QMessageBox
+                import os
+                import json as _json
+                from services.ai_policy_service import process_policy_files_with_ai
+                from ui.forms.import_policy_json_form import ImportPolicyJsonForm
+                from ui.common.message_boxes import show_error
+
+                try:
+                    results, conversations = process_policy_files_with_ai(files)
+                except Exception as e:  # pragma: no cover - network errors
+                    show_error(str(e))
+                    return
+
+                for src, data, conv in zip(files, results, conversations):
+                    msg = QMessageBox(self)
+                    msg.setWindowTitle("Диалог с ИИ")
+                    msg.setText(
+                        f"Распознавание файла {os.path.basename(src)} завершено. "
+                        "Полный диалог см. в деталях."
+                    )
+                    msg.setDetailedText(conv)
+                    msg.exec()
+
+                    json_text = _json.dumps(data, ensure_ascii=False, indent=2)
+                    dlg = ImportPolicyJsonForm(parent=self, json_text=json_text)
+                    if dlg.exec():
+                        policy = getattr(dlg, "imported_policy", None)
+                        if policy and policy.drive_folder_link:
+                            from services.folder_utils import move_file_to_folder
+
+                            move_file_to_folder(src, policy.drive_folder_link)
+                        self.refresh()
             event.acceptProposedAction()
         if hasattr(self, "_orig_style"):
             self.setStyleSheet(self._orig_style)
