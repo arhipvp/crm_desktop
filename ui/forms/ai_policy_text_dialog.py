@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
 )
 from PySide6.QtCore import QThread, Signal
+from PySide6.QtGui import QTextCursor
 import json
 
 from services.ai_policy_service import (
@@ -101,7 +102,7 @@ class AiPolicyTextDialog(QDialog):
     def _append(self, role: str, text: str):
         if role == "assistant":
             cursor = self.conv_edit.textCursor()
-            cursor.movePosition(cursor.End)
+            cursor.movePosition(QTextCursor.End)
             cursor.insertText(text)
             self.conv_edit.setTextCursor(cursor)
         else:
