@@ -50,12 +50,12 @@ class AiPolicyTextDialog(QDialog):
         *,
         forced_client=None,
         forced_deal=None,
-        file_path: str | None = None,
+        file_paths: list[str] | None = None,
     ):
         super().__init__(parent)
         self.forced_client = forced_client
         self.forced_deal = forced_deal
-        self.file_path = file_path
+        self.file_paths = file_paths or []
         self.setWindowTitle("Распознавание полиса из текста")
         self.setMinimumWidth(500)
 
@@ -64,10 +64,10 @@ class AiPolicyTextDialog(QDialog):
         self.setAcceptDrops(True)
 
         self.file_edit = QLineEdit(self)
-        self.file_edit.setPlaceholderText("Перетащите файл полиса сюда")
+        self.file_edit.setPlaceholderText("Перетащите файл(ы) полиса сюда")
         self.file_edit.setReadOnly(True)
-        if self.file_path:
-            self.file_edit.setText(self.file_path)
+        if self.file_paths:
+            self.file_edit.setText("; ".join(self.file_paths))
         layout.addWidget(self.file_edit)
 
         self.text_edit = QTextEdit(self)
@@ -123,8 +123,8 @@ class AiPolicyTextDialog(QDialog):
     def dropEvent(self, event):  # noqa: D401 - Qt override
         urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
         if urls:
-            self.file_path = urls[0].toLocalFile()
-            self.file_edit.setText(self.file_path)
+            self.file_paths = [u.toLocalFile() for u in urls]
+            self.file_edit.setText("; ".join(self.file_paths))
             event.acceptProposedAction()
 
     # ------------------------------------------------------------------
@@ -141,10 +141,10 @@ class AiPolicyTextDialog(QDialog):
             self._start_worker()
             return
 
-        if self.file_path:
+        if self.file_paths:
             from services.ai_policy_service import _read_text
 
-            text = _read_text(self.file_path)
+            text = "\n".join(_read_text(p) for p in self.file_paths)
         else:
             text = self.text_edit.toPlainText().strip()
             if not text:
@@ -187,12 +187,13 @@ class AiPolicyTextDialog(QDialog):
         )
         if form.exec():
             policy = getattr(form, "imported_policy", None)
-            if policy and self.file_path:
+            if policy and self.file_paths:
                 from services.folder_utils import move_file_to_folder, open_folder
 
                 dest = policy.drive_folder_link or policy.drive_folder_path
                 if dest:
-                    move_file_to_folder(self.file_path, dest)
+                    for path in self.file_paths:
+                        move_file_to_folder(path, dest)
                     open_folder(dest, parent=self)
             self.accept()
         else:

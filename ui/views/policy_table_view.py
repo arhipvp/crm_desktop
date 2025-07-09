@@ -226,10 +226,10 @@ class PolicyTableView(BaseTableView):
     def dropEvent(self, event):  # noqa: D401 - Qt override
         urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
         if urls:
-            file_path = urls[0].toLocalFile()
+            file_paths = [u.toLocalFile() for u in urls]
             from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
 
-            dlg = AiPolicyTextDialog(parent=self, file_path=file_path)
+            dlg = AiPolicyTextDialog(parent=self, file_paths=file_paths)
             if dlg.exec():
                 self.refresh()
             event.acceptProposedAction()
