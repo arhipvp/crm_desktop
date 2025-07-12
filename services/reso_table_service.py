@@ -155,10 +155,6 @@ def import_reso_payouts(
     if row is None:
         return 0
 
-    preview = preview_cls(row.to_dict(), parent=parent)
-    if not preview.exec():
-        return 0
-
     number = str(row.get(mapping["policy_number"], "")).strip()
     start_date, end_date = _parse_date_range(str(row.get(mapping["period"], "")))
     existing_policy = None
@@ -167,22 +163,24 @@ def import_reso_payouts(
 
         existing_policy = Policy.get_or_none(Policy.policy_number == number)
 
-    if existing_policy is not None:
+    preview = preview_cls(
+        row.to_dict(),
+        existing_policy=existing_policy,
+        policy_form_cls=policy_form_cls,
+        policy_number=number,
+        start_date=start_date,
+        end_date=end_date,
+        parent=parent,
+    )
+    if not preview.exec():
+        return 0
+
+    if preview.use_existing:
         policy = existing_policy
     else:
-        pol_form = policy_form_cls(parent=parent)
-        if "policy_number" in pol_form.fields:
-            pol_form.fields["policy_number"].setText(number)
-        if start_date and "start_date" in pol_form.fields:
-            pol_form.fields["start_date"].setDate(start_date)
-        if end_date and "end_date" in pol_form.fields:
-            pol_form.fields["end_date"].setDate(end_date)
-        if not pol_form.exec():
-            return 0
-
-        policy = getattr(pol_form, "saved_instance", None)
-        if not policy:
-            return 0
+        policy = preview.saved_instance or existing_policy
+    if not policy:
+        return 0
 
     amount = row.get(mapping["amount"])
 
