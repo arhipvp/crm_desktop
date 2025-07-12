@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import date, datetime
 import pandas as pd
 
 from PySide6.QtWidgets import QDialog, QInputDialog
@@ -76,6 +77,16 @@ def _parse_date_range(text: str):
     return None, None
 
 
+def _parse_amount(value) -> float:
+    """Convert a payout amount cell to float."""
+    if value in (None, ""):
+        return 0.0
+    try:
+        return float(str(value).replace(" ", "").replace(",", "."))
+    except Exception:
+        return 0.0
+
+
 def select_row_from_table(df: pd.DataFrame, parent=None) -> pd.Series | None:
     """Prompt the user to select a specific row from the RESO table."""
     if df.empty:
@@ -139,6 +150,7 @@ def import_reso_payouts(
     """
 
     df = load_reso_table(path)
+    file_date = date.fromtimestamp(os.path.getctime(path))
 
     mapping = {
         "policy_number": "НОМЕР ПОЛИСА",
@@ -151,9 +163,19 @@ def import_reso_payouts(
             return 0
         mapping = dlg.get_mapping()
 
-    row = select_policy_func(df, mapping["policy_number"], parent=parent)
-    if row is None:
+    row_or_df = select_policy_func(df, mapping["policy_number"], parent=parent)
+    if row_or_df is None:
         return 0
+
+    if isinstance(row_or_df, pd.DataFrame):
+        selected_rows = row_or_df
+        row = selected_rows.iloc[0]
+    else:
+        row = row_or_df
+        number_tmp = str(row.get(mapping["policy_number"], "")).strip()
+        selected_rows = df[
+            df[mapping["policy_number"]].astype(str).str.strip() == number_tmp
+        ]
 
     number = str(row.get(mapping["policy_number"], "")).strip()
     start_date, end_date = _parse_date_range(str(row.get(mapping["period"], "")))
@@ -182,7 +204,7 @@ def import_reso_payouts(
     if not policy:
         return 0
 
-    amount = row.get(mapping["amount"])
+    amount = selected_rows[mapping["amount"]].map(_parse_amount).sum()
 
     pay = (
         policy.payments.order_by(Payment.id).first()
@@ -214,5 +236,9 @@ def import_reso_payouts(
 
     if "amount" in inc_form.fields and amount not in (None, ""):
         inc_form.fields["amount"].setText(str(amount))
+    if "received_date" in inc_form.fields:
+        from ui.common.date_utils import to_qdate
+
+        inc_form.fields["received_date"].setDate(to_qdate(file_date))
     inc_form.exec()
     return 1
