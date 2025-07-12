@@ -6,6 +6,7 @@ import os
 import pandas as pd
 
 from PySide6.QtWidgets import QDialog, QInputDialog
+from ui.forms.column_mapping_dialog import ColumnMappingDialog
 from ui.forms.policy_form import PolicyForm
 from ui.forms.income_form import IncomeForm
 from ui.forms.policy_preview_dialog import PolicyPreviewDialog
@@ -98,11 +99,34 @@ def select_row_from_table(df: pd.DataFrame, parent=None) -> pd.Series | None:
     return None
 
 
+def select_policy_from_table(df: pd.DataFrame, policy_col: str, parent=None) -> pd.Series | None:
+    """Prompt the user to choose a policy number and return the first matching row."""
+    if df.empty or policy_col not in df.columns:
+        return None
+    numbers = [str(n).strip() for n in df[policy_col].dropna().unique()]
+    if not numbers:
+        return None
+    choice, ok = QInputDialog.getItem(
+        parent,
+        "Выберите полис",
+        "Номер полиса:",
+        numbers,
+        editable=False,
+    )
+    if not ok:
+        return None
+    match = df[df[policy_col].astype(str).str.strip() == choice]
+    if not match.empty:
+        return match.iloc[0]
+    return None
+
+
 def import_reso_payouts(
     path: str | os.PathLike,
     *,
     parent=None,
-    select_row_func=select_row_from_table,
+    select_policy_func=select_policy_from_table,
+    column_map_cls: type[QDialog] = ColumnMappingDialog,
     preview_cls: type[QDialog] = PolicyPreviewDialog,
     policy_form_cls: type[PolicyForm] = PolicyForm,
     income_form_cls: type[IncomeForm] = IncomeForm,
@@ -115,7 +139,19 @@ def import_reso_payouts(
     """
 
     df = load_reso_table(path)
-    row = select_row_func(df, parent=parent)
+
+    mapping = {
+        "policy_number": "НОМЕР ПОЛИСА",
+        "period": "НАЧИСЛЕНИЕ,С-ПО",
+        "amount": "arhvp",
+    }
+    if column_map_cls is not None:
+        dlg = column_map_cls(list(df.columns), parent=parent)
+        if not dlg.exec():
+            return 0
+        mapping = dlg.get_mapping()
+
+    row = select_policy_func(df, mapping["policy_number"], parent=parent)
     if row is None:
         return 0
 
@@ -123,17 +159,13 @@ def import_reso_payouts(
     if not preview.exec():
         return 0
 
-    number = str(row.get("НОМЕР ПОЛИСА", "")).strip()
-    start_date, end_date = _parse_date_range(str(row.get("НАЧИСЛЕНИЕ,С-ПО", "")))
+    number = str(row.get(mapping["policy_number"], "")).strip()
+    start_date, end_date = _parse_date_range(str(row.get(mapping["period"], "")))
     existing_policy = None
-    if number and start_date and end_date:
+    if number:
         from database.models import Policy
 
-        existing_policy = Policy.get_or_none(
-            (Policy.policy_number == number)
-            & (Policy.start_date == start_date)
-            & (Policy.end_date == end_date)
-        )
+        existing_policy = Policy.get_or_none(Policy.policy_number == number)
 
     if existing_policy is not None:
         policy = existing_policy
@@ -152,7 +184,7 @@ def import_reso_payouts(
         if not policy:
             return 0
 
-    amount = row.get("arhvp")
+    amount = row.get(mapping["amount"])
 
     pay = (
         policy.payments.order_by(Payment.id).first()
