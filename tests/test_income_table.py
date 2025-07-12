@@ -22,5 +22,10 @@ def test_income_table_has_policy_start_date():
 
     model = IncomeTableModel([income], Income)
     assert "Дата начала" in model.headers
-    idx = model.index(0, 2)
+    idx = model.index(0, 3)
     assert model.data(idx, Qt.DisplayRole) == "01.01.2025"
+
+    # новый столбец со сделкой
+    deal_idx = model.index(0, 1)
+    assert model.headers[1] == "Сделка"
+    assert model.data(deal_idx, Qt.DisplayRole) == "—"

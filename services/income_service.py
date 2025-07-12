@@ -4,7 +4,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from database.models import Client, Income, Payment, Policy
+from peewee import JOIN
+from database.models import Client, Income, Payment, Policy, Deal
 from services.payment_service import get_payment_by_id
 
 # ───────────────────────── базовые CRUD ─────────────────────────
@@ -183,6 +184,7 @@ def apply_income_filters(
         query = query.where(
             (Policy.policy_number.contains(search_text))
             | (Client.name.contains(search_text))
+            | (Deal.description.contains(search_text))
         )
     if only_unreceived:
         query = query.where(Income.received_date.is_null(True))
@@ -204,14 +206,16 @@ def build_income_query(
     received_date_range=None,
     **kwargs,
 ):
-    # JOIN Payment, Policy, Client
+    # JOIN Payment, Policy, Client, Deal
     query = (
-        Income.select(Income, Payment, Policy, Client)
+        Income.select(Income, Payment, Policy, Client, Deal)
         .join(Payment, on=(Income.payment == Payment.id))
         .switch(Payment)
         .join(Policy, on=(Payment.policy == Policy.id))
         .switch(Policy)
         .join(Client, on=(Policy.client == Client.id))
+        .switch(Policy)
+        .join(Deal, JOIN.LEFT_OUTER, on=(Policy.deal == Deal.id))
     )
 
     if not show_deleted:
@@ -221,6 +225,7 @@ def build_income_query(
         query = query.where(
             (Policy.policy_number.contains(search_text))
             | (Client.name.contains(search_text))
+            | (Deal.description.contains(search_text))
         )
 
     if only_unreceived:

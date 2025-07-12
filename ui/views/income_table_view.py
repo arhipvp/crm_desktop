@@ -1,7 +1,7 @@
 from peewee import prefetch
 from PySide6.QtCore import Qt
 
-from database.models import Client, Income, Payment, Policy
+from database.models import Client, Income, Payment, Policy, Deal
 from services.income_service import build_income_query, mark_income_deleted
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
@@ -26,6 +26,7 @@ class IncomeTableModel(BaseTableModel):
         self.virtual_fields = self.VIRTUAL_FIELDS
         self.headers = [
             "Полис",
+            "Сделка",
             "Клиент",
             "Дата начала",
             "Сумма комиссии",
@@ -46,20 +47,23 @@ class IncomeTableModel(BaseTableModel):
 
         payment = getattr(obj, "payment", None)
         policy = getattr(payment, "policy", None) if payment else None
+        deal = getattr(policy, "deal", None) if policy else None
 
         if col == 0:
             return policy.policy_number if policy else "—"
         elif col == 1:
-            return policy.client.name if policy and policy.client else "—"
+            return deal.description if deal else "—"
         elif col == 2:
+            return policy.client.name if policy and policy.client else "—"
+        elif col == 3:
             return (
                 policy.start_date.strftime("%d.%m.%Y")
                 if policy and policy.start_date
                 else "—"
             )
-        elif col == 3:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
         elif col == 4:
+            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+        elif col == 5:
             return (
                 obj.received_date.strftime("%d.%m.%Y")
                 if obj.received_date
@@ -87,7 +91,7 @@ class IncomeTableView(BaseTableView):
             checkbox_map=checkbox_map,
         )
         self.deal_id = deal_id
-        self.default_sort_column = 4
+        self.default_sort_column = 5
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
@@ -121,7 +125,7 @@ class IncomeTableView(BaseTableView):
 
         query = build_income_query(**filters)
         page_query = query.paginate(self.page, self.per_page)
-        items = prefetch(page_query, Payment, Policy, Client)
+        items = prefetch(page_query, Payment, Policy, Client, Deal)
         total = query.count()
 
         self.set_model_class_and_items(self.model_class, items, total_count=total)
