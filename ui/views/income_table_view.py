@@ -1,5 +1,6 @@
 from peewee import prefetch
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QHeaderView
 
 from database.models import Client, Income, Payment, Policy, Deal
 from services.income_service import build_income_query, mark_income_deleted
@@ -108,6 +109,9 @@ class IncomeTableView(BaseTableView):
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
 
+        # Разрешаем пользователю менять ширину столбцов
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+
         self.table.horizontalHeader().sectionClicked.connect(self.on_sort_requested)
         self.row_double_clicked.connect(self.open_detail)
         self.load_data()
@@ -143,17 +147,31 @@ class IncomeTableView(BaseTableView):
         self.set_model_class_and_items(self.model_class, items, total_count=total)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
+        """Устанавливает модель таблицы и применяет сохранённые настройки."""
         self.model = IncomeTableModel(items, model_class)
         self.proxy_model.setSourceModel(self.model)
         self.table.setModel(self.proxy_model)
+
         try:
-            self.table.sortByColumn(self.default_sort_column, self.default_sort_order)
+            self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
             self.table.resizeColumnsToContents()
         except NotImplementedError:
             pass
+
         if total_count is not None:
             self.total_count = total_count
             self.paginator.update(self.total_count, self.page)
+            self.data_loaded.emit(self.total_count)
+
+        headers = [
+            self.model.headerData(i, Qt.Horizontal)
+            for i in range(self.model.columnCount())
+        ]
+        self.column_filters.set_headers(headers)
+        self.load_table_settings()
+
+        # В интерактивном режиме пользователь сам выбирает ширину
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
 
     def get_selected(self):
         idx = self.table.currentIndex()
