@@ -9,7 +9,7 @@ from ui.views.income_table_view import IncomeTableModel
 from database.models import Income
 
 
-def test_income_table_has_policy_start_date():
+def test_income_table_shows_payment_date():
     client = add_client(name="X")
     policy = add_policy(
         client_id=client.id,
@@ -21,19 +21,35 @@ def test_income_table_has_policy_start_date():
     income = add_income(payment_id=payment.id, amount=5, received_date=date(2025, 1, 3))
 
     model = IncomeTableModel([income], Income)
-    assert "Дата начала" in model.headers
-    idx = model.index(0, 3)
-    assert model.data(idx, Qt.DisplayRole) == "01.01.2025"
 
-    # столбцы суммы и даты платежа
-    amount_idx = model.index(0, 4)
-    date_idx = model.index(0, 5)
-    assert model.headers[4] == "Сумма платежа"
-    assert model.headers[5] == "Дата платежа"
-    assert model.data(amount_idx, Qt.DisplayRole) == "10.00 ₽"
+    # Проверка на наличие всех ожидаемых заголовков
+    expected_headers = [
+        "Полис", "Сделка", "Клиент", "Дата начала", "Дата платежа",
+        "Сумма платежа", "Сумма комиссии", "Дата получения"
+    ]
+    for header in expected_headers:
+        assert header in model.headers, f"Ожидается заголовок '{header}'"
+
+    # Проверка "Дата начала"
+    start_idx = model.index(0, model.headers.index("Дата начала"))
+    assert model.data(start_idx, Qt.DisplayRole) == "01.01.2025"
+
+    # Проверка "Дата платежа"
+    date_idx = model.index(0, model.headers.index("Дата платежа"))
     assert model.data(date_idx, Qt.DisplayRole) == "02.01.2025"
 
-    # новый столбец со сделкой
-    deal_idx = model.index(0, 1)
-    assert model.headers[1] == "Сделка"
+    # Проверка "Сумма платежа"
+    amount_idx = model.index(0, model.headers.index("Сумма платежа"))
+    assert model.data(amount_idx, Qt.DisplayRole) == "10.00 ₽"
+
+    # Проверка "Сумма комиссии"
+    commission_idx = model.index(0, model.headers.index("Сумма комиссии"))
+    assert model.data(commission_idx, Qt.DisplayRole) == "5.00 ₽"
+
+    # Проверка "Дата получения"
+    received_idx = model.index(0, model.headers.index("Дата получения"))
+    assert model.data(received_idx, Qt.DisplayRole) == "03.01.2025"
+
+    # Проверка "Сделка"
+    deal_idx = model.index(0, model.headers.index("Сделка"))
     assert model.data(deal_idx, Qt.DisplayRole) == "—"
