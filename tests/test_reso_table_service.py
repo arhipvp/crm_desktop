@@ -75,23 +75,14 @@ def test_import_reso_payout_new_policy(monkeypatch):
         def setDate(self, val):
             pass
 
-    class FakePreview:
-        def __init__(self, data, parent=None):
-            events["prev"] += 1
-
-        def exec(self):
-            return True
-
     class FakePolicyForm:
         def __init__(self, parent=None):
+            events["pol"] += 1
             self.fields = {
                 "policy_number": DummyField(),
                 "start_date": DummyField(),
                 "end_date": DummyField(),
             }
-
-        def exec(self):
-            events["pol"] += 1
             self.saved_instance = types.SimpleNamespace(
                 deal_id=None,
                 payments=types.SimpleNamespace(
@@ -100,6 +91,18 @@ def test_import_reso_payout_new_policy(monkeypatch):
                     )
                 ),
             )
+
+    class FakePreview:
+        def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
+            events["prev"] += 1
+            assert existing_policy is None
+            assert policy_form_cls is FakePolicyForm
+            # имитируем создание формы
+            self.form = policy_form_cls()
+            self.saved_instance = self.form.saved_instance
+            self.use_existing = False
+
+        def exec(self):
             return True
 
     class FakeIncomeForm:
@@ -164,8 +167,11 @@ def test_import_reso_payout_existing_policy(monkeypatch):
         return df.iloc[0]
 
     class FakePreview:
-        def __init__(self, data, parent=None):
+        def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
             events["prev"] += 1
+            assert existing_policy.id == policy.id
+            self.use_existing = True
+            self.saved_instance = None
 
         def exec(self):
             return True
@@ -174,9 +180,6 @@ def test_import_reso_payout_existing_policy(monkeypatch):
         def __init__(self, parent=None):
             events["pol"] += 1
             self.fields = {}
-
-        def exec(self):
-            return True
 
     class FakeIncomeForm:
         def __init__(self, instance=None, parent=None, deal_id=None):
@@ -242,8 +245,11 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
         return df.iloc[0]
 
     class FakePreview:
-        def __init__(self, data, parent=None):
+        def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
             events["prev"] += 1
+            assert existing_policy.id == policy.id
+            self.use_existing = True
+            self.saved_instance = None
 
         def exec(self):
             return True
@@ -252,9 +258,6 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
         def __init__(self, parent=None):
             events["pol"] += 1
             self.fields = {}
-
-        def exec(self):
-            return True
 
     class DummyField:
         def setText(self, val):
