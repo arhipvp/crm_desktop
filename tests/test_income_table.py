@@ -22,17 +22,34 @@ def test_income_table_shows_payment_date():
 
     model = IncomeTableModel([income], Income)
 
-    # Проверка на наличие "Дата платежа"
-    assert "Дата платежа" in model.headers
-    idx = model.index(0, model.headers.index("Дата платежа"))
-    assert model.data(idx, Qt.DisplayRole) == "02.01.2025"
+    # Проверка на наличие всех ожидаемых заголовков
+    expected_headers = [
+        "Полис", "Сделка", "Клиент", "Дата начала", "Дата платежа",
+        "Сумма платежа", "Сумма комиссии", "Дата получения"
+    ]
+    for header in expected_headers:
+        assert header in model.headers, f"Ожидается заголовок '{header}'"
 
-    # Проверка на наличие "Дата начала"
-    assert "Дата начала" in model.headers
+    # Проверка "Дата начала"
     start_idx = model.index(0, model.headers.index("Дата начала"))
     assert model.data(start_idx, Qt.DisplayRole) == "01.01.2025"
 
-    # Проверка на наличие колонки "Сделка"
-    assert "Сделка" in model.headers
+    # Проверка "Дата платежа"
+    date_idx = model.index(0, model.headers.index("Дата платежа"))
+    assert model.data(date_idx, Qt.DisplayRole) == "02.01.2025"
+
+    # Проверка "Сумма платежа"
+    amount_idx = model.index(0, model.headers.index("Сумма платежа"))
+    assert model.data(amount_idx, Qt.DisplayRole) == "10.00 ₽"
+
+    # Проверка "Сумма комиссии"
+    commission_idx = model.index(0, model.headers.index("Сумма комиссии"))
+    assert model.data(commission_idx, Qt.DisplayRole) == "5.00 ₽"
+
+    # Проверка "Дата получения"
+    received_idx = model.index(0, model.headers.index("Дата получения"))
+    assert model.data(received_idx, Qt.DisplayRole) == "03.01.2025"
+
+    # Проверка "Сделка"
     deal_idx = model.index(0, model.headers.index("Сделка"))
     assert model.data(deal_idx, Qt.DisplayRole) == "—"
