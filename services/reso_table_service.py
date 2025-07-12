@@ -153,14 +153,35 @@ def import_reso_payouts(
             return 0
 
     amount = row.get("arhvp")
-    inc_form = income_form_cls(parent=parent, deal_id=getattr(policy, "deal_id", None))
+
     pay = (
         policy.payments.order_by(Payment.id).first()
         if hasattr(policy, "payments")
         else None
     )
+    existing_income = None
     if pay:
-        inc_form.prefill_payment(pay.id)
+        from database.models import Income
+
+        existing_income = (
+            Income.select()
+            .where(
+                (Income.payment == pay.id)
+                & (Income.received_date.is_null(True))
+            )
+            .order_by(Income.id)
+            .first()
+        )
+
+    if existing_income:
+        inc_form = income_form_cls(instance=existing_income, parent=parent)
+    else:
+        inc_form = income_form_cls(
+            parent=parent, deal_id=getattr(policy, "deal_id", None)
+        )
+        if pay:
+            inc_form.prefill_payment(pay.id)
+
     if "amount" in inc_form.fields and amount not in (None, ""):
         inc_form.fields["amount"].setText(str(amount))
     inc_form.exec()
