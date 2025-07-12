@@ -2,6 +2,7 @@
 
 import logging
 from datetime import timedelta
+from peewee import fn
 
 
 from database.models import Client  # если ещё не импортирован
@@ -541,3 +542,18 @@ def get_unique_policy_field_values(field_name: str) -> list[str]:
         .distinct()
     )
     return sorted({getattr(p, field_name) for p in q if getattr(p, field_name)})
+
+
+def attach_premium(policies: list[Policy]) -> None:
+    """Добавить атрибут ``_premium`` со суммой платежей."""
+    if not policies:
+        return
+    ids = [p.id for p in policies]
+    sub = (
+        Payment.select(Payment.policy, fn.SUM(Payment.amount).alias("total"))
+        .where((Payment.policy.in_(ids)) & (Payment.is_deleted == False))
+        .group_by(Payment.policy)
+    )
+    totals = {row.policy_id: row.total for row in sub}
+    for p in policies:
+        setattr(p, "_premium", totals.get(p.id, 0) or 0)

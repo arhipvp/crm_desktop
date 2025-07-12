@@ -6,10 +6,12 @@ from services.policy_service import (
     mark_policy_renewed,
     mark_policies_renewed,
     mark_policies_deleted,
+    attach_premium,
 )
 from PySide6.QtWidgets import QAbstractItemView
 from PySide6.QtCore import Qt
 from ui.base.base_table_view import BaseTableView
+from ui.base.base_table_model import BaseTableModel
 from ui.common.message_boxes import confirm, show_error
 from ui.common.search_dialog import SearchDialog
 from ui.forms.policy_form import PolicyForm
@@ -74,15 +76,18 @@ class PolicyTableView(BaseTableView):
 
     def load_data(self):
         filters = self.get_filters()
-        items = get_policies_page(
-            self.page,
-            self.per_page,
-            order_by=self.order_by,
-            order_dir=self.order_dir,
-            **filters,
+        items = list(
+            get_policies_page(
+                self.page,
+                self.per_page,
+                order_by=self.order_by,
+                order_dir=self.order_dir,
+                **filters,
+            )
         )
+        attach_premium(items)
         total = build_policy_query(**filters).count()
-        self.set_model_class_and_items(Policy, list(items), total_count=total)
+        self.set_model_class_and_items(Policy, items, total_count=total)
 
     def get_selected(self):
         idx = self.table.currentIndex()
@@ -203,6 +208,19 @@ class PolicyTableView(BaseTableView):
             dlg = PolicyDetailView(policy)
             dlg.exec()
 
+    def set_model_class_and_items(self, model_class, items, total_count=None):
+        self.model = PolicyTableModel(items, model_class)
+        self.proxy_model.setSourceModel(self.model)
+        self.table.setModel(self.proxy_model)
+        try:
+            self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
+            self.table.resizeColumnsToContents()
+        except NotImplementedError:
+            pass
+        if total_count is not None:
+            self.total_count = total_count
+            self.paginator.update(self.total_count, self.page)
+
     def on_section_clicked(self, logicalIndex):
         field = self.model.fields[logicalIndex].name
         if not hasattr(Policy, field):
@@ -228,6 +246,42 @@ class PolicyTableView(BaseTableView):
     def dragLeaveEvent(self, event):  # noqa: D401 - Qt override
         if hasattr(self, "_orig_style"):
             self.setStyleSheet(self._orig_style)
+
+
+class PolicyTableModel(BaseTableModel):
+    def __init__(self, objects, model_class, parent=None):
+        super().__init__(objects, model_class, parent)
+        self.virtual_fields = ["premium"]
+        self.headers.append("Страховая премия")
+
+    def columnCount(self, parent=None):
+        return len(self.fields) + len(self.virtual_fields)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+
+        obj = self.objects[index.row()]
+        col = index.column()
+
+        if col >= len(self.fields):
+            if role == Qt.DisplayRole:
+                return self.format_money(getattr(obj, "_premium", 0))
+            if role == Qt.UserRole:
+                return getattr(obj, "_premium", 0)
+            if role == Qt.TextAlignmentRole:
+                return Qt.AlignRight | Qt.AlignVCenter
+            return None
+
+        return super().data(index, role)
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role != Qt.DisplayRole or orientation != Qt.Horizontal:
+            return None
+
+        if section < len(self.fields):
+            return super().headerData(section, orientation, role)
+        return self.headers[-1]
         event.accept()
 
     def dropEvent(self, event):  # noqa: D401 - Qt override
