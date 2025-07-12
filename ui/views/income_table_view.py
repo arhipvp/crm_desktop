@@ -28,7 +28,7 @@ class IncomeTableModel(BaseTableModel):
             "Полис",
             "Сделка",
             "Клиент",
-            "Дата начала",
+            "Дата платежа",
             "Сумма комиссии",
             "Дата получения",
         ]
@@ -57,8 +57,8 @@ class IncomeTableModel(BaseTableModel):
             return policy.client.name if policy and policy.client else "—"
         elif col == 3:
             return (
-                policy.start_date.strftime("%d.%m.%Y")
-                if policy and policy.start_date
+                payment.payment_date.strftime("%d.%m.%Y")
+                if payment and payment.payment_date
                 else "—"
             )
         elif col == 4:
