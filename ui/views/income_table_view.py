@@ -29,6 +29,8 @@ class IncomeTableModel(BaseTableModel):
             "Сделка",
             "Клиент",
             "Дата начала",
+            "Сумма платежа",
+            "Дата платежа",
             "Сумма комиссии",
             "Дата получения",
         ]
@@ -62,8 +64,18 @@ class IncomeTableModel(BaseTableModel):
                 else "—"
             )
         elif col == 4:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+            return (
+                f"{payment.amount:,.2f} ₽" if payment and payment.amount else "0 ₽"
+            )
         elif col == 5:
+            return (
+                payment.payment_date.strftime("%d.%m.%Y")
+                if payment and payment.payment_date
+                else "—"
+            )
+        elif col == 6:
+            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+        elif col == 7:
             return (
                 obj.received_date.strftime("%d.%m.%Y")
                 if obj.received_date
@@ -91,7 +103,7 @@ class IncomeTableView(BaseTableView):
             checkbox_map=checkbox_map,
         )
         self.deal_id = deal_id
-        self.default_sort_column = 5
+        self.default_sort_column = 7
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
