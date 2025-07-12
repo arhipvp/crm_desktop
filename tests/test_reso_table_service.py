@@ -8,6 +8,7 @@ from services.reso_table_service import (
 )
 from services.client_service import add_client
 from services.policy_service import add_policy
+from database.models import Payment, Income
 
 
 def test_load_reso_table(tmp_path):
@@ -163,7 +164,7 @@ def test_import_reso_payout_existing_policy(monkeypatch):
             return True
 
     class FakeIncomeForm:
-        def __init__(self, parent=None, deal_id=None):
+        def __init__(self, instance=None, parent=None, deal_id=None):
             events["inc"] += 1
             self.fields = {}
 
@@ -182,4 +183,73 @@ def test_import_reso_payout_existing_policy(monkeypatch):
     )
     assert count == 1
     assert events == {"sel": 1, "prev": 1, "pol": 0, "inc": 1}
+
+
+def test_import_reso_payout_updates_pending_income(monkeypatch):
+    client = add_client(name="X")
+    policy = add_policy(
+        client_id=client.id,
+        policy_number="B",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+    payment = policy.payments.order_by(Payment.id).first()
+    pending_inc = payment.incomes.order_by(Income.id).first()
+
+    df = pd.DataFrame(
+        {
+            "НОМЕР ПОЛИСА": ["B"],
+            "НАЧИСЛЕНИЕ,С-ПО": ["01.01.2025 -31.12.2025"],
+            "arhvp": ["7"],
+        }
+    )
+    monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
+
+    events = {"sel": 0, "prev": 0, "inst": None, "amount": None, "pol": 0}
+
+    def select_row(table, parent=None):
+        events["sel"] += 1
+        return table.iloc[0]
+
+    class FakePreview:
+        def __init__(self, data, parent=None):
+            events["prev"] += 1
+
+        def exec(self):
+            return True
+
+    class FakePolicyForm:
+        def __init__(self, parent=None):
+            events["pol"] += 1
+            self.fields = {}
+
+        def exec(self):
+            return True
+
+    class DummyField:
+        def setText(self, val):
+            events["amount"] = val
+
+    class FakeIncomeForm:
+        def __init__(self, instance=None, parent=None, deal_id=None):
+            events["inst"] = instance
+            self.fields = {"amount": DummyField()}
+
+        def prefill_payment(self, pid):
+            events.setdefault("prefill", pid)
+
+        def exec(self):
+            return True
+
+    count = import_reso_payouts(
+        "dummy",
+        select_row_func=select_row,
+        preview_cls=FakePreview,
+        policy_form_cls=FakePolicyForm,
+        income_form_cls=FakeIncomeForm,
+    )
+    assert count == 1
+    assert events["pol"] == 0
+    assert events["inst"] == pending_inc
+    assert events["amount"] == "7"
 
