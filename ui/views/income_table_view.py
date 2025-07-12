@@ -25,14 +25,14 @@ class IncomeTableModel(BaseTableModel):
 
         self.virtual_fields = self.VIRTUAL_FIELDS
         self.headers = [
-            "Полис",          # 0
-            "Сделка",         # 1
-            "Клиент",         # 2
-            "Дата начала",    # 3
-            "Дата платежа",   # 4
-            "Сумма платежа",  # 5
-            "Сумма комиссии", # 6
-            "Дата получения", # 7
+            "Полис",
+            "Сделка",
+            "Клиент",
+            "Дата начала",
+            "Сумма платежа",
+            "Дата платежа",
+            "Сумма комиссии",
+            "Дата получения",
         ]
 
     def columnCount(self, parent=None):
@@ -65,13 +65,13 @@ class IncomeTableModel(BaseTableModel):
             )
         elif col == 4:
             return (
-                payment.payment_date.strftime("%d.%m.%Y")
-                if payment and payment.payment_date
-                else "—"
+                f"{payment.amount:,.2f} ₽" if payment and payment.amount else "0 ₽"
             )
         elif col == 5:
             return (
-                f"{payment.amount:,.2f} ₽" if payment and payment.amount else "0 ₽"
+                payment.payment_date.strftime("%d.%m.%Y")
+                if payment and payment.payment_date
+                else "—"
             )
         elif col == 6:
             return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
