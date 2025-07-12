@@ -15,7 +15,12 @@ from services.policy_service import (
 )
 from services.payment_service import add_payment, apply_payment_filters
 from services.expense_service import add_expense, apply_expense_filters
-from services.income_service import add_income, create_stub_income, apply_income_filters
+from services.income_service import (
+    add_income,
+    create_stub_income,
+    apply_income_filters,
+    build_income_query,
+)
 from services.dashboard_service import (
     get_basic_stats,
     count_assistant_tasks,
@@ -276,6 +281,16 @@ def test_apply_income_filters_range_and_unreceived():
     )
     res2 = list(q2)
     assert inc2 in res2
+
+
+def test_income_search_by_deal_description():
+    client = add_client(name='S')
+    deal = add_deal(client_id=client.id, description='Super deal', start_date=date(2025,1,1))
+    pol = add_policy(client_id=client.id, deal_id=deal.id, policy_number='SD1', start_date=date(2025,1,1), end_date=date(2025,1,10))
+    pay = add_payment(policy_id=pol.id, amount=10, payment_date=date(2025,1,2))
+    inc = add_income(payment_id=pay.id, amount=5)
+    q = build_income_query(search_text='Super')
+    assert inc in list(q)
 
 
 def test_apply_payment_filters():

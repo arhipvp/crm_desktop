@@ -21,6 +21,18 @@ def test_income_table_shows_payment_date():
     income = add_income(payment_id=payment.id, amount=5, received_date=date(2025, 1, 3))
 
     model = IncomeTableModel([income], Income)
+
+    # Проверка на наличие "Дата платежа"
     assert "Дата платежа" in model.headers
-    idx = model.index(0, 2)
+    idx = model.index(0, model.headers.index("Дата платежа"))
     assert model.data(idx, Qt.DisplayRole) == "02.01.2025"
+
+    # Проверка на наличие "Дата начала"
+    assert "Дата начала" in model.headers
+    start_idx = model.index(0, model.headers.index("Дата начала"))
+    assert model.data(start_idx, Qt.DisplayRole) == "01.01.2025"
+
+    # Проверка на наличие колонки "Сделка"
+    assert "Сделка" in model.headers
+    deal_idx = model.index(0, model.headers.index("Сделка"))
+    assert model.data(deal_idx, Qt.DisplayRole) == "—"
