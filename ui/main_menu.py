@@ -33,6 +33,10 @@ class MainMenu(QMenuBar):
         import_policy_action.triggered.connect(self.open_import_policy_json)
         file_menu.addAction(import_policy_action)
 
+        import_reso_action = QAction("📥 Импорт выплат RESO…", self)
+        import_reso_action.triggered.connect(self.open_reso_import)
+        file_menu.addAction(import_reso_action)
+
         executor_action = QAction("👥 Исполнители…", self)
         executor_action.triggered.connect(self.open_executors)
         file_menu.addAction(executor_action)
@@ -94,6 +98,11 @@ class MainMenu(QMenuBar):
         mw = self.parent()
         if mw and hasattr(mw, "open_import_policy_json"):
             mw.open_import_policy_json()
+
+    def open_reso_import(self):
+        mw = self.parent()
+        if mw and hasattr(mw, "open_reso_import"):
+            mw.open_reso_import()
 
     def open_executors(self):
         mw = self.parent()

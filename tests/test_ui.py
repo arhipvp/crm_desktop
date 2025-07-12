@@ -206,6 +206,17 @@ def test_menu_open_settings(qtbot, monkeypatch):
     assert called.get("exec")
 
 
+def test_menu_open_reso_import(qtbot, monkeypatch):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    called = {}
+
+    monkeypatch.setattr(window, "open_reso_import", lambda: called.setdefault("ok", True))
+
+    window.menu_bar.open_reso_import()
+    assert called.get("ok")
+
+
 def test_deal_detail_refresh_syncs_sheet(qtbot, monkeypatch):
     from datetime import date
     from services.client_service import add_client

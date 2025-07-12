@@ -78,6 +78,19 @@ class MainWindow(QMainWindow):
             if dlg.exec() != QDialog.Accepted:
                 break
 
+    def open_reso_import(self):
+        from PySide6.QtWidgets import QFileDialog
+        from services.reso_table_service import import_reso_payouts
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Выберите таблицу RESO",
+            "",
+            "Excel/CSV (*.xlsx *.xls *.csv *.tsv)"
+        )
+        if file_path:
+            import_reso_payouts(file_path, parent=self)
+
     def open_executors(self):
         dlg = QDialog(self)
         dlg.setWindowTitle("Исполнители")
