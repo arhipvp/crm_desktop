@@ -64,9 +64,9 @@ def test_import_reso_payout_new_policy(monkeypatch):
 
     events = {"sel": 0, "prev": 0, "pol": 0, "inc": 0, "amount": None}
 
-    def select_row(table, parent=None):
+    def select_policy(df, col, parent=None):
         events["sel"] += 1
-        return table.iloc[0]
+        return df.iloc[0]
 
     class DummyField:
         def setText(self, val):
@@ -113,9 +113,24 @@ def test_import_reso_payout_new_policy(monkeypatch):
         def exec(self):
             return True
 
+    class FakeMapDlg:
+        def __init__(self, columns, parent=None):
+            pass
+
+        def exec(self):
+            return True
+
+        def get_mapping(self):
+            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+
+    def select_policy(df, col, parent=None):
+        events["sel"] += 1
+        return df.iloc[0]
+
     count = import_reso_payouts(
         "dummy",
-        select_row_func=select_row,
+        select_policy_func=select_policy,
+        column_map_cls=FakeMapDlg,
         preview_cls=FakePreview,
         policy_form_cls=FakePolicyForm,
         income_form_cls=FakeIncomeForm,
@@ -144,9 +159,9 @@ def test_import_reso_payout_existing_policy(monkeypatch):
 
     events = {"sel": 0, "prev": 0, "pol": 0, "inc": 0}
 
-    def select_row(table, parent=None):
+    def select_policy(df, col, parent=None):
         events["sel"] += 1
-        return table.iloc[0]
+        return df.iloc[0]
 
     class FakePreview:
         def __init__(self, data, parent=None):
@@ -174,9 +189,24 @@ def test_import_reso_payout_existing_policy(monkeypatch):
         def exec(self):
             return True
 
+    class FakeMapDlg:
+        def __init__(self, columns, parent=None):
+            pass
+
+        def exec(self):
+            return True
+
+        def get_mapping(self):
+            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+
+    def select_policy(df, col, parent=None):
+        events["sel"] += 1
+        return df.iloc[0]
+
     count = import_reso_payouts(
         "dummy",
-        select_row_func=select_row,
+        select_policy_func=select_policy,
+        column_map_cls=FakeMapDlg,
         preview_cls=FakePreview,
         policy_form_cls=FakePolicyForm,
         income_form_cls=FakeIncomeForm,
@@ -207,9 +237,9 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
 
     events = {"sel": 0, "prev": 0, "inst": None, "amount": None, "pol": 0}
 
-    def select_row(table, parent=None):
+    def select_policy(df, col, parent=None):
         events["sel"] += 1
-        return table.iloc[0]
+        return df.iloc[0]
 
     class FakePreview:
         def __init__(self, data, parent=None):
@@ -241,9 +271,20 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
         def exec(self):
             return True
 
+    class FakeMapDlg:
+        def __init__(self, columns, parent=None):
+            pass
+
+        def exec(self):
+            return True
+
+        def get_mapping(self):
+            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+
     count = import_reso_payouts(
         "dummy",
-        select_row_func=select_row,
+        select_policy_func=select_policy,
+        column_map_cls=FakeMapDlg,
         preview_cls=FakePreview,
         policy_form_cls=FakePolicyForm,
         income_form_cls=FakeIncomeForm,
