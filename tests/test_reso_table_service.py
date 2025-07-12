@@ -1,6 +1,7 @@
+import os
 import pandas as pd
 import types
-from datetime import date
+from datetime import date, datetime
 from services.reso_table_service import (
     load_reso_table,
     import_reso_payouts,
@@ -61,6 +62,7 @@ def test_import_reso_payout_new_policy(monkeypatch):
         }
     )
     monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
+    monkeypatch.setattr(os.path, "getctime", lambda p: 0)
 
     events = {"sel": 0, "prev": 0, "pol": 0, "inc": 0, "amount": None}
 
@@ -139,7 +141,7 @@ def test_import_reso_payout_new_policy(monkeypatch):
         income_form_cls=FakeIncomeForm,
     )
     assert count == 1
-    assert events == {"sel": 1, "prev": 1, "pol": 1, "inc": 1, "amount": "10"}
+    assert events == {"sel": 1, "prev": 1, "pol": 1, "inc": 1, "amount": "10.0"}
 
 
 def test_import_reso_payout_existing_policy(monkeypatch):
@@ -159,6 +161,7 @@ def test_import_reso_payout_existing_policy(monkeypatch):
         }
     )
     monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
+    monkeypatch.setattr(os.path, "getctime", lambda p: 0)
 
     events = {"sel": 0, "prev": 0, "pol": 0, "inc": 0}
 
@@ -237,6 +240,7 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
         }
     )
     monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
+    monkeypatch.setattr(os.path, "getctime", lambda p: 0)
 
     events = {"sel": 0, "prev": 0, "inst": None, "amount": None, "pol": 0}
 
@@ -295,5 +299,82 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
     assert count == 1
     assert events["pol"] == 0
     assert events["inst"] == pending_inc
-    assert events["amount"] == "7"
+    assert events["amount"] == "7.0"
+
+
+def test_import_reso_payout_sums_all_rows(monkeypatch):
+    df = pd.DataFrame(
+        {
+            "НОМЕР ПОЛИСА": ["A", "A"],
+            "НАЧИСЛЕНИЕ,С-ПО": ["01.01.2025 -31.12.2025", "01.01.2025 -31.12.2025"],
+            "arhvp": ["10", "-2"],
+        }
+    )
+    monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
+    monkeypatch.setattr(os.path, "getctime", lambda p: datetime(2025, 1, 5).timestamp())
+
+    events = {"amount": None, "date": None}
+
+    def select_policy(df, col, parent=None):
+        return df.iloc[0]
+
+    class DummyField:
+        def setText(self, val):
+            events["amount"] = val
+
+        def setDate(self, qd):
+            events["date"] = qd.toPython()
+
+    class FakePolicyForm:
+        def __init__(self, parent=None):
+            self.fields = {
+                "policy_number": DummyField(),
+                "start_date": DummyField(),
+                "end_date": DummyField(),
+            }
+            self.saved_instance = types.SimpleNamespace(
+                deal_id=None,
+                payments=types.SimpleNamespace(order_by=lambda *_: types.SimpleNamespace(first=lambda: types.SimpleNamespace(id=1))),
+            )
+
+    class FakePreview:
+        def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
+            self.form = policy_form_cls()
+            self.saved_instance = self.form.saved_instance
+            self.use_existing = False
+
+        def exec(self):
+            return True
+
+    class FakeIncomeForm:
+        def __init__(self, parent=None, deal_id=None, instance=None):
+            self.fields = {"amount": DummyField(), "received_date": DummyField()}
+
+        def prefill_payment(self, pid):
+            pass
+
+        def exec(self):
+            return True
+
+    class FakeMapDlg:
+        def __init__(self, columns, parent=None):
+            pass
+
+        def exec(self):
+            return True
+
+        def get_mapping(self):
+            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+
+    count = import_reso_payouts(
+        "dummy",
+        select_policy_func=select_policy,
+        column_map_cls=FakeMapDlg,
+        preview_cls=FakePreview,
+        policy_form_cls=FakePolicyForm,
+        income_form_cls=FakeIncomeForm,
+    )
+    assert count == 1
+    assert events["amount"] == "8.0"
+    assert events["date"] == date(2025, 1, 5)
 
