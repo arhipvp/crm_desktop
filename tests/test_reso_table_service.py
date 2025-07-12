@@ -48,11 +48,18 @@ def test_import_reso_payouts_unique(monkeypatch):
     df = pd.DataFrame({"НОМЕР ПОЛИСА": ["A", "A", "B"], "arhvp": ["10", "10", "20"]})
     monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
 
-    events = {"pol": 0, "inc": 0, "amounts": []}
+    events = {"prev": 0, "pol": 0, "inc": 0, "amounts": []}
 
     class DummyField:
         def setText(self, val):
             events["amounts"].append(val)
+
+    class FakePreview:
+        def __init__(self, data, parent=None):
+            events["prev"] += 1
+
+        def exec(self):
+            return True
 
     class FakePolicyForm:
         def __init__(self, parent=None):
@@ -77,8 +84,54 @@ def test_import_reso_payouts_unique(monkeypatch):
             events["inc"] += 1
             return True
 
-    count = import_reso_payouts("dummy", policy_form_cls=FakePolicyForm, income_form_cls=FakeIncomeForm)
+    count = import_reso_payouts(
+        "dummy",
+        preview_cls=FakePreview,
+        policy_form_cls=FakePolicyForm,
+        income_form_cls=FakeIncomeForm,
+    )
     assert count == 2
+    assert events["prev"] == 2
     assert events["pol"] == 2
     assert events["inc"] == 2
     assert events["amounts"] == ["A", "10", "B", "20"]
+
+
+def test_import_reso_payouts_preview_reject(monkeypatch):
+    df = pd.DataFrame({"НОМЕР ПОЛИСА": ["A"], "arhvp": ["10"]})
+    monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
+
+    events = {"prev": 0, "pol": 0, "inc": 0}
+
+    class FakePreview:
+        def __init__(self, data, parent=None):
+            events["prev"] += 1
+
+        def exec(self):
+            return False
+
+    class FakePolicyForm:
+        def __init__(self, parent=None):
+            events["pol"] += 1
+            self.fields = {}
+
+        def exec(self):
+            return True
+
+    class FakeIncomeForm:
+        def __init__(self, parent=None, deal_id=None):
+            events["inc"] += 1
+            self.fields = {}
+
+        def exec(self):
+            return True
+
+    count = import_reso_payouts(
+        "dummy",
+        preview_cls=FakePreview,
+        policy_form_cls=FakePolicyForm,
+        income_form_cls=FakeIncomeForm,
+    )
+    assert count == 0
+    assert events == {"prev": 1, "pol": 0, "inc": 0}
+

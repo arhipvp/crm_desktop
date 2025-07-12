@@ -5,8 +5,10 @@ from __future__ import annotations
 import os
 import pandas as pd
 
+from PySide6.QtWidgets import QDialog
 from ui.forms.policy_form import PolicyForm
 from ui.forms.income_form import IncomeForm
+from ui.forms.policy_preview_dialog import PolicyPreviewDialog
 from database.models import Payment
 
 
@@ -60,6 +62,7 @@ def import_reso_payouts(
     path: str | os.PathLike,
     *,
     parent=None,
+    preview_cls: type[QDialog] = PolicyPreviewDialog,
     policy_form_cls: type[PolicyForm] = PolicyForm,
     income_form_cls: type[IncomeForm] = IncomeForm,
 ) -> int:
@@ -79,6 +82,10 @@ def import_reso_payouts(
         if not number or number in seen:
             continue
         seen.add(number)
+
+        preview = preview_cls(row.to_dict(), parent=parent)
+        if not preview.exec():
+            continue
 
         pol_form = policy_form_cls(parent=parent)
         if "policy_number" in pol_form.fields:
