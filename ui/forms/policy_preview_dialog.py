@@ -33,6 +33,8 @@ class PolicyPreviewDialog(QDialog):
         if progress:
             title += f" ({progress})"
         self.setWindowTitle(title)
+        # окно получилось узким, делаем его шире по умолчанию
+        self.setMinimumSize(960, 500)
         self.saved_instance = None
         self.use_existing = False
         self.skipped = False
