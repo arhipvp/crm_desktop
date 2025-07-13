@@ -178,6 +178,18 @@ def import_reso_payouts(
         if selected_rows.empty:
             continue
         row = selected_rows.iloc[0]
+        forced_client = None
+        if "СТРАХОВАТЕЛЬ" in df.columns:
+            raw_client = str(row.get("СТРАХОВАТЕЛЬ", "")).strip()
+            if raw_client:
+                import re
+                from services.client_service import find_similar_clients
+
+                m = re.match(r"(.*?)\s*\[\d+\]$", raw_client)
+                name = m.group(1) if m else raw_client
+                matches = find_similar_clients(name)
+                if len(matches) == 1:
+                    forced_client = matches[0]
         start_date, end_date = _parse_date_range(str(row.get(mapping["period"], "")))
 
         existing_policy = None
@@ -196,6 +208,7 @@ def import_reso_payouts(
             end_date=end_date,
             parent=parent,
             progress=progress,
+            forced_client=forced_client,
         )
 
         if not preview.exec():

@@ -88,7 +88,7 @@ def test_import_reso_payout_new_policy(monkeypatch):
             pass
 
     class FakePolicyForm:
-        def __init__(self, parent=None):
+        def __init__(self, parent=None, forced_client=None):
             events["pol"] += 1
             self.fields = {
                 "policy_number": DummyField(),
@@ -109,8 +109,8 @@ def test_import_reso_payout_new_policy(monkeypatch):
             events["prev"] += 1
             assert existing_policy is None
             assert policy_form_cls is FakePolicyForm
-            # имитируем создание формы
-            self.form = policy_form_cls()
+            forced_client = kwargs.get("forced_client")
+            self.form = policy_form_cls(forced_client=forced_client)
             self.saved_instance = self.form.saved_instance
             self.use_existing = False
 
@@ -178,6 +178,8 @@ def test_import_reso_payout_existing_policy(monkeypatch):
         def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
             events["prev"] += 1
             assert existing_policy.id == policy.id
+            forced_client = kwargs.get("forced_client")
+            self.form = policy_form_cls(forced_client=forced_client)
             self.use_existing = True
             self.saved_instance = None
 
@@ -185,7 +187,7 @@ def test_import_reso_payout_existing_policy(monkeypatch):
             return True
 
     class FakePolicyForm:
-        def __init__(self, parent=None):
+        def __init__(self, parent=None, forced_client=None):
             events["pol"] += 1
             self.fields = {}
 
@@ -218,7 +220,7 @@ def test_import_reso_payout_existing_policy(monkeypatch):
         income_form_cls=FakeIncomeForm,
     )
     assert count == 1
-    assert events == {"prev": 1, "pol": 0, "inc": 1}
+    assert events == {"prev": 1, "pol": 1, "inc": 1}
     assert DummyMB.last is not None
 
 
@@ -252,6 +254,8 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
         def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
             events["prev"] += 1
             assert existing_policy.id == policy.id
+            forced_client = kwargs.get("forced_client")
+            self.form = policy_form_cls(forced_client=forced_client)
             self.use_existing = True
             self.saved_instance = None
 
@@ -259,7 +263,7 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
             return True
 
     class FakePolicyForm:
-        def __init__(self, parent=None):
+        def __init__(self, parent=None, forced_client=None):
             events["pol"] += 1
             self.fields = {}
 
@@ -296,7 +300,7 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
         income_form_cls=FakeIncomeForm,
     )
     assert count == 1
-    assert events["pol"] == 0
+    assert events["pol"] == 1
     assert events["inst"] == pending_inc
     assert events["amount"] == "7.0"
     assert DummyMB.last is not None
@@ -326,7 +330,7 @@ def test_import_reso_payout_sums_all_rows(monkeypatch):
             events["date"] = qd.toPython()
 
     class FakePolicyForm:
-        def __init__(self, parent=None):
+        def __init__(self, parent=None, forced_client=None):
             self.fields = {
                 "policy_number": DummyField(),
                 "start_date": DummyField(),
@@ -339,7 +343,8 @@ def test_import_reso_payout_sums_all_rows(monkeypatch):
 
     class FakePreview:
         def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
-            self.form = policy_form_cls()
+            forced_client = kwargs.get("forced_client")
+            self.form = policy_form_cls(forced_client=forced_client)
             self.saved_instance = self.form.saved_instance
             self.use_existing = False
 
@@ -376,5 +381,94 @@ def test_import_reso_payout_sums_all_rows(monkeypatch):
     assert count == 1
     assert events["amount"] == "8.0"
     assert events["date"] == date(2025, 1, 5)
+    assert DummyMB.last is not None
+
+
+def test_import_reso_payout_prefills_client(monkeypatch):
+    client = add_client(name="Котельников Кирилл Владимирович")
+
+    df = pd.DataFrame(
+        {
+            "НОМЕР ПОЛИСА": ["X"],
+            "НАЧИСЛЕНИЕ,С-ПО": ["01.01.2025 -31.12.2025"],
+            "СТРАХОВАТЕЛЬ": [client.name],
+            "arhvp": ["5"],
+        }
+    )
+    monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
+    monkeypatch.setattr(os.path, "getctime", lambda p: 0)
+
+    DummyMB.last = None
+    monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
+
+    captured = {}
+
+    class DummyField:
+        def setText(self, val):
+            pass
+
+        def setDate(self, qd):
+            pass
+
+    class FakePolicyForm:
+        def __init__(self, parent=None, forced_client=None):
+            captured["client"] = forced_client
+            self.fields = {
+                "policy_number": DummyField(),
+                "start_date": DummyField(),
+                "end_date": DummyField(),
+            }
+            self.saved_instance = types.SimpleNamespace(
+                deal_id=None,
+                payments=types.SimpleNamespace(
+                    order_by=lambda *_: types.SimpleNamespace(
+                        first=lambda: types.SimpleNamespace(id=1)
+                    )
+                ),
+            )
+
+    class FakePreview:
+        def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
+            forced_client = kwargs.get("forced_client")
+            self.form = policy_form_cls(forced_client=forced_client)
+            self.saved_instance = self.form.saved_instance
+            self.use_existing = False
+
+        def exec(self):
+            return True
+
+    class FakeIncomeForm:
+        def __init__(self, parent=None, deal_id=None, instance=None):
+            self.fields = {"amount": DummyField(), "received_date": DummyField()}
+
+        def prefill_payment(self, pid):
+            pass
+
+        def exec(self):
+            return True
+
+    class FakeMapDlg:
+        def __init__(self, columns, parent=None):
+            pass
+
+        def exec(self):
+            return True
+
+        def get_mapping(self):
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+            }
+
+    count = import_reso_payouts(
+        "dummy",
+        column_map_cls=FakeMapDlg,
+        preview_cls=FakePreview,
+        policy_form_cls=FakePolicyForm,
+        income_form_cls=FakeIncomeForm,
+    )
+    assert count == 1
+    assert captured["client"] == client
     assert DummyMB.last is not None
 
