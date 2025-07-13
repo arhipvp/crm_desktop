@@ -174,7 +174,13 @@ def test_import_reso_payout_new_policy(monkeypatch):
             return True
 
         def get_mapping(self):
-            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
+            }
 
     count = import_reso_payouts(
         "dummy",
@@ -258,7 +264,13 @@ def test_import_reso_payout_existing_policy(monkeypatch):
             return True
 
         def get_mapping(self):
-            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
+            }
 
     count = import_reso_payouts(
         "dummy",
@@ -338,7 +350,13 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
             return True
 
         def get_mapping(self):
-            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
+            }
 
     count = import_reso_payouts(
         "dummy",
@@ -416,7 +434,13 @@ def test_import_reso_payout_sums_all_rows(monkeypatch):
             return True
 
         def get_mapping(self):
-            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
+            }
 
     count = import_reso_payouts(
         "dummy",
@@ -506,6 +530,8 @@ def test_import_reso_payout_prefills_client(monkeypatch):
                 "policy_number": "НОМЕР ПОЛИСА",
                 "period": "НАЧИСЛЕНИЕ,С-ПО",
                 "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
             }
 
     count = import_reso_payouts(
@@ -610,6 +636,8 @@ def test_import_reso_payout_creates_client(monkeypatch):
                 "policy_number": "НОМЕР ПОЛИСА",
                 "period": "НАЧИСЛЕНИЕ,С-ПО",
                 "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
             }
 
     count = import_reso_payouts(

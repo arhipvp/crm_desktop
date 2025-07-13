@@ -163,6 +163,8 @@ def import_reso_payouts(
         "policy_number": "НОМЕР ПОЛИСА",
         "period": "НАЧИСЛЕНИЕ,С-ПО",
         "amount": "arhvp",
+        "premium": "ПРЕМИЯ,РУБ.",
+        "insurance_type": "ПРОДУКТ",
     }
     if column_map_cls is not None:
         dlg = column_map_cls(list(df.columns), parent=parent)
@@ -171,6 +173,8 @@ def import_reso_payouts(
         mapping = dlg.get_mapping()
 
     policy_col = mapping["policy_number"]
+    premium_col = mapping.get("premium")
+    type_col = mapping.get("insurance_type")
     numbers = [str(n).strip() for n in df[policy_col].dropna().unique()]
     total = len(numbers)
     processed = 0
@@ -232,12 +236,12 @@ def import_reso_payouts(
                 widget = form.fields["insurance_company"]
                 if hasattr(widget, "setCurrentText"):
                     widget.setCurrentText("Ресо")
-            if "insurance_type" in form.fields and "ПРОДУКТ" in df.columns:
-                ins_type = str(row.get("ПРОДУКТ", "")).strip()
+            if "insurance_type" in form.fields and type_col in df.columns:
+                ins_type = str(row.get(type_col, "")).strip()
                 if ins_type and hasattr(form.fields["insurance_type"], "setCurrentText"):
                     form.fields["insurance_type"].setCurrentText(ins_type)
-            if "ПРЕМИЯ,РУБ." in df.columns:
-                prem = _parse_amount(row.get("ПРЕМИЯ,РУБ."))
+            if premium_col in df.columns:
+                prem = _parse_amount(row.get(premium_col))
                 if prem:
                     pay_date = start_date or file_date
                     pay_data = {"payment_date": pay_date, "amount": prem}
