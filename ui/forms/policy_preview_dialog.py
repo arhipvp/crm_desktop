@@ -26,11 +26,16 @@ class PolicyPreviewDialog(QDialog):
         start_date=None,
         end_date=None,
         parent=None,
+        progress: str | None = None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Предпросмотр полиса")
+        title = "Предпросмотр полиса"
+        if progress:
+            title += f" ({progress})"
+        self.setWindowTitle(title)
         self.saved_instance = None
         self.use_existing = False
+        self.skipped = False
 
         layout = QVBoxLayout(self)
         content = QHBoxLayout()
@@ -51,6 +56,19 @@ class PolicyPreviewDialog(QDialog):
         if end_date and "end_date" in self.form.fields:
             self.form.fields["end_date"].setDate(end_date)
         content.addWidget(self.form)
+
+        # -------- средняя часть: данные из таблицы --------
+        data_layout = QVBoxLayout()
+        data_layout.addWidget(QLabel("Данные из таблицы:"))
+        data_table = QTableWidget(0, 2)
+        data_table.setHorizontalHeaderLabels(["Поле", "Значение"])
+        for i, (k, v) in enumerate(data.items()):
+            data_table.insertRow(i)
+            data_table.setItem(i, 0, QTableWidgetItem(str(k)))
+            data_table.setItem(i, 1, QTableWidgetItem("" if v is None else str(v)))
+        data_table.resizeColumnsToContents()
+        data_layout.addWidget(data_table)
+        content.addLayout(data_layout)
 
         # -------- правая часть: найденный полис --------
         right = QVBoxLayout()
@@ -84,9 +102,12 @@ class PolicyPreviewDialog(QDialog):
         btns = QHBoxLayout()
         create_btn = QPushButton("Создать полис", self)
         create_btn.clicked.connect(self._create_policy)
+        skip_btn = QPushButton("Пропустить полис", self)
+        skip_btn.clicked.connect(self._skip)
         cancel_btn = QPushButton("Отмена", self)
         cancel_btn.clicked.connect(self.reject)
         btns.addStretch()
+        btns.addWidget(skip_btn)
         btns.addWidget(create_btn)
         btns.addWidget(cancel_btn)
         layout.addLayout(btns)
@@ -100,6 +121,10 @@ class PolicyPreviewDialog(QDialog):
 
     def _use_existing(self):
         self.use_existing = True
+        self.accept()
+
+    def _skip(self):
+        self.skipped = True
         self.accept()
 
     def _on_form_accepted(self):

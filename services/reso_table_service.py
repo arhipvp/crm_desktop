@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import date, datetime
+import logging
 import pandas as pd
 
 from PySide6.QtWidgets import QDialog, QInputDialog
@@ -12,6 +13,8 @@ from ui.forms.policy_form import PolicyForm
 from ui.forms.income_form import IncomeForm
 from ui.forms.policy_preview_dialog import PolicyPreviewDialog
 from database.models import Payment
+
+logger = logging.getLogger(__name__)
 
 
 COLUMNS = [
@@ -136,17 +139,16 @@ def import_reso_payouts(
     path: str | os.PathLike,
     *,
     parent=None,
-    select_policy_func=select_policy_from_table,
     column_map_cls: type[QDialog] = ColumnMappingDialog,
     preview_cls: type[QDialog] = PolicyPreviewDialog,
     policy_form_cls: type[PolicyForm] = PolicyForm,
     income_form_cls: type[IncomeForm] = IncomeForm,
 ) -> int:
-    """Import a single RESO payout entry interactively.
+    """Import RESO payout table sequentially.
 
-    The user chooses a row from the table, previews it and either attaches the
-    income to an existing policy or creates a new one. Returns ``1`` if the
-    operation was completed, otherwise ``0``.
+    Each unique policy number in the table is processed one by one. For every
+    policy the user can create a new policy, attach the payout to an existing
+    one or skip it. Returns the number of successfully processed policies.
     """
 
     df = load_reso_table(path)
@@ -163,82 +165,86 @@ def import_reso_payouts(
             return 0
         mapping = dlg.get_mapping()
 
-    row_or_df = select_policy_func(df, mapping["policy_number"], parent=parent)
-    if row_or_df is None:
-        return 0
+    policy_col = mapping["policy_number"]
+    numbers = [str(n).strip() for n in df[policy_col].dropna().unique()]
+    total = len(numbers)
+    processed = 0
 
-    if isinstance(row_or_df, pd.DataFrame):
-        selected_rows = row_or_df
+    for idx, number in enumerate(numbers, start=1):
+        logger.info("🔄 %s/%s: обработка полиса %s", idx, total, number)
+        selected_rows = df[df[policy_col].astype(str).str.strip() == number]
+        if selected_rows.empty:
+            continue
         row = selected_rows.iloc[0]
-    else:
-        row = row_or_df
-        number_tmp = str(row.get(mapping["policy_number"], "")).strip()
-        selected_rows = df[
-            df[mapping["policy_number"]].astype(str).str.strip() == number_tmp
-        ]
+        start_date, end_date = _parse_date_range(str(row.get(mapping["period"], "")))
 
-    number = str(row.get(mapping["policy_number"], "")).strip()
-    start_date, end_date = _parse_date_range(str(row.get(mapping["period"], "")))
-    existing_policy = None
-    if number:
-        from database.models import Policy
+        existing_policy = None
+        if number:
+            from database.models import Policy
 
-        existing_policy = Policy.get_or_none(Policy.policy_number == number)
+            existing_policy = Policy.get_or_none(Policy.policy_number == number)
 
-    preview = preview_cls(
-        row.to_dict(),
-        existing_policy=existing_policy,
-        policy_form_cls=policy_form_cls,
-        policy_number=number,
-        start_date=start_date,
-        end_date=end_date,
-        parent=parent,
-    )
-    if not preview.exec():
-        return 0
-
-    if preview.use_existing:
-        policy = existing_policy
-    else:
-        policy = preview.saved_instance or existing_policy
-    if not policy:
-        return 0
-
-    amount = selected_rows[mapping["amount"]].map(_parse_amount).sum()
-
-    pay = (
-        policy.payments.order_by(Payment.id).first()
-        if hasattr(policy, "payments")
-        else None
-    )
-    existing_income = None
-    if pay:
-        from database.models import Income
-
-        existing_income = (
-            Income.select()
-            .where(
-                (Income.payment == pay.id)
-                & (Income.received_date.is_null(True))
-            )
-            .order_by(Income.id)
-            .first()
+        progress = f"{idx}/{total}"
+        preview = preview_cls(
+            row.to_dict(),
+            existing_policy=existing_policy,
+            policy_form_cls=policy_form_cls,
+            policy_number=number,
+            start_date=start_date,
+            end_date=end_date,
+            parent=parent,
+            progress=progress,
         )
 
-    if existing_income:
-        inc_form = income_form_cls(instance=existing_income, parent=parent)
-    else:
-        inc_form = income_form_cls(
-            parent=parent, deal_id=getattr(policy, "deal_id", None)
+        if not preview.exec():
+            break
+        if getattr(preview, "skipped", False):
+            continue
+
+        if preview.use_existing:
+            policy = existing_policy
+        else:
+            policy = preview.saved_instance or existing_policy
+        if not policy:
+            continue
+
+        amount = selected_rows[mapping["amount"]].map(_parse_amount).sum()
+
+        pay = (
+            policy.payments.order_by(Payment.id).first()
+            if hasattr(policy, "payments")
+            else None
         )
+        existing_income = None
         if pay:
-            inc_form.prefill_payment(pay.id)
+            from database.models import Income
 
-    if "amount" in inc_form.fields and amount not in (None, ""):
-        inc_form.fields["amount"].setText(str(amount))
-    if "received_date" in inc_form.fields:
-        from ui.common.date_utils import to_qdate
+            existing_income = (
+                Income.select()
+                .where(
+                    (Income.payment == pay.id)
+                    & (Income.received_date.is_null(True))
+                )
+                .order_by(Income.id)
+                .first()
+            )
 
-        inc_form.fields["received_date"].setDate(to_qdate(file_date))
-    inc_form.exec()
-    return 1
+        if existing_income:
+            inc_form = income_form_cls(instance=existing_income, parent=parent)
+        else:
+            inc_form = income_form_cls(
+                parent=parent, deal_id=getattr(policy, "deal_id", None)
+            )
+            if pay:
+                inc_form.prefill_payment(pay.id)
+
+        if "amount" in inc_form.fields and amount not in (None, ""):
+            inc_form.fields["amount"].setText(str(amount))
+        if "received_date" in inc_form.fields:
+            from ui.common.date_utils import to_qdate
+
+            inc_form.fields["received_date"].setDate(to_qdate(file_date))
+        inc_form.exec()
+        processed += 1
+
+    return processed
