@@ -79,17 +79,10 @@ class MainWindow(QMainWindow):
                 break
 
     def open_reso_import(self):
-        from PySide6.QtWidgets import QFileDialog
-        from services.reso_table_service import import_reso_payouts
+        from ui.forms.reso_import_dialog import ResoImportDialog
 
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Выберите таблицу RESO",
-            "",
-            "Excel/CSV (*.xlsx *.xls *.csv *.tsv)"
-        )
-        if file_path:
-            import_reso_payouts(file_path, parent=self)
+        dlg = ResoImportDialog(parent=self)
+        dlg.exec()
 
     def open_executors(self):
         dlg = QDialog(self)

@@ -86,6 +86,7 @@ def test_import_reso_payout_new_policy(monkeypatch):
             "ПРОДУКТ": ["КАСКО"],
             "ПРЕМИЯ,РУБ.": ["1000"],
             "arhvp": ["10"],
+            "Источник": ["Онлайн"],
         }
     )
     monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
@@ -102,6 +103,7 @@ def test_import_reso_payout_new_policy(monkeypatch):
         "company": None,
         "ins_type": None,
         "payment": None,
+        "channel": None,
     }
 
     class DummyField:
@@ -128,6 +130,7 @@ def test_import_reso_payout_new_policy(monkeypatch):
                 "end_date": DummyField(),
                 "insurance_company": DummyField("company"),
                 "insurance_type": DummyField("ins_type"),
+                "sales_channel": DummyField("channel"),
             }
             self.saved_instance = types.SimpleNamespace(
                 deal_id=None,
@@ -174,7 +177,14 @@ def test_import_reso_payout_new_policy(monkeypatch):
             return True
 
         def get_mapping(self):
-            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
+                "sales_channel": "Источник",
+            }
 
     count = import_reso_payouts(
         "dummy",
@@ -190,6 +200,7 @@ def test_import_reso_payout_new_policy(monkeypatch):
     assert events["amount"] == "10.0"
     assert events["company"] == "Ресо"
     assert events["ins_type"] == "КАСКО"
+    assert events["channel"] == "Онлайн"
     assert events["payment"] == {
         "payment_date": date(2025, 1, 1),
         "amount": 1000.0,
@@ -258,7 +269,14 @@ def test_import_reso_payout_existing_policy(monkeypatch):
             return True
 
         def get_mapping(self):
-            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
+                "sales_channel": "Источник",
+            }
 
     count = import_reso_payouts(
         "dummy",
@@ -338,7 +356,14 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
             return True
 
         def get_mapping(self):
-            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
+                "sales_channel": "Источник",
+            }
 
     count = import_reso_payouts(
         "dummy",
@@ -416,7 +441,14 @@ def test_import_reso_payout_sums_all_rows(monkeypatch):
             return True
 
         def get_mapping(self):
-            return {"policy_number": "НОМЕР ПОЛИСА", "period": "НАЧИСЛЕНИЕ,С-ПО", "amount": "arhvp"}
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
+                "sales_channel": "Источник",
+            }
 
     count = import_reso_payouts(
         "dummy",
@@ -506,6 +538,9 @@ def test_import_reso_payout_prefills_client(monkeypatch):
                 "policy_number": "НОМЕР ПОЛИСА",
                 "period": "НАЧИСЛЕНИЕ,С-ПО",
                 "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
+                "sales_channel": "Источник",
             }
 
     count = import_reso_payouts(
@@ -610,6 +645,9 @@ def test_import_reso_payout_creates_client(monkeypatch):
                 "policy_number": "НОМЕР ПОЛИСА",
                 "period": "НАЧИСЛЕНИЕ,С-ПО",
                 "amount": "arhvp",
+                "premium": "ПРЕМИЯ,РУБ.",
+                "insurance_type": "ПРОДУКТ",
+                "sales_channel": "Источник",
             }
 
     count = import_reso_payouts(
