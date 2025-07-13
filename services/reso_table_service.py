@@ -113,7 +113,9 @@ def select_row_from_table(df: pd.DataFrame, parent=None) -> pd.Series | None:
     return None
 
 
-def select_policy_from_table(df: pd.DataFrame, policy_col: str, parent=None) -> pd.Series | None:
+def select_policy_from_table(
+    df: pd.DataFrame, policy_col: str, parent=None
+) -> pd.Series | None:
     """Prompt the user to choose a policy number and return the first matching row."""
     if df.empty or policy_col not in df.columns:
         return None
@@ -222,8 +224,7 @@ def import_reso_payouts(
             existing_income = (
                 Income.select()
                 .where(
-                    (Income.payment == pay.id)
-                    & (Income.received_date.is_null(True))
+                    (Income.payment == pay.id) & (Income.received_date.is_null(True))
                 )
                 .order_by(Income.id)
                 .first()
@@ -233,20 +234,32 @@ def import_reso_payouts(
 
         use_existing = False
         if existing_income is not None:
+            pay = getattr(existing_income, "payment", None)
+            pay_date = getattr(pay, "payment_date", None)
+            pay_date_s = pay_date.strftime("%d.%m.%Y") if pay_date else "—"
+            msg = (
+                f"Обновить неоплаченный доход №{existing_income.id} "
+                f"({existing_income.amount:.2f} ₽ от {pay_date_s})?"
+            )
             answer = QMessageBox.question(
                 parent,
                 "Найден неоплаченный доход",
-                "Обновить найденный неоплаченный доход?",
+                msg,
                 QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
             )
             if answer == QMessageBox.Cancel:
                 continue
             use_existing = answer == QMessageBox.Yes
         else:
+            pay_info = ""
+            if pay is not None:
+                pdate = getattr(pay, "payment_date", None)
+                pdate_s = pdate.strftime("%d.%m.%Y") if pdate else "—"
+                pay_info = f" по платежу #{pay.id} от {pdate_s}"
             answer = QMessageBox.question(
                 parent,
                 "Добавить доход",
-                f"Добавить доход на сумму {amount:.2f}?",
+                f"Добавить доход{pay_info} на сумму {amount:.2f} ₽?",
                 QMessageBox.Yes | QMessageBox.No,
             )
             if answer != QMessageBox.Yes:
