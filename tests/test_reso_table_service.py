@@ -12,6 +12,17 @@ from services.policy_service import add_policy
 from database.models import Payment, Income
 
 
+class DummyMB:
+    Yes = 1
+    No = 2
+    Cancel = 4
+
+    @staticmethod
+    def question(parent, title, text, buttons):
+        DummyMB.last = text
+        return DummyMB.Yes
+
+
 def test_load_reso_table(tmp_path):
     data = (
         "\t".join(COLUMNS) + "\n" +
@@ -63,6 +74,9 @@ def test_import_reso_payout_new_policy(monkeypatch):
     )
     monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
     monkeypatch.setattr(os.path, "getctime", lambda p: 0)
+
+    DummyMB.last = None
+    monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
 
     events = {"prev": 0, "pol": 0, "inc": 0, "amount": None}
 
@@ -133,6 +147,7 @@ def test_import_reso_payout_new_policy(monkeypatch):
     )
     assert count == 1
     assert events == {"prev": 1, "pol": 1, "inc": 1, "amount": "10.0"}
+    assert DummyMB.last is not None
 
 
 def test_import_reso_payout_existing_policy(monkeypatch):
@@ -153,6 +168,9 @@ def test_import_reso_payout_existing_policy(monkeypatch):
     )
     monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
     monkeypatch.setattr(os.path, "getctime", lambda p: 0)
+
+    DummyMB.last = None
+    monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
 
     events = {"prev": 0, "pol": 0, "inc": 0}
 
@@ -201,6 +219,7 @@ def test_import_reso_payout_existing_policy(monkeypatch):
     )
     assert count == 1
     assert events == {"prev": 1, "pol": 0, "inc": 1}
+    assert DummyMB.last is not None
 
 
 def test_import_reso_payout_updates_pending_income(monkeypatch):
@@ -223,6 +242,9 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
     )
     monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
     monkeypatch.setattr(os.path, "getctime", lambda p: 0)
+
+    DummyMB.last = None
+    monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
 
     events = {"prev": 0, "inst": None, "amount": None, "pol": 0}
 
@@ -277,6 +299,7 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
     assert events["pol"] == 0
     assert events["inst"] == pending_inc
     assert events["amount"] == "7.0"
+    assert DummyMB.last is not None
 
 
 def test_import_reso_payout_sums_all_rows(monkeypatch):
@@ -289,6 +312,9 @@ def test_import_reso_payout_sums_all_rows(monkeypatch):
     )
     monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
     monkeypatch.setattr(os.path, "getctime", lambda p: datetime(2025, 1, 5).timestamp())
+
+    DummyMB.last = None
+    monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
 
     events = {"amount": None, "date": None}
 
@@ -350,4 +376,5 @@ def test_import_reso_payout_sums_all_rows(monkeypatch):
     assert count == 1
     assert events["amount"] == "8.0"
     assert events["date"] == date(2025, 1, 5)
+    assert DummyMB.last is not None
 

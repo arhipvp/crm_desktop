@@ -229,7 +229,30 @@ def import_reso_payouts(
                 .first()
             )
 
-        if existing_income:
+        from PySide6.QtWidgets import QMessageBox
+
+        use_existing = False
+        if existing_income is not None:
+            answer = QMessageBox.question(
+                parent,
+                "Найден неоплаченный доход",
+                "Обновить найденный неоплаченный доход?",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            )
+            if answer == QMessageBox.Cancel:
+                continue
+            use_existing = answer == QMessageBox.Yes
+        else:
+            answer = QMessageBox.question(
+                parent,
+                "Добавить доход",
+                f"Добавить доход на сумму {amount:.2f}?",
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                continue
+
+        if use_existing:
             inc_form = income_form_cls(instance=existing_income, parent=parent)
         else:
             inc_form = income_form_cls(
