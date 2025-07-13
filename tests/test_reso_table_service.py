@@ -23,6 +23,20 @@ class DummyMB:
         return DummyMB.Yes
 
 
+class DummyIncomeDlg:
+    def __init__(self, *args, **kwargs):
+        if "new_data" in kwargs:
+            DummyIncomeDlg.last = kwargs["new_data"]
+        elif len(args) > 1:
+            DummyIncomeDlg.last = args[1]
+        else:
+            DummyIncomeDlg.last = None
+        self.choice = "update"
+
+    def exec(self):
+        return 1
+
+
 def test_load_reso_table(tmp_path):
     data = (
         "\t".join(COLUMNS) + "\n" +
@@ -171,6 +185,7 @@ def test_import_reso_payout_existing_policy(monkeypatch):
 
     DummyMB.last = None
     monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
+    monkeypatch.setattr("services.reso_table_service.IncomeUpdateDialog", DummyIncomeDlg)
 
     events = {"prev": 0, "pol": 0, "inc": 0}
 
@@ -221,8 +236,7 @@ def test_import_reso_payout_existing_policy(monkeypatch):
     )
     assert count == 1
     assert events == {"prev": 1, "pol": 1, "inc": 1}
-    assert DummyMB.last is not None
-
+    assert DummyIncomeDlg.last is not None
 
 def test_import_reso_payout_updates_pending_income(monkeypatch):
     client = add_client(name="X")
@@ -248,6 +262,7 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
     DummyMB.last = None
     monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
 
+    monkeypatch.setattr("services.reso_table_service.IncomeUpdateDialog", DummyIncomeDlg)
     events = {"prev": 0, "inst": None, "amount": None, "pol": 0}
 
     class FakePreview:
@@ -303,8 +318,7 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
     assert events["pol"] == 1
     assert events["inst"] == pending_inc
     assert events["amount"] == "7.0"
-    assert DummyMB.last is not None
-
+    assert DummyIncomeDlg.last is not None
 
 def test_import_reso_payout_sums_all_rows(monkeypatch):
     df = pd.DataFrame(

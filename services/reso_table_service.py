@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QDialog, QInputDialog
 from ui.forms.column_mapping_dialog import ColumnMappingDialog
 from ui.forms.policy_form import PolicyForm
 from ui.forms.income_form import IncomeForm
+from ui.forms.income_update_dialog import IncomeUpdateDialog
 from ui.forms.policy_preview_dialog import PolicyPreviewDialog
 from database.models import Payment
 
@@ -247,22 +248,14 @@ def import_reso_payouts(
 
         use_existing = False
         if existing_income is not None:
-            pay = getattr(existing_income, "payment", None)
-            pay_date = getattr(pay, "payment_date", None)
-            pay_date_s = pay_date.strftime("%d.%m.%Y") if pay_date else "—"
-            msg = (
-                f"Обновить неоплаченный доход №{existing_income.id} "
-                f"({existing_income.amount:.2f} ₽ от {pay_date_s})?"
-            )
-            answer = QMessageBox.question(
-                parent,
-                "Найден неоплаченный доход",
-                msg,
-                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
-            )
-            if answer == QMessageBox.Cancel:
+            new_data = {"amount": amount}
+            if file_date:
+                new_data["received_date"] = file_date
+            dlg = IncomeUpdateDialog(existing_income, new_data, parent=parent)
+            if dlg.exec() != QDialog.Accepted:
                 continue
-            use_existing = answer == QMessageBox.Yes
+            if dlg.choice == "update":
+                use_existing = True
         else:
             pay_info = ""
             if pay is not None:
