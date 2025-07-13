@@ -11,7 +11,9 @@ from PySide6.QtWidgets import QDialog, QInputDialog
 from ui.forms.column_mapping_dialog import ColumnMappingDialog
 from ui.forms.policy_form import PolicyForm
 from ui.forms.income_form import IncomeForm
+from ui.forms.income_update_dialog import IncomeUpdateDialog
 from ui.forms.policy_preview_dialog import PolicyPreviewDialog
+from ui.forms.client_form import ClientForm
 from database.models import Payment
 
 logger = logging.getLogger(__name__)
@@ -113,7 +115,9 @@ def select_row_from_table(df: pd.DataFrame, parent=None) -> pd.Series | None:
     return None
 
 
-def select_policy_from_table(df: pd.DataFrame, policy_col: str, parent=None) -> pd.Series | None:
+def select_policy_from_table(
+    df: pd.DataFrame, policy_col: str, parent=None
+) -> pd.Series | None:
     """Prompt the user to choose a policy number and return the first matching row."""
     if df.empty or policy_col not in df.columns:
         return None
@@ -143,6 +147,7 @@ def import_reso_payouts(
     preview_cls: type[QDialog] = PolicyPreviewDialog,
     policy_form_cls: type[PolicyForm] = PolicyForm,
     income_form_cls: type[IncomeForm] = IncomeForm,
+    client_form_cls: type[ClientForm] = ClientForm,
 ) -> int:
     """Import RESO payout table sequentially.
 
@@ -176,6 +181,30 @@ def import_reso_payouts(
         if selected_rows.empty:
             continue
         row = selected_rows.iloc[0]
+        forced_client = None
+        if "СТРАХОВАТЕЛЬ" in df.columns:
+            raw_client = str(row.get("СТРАХОВАТЕЛЬ", "")).strip()
+            if raw_client:
+                import re
+                from services.client_service import find_similar_clients
+
+                m = re.match(r"(.*?)\s*\[\d+\]$", raw_client)
+                name = m.group(1) if m else raw_client
+                matches = find_similar_clients(name)
+                if len(matches) == 1:
+                    forced_client = matches[0]
+                else:
+                    form = client_form_cls(parent=parent)
+                    if "name" in getattr(form, "fields", {}):
+                        widget = form.fields["name"]
+                        if hasattr(widget, "setText"):
+                            widget.setText(name)
+                    if form.exec() == QDialog.Accepted:
+                        forced_client = getattr(form, "saved_instance", None)
+                        if not forced_client:
+                            continue
+                    else:
+                        continue
         start_date, end_date = _parse_date_range(str(row.get(mapping["period"], "")))
 
         existing_policy = None
@@ -194,7 +223,27 @@ def import_reso_payouts(
             end_date=end_date,
             parent=parent,
             progress=progress,
+            forced_client=forced_client,
         )
+
+        form = getattr(preview, "form", None)
+        if form:
+            if "insurance_company" in form.fields:
+                widget = form.fields["insurance_company"]
+                if hasattr(widget, "setCurrentText"):
+                    widget.setCurrentText("Ресо")
+            if "insurance_type" in form.fields and "ПРОДУКТ" in df.columns:
+                ins_type = str(row.get("ПРОДУКТ", "")).strip()
+                if ins_type and hasattr(form.fields["insurance_type"], "setCurrentText"):
+                    form.fields["insurance_type"].setCurrentText(ins_type)
+            if "ПРЕМИЯ,РУБ." in df.columns:
+                prem = _parse_amount(row.get("ПРЕМИЯ,РУБ."))
+                if prem:
+                    pay_date = start_date or file_date
+                    pay_data = {"payment_date": pay_date, "amount": prem}
+                    form._draft_payments = [pay_data]
+                    if hasattr(form, "add_payment_row"):
+                        form.add_payment_row(pay_data)
 
         if not preview.exec():
             break
@@ -222,8 +271,7 @@ def import_reso_payouts(
             existing_income = (
                 Income.select()
                 .where(
-                    (Income.payment == pay.id)
-                    & (Income.received_date.is_null(True))
+                    (Income.payment == pay.id) & (Income.received_date.is_null(True))
                 )
                 .order_by(Income.id)
                 .first()
@@ -233,20 +281,24 @@ def import_reso_payouts(
 
         use_existing = False
         if existing_income is not None:
-            answer = QMessageBox.question(
-                parent,
-                "Найден неоплаченный доход",
-                "Обновить найденный неоплаченный доход?",
-                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
-            )
-            if answer == QMessageBox.Cancel:
+            new_data = {"amount": amount}
+            if file_date:
+                new_data["received_date"] = file_date
+            dlg = IncomeUpdateDialog(existing_income, new_data, parent=parent)
+            if dlg.exec() != QDialog.Accepted:
                 continue
-            use_existing = answer == QMessageBox.Yes
+            if dlg.choice == "update":
+                use_existing = True
         else:
+            pay_info = ""
+            if pay is not None:
+                pdate = getattr(pay, "payment_date", None)
+                pdate_s = pdate.strftime("%d.%m.%Y") if pdate else "—"
+                pay_info = f" по платежу #{pay.id} от {pdate_s}"
             answer = QMessageBox.question(
                 parent,
                 "Добавить доход",
-                f"Добавить доход на сумму {amount:.2f}?",
+                f"Добавить доход{pay_info} на сумму {amount:.2f} ₽?",
                 QMessageBox.Yes | QMessageBox.No,
             )
             if answer != QMessageBox.Yes:

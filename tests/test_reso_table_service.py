@@ -23,6 +23,20 @@ class DummyMB:
         return DummyMB.Yes
 
 
+class DummyIncomeDlg:
+    def __init__(self, *args, **kwargs):
+        if "new_data" in kwargs:
+            DummyIncomeDlg.last = kwargs["new_data"]
+        elif len(args) > 1:
+            DummyIncomeDlg.last = args[1]
+        else:
+            DummyIncomeDlg.last = None
+        self.choice = "update"
+
+    def exec(self):
+        return 1
+
+
 def test_load_reso_table(tmp_path):
     data = (
         "\t".join(COLUMNS) + "\n" +
@@ -69,6 +83,8 @@ def test_import_reso_payout_new_policy(monkeypatch):
         {
             "НОМЕР ПОЛИСА": ["A"],
             "НАЧИСЛЕНИЕ,С-ПО": ["01.01.2025 -31.12.2025"],
+            "ПРОДУКТ": ["КАСКО"],
+            "ПРЕМИЯ,РУБ.": ["1000"],
             "arhvp": ["10"],
         }
     )
@@ -78,22 +94,40 @@ def test_import_reso_payout_new_policy(monkeypatch):
     DummyMB.last = None
     monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
 
-    events = {"prev": 0, "pol": 0, "inc": 0, "amount": None}
+    events = {
+        "prev": 0,
+        "pol": 0,
+        "inc": 0,
+        "amount": None,
+        "company": None,
+        "ins_type": None,
+        "payment": None,
+    }
 
     class DummyField:
+        def __init__(self, key=None):
+            self.key = key
+
         def setText(self, val):
-            events["amount"] = val
+            if self.key:
+                events[self.key] = val
 
         def setDate(self, val):
             pass
 
+        def setCurrentText(self, val):
+            if self.key:
+                events[self.key] = val
+
     class FakePolicyForm:
-        def __init__(self, parent=None):
+        def __init__(self, parent=None, forced_client=None):
             events["pol"] += 1
             self.fields = {
                 "policy_number": DummyField(),
                 "start_date": DummyField(),
                 "end_date": DummyField(),
+                "insurance_company": DummyField("company"),
+                "insurance_type": DummyField("ins_type"),
             }
             self.saved_instance = types.SimpleNamespace(
                 deal_id=None,
@@ -103,14 +137,18 @@ def test_import_reso_payout_new_policy(monkeypatch):
                     )
                 ),
             )
+            self._draft_payments = []
+
+        def add_payment_row(self, pay):
+            events["payment"] = pay
 
     class FakePreview:
         def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
             events["prev"] += 1
             assert existing_policy is None
             assert policy_form_cls is FakePolicyForm
-            # имитируем создание формы
-            self.form = policy_form_cls()
+            forced_client = kwargs.get("forced_client")
+            self.form = policy_form_cls(forced_client=forced_client)
             self.saved_instance = self.form.saved_instance
             self.use_existing = False
 
@@ -120,7 +158,7 @@ def test_import_reso_payout_new_policy(monkeypatch):
     class FakeIncomeForm:
         def __init__(self, parent=None, deal_id=None):
             events["inc"] += 1
-            self.fields = {"amount": DummyField()}
+            self.fields = {"amount": DummyField("amount")}
 
         def prefill_payment(self, pid):
             pass
@@ -146,7 +184,16 @@ def test_import_reso_payout_new_policy(monkeypatch):
         income_form_cls=FakeIncomeForm,
     )
     assert count == 1
-    assert events == {"prev": 1, "pol": 1, "inc": 1, "amount": "10.0"}
+    assert events["prev"] == 1
+    assert events["pol"] == 1
+    assert events["inc"] == 1
+    assert events["amount"] == "10.0"
+    assert events["company"] == "Ресо"
+    assert events["ins_type"] == "КАСКО"
+    assert events["payment"] == {
+        "payment_date": date(2025, 1, 1),
+        "amount": 1000.0,
+    }
     assert DummyMB.last is not None
 
 
@@ -171,6 +218,7 @@ def test_import_reso_payout_existing_policy(monkeypatch):
 
     DummyMB.last = None
     monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
+    monkeypatch.setattr("services.reso_table_service.IncomeUpdateDialog", DummyIncomeDlg)
 
     events = {"prev": 0, "pol": 0, "inc": 0}
 
@@ -178,6 +226,8 @@ def test_import_reso_payout_existing_policy(monkeypatch):
         def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
             events["prev"] += 1
             assert existing_policy.id == policy.id
+            forced_client = kwargs.get("forced_client")
+            self.form = policy_form_cls(forced_client=forced_client)
             self.use_existing = True
             self.saved_instance = None
 
@@ -185,7 +235,7 @@ def test_import_reso_payout_existing_policy(monkeypatch):
             return True
 
     class FakePolicyForm:
-        def __init__(self, parent=None):
+        def __init__(self, parent=None, forced_client=None):
             events["pol"] += 1
             self.fields = {}
 
@@ -218,9 +268,8 @@ def test_import_reso_payout_existing_policy(monkeypatch):
         income_form_cls=FakeIncomeForm,
     )
     assert count == 1
-    assert events == {"prev": 1, "pol": 0, "inc": 1}
-    assert DummyMB.last is not None
-
+    assert events == {"prev": 1, "pol": 1, "inc": 1}
+    assert DummyIncomeDlg.last is not None
 
 def test_import_reso_payout_updates_pending_income(monkeypatch):
     client = add_client(name="X")
@@ -246,12 +295,15 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
     DummyMB.last = None
     monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
 
+    monkeypatch.setattr("services.reso_table_service.IncomeUpdateDialog", DummyIncomeDlg)
     events = {"prev": 0, "inst": None, "amount": None, "pol": 0}
 
     class FakePreview:
         def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
             events["prev"] += 1
             assert existing_policy.id == policy.id
+            forced_client = kwargs.get("forced_client")
+            self.form = policy_form_cls(forced_client=forced_client)
             self.use_existing = True
             self.saved_instance = None
 
@@ -259,7 +311,7 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
             return True
 
     class FakePolicyForm:
-        def __init__(self, parent=None):
+        def __init__(self, parent=None, forced_client=None):
             events["pol"] += 1
             self.fields = {}
 
@@ -296,11 +348,10 @@ def test_import_reso_payout_updates_pending_income(monkeypatch):
         income_form_cls=FakeIncomeForm,
     )
     assert count == 1
-    assert events["pol"] == 0
+    assert events["pol"] == 1
     assert events["inst"] == pending_inc
     assert events["amount"] == "7.0"
-    assert DummyMB.last is not None
-
+    assert DummyIncomeDlg.last is not None
 
 def test_import_reso_payout_sums_all_rows(monkeypatch):
     df = pd.DataFrame(
@@ -326,7 +377,7 @@ def test_import_reso_payout_sums_all_rows(monkeypatch):
             events["date"] = qd.toPython()
 
     class FakePolicyForm:
-        def __init__(self, parent=None):
+        def __init__(self, parent=None, forced_client=None):
             self.fields = {
                 "policy_number": DummyField(),
                 "start_date": DummyField(),
@@ -339,7 +390,8 @@ def test_import_reso_payout_sums_all_rows(monkeypatch):
 
     class FakePreview:
         def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
-            self.form = policy_form_cls()
+            forced_client = kwargs.get("forced_client")
+            self.form = policy_form_cls(forced_client=forced_client)
             self.saved_instance = self.form.saved_instance
             self.use_existing = False
 
@@ -376,5 +428,200 @@ def test_import_reso_payout_sums_all_rows(monkeypatch):
     assert count == 1
     assert events["amount"] == "8.0"
     assert events["date"] == date(2025, 1, 5)
+    assert DummyMB.last is not None
+
+
+def test_import_reso_payout_prefills_client(monkeypatch):
+    client = add_client(name="Котельников Кирилл Владимирович")
+
+    df = pd.DataFrame(
+        {
+            "НОМЕР ПОЛИСА": ["X"],
+            "НАЧИСЛЕНИЕ,С-ПО": ["01.01.2025 -31.12.2025"],
+            "СТРАХОВАТЕЛЬ": [client.name],
+            "arhvp": ["5"],
+        }
+    )
+    monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
+    monkeypatch.setattr(os.path, "getctime", lambda p: 0)
+
+    DummyMB.last = None
+    monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
+
+    captured = {}
+
+    class DummyField:
+        def setText(self, val):
+            pass
+
+        def setDate(self, qd):
+            pass
+
+    class FakePolicyForm:
+        def __init__(self, parent=None, forced_client=None):
+            captured["client"] = forced_client
+            self.fields = {
+                "policy_number": DummyField(),
+                "start_date": DummyField(),
+                "end_date": DummyField(),
+            }
+            self.saved_instance = types.SimpleNamespace(
+                deal_id=None,
+                payments=types.SimpleNamespace(
+                    order_by=lambda *_: types.SimpleNamespace(
+                        first=lambda: types.SimpleNamespace(id=1)
+                    )
+                ),
+            )
+
+    class FakePreview:
+        def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
+            forced_client = kwargs.get("forced_client")
+            self.form = policy_form_cls(forced_client=forced_client)
+            self.saved_instance = self.form.saved_instance
+            self.use_existing = False
+
+        def exec(self):
+            return True
+
+    class FakeIncomeForm:
+        def __init__(self, parent=None, deal_id=None, instance=None):
+            self.fields = {"amount": DummyField(), "received_date": DummyField()}
+
+        def prefill_payment(self, pid):
+            pass
+
+        def exec(self):
+            return True
+
+    class FakeMapDlg:
+        def __init__(self, columns, parent=None):
+            pass
+
+        def exec(self):
+            return True
+
+        def get_mapping(self):
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+            }
+
+    count = import_reso_payouts(
+        "dummy",
+        column_map_cls=FakeMapDlg,
+        preview_cls=FakePreview,
+        policy_form_cls=FakePolicyForm,
+        income_form_cls=FakeIncomeForm,
+    )
+    assert count == 1
+    assert captured["client"] == client
+    assert DummyMB.last is not None
+
+
+def test_import_reso_payout_creates_client(monkeypatch):
+    df = pd.DataFrame(
+        {
+            "НОМЕР ПОЛИСА": ["Z"],
+            "НАЧИСЛЕНИЕ,С-ПО": ["01.01.2025 -31.12.2025"],
+            "СТРАХОВАТЕЛЬ": ["Иванов Иван Иванович"],
+            "ПРЕМИЯ,РУБ.": ["200"],
+            "arhvp": ["3"],
+        }
+    )
+    monkeypatch.setattr("services.reso_table_service.load_reso_table", lambda p: df)
+    monkeypatch.setattr(os.path, "getctime", lambda p: 0)
+
+    DummyMB.last = None
+    monkeypatch.setattr("PySide6.QtWidgets.QMessageBox", DummyMB)
+    monkeypatch.setattr("services.reso_table_service.IncomeUpdateDialog", DummyIncomeDlg)
+
+    captured = {}
+
+    class DummyField:
+        def __init__(self, key=None):
+            self.key = key
+
+        def setText(self, val):
+            if self.key:
+                captured[self.key] = val
+
+        def setCurrentText(self, val):
+            if self.key:
+                captured[self.key] = val
+
+        def setDate(self, val):
+            pass
+
+    class FakeClientForm:
+        def __init__(self, parent=None):
+            self.fields = {"name": DummyField("client_name")}
+            self.saved_instance = types.SimpleNamespace(id=55, name="Иванов Иван Иванович")
+
+        def exec(self):
+            return True
+
+    class FakePolicyForm:
+        def __init__(self, parent=None, forced_client=None):
+            captured["forced_client"] = forced_client
+            self.fields = {
+                "policy_number": DummyField(),
+                "start_date": DummyField(),
+                "end_date": DummyField(),
+            }
+            self.saved_instance = types.SimpleNamespace(
+                deal_id=None,
+                payments=types.SimpleNamespace(
+                    order_by=lambda *_: types.SimpleNamespace(
+                        first=lambda: types.SimpleNamespace(id=1)
+                    )
+                ),
+            )
+
+    class FakePreview:
+        def __init__(self, data, *, existing_policy=None, policy_form_cls=None, **kwargs):
+            self.form = policy_form_cls(forced_client=kwargs.get("forced_client"))
+            self.saved_instance = self.form.saved_instance
+            self.use_existing = False
+
+        def exec(self):
+            return True
+
+    class FakeIncomeForm:
+        def __init__(self, parent=None, deal_id=None, instance=None):
+            self.fields = {"amount": DummyField(), "received_date": DummyField()}
+
+        def prefill_payment(self, pid):
+            pass
+
+        def exec(self):
+            return True
+
+    class FakeMapDlg:
+        def __init__(self, columns, parent=None):
+            pass
+
+        def exec(self):
+            return True
+
+        def get_mapping(self):
+            return {
+                "policy_number": "НОМЕР ПОЛИСА",
+                "period": "НАЧИСЛЕНИЕ,С-ПО",
+                "amount": "arhvp",
+            }
+
+    count = import_reso_payouts(
+        "dummy",
+        column_map_cls=FakeMapDlg,
+        preview_cls=FakePreview,
+        policy_form_cls=FakePolicyForm,
+        income_form_cls=FakeIncomeForm,
+        client_form_cls=FakeClientForm,
+    )
+    assert count == 1
+    assert captured["client_name"] == "Иванов Иван Иванович"
+    assert captured["forced_client"].id == 55
     assert DummyMB.last is not None
 

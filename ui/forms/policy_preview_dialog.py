@@ -27,6 +27,7 @@ class PolicyPreviewDialog(QDialog):
         end_date=None,
         parent=None,
         progress: str | None = None,
+        forced_client=None,
     ):
         super().__init__(parent)
         title = "Предпросмотр полиса"
@@ -44,7 +45,7 @@ class PolicyPreviewDialog(QDialog):
         layout.addLayout(content)
 
         # -------- левая часть: форма создания полиса --------
-        self.form = policy_form_cls(parent=self)
+        self.form = policy_form_cls(parent=self, forced_client=forced_client)
         # убираем внутренние кнопки формы
         if hasattr(self.form, "save_btn"):
             self.form.save_btn.hide()
