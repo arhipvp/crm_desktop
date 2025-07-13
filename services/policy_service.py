@@ -378,6 +378,10 @@ def update_policy(policy: Policy, **kwargs):
 
     updates = {}
 
+    old_number = policy.policy_number
+    old_deal_desc = policy.deal.description if policy.deal_id else None
+    client_name = policy.client.name
+
     start_date = kwargs.get("start_date", policy.start_date)
     end_date = kwargs.get("end_date", policy.end_date)
     if not end_date:
@@ -422,6 +426,27 @@ def update_policy(policy: Policy, **kwargs):
     logger.info("✏️ Обновление полиса #%s: %s", policy.id, updates)
     policy.save()
     logger.info("✅ Полис #%s успешно обновлён", policy.id)
+
+    new_number = policy.policy_number
+    new_deal_desc = policy.deal.description if policy.deal_id else None
+    if old_number != new_number or old_deal_desc != new_deal_desc:
+        try:
+            from services.folder_utils import rename_policy_folder
+
+            new_path, _ = rename_policy_folder(
+                client_name,
+                old_number,
+                old_deal_desc,
+                client_name,
+                new_number,
+                new_deal_desc,
+                policy.drive_folder_link,
+            )
+            if new_path and new_path != policy.drive_folder_link:
+                policy.drive_folder_link = new_path
+                policy.save(only=[Policy.drive_folder_link])
+        except Exception:
+            logger.exception("Не удалось переименовать папку полиса")
 
     return policy
 
