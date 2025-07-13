@@ -13,6 +13,7 @@ from ui.forms.policy_form import PolicyForm
 from ui.forms.income_form import IncomeForm
 from ui.forms.income_update_dialog import IncomeUpdateDialog
 from ui.forms.policy_preview_dialog import PolicyPreviewDialog
+from ui.forms.client_form import ClientForm
 from database.models import Payment
 
 logger = logging.getLogger(__name__)
@@ -146,6 +147,7 @@ def import_reso_payouts(
     preview_cls: type[QDialog] = PolicyPreviewDialog,
     policy_form_cls: type[PolicyForm] = PolicyForm,
     income_form_cls: type[IncomeForm] = IncomeForm,
+    client_form_cls: type[ClientForm] = ClientForm,
 ) -> int:
     """Import RESO payout table sequentially.
 
@@ -191,6 +193,18 @@ def import_reso_payouts(
                 matches = find_similar_clients(name)
                 if len(matches) == 1:
                     forced_client = matches[0]
+                else:
+                    form = client_form_cls(parent=parent)
+                    if "name" in getattr(form, "fields", {}):
+                        widget = form.fields["name"]
+                        if hasattr(widget, "setText"):
+                            widget.setText(name)
+                    if form.exec() == QDialog.Accepted:
+                        forced_client = getattr(form, "saved_instance", None)
+                        if not forced_client:
+                            continue
+                    else:
+                        continue
         start_date, end_date = _parse_date_range(str(row.get(mapping["period"], "")))
 
         existing_policy = None
@@ -211,6 +225,25 @@ def import_reso_payouts(
             progress=progress,
             forced_client=forced_client,
         )
+
+        form = getattr(preview, "form", None)
+        if form:
+            if "insurance_company" in form.fields:
+                widget = form.fields["insurance_company"]
+                if hasattr(widget, "setCurrentText"):
+                    widget.setCurrentText("Ресо")
+            if "insurance_type" in form.fields and "ПРОДУКТ" in df.columns:
+                ins_type = str(row.get("ПРОДУКТ", "")).strip()
+                if ins_type and hasattr(form.fields["insurance_type"], "setCurrentText"):
+                    form.fields["insurance_type"].setCurrentText(ins_type)
+            if "ПРЕМИЯ,РУБ." in df.columns:
+                prem = _parse_amount(row.get("ПРЕМИЯ,РУБ."))
+                if prem:
+                    pay_date = start_date or file_date
+                    pay_data = {"payment_date": pay_date, "amount": prem}
+                    form._draft_payments = [pay_data]
+                    if hasattr(form, "add_payment_row"):
+                        form.add_payment_row(pay_data)
 
         if not preview.exec():
             break
