@@ -165,6 +165,7 @@ def import_reso_payouts(
         "amount": "arhvp",
         "premium": "ПРЕМИЯ,РУБ.",
         "insurance_type": "ПРОДУКТ",
+        "sales_channel": "Источник",
     }
     if column_map_cls is not None:
         dlg = column_map_cls(list(df.columns), parent=parent)
@@ -175,6 +176,7 @@ def import_reso_payouts(
     policy_col = mapping["policy_number"]
     premium_col = mapping.get("premium")
     type_col = mapping.get("insurance_type")
+    channel_col = mapping.get("sales_channel")
     numbers = [str(n).strip() for n in df[policy_col].dropna().unique()]
     total = len(numbers)
     processed = 0
@@ -240,6 +242,10 @@ def import_reso_payouts(
                 ins_type = str(row.get(type_col, "")).strip()
                 if ins_type and hasattr(form.fields["insurance_type"], "setCurrentText"):
                     form.fields["insurance_type"].setCurrentText(ins_type)
+            if "sales_channel" in form.fields and channel_col in df.columns:
+                channel = str(row.get(channel_col, "")).strip()
+                if channel and hasattr(form.fields["sales_channel"], "setCurrentText"):
+                    form.fields["sales_channel"].setCurrentText(channel)
             if premium_col in df.columns:
                 prem = _parse_amount(row.get(premium_col))
                 if prem:

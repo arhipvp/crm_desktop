@@ -14,6 +14,7 @@ class ColumnMappingDialog(QDialog):
         self.amount_cb = QComboBox()
         self.premium_cb = QComboBox()
         self.type_cb = QComboBox()
+        self.channel_cb = QComboBox()
 
         for cb in (
             self.policy_cb,
@@ -21,6 +22,7 @@ class ColumnMappingDialog(QDialog):
             self.amount_cb,
             self.premium_cb,
             self.type_cb,
+            self.channel_cb,
         ):
             cb.addItems(columns)
 
@@ -34,12 +36,15 @@ class ColumnMappingDialog(QDialog):
             self.premium_cb.setCurrentText("ПРЕМИЯ,РУБ.")
         if "ПРОДУКТ" in columns:
             self.type_cb.setCurrentText("ПРОДУКТ")
+        if "Источник" in columns:
+            self.channel_cb.setCurrentText("Источник")
 
         form.addRow("Номер полиса", self.policy_cb)
         form.addRow("Период", self.period_cb)
         form.addRow("Сумма", self.amount_cb)
         form.addRow("Премия", self.premium_cb)
         form.addRow("Тип страхования", self.type_cb)
+        form.addRow("Канал продаж", self.channel_cb)
         layout.addLayout(form)
         btns = QHBoxLayout()
         ok_btn = QPushButton("Продолжить")
@@ -58,4 +63,5 @@ class ColumnMappingDialog(QDialog):
             "amount": self.amount_cb.currentText(),
             "premium": self.premium_cb.currentText(),
             "insurance_type": self.type_cb.currentText(),
+            "sales_channel": self.channel_cb.currentText(),
         }
