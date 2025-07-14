@@ -135,7 +135,7 @@ def add_client(**kwargs) -> Client:
             client.drive_folder_link = folder_link
             client.save()
         except Exception as e:
-            logger.error("❌ Ошибка создания папки в Drive: %s", e)
+            logger.error("❌ Ошибка создания папки клиента: %s", e)
 
         return client
 

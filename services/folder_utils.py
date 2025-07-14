@@ -119,18 +119,21 @@ def find_drive_folder(folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> str 
 
 
 def create_client_drive_folder(client_name: str) -> Tuple[str, Optional[str]]:
-    """Создать папку клиента в Google Drive и вернуть локальный путь и ссылку."""
+    """Создать локальную папку клиента и вернуть её путь.
+
+    Папка на Google Drive больше не создаётся автоматически. ``web_link``
+    всегда будет ``None``.
+    """
     safe_name = sanitize_name(client_name)
     local_path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, safe_name)
 
-    web_link: Optional[str] = None
-    if Credentials is not None:
-        try:
-            web_link = create_drive_folder(safe_name, ROOT_FOLDER_ID)
-        except Exception:
-            logger.exception("Не удалось создать папку клиента на Drive")
+    try:
+        os.makedirs(local_path, exist_ok=True)
+        logger.info("📁 Создана папка клиента: %s", local_path)
+    except Exception:
+        logger.exception("Не удалось создать папку клиента локально")
 
-    return local_path, web_link
+    return local_path, None
 
 
 def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
