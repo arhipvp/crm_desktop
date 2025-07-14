@@ -14,6 +14,20 @@ from ui.views.deal_detail_view import DealDetailView
 class DealTableModel(BaseTableModel):
     def __init__(self, objects, model_class, parent=None):
         super().__init__(objects, model_class, parent)
+
+        # скрываем ссылку на папку и двигаем колонки закрытия в конец
+        self.fields = [f for f in self.fields if f.name != "drive_folder_link"]
+
+        def move_to_end(field_name):
+            for i, f in enumerate(self.fields):
+                if f.name == field_name:
+                    self.fields.append(self.fields.pop(i))
+                    break
+
+        move_to_end("is_closed")
+        move_to_end("closed_reason")
+
+        self.headers = [f.name for f in self.fields]
         self.virtual_fields = ["executor"]
         self.headers.append("Исполнитель")
 
