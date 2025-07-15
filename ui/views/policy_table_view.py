@@ -157,8 +157,28 @@ class PolicyTableView(BaseTableView):
         if not policy:
             return
         try:
-            from services.deal_service import add_deal_from_policy
+            from services.deal_service import add_deal_from_policy, get_all_deals
+            from services.policy_service import update_policy
             from ui.views.deal_detail_view import DealDetailView
+            from utils.name_utils import extract_surname
+
+            if confirm("Привязать полис к существующей сделке?"):
+                deals = list(get_all_deals())
+                if not deals:
+                    show_error("Нет доступных сделок")
+                    return
+
+                labels = [f"{d.client.name} - {d.description}" for d in deals]
+                dlg = SearchDialog(labels, parent=self)
+                surname = extract_surname(policy.client.name)
+                if surname:
+                    dlg.search.setText(surname)
+                if dlg.exec() and dlg.selected_index:
+                    idx = labels.index(dlg.selected_index)
+                    deal = deals[idx]
+                    update_policy(policy, deal_id=deal.id)
+                    self.refresh()
+                return
 
             deal = add_deal_from_policy(policy)
             self.refresh()
