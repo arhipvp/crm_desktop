@@ -93,7 +93,9 @@ class PolicyTableView(BaseTableView):
         idx = self.table.currentIndex()
         if not idx.isValid():
             return None
-        return self.model.get_item(idx.row())
+        # map index through proxy to account for sorting/filtering
+        source_row = self.proxy_model.mapToSource(idx).row()
+        return self.model.get_item(source_row)
 
     def get_selected_multiple(self):
         indexes = self.table.selectionModel().selectedRows()
