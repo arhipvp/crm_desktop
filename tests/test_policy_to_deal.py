@@ -65,3 +65,39 @@ def test_update_policy_moves_folder_when_binding(monkeypatch):
     assert called["args"] == ("Bind", "B1", None, "Bind", "B1", "D")
     assert policy.deal_id == deal.id
     assert policy.drive_folder_link == "/tmp/new_path"
+
+
+def test_update_policy_allows_unbinding(monkeypatch):
+    client = add_client(name="Unbind")
+
+    monkeypatch.setattr("services.policy_service.create_policy_folder", lambda *a, **k: "/tmp/policy")
+    monkeypatch.setattr("services.policy_service.open_folder", lambda *a, **k: None)
+
+    policy = add_policy(
+        client_id=client.id,
+        policy_number="U1",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+    )
+
+    deal = add_deal(client_id=client.id, start_date=date(2025, 1, 1), description="D")
+
+    monkeypatch.setattr(
+        "services.folder_utils.rename_policy_folder",
+        lambda *a, **k: ("/tmp/bound", None),
+    )
+    update_policy(policy, deal_id=deal.id)
+    assert policy.deal_id == deal.id
+
+    called = {}
+
+    def fake_rename(oc, op, od, nc, np, nd, link):
+        called["args"] = (oc, op, od, nc, np, nd)
+        return "/tmp/unbound", link
+
+    monkeypatch.setattr("services.folder_utils.rename_policy_folder", fake_rename)
+
+    update_policy(policy, deal_id=None)
+
+    assert called["args"] == (client.name, "U1", "D", client.name, "U1", None)
+    assert policy.deal_id is None

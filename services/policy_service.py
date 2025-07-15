@@ -394,19 +394,21 @@ def update_policy(policy: Policy, **kwargs):
     for key, value in kwargs.items():
         if key not in allowed_fields:
             continue
-        if key == "deal_id" and not kwargs.get("deal"):
-            value = get_deal_by_id(value)
+        if key == "deal_id" and "deal" not in kwargs:
+            value = get_deal_by_id(value) if value not in ("", None) else None
             key = "deal"
         if value not in ("", None):
             updates[key] = value
-        elif key == "contractor":
+        elif key in {"contractor", "deal"}:
             updates[key] = None
 
     # ────────── Проверка дубликата ──────────
     new_number = updates.get("policy_number", policy.policy_number)
-    new_deal_id = (
-        updates.get("deal").id if updates.get("deal") else updates.get("deal_id", policy.deal_id)
-    )
+    if "deal" in updates:
+        new_deal = updates.get("deal")
+        new_deal_id = new_deal.id if new_deal else None
+    else:
+        new_deal_id = policy.deal_id
     compare_data = {
         f: updates.get(f, getattr(policy, f))
         for f in allowed_fields
