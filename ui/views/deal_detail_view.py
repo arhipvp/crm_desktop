@@ -77,6 +77,28 @@ class _CalcHighlighter(QSyntaxHighlighter):
             self.setFormat(m.start(), m.end() - m.start(), fmt)
 
 
+def _with_day_separators(text: str | None) -> str:
+    """Insert horizontal separators between different days in the journal."""
+    if not text:
+        return "\u2014"  # em dash as empty placeholder
+
+    lines = text.splitlines()
+    result: list[str] = []
+    prev_date = None
+    date_rx = re.compile(r"\[(\d{2}\.\d{2}\.\d{4})")
+
+    for line in lines:
+        m = date_rx.match(line)
+        if m:
+            cur_date = m.group(1)
+            if prev_date and cur_date != prev_date:
+                result.append("-" * 40)
+            prev_date = cur_date
+        result.append(line)
+
+    return "\n".join(result)
+
+
 class DealDetailView(QDialog):
     def __init__(self, deal, parent=None):
         super().__init__(parent)
@@ -216,7 +238,9 @@ class DealDetailView(QDialog):
         self.calc_view.setReadOnly(True)
         self.calc_view.setFixedHeight(140)
         self.calc_view.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self.calc_view.setPlainText(self.instance.calculations or "—")
+        self.calc_view.setPlainText(
+            _with_day_separators(self.instance.calculations)
+        )
         self._calc_highlighter = _CalcHighlighter(self.calc_view.document())
         journal_form.addRow("История:", self.calc_view)
 
@@ -726,7 +750,9 @@ class DealDetailView(QDialog):
                 journal_entry=new_calc_part or None,
             )
             self.calc_append.clear()
-            self.calc_view.setPlainText(self.instance.calculations or "—")
+            self.calc_view.setPlainText(
+                _with_day_separators(self.instance.calculations)
+            )
             if new_calc_part:
                 self.calc_table.refresh()
         except Exception as e:
