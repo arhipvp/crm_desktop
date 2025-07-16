@@ -18,6 +18,27 @@ QTableView::item:hover {
     background-color: #edf6ff;
 }
 
+/* 📌 Оформление групповых блоков */
+QGroupBox {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    margin-top: 10px;
+    padding: 6px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    top: -7px;
+    background: #f0f0f0;
+    padding: 0 4px;
+}
+
+/* 📌 Ползунок разделителя */
+QSplitter::handle {
+    background: #d0d0d0;
+    border: 1px solid #ccc;
+}
+
 /* Вкладки */
 QTabBar::tab {
     padding: 6px 12px;
