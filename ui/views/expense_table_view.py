@@ -75,7 +75,7 @@ class ExpenseTableView(BaseTableView):
         filters = {
             "search_text": self.filter_controls.get_search_text(),
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "only_unpaid": not self.filter_controls.is_checked(
+            "include_paid": self.filter_controls.is_checked(
                 "Показывать выплаченные"
             ),
         }

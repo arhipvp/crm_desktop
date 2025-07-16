@@ -44,7 +44,7 @@ def get_incomes_page(
     order_dir: str = "desc",
     search_text: str = "",
     show_deleted: bool = False,
-    only_unreceived: bool = False,
+    include_received: bool = True,
     received_date_range=None,
     **kwargs,
 ):
@@ -57,7 +57,7 @@ def get_incomes_page(
         order_dir: Направление сортировки.
         search_text: Строка поиска.
         show_deleted: Учитывать удалённые записи.
-        only_unreceived: Только не полученные доходы.
+        include_received: Показывать полученные доходы.
         received_date_range: Диапазон дат получения.
 
     Returns:
@@ -66,7 +66,7 @@ def get_incomes_page(
     query = build_income_query(
         search_text=search_text,
         show_deleted=show_deleted,
-        only_unreceived=only_unreceived,
+        include_received=include_received,
         received_date_range=received_date_range,
         **kwargs,
     )
@@ -174,7 +174,7 @@ def apply_income_filters(
     query,
     search_text="",
     show_deleted=False,
-    only_unreceived=False,
+    include_received=True,
     received_date_range=None,
     deal_id=None,
 ):
@@ -186,7 +186,7 @@ def apply_income_filters(
             | (Client.name.contains(search_text))
             | (Deal.description.contains(search_text))
         )
-    if only_unreceived:
+    if not include_received:
         query = query.where(Income.received_date.is_null(True))
     if received_date_range:
         date_from, date_to = received_date_range
@@ -202,7 +202,7 @@ def apply_income_filters(
 def build_income_query(
     search_text: str = "",
     show_deleted: bool = False,
-    only_unreceived: bool = False,
+    include_received: bool = True,
     received_date_range=None,
     **kwargs,
 ):
@@ -228,7 +228,7 @@ def build_income_query(
             | (Deal.description.contains(search_text))
         )
 
-    if only_unreceived:
+    if not include_received:
         query = query.where(Income.received_date.is_null(True))
     if received_date_range:
         date_from, date_to = received_date_range
