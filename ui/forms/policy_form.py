@@ -188,8 +188,9 @@ class PolicyForm(BaseEditForm):
         ]:
             widget = self.fields.get(field)
             if widget:
-                value = widget.currentText().strip() or None
-                if value or field == "contractor":
+                text = widget.currentText().strip()
+                value = None if not text or text == "—" else text
+                if value is not None or field == "contractor":
                     data[field] = value
 
         return data
