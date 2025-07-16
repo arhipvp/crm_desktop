@@ -24,7 +24,7 @@ class PolicyTableView(BaseTableView):
         self.deal_id = deal_id
         checkbox_map = {
             "Показывать продленное": self.on_filter_changed,
-            "Показать полисы без сделок": self.on_filter_changed,
+            "Показывать только полисы без сделок": self.on_filter_changed,
         }
         super().__init__(
             parent=parent,
@@ -68,7 +68,7 @@ class PolicyTableView(BaseTableView):
             "search_text": self.filter_controls.get_search_text(),
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
             "include_renewed": self.filter_controls.is_checked("Показывать продленное"),
-            "without_deal_only": self.filter_controls.is_checked("Показать полисы без сделок"),
+            "without_deal_only": self.filter_controls.is_checked("Показывать только полисы без сделок"),
         }
         if self.deal_id is not None:
             filters["deal_id"] = self.deal_id
