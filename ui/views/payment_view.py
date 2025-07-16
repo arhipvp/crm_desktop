@@ -39,10 +39,10 @@ class PaymentView(QWidget):
         self.show_deleted_checkbox.stateChanged.connect(self.reset_pagination)
         control_layout.addWidget(self.show_deleted_checkbox)
 
-        self.only_paid_checkbox = QCheckBox("Показывать оплаченные")
-        self.only_paid_checkbox.setChecked(False)
-        self.only_paid_checkbox.stateChanged.connect(self.reset_pagination)
-        control_layout.addWidget(self.only_paid_checkbox)
+        self.include_paid_checkbox = QCheckBox("Показывать оплаченные")
+        self.include_paid_checkbox.setChecked(True)
+        self.include_paid_checkbox.stateChanged.connect(self.reset_pagination)
+        control_layout.addWidget(self.include_paid_checkbox)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(
@@ -76,14 +76,14 @@ class PaymentView(QWidget):
     def load_payments(self):
         search_text = self.search_input.text().strip().lower()
         show_deleted = self.show_deleted_checkbox.isChecked()
-        only_paid = self.only_paid_checkbox.isChecked()
+        include_paid = self.include_paid_checkbox.isChecked()
 
         self.payments = get_payments_page(
             self.current_page,
             self.per_page,
             search_text,
             show_deleted,
-            only_paid=only_paid,
+            include_paid=include_paid,
         )
 
         self.render_payments()

@@ -496,9 +496,11 @@ def apply_policy_filters(
         query = query.where(Policy.is_deleted == False)
     if not include_renewed:
         query = query.where(
-            (Policy.renewed_to.is_null(True)) | (Policy.renewed_to == "")
+            (Policy.renewed_to.is_null(True))
+            | (Policy.renewed_to == "")
+            | (Policy.renewed_to == "Нет")
         )
-    if without_deal_only:
+    if deal_id is None and without_deal_only:
         query = query.where(Policy.deal_id.is_null(True))
     if search_text:
         query = query.where(

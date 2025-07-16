@@ -128,7 +128,7 @@ def get_expenses_page(
     search_text: str = "",
     show_deleted: bool = False,
     deal_id: int = None,
-    only_unpaid: bool = False,
+    include_paid: bool = True,
 ):
     """Вернуть страницу расходов с фильтрами.
 
@@ -138,7 +138,7 @@ def get_expenses_page(
         search_text: Строка поиска по полисам и клиентам.
         show_deleted: Учитывать удалённые записи.
         deal_id: Идентификатор сделки для фильтра.
-        only_unpaid: Показывать только неоплаченные расходы.
+        include_paid: Показывать оплаченные расходы.
 
     Returns:
         ModelSelect: Выборка расходов.
@@ -147,7 +147,7 @@ def get_expenses_page(
         search_text=search_text,
         show_deleted=show_deleted,
         deal_id=deal_id,
-        only_unpaid=only_unpaid,
+        include_paid=include_paid,
     )
     offset = (page - 1) * per_page
     return query.order_by(Expense.expense_date.desc()).limit(per_page).offset(offset)
@@ -158,7 +158,7 @@ def apply_expense_filters(
     search_text=None,
     show_deleted=False,
     deal_id=None,
-    only_unpaid=False,
+    include_paid=True,
     **kwargs,
 ):
     if not show_deleted:
@@ -170,14 +170,14 @@ def apply_expense_filters(
             (Policy.policy_number.contains(search_text))
             | (Client.name.contains(search_text))
         )
-    if only_unpaid:
+    if not include_paid:
         query = query.where(Expense.expense_date.is_null(True))
 
     return query
 
 
 def build_expense_query(
-    search_text=None, show_deleted=False, deal_id=None, only_unpaid=False, **kwargs
+    search_text=None, show_deleted=False, deal_id=None, include_paid=True, **kwargs
 ):
     query = (
         Expense.select(Expense, Payment, Policy, Client)
@@ -186,7 +186,7 @@ def build_expense_query(
         .join(Client)
     )
     return apply_expense_filters(
-        query, search_text, show_deleted, deal_id, only_unpaid, **kwargs
+        query, search_text, show_deleted, deal_id, include_paid, **kwargs
     )
 
 

@@ -71,7 +71,7 @@ def get_payments_page(
     search_text: str = "",
     show_deleted: bool = False,
     deal_id: int | None = None,
-    only_paid: bool = False,
+    include_paid: bool = True,
     **filters,
 ) -> ModelSelect:
     """Получить страницу платежей по заданным фильтрам.
@@ -82,7 +82,7 @@ def get_payments_page(
         search_text: Строка поиска.
         show_deleted: Учитывать удалённые записи.
         deal_id: Фильтр по сделке.
-        only_paid: Только неоплаченные/оплаченные.
+        include_paid: Показывать оплаченные платежи.
 
     Returns:
         ModelSelect: Отфильтрованная выборка платежей.
@@ -91,7 +91,7 @@ def get_payments_page(
         search_text=search_text,
         show_deleted=show_deleted,
         deal_id=deal_id,
-        only_paid=only_paid,
+        include_paid=include_paid,
         **filters,
     )
     offset = (page - 1) * per_page
@@ -248,7 +248,7 @@ def apply_payment_filters(
     search_text: str = "",
     show_deleted: bool = False,
     deal_id: int | None = None,
-    only_paid: bool = False,
+    include_paid: bool = True,
 ) -> ModelSelect:
     """Фильтры для выборки платежей."""
     if deal_id is not None:
@@ -260,7 +260,7 @@ def apply_payment_filters(
             (Policy.policy_number.contains(search_text))
             | (Client.name.contains(search_text))
         )
-    if not only_paid:
+    if not include_paid:
         query = query.where(Payment.actual_payment_date.is_null(True))
 
     return query
@@ -270,7 +270,7 @@ def build_payment_query(
     search_text: str = "",
     show_deleted: bool = False,
     deal_id: int | None = None,
-    only_paid: bool = False,
+    include_paid: bool = True,
     **filters,
 ) -> ModelSelect:
     """Сконструировать базовый запрос платежей с агрегатами."""
@@ -296,7 +296,9 @@ def build_payment_query(
     )
 
     # Фильтрация по deal_id через Policy
-    query = apply_payment_filters(query, search_text, show_deleted, deal_id, only_paid)
+    query = apply_payment_filters(
+        query, search_text, show_deleted, deal_id, include_paid
+    )
 
     return query
 

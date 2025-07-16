@@ -53,7 +53,7 @@ class PaymentTableView(BaseTableView):
         filters = {
             "search_text": self.filter_controls.get_search_text(),
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "only_paid": self.filter_controls.is_checked("Показывать оплаченные"),
+            "include_paid": self.filter_controls.is_checked("Показывать оплаченные"),
         }
         if self.deal_id is not None:
             filters["deal_id"] = self.deal_id

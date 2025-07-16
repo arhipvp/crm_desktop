@@ -255,19 +255,27 @@ def test_get_deal_reminder_counts():
     assert counts[today + timedelta(days=2)] == 1
 
 
-def test_apply_expense_filters_only_unpaid():
+def test_apply_expense_filters_include_paid():
     client = add_client(name='E')
     pol = add_policy(client_id=client.id, policy_number='P1', start_date=date(2025,1,1), end_date=date(2025,1,10))
     pay = add_payment(policy_id=pol.id, amount=10, payment_date=date(2025,1,2))
     exp = add_expense(payment_id=pay.id, amount=5, expense_type='agent')
-    query = apply_expense_filters(Expense.select().join(Payment).join(Policy).join(Client), only_unpaid=True)
+    query = apply_expense_filters(
+        Expense.select().join(Payment).join(Policy).join(Client),
+        include_paid=False,
+    )
     assert list(query) == [exp]
     exp.expense_date = date(2025,1,3)
     exp.save()
-    assert list(apply_expense_filters(Expense.select().join(Payment).join(Policy).join(Client), only_unpaid=True)) == []
+    assert list(
+        apply_expense_filters(
+            Expense.select().join(Payment).join(Policy).join(Client),
+            include_paid=False,
+        )
+    ) == []
 
 
-def test_apply_income_filters_range_and_unreceived():
+def test_apply_income_filters_include_received():
     client = add_client(name='I')
     pol = add_policy(client_id=client.id, policy_number='IP1', start_date=date(2025,1,1), end_date=date(2025,1,10))
     pay = add_payment(policy_id=pol.id, amount=10, payment_date=date(2025,1,2))
@@ -277,7 +285,7 @@ def test_apply_income_filters_range_and_unreceived():
     assert list(q1) == [inc1]
     q2 = apply_income_filters(
         Income.select().join(Payment).join(Policy).join(Client),
-        only_unreceived=True,
+        include_received=False,
     )
     res2 = list(q2)
     assert inc2 in res2
@@ -300,13 +308,13 @@ def test_apply_payment_filters():
     pay2 = add_payment(policy_id=pol.id, amount=20, payment_date=date(2025,1,3))
     q_unpaid = apply_payment_filters(
         Payment.select().join(Policy).join(Client),
-        only_paid=False,
+        include_paid=False,
     )
     assert pay2 in list(q_unpaid)
     q_search = apply_payment_filters(
         Payment.select().join(Policy).join(Client),
         search_text='PP1',
-        only_paid=True,
+        include_paid=True,
     )
     res = list(q_search)
     assert pay1 in res and pay2 in res
