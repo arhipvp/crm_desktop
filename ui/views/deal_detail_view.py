@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QGroupBox,
+    QSplitter,
     QSizePolicy,
     QTabWidget,
     QTextEdit,
@@ -130,9 +131,19 @@ class DealDetailView(QDialog):
         self.layout.addLayout(self.kpi_layout)
         self._init_kpi_panel()
 
-        # Вкладки
+        # Основная область с разделением на информацию и остальные вкладки
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        self.layout.addWidget(self.main_splitter, stretch=1)
+
+        self.info_container = QWidget()
+        self.info_layout = QVBoxLayout(self.info_container)
+        self.main_splitter.addWidget(self.info_container)
+
         self.tabs = QTabWidget()
-        self.layout.addWidget(self.tabs, stretch=1)
+        self.main_splitter.addWidget(self.tabs)
+        self.main_splitter.setStretchFactor(0, 0)
+        self.main_splitter.setStretchFactor(1, 1)
+
         self._init_tabs()
 
         # Быстрые действия
@@ -176,9 +187,13 @@ class DealDetailView(QDialog):
             self.tabs.removeTab(0)
             w.deleteLater()
 
-        # 1) Информация
-        info = QWidget()
-        main_layout = QVBoxLayout(info)
+        # 1) Информация — теперь находится в отдельной панели слева
+        main_layout = self.info_layout
+        while main_layout.count():
+            item = main_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         info_group = QGroupBox("Основная информация")
@@ -285,9 +300,6 @@ class DealDetailView(QDialog):
         btn_row.addWidget(btn_save_close)
         btn_row.addWidget(btn_refresh)
         main_layout.addLayout(btn_row)
-
-        info.setLayout(main_layout)
-        self.tabs.addTab(info, "Информация")
 
         # 3) Полисы
 
