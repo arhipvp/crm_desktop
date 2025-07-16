@@ -53,12 +53,10 @@ class CalculationForm(BaseEditForm):
         data.pop("deal", None)
 
         # сохраняем свободный ввод из комбобоксов
-        data["insurance_company"] = (
-            self.company_combo.currentText().strip() or None
-        )
-        data["insurance_type"] = (
-            self.type_combo.currentText().strip() or None
-        )
+        company_text = self.company_combo.currentText().strip()
+        data["insurance_company"] = None if not company_text or company_text == "—" else company_text
+        type_text = self.type_combo.currentText().strip()
+        data["insurance_type"] = None if not type_text or type_text == "—" else type_text
         return data
 
     def save_data(self):
