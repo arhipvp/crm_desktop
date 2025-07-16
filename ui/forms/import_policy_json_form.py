@@ -114,6 +114,15 @@ class ImportPolicyJsonForm(QDialog):
         policy_data = data.get("policy", {})
         payments_data = data.get("payments", [])
 
+        # Если клиент или сделка зафиксированы, игнорируем соответствующие поля
+        if self._forced_client is not None:
+            policy_data.pop("client_id", None)
+            policy_data.pop("client", None)
+
+        if self._forced_deal is not None:
+            policy_data.pop("deal_id", None)
+            policy_data.pop("deal", None)
+
         form = PolicyForm(
             forced_client=client,
             forced_deal=self._forced_deal,
