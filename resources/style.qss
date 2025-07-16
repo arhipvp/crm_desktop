@@ -18,6 +18,11 @@ QTableView::item:hover {
     background-color: #edf6ff;
 }
 
+/* 📌 Область прокрутки без рамки */
+QScrollArea {
+    border: none;
+}
+
 /* 📌 Оформление групповых блоков */
 QGroupBox {
     border: 1px solid #ccc;

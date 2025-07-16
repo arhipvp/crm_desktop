@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (
     QWidget,
     QHeaderView,
     QMessageBox,
+    QScrollArea,
+    QFrame,
 )
 from PySide6.QtGui import (
     QSyntaxHighlighter,
@@ -137,7 +139,13 @@ class DealDetailView(QDialog):
 
         self.info_container = QWidget()
         self.info_layout = QVBoxLayout(self.info_container)
-        self.main_splitter.addWidget(self.info_container)
+
+        self.info_scroll = QScrollArea()
+        self.info_scroll.setFrameShape(QFrame.NoFrame)
+        self.info_scroll.setWidgetResizable(True)
+        self.info_scroll.setWidget(self.info_container)
+        self.info_scroll.setMinimumWidth(320)
+        self.main_splitter.addWidget(self.info_scroll)
 
         self.tabs = QTabWidget()
         self.main_splitter.addWidget(self.tabs)
