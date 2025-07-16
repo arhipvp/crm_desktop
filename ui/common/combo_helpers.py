@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QCompleter
 
 from services.client_service import get_all_clients
-from services.deal_service import get_all_deals
+from services.deal_service import get_all_deals, get_deals_by_client_id
 from services.policy_service import get_all_policies
 
 
@@ -103,8 +103,13 @@ def create_client_combobox() -> QComboBox:
     )
 
 
-def create_deal_combobox() -> QComboBox:
-    deals = list(get_all_deals())
+def create_deal_combobox(client_id: int | None = None) -> QComboBox:
+    """Комбобокс сделок с необязательной фильтрацией по клиенту."""
+    deals = (
+        list(get_deals_by_client_id(client_id))
+        if client_id is not None
+        else list(get_all_deals())
+    )
     return create_entity_combobox(
         items=deals,
         label_func=lambda d: f"{d.client.name} - {d.description} ",

@@ -23,6 +23,7 @@ from services.policy_service import (
     update_policy,
     DuplicatePolicyError,
 )
+from services.deal_service import get_all_deals, get_deals_by_client_id
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import (
@@ -30,6 +31,7 @@ from ui.common.combo_helpers import (
     create_deal_combobox,
     create_editable_combo,
     set_selected_by_id,
+    populate_combo,
 )
 from ui.common.date_utils import add_year_minus_one_day
 from ui.common.message_boxes import show_error, show_info
@@ -63,6 +65,8 @@ class PolicyForm(BaseEditForm):
         super().__init__(
             instance=policy, model_class=Policy, entity_name="полис", parent=parent
         )
+        # после построения формы применяем фильтрацию сделок по выбранному клиенту
+        self.on_client_changed()
 
     def set_instance(self, instance):
         super().set_instance(instance)
@@ -117,7 +121,12 @@ class PolicyForm(BaseEditForm):
                 self.client_combo.setCurrentIndex(idx)
             self.client_combo.setEnabled(False)
 
-        self.deal_combo = create_deal_combobox()
+        initial_client_id = (
+            getattr(self._forced_client, "id", self._forced_client)
+            if self._forced_client is not None
+            else None
+        )
+        self.deal_combo = create_deal_combobox(initial_client_id)
         self.fields["deal_id"] = self.deal_combo
         self.form_layout.insertRow(1, "Сделка:", self.deal_combo)
 
@@ -161,6 +170,9 @@ class PolicyForm(BaseEditForm):
             qd = self.start_date_edit.date()
             if qd.isValid():
                 self.on_start_date_changed(qd)
+
+        # обновляем список сделок при смене клиента
+        self.client_combo.currentIndexChanged.connect(self.on_client_changed)
 
     # ---------- сбор данных ----------
     def collect_data(self) -> dict:
@@ -265,6 +277,27 @@ class PolicyForm(BaseEditForm):
         ):
             self.end_date_edit.setDate(auto_end)
             self._auto_end_date = auto_end
+
+    def on_client_changed(self, _=None):
+        """Фильтровать список сделок по выбранному клиенту."""
+        if not self.deal_combo.isEnabled():
+            return
+        client_id = self.client_combo.currentData()
+        deals = (
+            list(get_deals_by_client_id(client_id))
+            if client_id is not None
+            else list(get_all_deals())
+        )
+        current_deal = self.deal_combo.currentData()
+        populate_combo(
+            self.deal_combo,
+            deals,
+            label_func=lambda d: f"{d.client.name} - {d.description} ",
+            id_attr="id",
+            placeholder="— Сделка —",
+        )
+        if current_deal is not None:
+            set_selected_by_id(self.deal_combo, current_deal)
 
     def build_payments_section(self):
         # Группа платежей
