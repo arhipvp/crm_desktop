@@ -71,7 +71,11 @@ def create_entity_combobox(
         combo.view().hide()  # подавляем стандартный дроп‑даун
 
         def open_search():
-            dlg = SearchDialog([label_func(it) for it in items], combo)
+            search_items = [label_func(it) for it in items]
+            if placeholder:
+                search_items.insert(0, placeholder)
+
+            dlg = SearchDialog(search_items, combo)
             if dlg.exec():
                 text = dlg.selected_index
                 idx = combo.findText(text, Qt.MatchExactly)
