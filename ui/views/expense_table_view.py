@@ -18,7 +18,17 @@ class ExpenseTableModel(BaseTableModel):
         super().__init__(objects, model_class, parent)
 
         self.fields = []  # отключаем автоколонки
-        self.headers = ["Полис", "Тип расхода", "Контрагент", "Сумма", "Дата выплаты"]
+        self.headers = [
+            'Полис',
+            'Сделка',
+            'Клиент',
+            'Дата начала',
+            'Тип расхода',
+            'Сумма платежа',
+            'Дата платежа',
+            'Сумма расхода',
+            'Дата выплаты',
+        ]
 
     def columnCount(self, parent=None):
         return len(self.headers)
@@ -37,24 +47,44 @@ class ExpenseTableModel(BaseTableModel):
         obj = self.objects[index.row()]
         policy = getattr(obj, "policy", None)
         payment = getattr(obj, "payment", None)
+        if not policy and payment:
+            policy = getattr(payment, "policy", None)
+        deal = getattr(policy, "deal", None) if policy else None
 
         col = index.column()
 
         if col == 0:
             return policy.policy_number if policy else "—"
         elif col == 1:
-            return obj.expense_type or "—"
+            return deal.description if deal else "—"
         elif col == 2:
+            return policy.client.name if policy and policy.client else "—"
+        elif col == 3:
             return (
-                getattr(payment, "contractor", None)
-                or getattr(policy, "contractor", "—")
-                if policy
+                policy.start_date.strftime("%d.%m.%Y")
+                if policy and policy.start_date
                 else "—"
             )
-        elif col == 3:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
         elif col == 4:
-            return obj.expense_date.strftime("%d.%m.%Y") if obj.expense_date else "—"
+            return obj.expense_type or "—"
+        elif col == 5:
+            return (
+                f"{payment.amount:,.2f} ₽" if payment and payment.amount else "0 ₽"
+            )
+        elif col == 6:
+            return (
+                payment.payment_date.strftime("%d.%m.%Y")
+                if payment and payment.payment_date
+                else "—"
+            )
+        elif col == 7:
+            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+        elif col == 8:
+            return (
+                obj.expense_date.strftime("%d.%m.%Y")
+                if obj.expense_date
+                else "—"
+            )
 
 
 class ExpenseTableView(BaseTableView):
@@ -67,6 +97,11 @@ class ExpenseTableView(BaseTableView):
         self.model_class = Expense  # или Client, Policy и т.д.
         self.form_class = ExpenseForm  # соответствующая форма
         self.virtual_fields = ["policy_num", "deal_desc", "client_name", "contractor"]
+
+        self.default_sort_column = 8
+        self.default_sort_order = Qt.DescendingOrder
+        self.current_sort_column = self.default_sort_column
+        self.current_sort_order = self.default_sort_order
 
         self.row_double_clicked.connect(self.open_detail)
         self.load_data()
