@@ -417,13 +417,20 @@ def rename_deal_folder(
     new_client_name: str,
     new_description: str,
     drive_link: str | None,
+    current_path: str | None = None,
 ):
     """Переименовать или переместить папку сделки."""
 
-    old_path = os.path.join(
+    default_old_path = os.path.join(
         GOOGLE_DRIVE_LOCAL_ROOT,
         sanitize_name(old_client_name),
         sanitize_name(f"Сделка - {old_description}"),
+    )
+    # если передан фактический путь и он существует — используем его
+    old_path = (
+        current_path
+        if current_path and os.path.isdir(current_path)
+        else default_old_path
     )
     new_path = os.path.join(
         GOOGLE_DRIVE_LOCAL_ROOT,
@@ -439,6 +446,9 @@ def rename_deal_folder(
                 logger.info("📂 Папка сделки перемещена: %s → %s", old_path, new_path)
             else:
                 logger.info("📂 Папка сделки уже в нужном месте: %s", new_path)
+        elif os.path.isdir(new_path):
+            # папка уже в нужном месте (например, переименовали родителя)
+            logger.info("📂 Папка сделки уже в нужном месте: %s", new_path)
         else:
             _msg(f"Папка сделки не найдена: {old_path}\nСоздаю новую.", None)
             os.makedirs(new_path, exist_ok=True)

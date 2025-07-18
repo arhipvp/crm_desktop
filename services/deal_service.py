@@ -238,7 +238,12 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
             from services.folder_utils import rename_deal_folder
 
             new_path, _ = rename_deal_folder(
-                old_client_name or "", old_desc, new_client_name or "", new_desc, deal.drive_folder_link
+                old_client_name or "",
+                old_desc,
+                new_client_name or "",
+                new_desc,
+                deal.drive_folder_link,
+                deal.drive_folder_path,
             )
             if new_path and new_path != deal.drive_folder_path:
                 deal.drive_folder_path = new_path
@@ -271,6 +276,7 @@ def mark_deal_deleted(deal_id: int):
                 deal.client.name,
                 new_desc,
                 deal.drive_folder_link,
+                deal.drive_folder_path,
             )
             deal.description = new_desc
             deal.drive_folder_path = new_path
