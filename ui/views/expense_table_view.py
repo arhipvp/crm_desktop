@@ -1,10 +1,12 @@
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QAbstractItemView
 
 from database.models import Expense
 from services.expense_service import (
     build_expense_query,
     get_expenses_page,
     mark_expense_deleted,
+    mark_expenses_deleted,
 )
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
@@ -104,6 +106,11 @@ class ExpenseTableView(BaseTableView):
         self.current_sort_order = self.default_sort_order
 
         self.row_double_clicked.connect(self.open_detail)
+
+        # разрешаем множественный выбор для массовых действий
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.delete_callback = self.delete_selected
+
         self.load_data()
 
     def get_filters(self) -> dict:
@@ -146,6 +153,10 @@ class ExpenseTableView(BaseTableView):
             return None
         return self.model.get_item(idx.row())
 
+    def get_selected_multiple(self):
+        indexes = self.table.selectionModel().selectedRows()
+        return [self.model.get_item(self._source_row(i)) for i in indexes]
+
     def add_new(self):
         form = ExpenseForm()
         if form.exec():
@@ -159,12 +170,20 @@ class ExpenseTableView(BaseTableView):
                 self.refresh()
 
     def delete_selected(self):
-        expense = self.get_selected()
-        if not expense:
+        expenses = self.get_selected_multiple()
+        if not expenses:
             return
-        if confirm(f"Удалить расход {expense.amount} ₽?"):
+        if len(expenses) == 1:
+            message = f"Удалить расход {expenses[0].amount} ₽?"
+        else:
+            message = f"Удалить {len(expenses)} расход(ов)?"
+        if confirm(message):
             try:
-                mark_expense_deleted(expense.id)
+                if len(expenses) == 1:
+                    mark_expense_deleted(expenses[0].id)
+                else:
+                    ids = [exp.id for exp in expenses]
+                    mark_expenses_deleted(ids)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
