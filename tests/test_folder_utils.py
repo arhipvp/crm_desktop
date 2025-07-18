@@ -48,7 +48,14 @@ def test_rename_deal_folder_local(tmp_path, monkeypatch):
     old_path = root / sanitize_name(old_client) / sanitize_name(f'Сделка - {old_desc}')
     old_path.mkdir(parents=True)
 
-    new_path, link = rename_deal_folder(old_client, old_desc, new_client, new_desc, None)
+    new_path, link = rename_deal_folder(
+        old_client,
+        old_desc,
+        new_client,
+        new_desc,
+        None,
+        str(old_path),
+    )
 
     expected = root / sanitize_name(new_client) / sanitize_name(f'Сделка - {new_desc}')
     assert new_path == str(expected)
@@ -61,7 +68,14 @@ def test_rename_deal_folder_missing(tmp_path, monkeypatch):
     monkeypatch.setenv('GOOGLE_DRIVE_LOCAL_ROOT', str(root))
     monkeypatch.setattr('services.folder_utils.GOOGLE_DRIVE_LOCAL_ROOT', str(root))
 
-    new_path, link = rename_deal_folder('Old', 'Old Deal', 'New', 'New Deal', None)
+    new_path, link = rename_deal_folder(
+        'Old',
+        'Old Deal',
+        'New',
+        'New Deal',
+        None,
+        None,
+    )
 
     expected = root / sanitize_name('New') / sanitize_name('Сделка - New Deal')
     assert new_path == str(expected)

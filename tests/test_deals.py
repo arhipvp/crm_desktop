@@ -53,8 +53,8 @@ def test_update_deal_changes_folder(monkeypatch):
 
     called = {}
 
-    def fake_rename(old_c, old_d, new_c, new_d, link):
-        called["args"] = (old_c, old_d, new_c, new_d)
+    def fake_rename(old_c, old_d, new_c, new_d, link, path):
+        called["args"] = (old_c, old_d, new_c, new_d, path)
         return f"/tmp/{new_c}_{new_d}", link
 
     monkeypatch.setattr("services.folder_utils.rename_deal_folder", fake_rename)
@@ -62,7 +62,7 @@ def test_update_deal_changes_folder(monkeypatch):
     update_deal(deal, client_id=c2.id, description="New")
     deal = get_deals_by_client_id(c2.id)[0]
 
-    assert called["args"] == ("C1", "Old", "C2", "New")
+    assert called["args"][:4] == ("C1", "Old", "C2", "New")
     assert deal.drive_folder_path == "/tmp/C2_New"
 
 
@@ -72,7 +72,7 @@ def test_mark_deal_deleted_renames_folder(monkeypatch):
 
     monkeypatch.setattr(
         "services.folder_utils.rename_deal_folder",
-        lambda oc, od, nc, nd, link: (f"/tmp/{nd}", link),
+        lambda oc, od, nc, nd, link, path: (f"/tmp/{nd}", link),
     )
 
     mark_deal_deleted(deal.id)
@@ -92,8 +92,8 @@ def test_update_client_renames_deal_folders(monkeypatch):
 
     called = {}
 
-    def fake_rename(old_c, old_d, new_c, new_d, link):
-        called["args"] = (old_c, old_d, new_c, new_d)
+    def fake_rename(old_c, old_d, new_c, new_d, link, path):
+        called["args"] = (old_c, old_d, new_c, new_d, path)
         return f"/tmp/{new_c}_{new_d}", link
 
     monkeypatch.setattr("services.folder_utils.rename_deal_folder", fake_rename)
@@ -101,5 +101,5 @@ def test_update_client_renames_deal_folders(monkeypatch):
     update_client(client, name="New")
 
     deal = Deal.get_by_id(deal.id)
-    assert called["args"] == ("Old", "D", "New", "D")
+    assert called["args"][:4] == ("Old", "D", "New", "D")
     assert deal.drive_folder_path == "/tmp/New_D"

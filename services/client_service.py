@@ -188,6 +188,7 @@ def update_client(client: Client, **kwargs) -> Client:
                     new_name,
                     deal.description,
                     deal.drive_folder_link,
+                    deal.drive_folder_path,
                 )
                 if new_deal_path and new_deal_path != deal.drive_folder_path:
                     deal.drive_folder_path = new_deal_path
