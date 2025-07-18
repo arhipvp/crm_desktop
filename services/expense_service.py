@@ -36,6 +36,19 @@ def mark_expense_deleted(expense_id: int):
         logger.warning("❗ Расход с id=%s не найден для удаления", expense_id)
 
 
+def mark_expenses_deleted(expense_ids: list[int]) -> int:
+    """Массово пометить расходы удалёнными."""
+    if not expense_ids:
+        return 0
+    count = 0
+    for eid in expense_ids:
+        before = Expense.get_or_none(Expense.id == eid)
+        if before and not before.is_deleted:
+            mark_expense_deleted(eid)
+            count += 1
+    return count
+
+
 # ─────────────────────────── Добавление ───────────────────────────
 
 
