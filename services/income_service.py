@@ -185,6 +185,7 @@ def apply_income_filters(
             (Policy.policy_number.contains(search_text))
             | (Client.name.contains(search_text))
             | (Deal.description.contains(search_text))
+            | (Policy.note.contains(search_text))
         )
     if not include_received:
         query = query.where(Income.received_date.is_null(True))
@@ -226,6 +227,7 @@ def build_income_query(
             (Policy.policy_number.contains(search_text))
             | (Client.name.contains(search_text))
             | (Deal.description.contains(search_text))
+            | (Policy.note.contains(search_text))
         )
 
     if not include_received:

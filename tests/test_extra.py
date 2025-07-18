@@ -301,6 +301,21 @@ def test_income_search_by_deal_description():
     assert inc in list(q)
 
 
+def test_income_search_by_policy_note():
+    client = add_client(name='N')
+    pol = add_policy(
+        client_id=client.id,
+        policy_number='NN1',
+        note='Important note',
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 10),
+    )
+    pay = add_payment(policy_id=pol.id, amount=10, payment_date=date(2025, 1, 2))
+    inc = add_income(payment_id=pay.id, amount=5)
+    q = build_income_query(search_text='Important')
+    assert inc in list(q)
+
+
 def test_apply_payment_filters():
     client = add_client(name='P')
     pol = add_policy(client_id=client.id, policy_number='PP1', start_date=date(2025,1,1), end_date=date(2025,1,10))
