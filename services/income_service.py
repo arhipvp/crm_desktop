@@ -1,6 +1,7 @@
 """Сервисные функции для учёта доходов."""
 
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def mark_incomes_deleted(income_ids: list[int]) -> int:
 def get_incomes_page(
     page: int,
     per_page: int,
-    order_by: str = "received_date",
+    order_by: str | Any = "received_date",
     order_dir: str = "desc",
     search_text: str = "",
     show_deleted: bool = False,
@@ -83,13 +84,18 @@ def get_incomes_page(
         received_date_range=received_date_range,
         **kwargs,
     )
+
     # --- сортировка ---
-    # --- сортировка ---
-    if hasattr(Income, order_by):
-        field = getattr(Income, order_by)
-        query = query.order_by(field.desc() if order_dir == "desc" else field.asc())
+    if isinstance(order_by, str):
+        if hasattr(Income, order_by):
+            field = getattr(Income, order_by)
+        else:
+            field = Income.received_date
     else:
-        query = query.order_by(Income.received_date.desc())
+        # ожидается поле peewee
+        field = order_by
+
+    query = query.order_by(field.desc() if order_dir == "desc" else field.asc())
 
     offset = (page - 1) * per_page
     return query.limit(per_page).offset(offset)
@@ -198,6 +204,7 @@ def apply_income_filters(
             (Policy.policy_number.contains(search_text))
             | (Client.name.contains(search_text))
             | (Deal.description.contains(search_text))
+            | (Policy.note.contains(search_text))
         )
     if not include_received:
         query = query.where(Income.received_date.is_null(True))
@@ -239,6 +246,7 @@ def build_income_query(
             (Policy.policy_number.contains(search_text))
             | (Client.name.contains(search_text))
             | (Deal.description.contains(search_text))
+            | (Policy.note.contains(search_text))
         )
 
     if not include_received:

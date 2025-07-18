@@ -6,7 +6,7 @@ from database.models import Client, Income, Payment, Policy, Deal
 from services.income_service import (
     build_income_query,
     mark_income_deleted,
-    mark_incomes_deleted,
+    get_incomes_page,
 )
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
@@ -96,6 +96,16 @@ class IncomeTableModel(BaseTableModel):
 
 
 class IncomeTableView(BaseTableView):
+    COLUMN_FIELD_MAP = {
+        0: Policy.policy_number,
+        1: Deal.description,
+        2: Client.name,
+        3: Policy.start_date,
+        4: Payment.amount,
+        5: Payment.payment_date,
+        6: Income.amount,
+        7: Income.received_date,
+    }
     def __init__(self, parent=None, deal_id=None):
         checkbox_map = {
             "Показывать выплаченные": self.load_data,
@@ -145,10 +155,22 @@ class IncomeTableView(BaseTableView):
     def load_data(self):
         filters = self.get_filters()  # используем метод подкласса
 
-        query = build_income_query(**filters)
-        page_query = query.paginate(self.page, self.per_page)
-        items = prefetch(page_query, Payment, Policy, Client, Deal)
-        total = query.count()
+        order_field = self.COLUMN_FIELD_MAP.get(
+            self.current_sort_column, Income.received_date
+        )
+        order_dir = (
+            "desc" if self.current_sort_order == Qt.DescendingOrder else "asc"
+        )
+
+        query = get_incomes_page(
+            self.page,
+            self.per_page,
+            order_by=order_field,
+            order_dir=order_dir,
+            **filters,
+        )
+        items = prefetch(query, Payment, Policy, Client, Deal)
+        total = build_income_query(**filters).count()
 
         self.set_model_class_and_items(self.model_class, items, total_count=total)
 
@@ -159,7 +181,6 @@ class IncomeTableView(BaseTableView):
         self.table.setModel(self.proxy_model)
 
         try:
-            self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
             self.table.resizeColumnsToContents()
         except NotImplementedError:
             pass
@@ -175,6 +196,11 @@ class IncomeTableView(BaseTableView):
         ]
         self.column_filters.set_headers(headers)
         self.load_table_settings()
+
+        # Показать индикатор сортировки на текущем столбце
+        self.table.horizontalHeader().setSortIndicator(
+            self.current_sort_column, self.current_sort_order
+        )
 
         # В интерактивном режиме пользователь сам выбирает ширину
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
