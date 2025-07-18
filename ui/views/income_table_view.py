@@ -1,6 +1,6 @@
 from peewee import prefetch
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHeaderView
+from PySide6.QtWidgets import QHeaderView, QAbstractItemView
 
 from database.models import Client, Income, Payment, Policy, Deal
 from services.income_service import (
@@ -125,6 +125,8 @@ class IncomeTableView(BaseTableView):
 
         # Разрешаем пользователю менять ширину столбцов
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        # разрешаем множественный выбор для массовых действий
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
         self.table.horizontalHeader().sectionClicked.connect(self.on_sort_requested)
         self.row_double_clicked.connect(self.open_detail)
@@ -209,6 +211,12 @@ class IncomeTableView(BaseTableView):
             return None
         return self.model.get_item(self._source_row(idx))
 
+    def get_selected_multiple(self):
+        indexes = self.table.selectionModel().selectedRows()
+        return [
+            self.model.get_item(self._source_row(i)) for i in indexes
+        ]
+
     def add_new(self):
         form = self.form_class()
         if form.exec():
@@ -222,10 +230,20 @@ class IncomeTableView(BaseTableView):
             self.refresh()
 
     def delete_selected(self):
-        income = self.get_selected()
-        if income and confirm(f"Удалить доход {income.amount} ₽?"):
+        incomes = self.get_selected_multiple()
+        if not incomes:
+            return
+        if len(incomes) == 1:
+            message = f"Удалить доход {incomes[0].amount} ₽?"
+        else:
+            message = f"Удалить {len(incomes)} доход(ов)?"
+        if confirm(message):
             try:
-                mark_income_deleted(income.id)
+                if len(incomes) == 1:
+                    mark_income_deleted(incomes[0].id)
+                else:
+                    ids = [inc.id for inc in incomes]
+                    mark_incomes_deleted(ids)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
