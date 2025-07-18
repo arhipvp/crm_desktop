@@ -144,10 +144,28 @@ class DealDetailView(QDialog):
         self.main_splitter.setStretchFactor(1, 1)
 
         self._init_tabs()
+        self.tabs.currentChanged.connect(self._on_tab_changed)
 
         # Быстрые действия
         self._init_actions()
         self._register_shortcuts()
+
+    def _on_tab_changed(self, index: int) -> None:
+        """Refresh data when switching between tabs."""
+        if index == getattr(self, "policy_tab_idx", None) and hasattr(self, "pol_view"):
+            self.pol_view.refresh()
+        elif index == getattr(self, "payment_tab_idx", None) and hasattr(self, "pay_view"):
+            self.pay_view.refresh()
+        elif index == getattr(self, "income_tab_idx", None) and hasattr(self, "income_view"):
+            self.income_view.refresh()
+        elif index == getattr(self, "expense_tab_idx", None) and hasattr(self, "expense_view"):
+            self.expense_view.refresh()
+        elif index == getattr(self, "task_tab_idx", None) and hasattr(self, "task_view"):
+            self.task_view.refresh()
+        else:
+            return
+
+        self._init_kpi_panel()
 
     def _init_kpi_panel(self):
         """(Re)populate the KPI panel without adding new duplicates."""
@@ -335,7 +353,8 @@ class DealDetailView(QDialog):
         pol_view.load_data()
         pol_l.addWidget(pol_view)
 
-        self.tabs.addTab(pol_tab, "Полисы")
+        self.pol_view = pol_view
+        self.policy_tab_idx = self.tabs.addTab(pol_tab, "Полисы")
 
         # 3) Платежи
         pay_tab = QWidget()
@@ -354,7 +373,8 @@ class DealDetailView(QDialog):
         pay_view.load_data()
         pay_l.addWidget(pay_view)
 
-        self.tabs.addTab(pay_tab, "Платежи")
+        self.pay_view = pay_view
+        self.payment_tab_idx = self.tabs.addTab(pay_tab, "Платежи")
 
         # 4) Доходы
         from ui.views.income_table_view import IncomeTableView
@@ -379,7 +399,8 @@ class DealDetailView(QDialog):
         income_view.load_data()
         income_layout.addWidget(income_view)
 
-        self.tabs.addTab(income_tab, "Доходы")
+        self.income_view = income_view
+        self.income_tab_idx = self.tabs.addTab(income_tab, "Доходы")
 
         # 5) Расходы
         from ui.views.expense_table_view import ExpenseTableView
@@ -399,7 +420,8 @@ class DealDetailView(QDialog):
         expense_view.load_data()
         expense_layout.addWidget(expense_view)
 
-        self.tabs.addTab(expense_tab, "Расходы")
+        self.expense_view = expense_view
+        self.expense_tab_idx = self.tabs.addTab(expense_tab, "Расходы")
 
         # 4) Задачи — внедряем TaskTableView с фильтром по сделке
         # ─── Задачи ───────────────────────────────────────────
@@ -423,7 +445,6 @@ class DealDetailView(QDialog):
         task_view = TaskTableView(parent=self, deal_id=self.instance.id)
         task_view.data_loaded.connect(self._adjust_task_columns)
         vbox.addWidget(task_view)
-        self.task_view = task_view
 
         task_view.set_model_class_and_items(Task, tasks, total_count=len(tasks))
         self._adjust_task_columns()
@@ -435,8 +456,8 @@ class DealDetailView(QDialog):
         task_view.table.setSortingEnabled(True)
         task_view.row_double_clicked.connect(self._on_task_double_clicked)
 
-        self.tabs.addTab(task_tab, "Задачи")
-        self.task_view = task_view  # сохраняем для refresh
+        self.task_view = task_view
+        self.task_tab_idx = self.tabs.addTab(task_tab, "Задачи")
 
     def _adjust_task_columns(self, *_):
         """Настройка колонок таблицы задач во вкладке сделки."""
