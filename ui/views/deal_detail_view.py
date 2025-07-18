@@ -36,7 +36,6 @@ from database.models import Task, Deal
 from services.deal_service import (
     get_deal_by_id,
     get_next_deal,
-    get_policies_by_deal_id,
     get_prev_deal,
     get_tasks_by_deal_id,
     update_deal,
@@ -510,6 +509,12 @@ class DealDetailView(QDialog):
         btn_next.clicked.connect(self._on_next_deal)
         self._add_shortcut("Alt+Right", self._on_next_deal)
         box.addWidget(btn_next)
+
+        if not self.instance.is_closed:
+            btn_delay = styled_button("⏳ Отложить", shortcut="Ctrl+Shift+N")
+            btn_delay.clicked.connect(self._on_delay_to_event)
+            self._add_shortcut("Ctrl+Shift+N", self._on_delay_to_event)
+            box.addWidget(btn_delay)
         self.layout.addLayout(box)
         if not self.instance.is_closed:
             btn_close = styled_button("🔒 Закрыть сделку", shortcut="Ctrl+Shift+L")
@@ -883,6 +888,38 @@ class DealDetailView(QDialog):
         )
         if dlg.exec():
             self._init_tabs()
+
+    def _on_delay_to_event(self):
+        events = self._collect_upcoming_events()
+        if not events:
+            from ui.common.message_boxes import show_info
+
+            show_info("Будущих событий не найдено")
+            return
+
+        from ui.forms.deal_next_event_dialog import DealNextEventDialog
+
+        dlg = DealNextEventDialog(events, parent=self)
+        if dlg.exec():
+            reminder = dlg.get_reminder_date()
+            update_deal(self.instance, reminder_date=reminder, status=str(reminder.year))
+            self.accept()
+
+    def _collect_upcoming_events(self) -> list[tuple[str, date]]:
+        today = date.today()
+        events: list[tuple[str, date]] = []
+
+        for p in get_payments_by_deal_id(self.instance.id):
+            if p.actual_payment_date is None and p.payment_date >= today:
+                label = f"Платёж {p.payment_date:%d.%m.%Y}"
+                events.append((label, p.payment_date))
+
+        for pol in get_policies_by_deal_id(self.instance.id):
+            if pol.end_date and pol.end_date >= today:
+                events.append((f"Окончание полиса {pol.policy_number}", pol.end_date))
+
+        events.sort(key=lambda e: e[1])
+        return events
 
 
 class CloseDealDialog(QDialog):
