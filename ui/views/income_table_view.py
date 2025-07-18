@@ -6,6 +6,7 @@ from database.models import Client, Income, Payment, Policy, Deal
 from services.income_service import (
     build_income_query,
     mark_income_deleted,
+    mark_incomes_deleted,
     get_incomes_page,
 )
 from ui.base.base_table_model import BaseTableModel
@@ -130,6 +131,7 @@ class IncomeTableView(BaseTableView):
 
         self.table.horizontalHeader().sectionClicked.connect(self.on_sort_requested)
         self.row_double_clicked.connect(self.open_detail)
+        self.delete_callback = self.delete_selected
         self.load_data()
 
     def get_filters(self) -> dict:
