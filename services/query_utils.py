@@ -1,6 +1,7 @@
 """Utility helpers for building filtered Peewee queries."""
 
-from peewee import Field, ModelSelect, fn
+from peewee import Field, ModelSelect
+from playhouse.shortcuts import Cast
 
 
 def apply_column_filters(query: ModelSelect, column_filters: dict[str, str] | None, model) -> ModelSelect:
@@ -13,6 +14,6 @@ def apply_column_filters(query: ModelSelect, column_filters: dict[str, str] | No
         field: Field | None = getattr(model, name, None)
         if not field:
             continue
-        query = query.where(fn.CAST(field, "TEXT").contains(value))
+        query = query.where(field.cast("TEXT").contains(value))
     return query
 
