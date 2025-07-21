@@ -241,3 +241,19 @@ def test_deal_detail_refresh_syncs_sheet(qtbot, monkeypatch):
     dlg._on_refresh()
 
     assert called.get("ok")
+
+
+def test_deal_detail_view_has_maximize_button(qtbot):
+    from datetime import date
+    from services.client_service import add_client
+    from services.deal_service import add_deal
+    from ui.views.deal_detail_view import DealDetailView
+    from PySide6.QtCore import Qt
+
+    client = add_client(name="C")
+    deal = add_deal(client_id=client.id, start_date=date.today(), description="D")
+
+    dlg = DealDetailView(deal)
+    qtbot.addWidget(dlg)
+
+    assert dlg.windowFlags() & Qt.WindowMinMaxButtonsHint
