@@ -2,7 +2,7 @@ from peewee import prefetch
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHeaderView, QAbstractItemView
 
-from database.models import Client, Income, Payment, Policy, Deal
+from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
 from services.income_service import (
     build_income_query,
     mark_income_deleted,
@@ -39,6 +39,7 @@ class IncomeTableModel(BaseTableModel):
             "Дата платежа",
             "Сумма комиссии",
             "Дата получения",
+            "Исполнитель",
         ]
 
     def columnCount(self, parent=None):
@@ -87,6 +88,11 @@ class IncomeTableModel(BaseTableModel):
                 if obj.received_date
                 else "—"
             )
+        elif col == 8:
+            if deal and getattr(deal, "executors", None):
+                ex = deal.executors[0].executor
+                return ex.full_name if ex else "—"
+            return "—"
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if role != Qt.DisplayRole or orientation != Qt.Horizontal:
@@ -106,10 +112,12 @@ class IncomeTableView(BaseTableView):
         5: Payment.payment_date,
         6: Income.amount,
         7: Income.received_date,
+        8: Executor.full_name,
     }
     def __init__(self, parent=None, deal_id=None):
         checkbox_map = {
             "Показывать выплаченные": self.load_data,
+            "Показывать ТОЛЬКО выплаченные": self.load_data,
         }
         super().__init__(
             parent=parent,
@@ -141,6 +149,9 @@ class IncomeTableView(BaseTableView):
             "include_received": self.filter_controls.is_checked(
                 "Показывать выплаченные"
             ),
+            "only_received": self.filter_controls.is_checked(
+                "Показывать ТОЛЬКО выплаченные"
+            ),
         }
         if self.deal_id:
             filters["deal_id"] = self.deal_id
@@ -171,7 +182,7 @@ class IncomeTableView(BaseTableView):
             order_dir=order_dir,
             **filters,
         )
-        items = prefetch(query, Payment, Policy, Client, Deal)
+        items = prefetch(query, Payment, Policy, Client, Deal, DealExecutor, Executor)
         total = build_income_query(**filters).count()
 
         self.set_model_class_and_items(self.model_class, items, total_count=total)

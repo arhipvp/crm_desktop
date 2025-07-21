@@ -291,6 +291,21 @@ def test_apply_income_filters_include_received():
     assert inc2 in res2
 
 
+def test_apply_income_filters_only_received():
+    client = add_client(name='IR')
+    pol = add_policy(client_id=client.id, policy_number='IR1', start_date=date(2025,1,1), end_date=date(2025,1,10))
+    pay = add_payment(policy_id=pol.id, amount=10, payment_date=date(2025,1,2))
+    inc1 = add_income(payment_id=pay.id, amount=5, received_date=date(2025,1,3))
+    inc2 = add_income(payment_id=pay.id, amount=5)
+
+    q = apply_income_filters(
+        Income.select().join(Payment).join(Policy).join(Client),
+        only_received=True,
+    )
+    res = list(q)
+    assert res == [inc1]
+
+
 def test_income_search_by_deal_description():
     client = add_client(name='S')
     deal = add_deal(client_id=client.id, description='Super deal', start_date=date(2025,1,1))

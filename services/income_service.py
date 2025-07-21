@@ -60,6 +60,8 @@ def get_incomes_page(
     show_deleted: bool = False,
     include_received: bool = True,
     received_date_range=None,
+    *,
+    only_received: bool = False,
     **kwargs,
 ):
     """Получить страницу доходов по фильтрам.
@@ -82,6 +84,7 @@ def get_incomes_page(
         show_deleted=show_deleted,
         include_received=include_received,
         received_date_range=received_date_range,
+        only_received=only_received,
         **kwargs,
     )
 
@@ -196,6 +199,8 @@ def apply_income_filters(
     include_received=True,
     received_date_range=None,
     deal_id=None,
+    *,
+    only_received: bool = False,
 ):
     if not show_deleted:
         query = query.where(Income.is_deleted == False)
@@ -206,7 +211,9 @@ def apply_income_filters(
             | (Deal.description.contains(search_text))
             | (Policy.note.contains(search_text))
         )
-    if not include_received:
+    if only_received:
+        query = query.where(Income.received_date.is_null(False))
+    elif not include_received:
         query = query.where(Income.received_date.is_null(True))
     if received_date_range:
         date_from, date_to = received_date_range
@@ -224,6 +231,8 @@ def build_income_query(
     show_deleted: bool = False,
     include_received: bool = True,
     received_date_range=None,
+    *,
+    only_received: bool = False,
     **kwargs,
 ):
     # JOIN Payment, Policy, Client, Deal
@@ -249,7 +258,9 @@ def build_income_query(
             | (Policy.note.contains(search_text))
         )
 
-    if not include_received:
+    if only_received:
+        query = query.where(Income.received_date.is_null(False))
+    elif not include_received:
         query = query.where(Income.received_date.is_null(True))
     if received_date_range:
         date_from, date_to = received_date_range
