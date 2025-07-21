@@ -217,6 +217,13 @@ def apply_income_filters(
                 JOIN.LEFT_OUTER,
                 on=(DealExecutor.executor == Executor.id),
             )
+        ).select(
+            Income,
+            Payment,
+            Policy,
+            Client,
+            Deal,
+            Executor.full_name,
         ).distinct()
     return query
 
