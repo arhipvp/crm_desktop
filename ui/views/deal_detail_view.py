@@ -102,6 +102,8 @@ def _with_day_separators(text: str | None) -> str:
 class DealDetailView(QDialog):
     def __init__(self, deal, parent=None):
         super().__init__(parent)
+        # allow the window to be maximized like a regular application window
+        self.setWindowFlag(Qt.WindowMinMaxButtonsHint, True)
         self.instance = deal
         # Enable drag-and-drop for files
         self.setAcceptDrops(True)
