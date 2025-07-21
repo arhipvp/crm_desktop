@@ -3,8 +3,8 @@
 import logging
 from typing import Any
 
-from peewee import JOIN
-from database.models import Client, Income, Payment, Policy, Deal
+from peewee import JOIN, Field
+from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
 from services.payment_service import get_payment_by_id
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ def get_incomes_page(
     show_deleted: bool = False,
     include_received: bool = True,
     received_date_range=None,
-    column_filters: dict[str, str] | None = None,
+    column_filters: dict | None = None,
     *,
     only_received: bool = False,
     **kwargs,
@@ -160,7 +160,7 @@ def apply_income_filters(
     include_received=True,
     received_date_range=None,
     deal_id=None,
-    column_filters: dict[str, str] | None = None,
+    column_filters: dict | None = None,
     *,
     only_received: bool = False,
 ):
@@ -186,9 +186,38 @@ def apply_income_filters(
     if deal_id:
         query = query.where(Policy.deal_id == deal_id)
 
-    from services.query_utils import apply_column_filters
+    from services.query_utils import apply_column_filters, apply_field_filters
 
-    query = apply_column_filters(query, column_filters, Income)
+    logger.debug(
+        "\U0001F50D apply_income_filters: col_filters=%s", column_filters
+    )
+
+    field_filters = {}
+    name_filters = {}
+    if column_filters:
+        for key, val in column_filters.items():
+            if isinstance(key, Field):
+                field_filters[key] = val
+            else:
+                name_filters[str(key)] = val
+
+    query = apply_field_filters(query, field_filters)
+    query = apply_column_filters(query, name_filters, Income)
+
+    if Executor.full_name in field_filters:
+        query = (
+            query.switch(Deal)
+            .join(
+                DealExecutor,
+                JOIN.LEFT_OUTER,
+                on=(DealExecutor.deal == Deal.id),
+            )
+            .join(
+                Executor,
+                JOIN.LEFT_OUTER,
+                on=(DealExecutor.executor == Executor.id),
+            )
+        ).distinct()
     return query
 
 

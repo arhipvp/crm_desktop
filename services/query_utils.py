@@ -17,3 +17,16 @@ def apply_column_filters(query: ModelSelect, column_filters: dict[str, str] | No
         query = query.where(field.cast("TEXT").contains(value))
     return query
 
+
+def apply_field_filters(
+    query: ModelSelect, field_filters: dict[Field, str] | None
+) -> ModelSelect:
+    """Apply 'contains' filters using explicit Peewee Field keys."""
+    if not field_filters:
+        return query
+    for field, value in field_filters.items():
+        if not value or not isinstance(field, Field):
+            continue
+        query = query.where(Cast(field, "TEXT").contains(value))
+    return query
+
