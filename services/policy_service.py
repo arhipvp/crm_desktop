@@ -374,13 +374,15 @@ def update_policy(policy: Policy, **kwargs):
         "note",
         "deal",
         "deal_id",
+        "client",
+        "client_id",
     }
 
     updates = {}
 
     old_number = policy.policy_number
     old_deal_desc = policy.deal.description if policy.deal_id else None
-    client_name = policy.client.name
+    old_client_name = policy.client.name
 
     start_date = kwargs.get("start_date", policy.start_date)
     end_date = kwargs.get("end_date", policy.end_date)
@@ -397,9 +399,12 @@ def update_policy(policy: Policy, **kwargs):
         if key == "deal_id" and "deal" not in kwargs:
             value = get_deal_by_id(value) if value not in ("", None) else None
             key = "deal"
+        if key == "client_id" and "client" not in kwargs:
+            value = get_client_by_id(value) if value not in ("", None) else None
+            key = "client"
         if value not in ("", None):
             updates[key] = value
-        elif key in {"contractor", "deal"}:
+        elif key in {"contractor", "deal", "client"}:
             updates[key] = None
 
     # ────────── Проверка дубликата ──────────
@@ -409,6 +414,10 @@ def update_policy(policy: Policy, **kwargs):
         new_deal_id = new_deal.id if new_deal else None
     else:
         new_deal_id = policy.deal_id
+    if "client" in updates:
+        new_client_id = updates["client"].id if updates["client"] else None
+    else:
+        new_client_id = policy.client_id
     compare_data = {
         f: updates.get(f, getattr(policy, f))
         for f in allowed_fields
@@ -417,7 +426,13 @@ def update_policy(policy: Policy, **kwargs):
 
     if not new_number:
         raise ValueError("Поле 'policy_number' обязательно для заполнения.")
-    _check_duplicate_policy(new_number, policy.client_id, new_deal_id, compare_data, exclude_id=policy.id)
+    _check_duplicate_policy(
+        new_number,
+        new_client_id,
+        new_deal_id,
+        compare_data,
+        exclude_id=policy.id,
+    )
 
     if not updates:
         logger.info("ℹ️ update_policy: нет изменений для полиса #%s", policy.id)
@@ -431,15 +446,20 @@ def update_policy(policy: Policy, **kwargs):
 
     new_number = policy.policy_number
     new_deal_desc = policy.deal.description if policy.deal_id else None
-    if old_number != new_number or old_deal_desc != new_deal_desc:
+    new_client_name = policy.client.name
+    if (
+        old_number != new_number
+        or old_deal_desc != new_deal_desc
+        or old_client_name != new_client_name
+    ):
         try:
             from services.folder_utils import rename_policy_folder
 
             new_path, _ = rename_policy_folder(
-                client_name,
+                old_client_name,
                 old_number,
                 old_deal_desc,
-                client_name,
+                new_client_name,
                 new_number,
                 new_deal_desc,
                 policy.drive_folder_link,
