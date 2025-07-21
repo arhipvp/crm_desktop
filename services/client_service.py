@@ -53,10 +53,11 @@ def get_clients_page(
     per_page: int,
     search_text: str = "",
     show_deleted: bool = False,
+    column_filters: dict[str, str] | None = None,
 ) -> ModelSelect:
     """Получить страницу клиентов с учётом фильтров."""
     query = Client.select()
-    query = apply_client_filters(query, search_text, show_deleted)
+    query = apply_client_filters(query, search_text, show_deleted, column_filters)
 
     offset = (page - 1) * per_page
     return query.order_by(Client.name.asc()).limit(per_page).offset(offset)
@@ -202,7 +203,10 @@ def update_client(client: Client, **kwargs) -> Client:
 
 
 def apply_client_filters(
-    query: ModelSelect, search_text: str, show_deleted: bool
+    query: ModelSelect,
+    search_text: str,
+    show_deleted: bool,
+    column_filters: dict[str, str] | None = None,
 ) -> ModelSelect:
     """Применяет фильтры поиска и удаления к выборке клиентов."""
     if not show_deleted:
@@ -214,6 +218,9 @@ def apply_client_filters(
             | (Client.email.contains(search_text))
             | (Client.note.contains(search_text))
         )
+    from services.query_utils import apply_column_filters
+
+    query = apply_column_filters(query, column_filters, Client)
     return query
 
 
@@ -293,7 +300,9 @@ def open_whatsapp(phone: str, message: str | None = None) -> None:
     webbrowser.open(url)
 
 
-def build_client_query(search_text: str = "", show_deleted: bool = False):
+def build_client_query(
+    search_text: str = "", show_deleted: bool = False, column_filters: dict[str, str] | None = None
+):
     """Создаёт выборку клиентов с учётом фильтров."""
     query = Client.select()
-    return apply_client_filters(query, search_text, show_deleted)
+    return apply_client_filters(query, search_text, show_deleted, column_filters)

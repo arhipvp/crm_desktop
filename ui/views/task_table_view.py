@@ -165,11 +165,15 @@ class TaskTableView(BaseTableView):
         self.refresh()
 
     def get_filters(self) -> dict:
-        return {
-            "search_text": self.filter_controls.get_search_text(),
-            "include_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "include_done": self.filter_controls.is_checked("Показывать выполненные"),
-        }
+        filters = super().get_filters()
+        filters.update(
+            {
+                "include_deleted": self.filter_controls.is_checked("Показывать удалённые"),
+                "include_done": self.filter_controls.is_checked("Показывать выполненные"),
+            }
+        )
+        filters.pop("show_deleted", None)
+        return filters
 
     def refresh(self):
         try:
@@ -201,12 +205,14 @@ class TaskTableView(BaseTableView):
                 sort_field=self.sort_field,
                 sort_order=self.sort_order,
                 deal_id=self.deal_id,
+                column_filters=f.get("column_filters"),
             )
             total = build_task_query(
                 include_done=f["include_done"],
                 include_deleted=f["include_deleted"],
                 search_text=f["search_text"],
                 deal_id=self.deal_id,
+                column_filters=f.get("column_filters"),
             ).count()
 
             # items = items.order_by(Task.due_date).paginate(self.page, self.per_page)
@@ -220,6 +226,7 @@ class TaskTableView(BaseTableView):
                 search_text=f["search_text"],
                 sort_field=self.sort_field,
                 sort_order=self.sort_order,
+                column_filters=f.get("column_filters"),
             )
             total = build_task_query(**f).count()
 

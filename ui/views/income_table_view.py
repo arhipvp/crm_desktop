@@ -146,12 +146,8 @@ class IncomeTableView(BaseTableView):
         filters = {
             "search_text": self.filter_controls.get_search_text(),
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "include_received": self.filter_controls.is_checked(
-                "Показывать выплаченные"
-            ),
-            "only_received": self.filter_controls.is_checked(
-                "Показывать ТОЛЬКО выплаченные"
-            ),
+            "include_received": self.filter_controls.is_checked("Показывать выплаченные"),
+            "only_received": self.filter_controls.is_checked("Показывать ТОЛЬКО выплаченные"),
         }
         if self.deal_id:
             filters["deal_id"] = self.deal_id
@@ -163,7 +159,9 @@ class IncomeTableView(BaseTableView):
             to_date = date_to.date_or_none()
             if from_date or to_date:
                 filters["received_date_range"] = (from_date, to_date)
+
         return filters
+
 
     def load_data(self):
         filters = self.get_filters()  # используем метод подкласса

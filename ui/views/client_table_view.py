@@ -37,15 +37,13 @@ class ClientTableView(BaseTableView):
          - текстовый поиск
          - флаг 'Показывать удалённые'
         """
-        return {
-            "search_text": self.filter_controls.get_search_text(),
-            "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-        }
+        filters = super().get_filters()
+        return filters
 
     def load_data(self):
         # 1) читаем фильтры
         filters = self.get_filters()
-
+        
         # 2) загружаем страницу и считаем общее количество
         items = get_clients_page(self.page, self.per_page, **filters)
         total = build_client_query(**filters).count()

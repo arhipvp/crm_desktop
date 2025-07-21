@@ -3,14 +3,13 @@
 import logging
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 from peewee import JOIN
 from database.models import Client, Income, Payment, Policy, Deal
 from services.payment_service import get_payment_by_id
 
-# ───────────────────────── базовые CRUD ─────────────────────────
+logger = logging.getLogger(__name__)
 
+# ───────────────────────── базовые CRUD ─────────────────────────
 
 def get_all_incomes():
     """Вернуть все доходы без удалённых."""
@@ -60,30 +59,18 @@ def get_incomes_page(
     show_deleted: bool = False,
     include_received: bool = True,
     received_date_range=None,
+    column_filters: dict[str, str] | None = None,
     *,
     only_received: bool = False,
     **kwargs,
 ):
-    """Получить страницу доходов по фильтрам.
-
-    Args:
-        page: Номер страницы.
-        per_page: Количество записей на странице.
-        order_by: Поле сортировки.
-        order_dir: Направление сортировки.
-        search_text: Строка поиска.
-        show_deleted: Учитывать удалённые записи.
-        include_received: Показывать полученные доходы.
-        received_date_range: Диапазон дат получения.
-
-    Returns:
-        ModelSelect: Отфильтрованная выборка доходов.
-    """
+    """Получить страницу доходов по фильтрам."""
     query = build_income_query(
         search_text=search_text,
         show_deleted=show_deleted,
         include_received=include_received,
         received_date_range=received_date_range,
+        column_filters=column_filters,
         only_received=only_received,
         **kwargs,
     )
@@ -95,7 +82,6 @@ def get_incomes_page(
         else:
             field = Income.received_date
     else:
-        # ожидается поле peewee
         field = order_by
 
     query = query.order_by(field.desc() if order_dir == "desc" else field.asc())
@@ -106,16 +92,8 @@ def get_incomes_page(
 
 # ─────────────────────────── Добавление ───────────────────────────
 
-
 def add_income(**kwargs):
-    """Создать запись дохода по платежу.
-
-    Args:
-        **kwargs: Параметры дохода, включая ``payment`` или ``payment_id`` и ``amount``.
-
-    Returns:
-        Income: Созданная запись дохода.
-    """
+    """Создать запись дохода по платежу."""
     payment = kwargs.get("payment") or get_payment_by_id(kwargs.get("payment_id"))
     if not payment:
         raise ValueError("Не найден платёж")
@@ -138,30 +116,13 @@ def add_income(**kwargs):
         logger.error("❌ Ошибка при создании дохода: %s", e)
         raise
 
-    # Автоматическая задача
-    # due_date = payment.payment_date or date.today()
-    # add_task(
-    #     title="получить",
-    #     due_date=due_date,
-    #     policy_id=payment.policy_id
-    # )
-
     return income
 
 
 # ─────────────────────────── Обновление ───────────────────────────
 
-
 def update_income(income: Income, **kwargs):
-    """Обновить запись дохода.
-
-    Args:
-        income: Изменяемый объект дохода.
-        **kwargs: Поля для обновления.
-
-    Returns:
-        Income: Обновлённая запись дохода.
-    """
+    """Обновить запись дохода."""
     allowed_fields = {
         "payment",
         "payment_id",
@@ -199,6 +160,7 @@ def apply_income_filters(
     include_received=True,
     received_date_range=None,
     deal_id=None,
+    column_filters: dict[str, str] | None = None,
     *,
     only_received: bool = False,
 ):
@@ -223,6 +185,10 @@ def apply_income_filters(
             query = query.where(Income.received_date <= date_to)
     if deal_id:
         query = query.where(Policy.deal_id == deal_id)
+
+    from services.query_utils import apply_column_filters
+
+    query = apply_column_filters(query, column_filters, Income)
     return query
 
 
@@ -231,11 +197,11 @@ def build_income_query(
     show_deleted: bool = False,
     include_received: bool = True,
     received_date_range=None,
+    column_filters: dict[str, str] | None = None,
     *,
     only_received: bool = False,
     **kwargs,
 ):
-    # JOIN Payment, Policy, Client, Deal
     query = (
         Income.select(Income, Payment, Policy, Client, Deal)
         .join(Payment, on=(Income.payment == Payment.id))
@@ -247,30 +213,16 @@ def build_income_query(
         .join(Deal, JOIN.LEFT_OUTER, on=(Policy.deal == Deal.id))
     )
 
-    if not show_deleted:
-        query = query.where(Income.is_deleted == False)
-
-    if search_text:
-        query = query.where(
-            (Policy.policy_number.contains(search_text))
-            | (Client.name.contains(search_text))
-            | (Deal.description.contains(search_text))
-            | (Policy.note.contains(search_text))
-        )
-
-    if only_received:
-        query = query.where(Income.received_date.is_null(False))
-    elif not include_received:
-        query = query.where(Income.received_date.is_null(True))
-    if received_date_range:
-        date_from, date_to = received_date_range
-        if date_from:
-            query = query.where(Income.received_date >= date_from)
-        if date_to:
-            query = query.where(Income.received_date <= date_to)
-    deal_id = kwargs.get("deal_id")
-    if deal_id:
-        query = query.where(Policy.deal_id == deal_id)
+    query = apply_income_filters(
+        query=query,
+        search_text=search_text,
+        show_deleted=show_deleted,
+        include_received=include_received,
+        received_date_range=received_date_range,
+        deal_id=kwargs.get("deal_id"),
+        column_filters=column_filters,
+        only_received=only_received,
+    )
 
     return query
 

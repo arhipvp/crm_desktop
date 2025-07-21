@@ -50,11 +50,12 @@ class PaymentTableView(BaseTableView):
         self.load_data()
 
     def get_filters(self) -> dict:
-        filters = {
-            "search_text": self.filter_controls.get_search_text(),
-            "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "include_paid": self.filter_controls.is_checked("Показывать оплаченные"),
-        }
+        filters = super().get_filters()
+        filters.update(
+            {
+                "include_paid": self.filter_controls.is_checked("Показывать оплаченные"),
+            }
+        )
         if self.deal_id is not None:
             filters["deal_id"] = self.deal_id
         return filters
