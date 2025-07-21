@@ -117,7 +117,6 @@ class IncomeTableView(BaseTableView):
     def __init__(self, parent=None, deal_id=None):
         checkbox_map = {
             "Показывать выплаченные": self.load_data,
-            "Показывать ТОЛЬКО выплаченные": self.load_data,
         }
         super().__init__(
             parent=parent,
@@ -147,7 +146,6 @@ class IncomeTableView(BaseTableView):
             "search_text": self.filter_controls.get_search_text(),
             "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
             "include_received": self.filter_controls.is_checked("Показывать выплаченные"),
-            "only_received": self.filter_controls.is_checked("Показывать ТОЛЬКО выплаченные"),
         }
         if self.deal_id:
             filters["deal_id"] = self.deal_id

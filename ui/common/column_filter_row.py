@@ -32,7 +32,9 @@ class ColumnFilterRow(QWidget):
             self.layout().addWidget(le)
             self._editors.append(le)
             if texts and idx < len(texts):
+                le.blockSignals(True)
                 le.setText(texts[idx])
+                le.blockSignals(False)
         self.layout().addStretch()
 
     def get_text(self, column: int) -> str:
