@@ -129,6 +129,14 @@ class IncomeTableView(BaseTableView):
             entity_name="Доход",
             checkbox_map=checkbox_map,
         )
+        # Переопределяем обработку фильтров по столбцам: только БД
+        try:
+            self.column_filters.filter_changed.disconnect()
+        except Exception:
+            pass
+        self.column_filters.filter_changed.connect(
+            self._on_column_filter_changed_db
+        )
         self.deal_id = deal_id
         self.default_sort_column = 7
         self.default_sort_order = Qt.DescendingOrder
@@ -162,7 +170,19 @@ class IncomeTableView(BaseTableView):
             if from_date or to_date:
                 filters["received_date_range"] = (from_date, to_date)
 
+        filters["column_filters"] = self.get_column_filters()
+        logger.debug("\U0001F4C3 column_filters=%s", filters["column_filters"])
+
         return filters
+
+    def get_column_filters(self) -> dict:
+        """Собрать фильтры по столбцам в виде {Field: text}."""
+        result: dict = {}
+        for col, field in self.COLUMN_FIELD_MAP.items():
+            text = self.column_filters.get_text(col)
+            if text:
+                result[field] = text
+        return result
 
 
     def load_data(self):
@@ -273,6 +293,10 @@ class IncomeTableView(BaseTableView):
         if income:
             dlg = self.detail_view_class(income)
             dlg.exec()
+
+    def _on_column_filter_changed_db(self, column: int, text: str):
+        """Обработка изменения фильтра без прокси-модели."""
+        self.on_filter_changed()
 
     def on_sort_requested(self, column):
         if column == self.current_sort_column:
