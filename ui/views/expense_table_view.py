@@ -206,7 +206,7 @@ class ExpenseTableView(BaseTableView):
             pass
         if total_count is not None:
             self.total_count = total_count
-            self.paginator.update(self.total_count, self.page)
+            self.paginator.update(self.total_count, self.page, self.per_page)
 
     def get_base_query(self):
         if self.deal_id:

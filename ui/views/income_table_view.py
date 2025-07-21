@@ -198,7 +198,7 @@ class IncomeTableView(BaseTableView):
 
         if total_count is not None:
             self.total_count = total_count
-            self.paginator.update(self.total_count, self.page)
+            self.paginator.update(self.total_count, self.page, self.per_page)
             self.data_loaded.emit(self.total_count)
 
         headers = [
