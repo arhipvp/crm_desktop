@@ -1,3 +1,4 @@
+import logging
 from peewee import prefetch
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHeaderView, QAbstractItemView
@@ -13,6 +14,9 @@ from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.income_form import IncomeForm
+
+
+logger = logging.getLogger(__name__)
 
 
 class IncomeTableModel(BaseTableModel):
@@ -163,6 +167,7 @@ class IncomeTableView(BaseTableView):
 
     def load_data(self):
         filters = self.get_filters()  # используем метод подкласса
+        logger.debug("\U0001F4CA Фильтры доходов: %s", filters)
 
         order_field = self.COLUMN_FIELD_MAP.get(
             self.current_sort_column, Income.received_date
@@ -180,11 +185,17 @@ class IncomeTableView(BaseTableView):
         )
         items = prefetch(query, Payment, Policy, Client, Deal, DealExecutor, Executor)
         total = build_income_query(**filters).count()
+        logger.debug("\U0001F4E6 Загружено доходов: %d", len(items))
 
         self.set_model_class_and_items(self.model_class, items, total_count=total)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         """Устанавливает модель таблицы и применяет сохранённые настройки."""
+        prev_texts = [
+            self.column_filters.get_text(i)
+            for i in range(len(self.column_filters._editors))
+        ]
+
         self.model = IncomeTableModel(items, model_class)
         self.proxy_model.setSourceModel(self.model)
         self.table.setModel(self.proxy_model)
@@ -203,7 +214,7 @@ class IncomeTableView(BaseTableView):
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(headers)
+        self.column_filters.set_headers(headers, prev_texts)
         self.load_table_settings()
 
         # Показать индикатор сортировки на текущем столбце
