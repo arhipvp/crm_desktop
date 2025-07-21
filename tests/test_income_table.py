@@ -24,8 +24,15 @@ def test_income_table_shows_payment_date():
 
     # Проверка на наличие всех ожидаемых заголовков
     expected_headers = [
-        "Полис", "Сделка", "Клиент", "Дата начала", "Дата платежа",
-        "Сумма платежа", "Сумма комиссии", "Дата получения"
+        "Полис",
+        "Сделка",
+        "Клиент",
+        "Дата начала",
+        "Дата платежа",
+        "Сумма платежа",
+        "Сумма комиссии",
+        "Дата получения",
+        "Исполнитель",
     ]
     for header in expected_headers:
         assert header in model.headers, f"Ожидается заголовок '{header}'"
@@ -53,3 +60,7 @@ def test_income_table_shows_payment_date():
     # Проверка "Сделка"
     deal_idx = model.index(0, model.headers.index("Сделка"))
     assert model.data(deal_idx, Qt.DisplayRole) == "—"
+
+    # Проверка "Исполнитель"
+    exec_idx = model.index(0, model.headers.index("Исполнитель"))
+    assert model.data(exec_idx, Qt.DisplayRole) == "—"
