@@ -23,10 +23,13 @@ class ExecutorTableView(BaseTableView):
         self.load_data()
 
     def get_filters(self) -> dict:
-        return {
-            "search_text": self.filter_controls.get_search_text(),
-            "show_inactive": self.filter_controls.is_checked("Показывать неактивных"),
-        }
+        filters = super().get_filters()
+        filters.update(
+            {
+                "show_inactive": self.filter_controls.is_checked("Показывать неактивных"),
+            }
+        )
+        return filters
 
     def load_data(self):
         filters = self.get_filters()

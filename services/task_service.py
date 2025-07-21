@@ -484,6 +484,7 @@ def build_task_query(
     policy_id=None,
     sort_field="due_date",
     sort_order="asc",
+    column_filters: dict[str, str] | None = None,
 ):
     query = Task.select()
     if not include_done:
@@ -513,11 +514,20 @@ def build_task_query(
         query = query.where(Task.deal == deal_id)
     if policy_id:
         query = query.where(Task.policy == policy_id)
+
+    from services.query_utils import apply_column_filters
+
+    query = apply_column_filters(query, column_filters, Task)
     return query
 
 
 def get_tasks_page(
-    page: int, per_page: int, sort_field="due_date", sort_order="asc", **filters
+    page: int,
+    per_page: int,
+    sort_field="due_date",
+    sort_order="asc",
+    column_filters: dict[str, str] | None = None,
+    **filters,
 ):
     """Получить страницу задач.
 
@@ -534,7 +544,7 @@ def get_tasks_page(
     logger.debug("🔽 Применяем сортировку: field=%s, order=%s", sort_field, sort_order)
 
     offset = (page - 1) * per_page
-    query = build_task_query(**filters)
+    query = build_task_query(column_filters=column_filters, **filters)
 
     if sort_field and hasattr(Task, sort_field):
         field = getattr(Task, sort_field)

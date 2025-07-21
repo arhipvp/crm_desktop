@@ -85,11 +85,13 @@ class DealTableView(BaseTableView):
          - текстовый поиск
          - флаг 'Показывать удалённые' из BaseTableView
         """
-        return {
-            "search_text": self.filter_controls.get_search_text(),
-            "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "show_closed": self.filter_controls.is_checked("Показать закрытые"),
-        }
+        filters = super().get_filters()
+        filters.update(
+            {
+                "show_closed": self.filter_controls.is_checked("Показать закрытые"),
+            }
+        )
+        return filters
 
     def load_data(self):
         filters = self.get_filters()

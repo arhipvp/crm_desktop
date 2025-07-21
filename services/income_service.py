@@ -60,6 +60,7 @@ def get_incomes_page(
     show_deleted: bool = False,
     include_received: bool = True,
     received_date_range=None,
+    column_filters: dict[str, str] | None = None,
     **kwargs,
 ):
     """Получить страницу доходов по фильтрам.
@@ -82,6 +83,7 @@ def get_incomes_page(
         show_deleted=show_deleted,
         include_received=include_received,
         received_date_range=received_date_range,
+        column_filters=column_filters,
         **kwargs,
     )
 
@@ -196,6 +198,7 @@ def apply_income_filters(
     include_received=True,
     received_date_range=None,
     deal_id=None,
+    column_filters: dict[str, str] | None = None,
 ):
     if not show_deleted:
         query = query.where(Income.is_deleted == False)
@@ -216,6 +219,10 @@ def apply_income_filters(
             query = query.where(Income.received_date <= date_to)
     if deal_id:
         query = query.where(Policy.deal_id == deal_id)
+
+    from services.query_utils import apply_column_filters
+
+    query = apply_column_filters(query, column_filters, Income)
     return query
 
 
@@ -224,6 +231,7 @@ def build_income_query(
     show_deleted: bool = False,
     include_received: bool = True,
     received_date_range=None,
+    column_filters: dict[str, str] | None = None,
     **kwargs,
 ):
     # JOIN Payment, Policy, Client, Deal
@@ -260,6 +268,10 @@ def build_income_query(
     deal_id = kwargs.get("deal_id")
     if deal_id:
         query = query.where(Policy.deal_id == deal_id)
+
+    from services.query_utils import apply_column_filters
+
+    query = apply_column_filters(query, column_filters, Income)
 
     return query
 

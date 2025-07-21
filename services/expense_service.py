@@ -142,6 +142,7 @@ def get_expenses_page(
     show_deleted: bool = False,
     deal_id: int = None,
     include_paid: bool = True,
+    column_filters: dict[str, str] | None = None,
 ):
     """Вернуть страницу расходов с фильтрами.
 
@@ -161,6 +162,7 @@ def get_expenses_page(
         show_deleted=show_deleted,
         deal_id=deal_id,
         include_paid=include_paid,
+        column_filters=column_filters,
     )
     offset = (page - 1) * per_page
     return query.order_by(Expense.expense_date.desc()).limit(per_page).offset(offset)
@@ -172,6 +174,7 @@ def apply_expense_filters(
     show_deleted=False,
     deal_id=None,
     include_paid=True,
+    column_filters: dict[str, str] | None = None,
     **kwargs,
 ):
     if not show_deleted:
@@ -186,6 +189,10 @@ def apply_expense_filters(
     if not include_paid:
         query = query.where(Expense.expense_date.is_null(True))
 
+    from services.query_utils import apply_column_filters
+
+    query = apply_column_filters(query, column_filters, Expense)
+
     return query
 
 
@@ -199,7 +206,12 @@ def build_expense_query(
         .join(Client)
     )
     return apply_expense_filters(
-        query, search_text, show_deleted, deal_id, include_paid, **kwargs
+        query,
+        search_text,
+        show_deleted,
+        deal_id,
+        include_paid,
+        column_filters=kwargs.get("column_filters"),
     )
 
 

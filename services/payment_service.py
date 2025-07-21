@@ -72,6 +72,7 @@ def get_payments_page(
     show_deleted: bool = False,
     deal_id: int | None = None,
     include_paid: bool = True,
+    column_filters: dict[str, str] | None = None,
     **filters,
 ) -> ModelSelect:
     """Получить страницу платежей по заданным фильтрам.
@@ -92,6 +93,7 @@ def get_payments_page(
         show_deleted=show_deleted,
         deal_id=deal_id,
         include_paid=include_paid,
+        column_filters=column_filters,
         **filters,
     )
     offset = (page - 1) * per_page
@@ -249,6 +251,7 @@ def apply_payment_filters(
     show_deleted: bool = False,
     deal_id: int | None = None,
     include_paid: bool = True,
+    column_filters: dict[str, str] | None = None,
 ) -> ModelSelect:
     """Фильтры для выборки платежей."""
     if deal_id is not None:
@@ -263,6 +266,9 @@ def apply_payment_filters(
     if not include_paid:
         query = query.where(Payment.actual_payment_date.is_null(True))
 
+    from services.query_utils import apply_column_filters
+
+    query = apply_column_filters(query, column_filters, Payment)
     return query
 
 
@@ -271,6 +277,7 @@ def build_payment_query(
     show_deleted: bool = False,
     deal_id: int | None = None,
     include_paid: bool = True,
+    column_filters: dict[str, str] | None = None,
     **filters,
 ) -> ModelSelect:
     """Сконструировать базовый запрос платежей с агрегатами."""
@@ -297,7 +304,7 @@ def build_payment_query(
 
     # Фильтрация по deal_id через Policy
     query = apply_payment_filters(
-        query, search_text, show_deleted, deal_id, include_paid
+        query, search_text, show_deleted, deal_id, include_paid, column_filters
     )
 
     return query

@@ -64,12 +64,13 @@ class PolicyTableView(BaseTableView):
         self.load_data()
 
     def get_filters(self) -> dict:
-        filters = {
-            "search_text": self.filter_controls.get_search_text(),
-            "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "include_renewed": self.filter_controls.is_checked("Показывать продленное"),
-            "without_deal_only": self.filter_controls.is_checked("Показывать только полисы без сделок"),
-        }
+        filters = super().get_filters()
+        filters.update(
+            {
+                "include_renewed": self.filter_controls.is_checked("Показывать продленное"),
+                "without_deal_only": self.filter_controls.is_checked("Показывать только полисы без сделок"),
+            }
+        )
         if self.deal_id is not None:
             filters["deal_id"] = self.deal_id
         return filters

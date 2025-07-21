@@ -178,6 +178,11 @@ class BaseTableView(QWidget):
         self.left_layout.addWidget(self.paginator)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
+        prev_texts = [
+            self.column_filters.get_text(i)
+            for i in range(len(self.column_filters._editors))
+        ]
+
         self.model = BaseTableModel(items, model_class)
         self.proxy_model.setSourceModel(self.model)
         self.table.setModel(self.proxy_model)
@@ -199,7 +204,7 @@ class BaseTableView(QWidget):
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(headers)
+        self.column_filters.set_headers(headers, prev_texts)
         self.load_table_settings()
 
     def load_data(self):
@@ -207,15 +212,7 @@ class BaseTableView(QWidget):
             return
 
         # 1. Собираем фильтры
-        filters = {}
-        filters["show_deleted"] = self.filter_controls.is_checked(
-            "Показывать удалённые"
-        )
-        filters["search_text"] = self.filter_controls.get_search_text()
-
-        date_range = self.filter_controls.get_date_filter()
-        if date_range:
-            filters.update(date_range)
+        filters = self.get_filters()
 
         # 2. Загружаем данные
         items = self.get_page_func(self.page, self.per_page, **filters)
@@ -242,6 +239,28 @@ class BaseTableView(QWidget):
 
     def _on_column_filter_changed(self, column: int, text: str):
         self.proxy_model.set_filter(column, text)
+        self.on_filter_changed()
+
+    def get_column_filters(self) -> dict[str, str]:
+        if not hasattr(self, "model") or not self.model:
+            return {}
+        filters: dict[str, str] = {}
+        for i, field in enumerate(self.model.fields):
+            text = self.column_filters.get_text(i)
+            if text:
+                filters[field.name] = text
+        return filters
+
+    def get_filters(self) -> dict:
+        filters = {
+            "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
+            "search_text": self.filter_controls.get_search_text(),
+            "column_filters": self.get_column_filters(),
+        }
+        date_range = self.filter_controls.get_date_filter()
+        if date_range:
+            filters.update(date_range)
+        return filters
 
     def add_new(self):
         if not self.form_class:

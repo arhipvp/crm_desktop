@@ -13,7 +13,7 @@ class ColumnFilterRow(QWidget):
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(3)
 
-    def set_headers(self, headers: list[str]):
+    def set_headers(self, headers: list[str], texts: list[str] | None = None):
         """Создаёт по одному полю ввода на каждый столбец."""
         # очистка старых редакторов
         for e in self._editors:
@@ -31,9 +31,15 @@ class ColumnFilterRow(QWidget):
             le.textChanged.connect(lambda text, col=idx: self.filter_changed.emit(col, text))
             self.layout().addWidget(le)
             self._editors.append(le)
+            if texts and idx < len(texts):
+                le.setText(texts[idx])
         self.layout().addStretch()
 
     def get_text(self, column: int) -> str:
         if 0 <= column < len(self._editors):
             return self._editors[column].text().strip()
         return ""
+
+    def set_text(self, column: int, text: str) -> None:
+        if 0 <= column < len(self._editors):
+            self._editors[column].setText(text)

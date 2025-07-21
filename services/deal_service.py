@@ -289,7 +289,12 @@ def mark_deal_deleted(deal_id: int):
         logger.warning("❗ Сделка с id=%s не найдена для удаления", deal_id)
 
 
-def apply_deal_filters(query, search_text: str = "", show_deleted: bool = False):
+def apply_deal_filters(
+    query,
+    search_text: str = "",
+    show_deleted: bool = False,
+    column_filters: dict[str, str] | None = None,
+):
     if not show_deleted:
         query = query.where(Deal.is_deleted == False)
     if search_text:
@@ -299,6 +304,9 @@ def apply_deal_filters(query, search_text: str = "", show_deleted: bool = False)
             | (Client.name.contains(search_text))
             | (Deal.calculations.contains(search_text))
         )
+    from services.query_utils import apply_column_filters
+
+    query = apply_column_filters(query, column_filters, Deal)
     return query
 
 
@@ -312,12 +320,13 @@ def get_deals_page(
     show_deleted: bool = False,
     order_by: str = "reminder_date",
     order_dir: str = "asc",
+    column_filters: dict[str, str] | None = None,
     **filters,
 ) -> ModelSelect:
     """Вернуть страницу сделок с указанными фильтрами."""
-    query = build_deal_query(**filters)
+    query = build_deal_query(column_filters=column_filters, **filters)
 
-    query = apply_deal_filters(query, search_text, show_deleted)
+    query = apply_deal_filters(query, search_text, show_deleted, column_filters)
 
     # 👉 Только один order_by
     if order_by and hasattr(Deal, order_by):
@@ -367,12 +376,15 @@ def get_tasks_by_deal_id(deal_id: int) -> ModelSelect:
 
 
 def build_deal_query(
-    search_text: str = "", show_deleted: bool = False, show_closed: bool = False
+    search_text: str = "",
+    show_deleted: bool = False,
+    show_closed: bool = False,
+    column_filters: dict[str, str] | None = None,
 ) -> ModelSelect:
     """Базовый запрос сделок с фильтрами по статусам."""
     query = Deal.select().join(Client)
 
-    query = apply_deal_filters(query, search_text, show_deleted)
+    query = apply_deal_filters(query, search_text, show_deleted, column_filters)
 
     if not show_closed:
         query = query.where(Deal.is_closed == False)

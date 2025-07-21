@@ -507,6 +507,7 @@ def apply_policy_filters(
     client_id: int | None = None,
     include_renewed: bool = True,
     without_deal_only: bool = False,
+    column_filters: dict[str, str] | None = None,
 ):
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
@@ -527,6 +528,10 @@ def apply_policy_filters(
             (Policy.policy_number.contains(search_text))
             | (Client.name.contains(search_text))
         )
+
+    from services.query_utils import apply_column_filters
+
+    query = apply_column_filters(query, column_filters, Policy)
     return query
 
 
@@ -537,6 +542,7 @@ def build_policy_query(
     client_id: int | None = None,
     include_renewed: bool = True,
     without_deal_only: bool = False,
+    column_filters: dict[str, str] | None = None,
     **filters,
 ):
     """Сформировать запрос для выборки полисов с фильтрами."""
@@ -549,6 +555,7 @@ def build_policy_query(
         client_id,
         include_renewed,
         without_deal_only,
+        column_filters,
     )
 
 

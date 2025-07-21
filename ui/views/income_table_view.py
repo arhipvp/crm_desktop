@@ -135,13 +135,14 @@ class IncomeTableView(BaseTableView):
         self.load_data()
 
     def get_filters(self) -> dict:
-        filters = {
-            "search_text": self.filter_controls.get_search_text(),
-            "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "include_received": self.filter_controls.is_checked(
-                "Показывать выплаченные"
-            ),
-        }
+        filters = super().get_filters()
+        filters.update(
+            {
+                "include_received": self.filter_controls.is_checked(
+                    "Показывать выплаченные"
+                ),
+            }
+        )
         if self.deal_id:
             filters["deal_id"] = self.deal_id
 
