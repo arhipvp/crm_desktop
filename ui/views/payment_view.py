@@ -64,7 +64,7 @@ class PaymentView(QWidget):
         self.layout.addWidget(self.scroll)
 
         # Пагинация внизу
-        self.paginator = Paginator(self.next_page, self.prev_page)
+        self.paginator = Paginator(self.next_page, self.prev_page, per_page=self.per_page)
         self.layout.addWidget(self.paginator)
 
         self.load_payments()
@@ -87,7 +87,9 @@ class PaymentView(QWidget):
         )
 
         self.render_payments()
-        self.paginator.update_page(self.current_page)
+        self.paginator.update_page(
+            self.current_page, len(self.payments), self.per_page
+        )
 
     def render_payments(self):
         for i in reversed(range(self.content_layout.count())):

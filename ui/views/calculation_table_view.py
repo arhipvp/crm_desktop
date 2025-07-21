@@ -81,7 +81,7 @@ class CalculationTableView(BaseTableView):
             pass
         if total_count is not None:
             self.total_count = total_count
-            self.paginator.update(self.total_count, self.page)
+            self.paginator.update(self.total_count, self.page, self.per_page)
 
     def get_selected(self):
         idx = self.table.currentIndex()

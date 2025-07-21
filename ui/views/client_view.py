@@ -57,7 +57,7 @@ class ClientView(QWidget):
         self.layout.addWidget(self.scroll)
 
         # Пагинация внизу
-        self.paginator = Paginator(self.next_page, self.prev_page)
+        self.paginator = Paginator(self.next_page, self.prev_page, per_page=self.per_page)
         self.layout.addWidget(self.paginator)
 
         self.load_clients()
@@ -74,7 +74,9 @@ class ClientView(QWidget):
             self.current_page, self.per_page, search_text, show_deleted
         )
         self.render_clients()
-        self.paginator.update_page(self.current_page)
+        self.paginator.update_page(
+            self.current_page, len(self.clients), self.per_page
+        )
 
     def render_clients(self):
         for i in reversed(range(self.content_layout.count())):

@@ -241,7 +241,7 @@ class PolicyTableView(BaseTableView):
             pass
         if total_count is not None:
             self.total_count = total_count
-            self.paginator.update(self.total_count, self.page)
+            self.paginator.update(self.total_count, self.page, self.per_page)
 
     def on_section_clicked(self, logicalIndex):
         field = self.model.fields[logicalIndex].name
