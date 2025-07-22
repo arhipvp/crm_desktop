@@ -157,6 +157,7 @@ class PolicyForm(BaseEditForm):
         from PySide6.QtWidgets import QCheckBox
 
         self.first_payment_checkbox = QCheckBox("Первый платёж уже оплачен")
+        self.first_payment_checkbox.setChecked(self._first_payment_paid)
         self.form_layout.addRow("", self.first_payment_checkbox)
 
         self.start_date_edit = self.fields.get("start_date")
@@ -222,12 +223,18 @@ class PolicyForm(BaseEditForm):
         payments = self._draft_payments if self._draft_payments else None
 
         if self.instance:
-            policy = update_policy(self.instance, **data)
+            policy = update_policy(
+                self.instance,
+                first_payment_paid=self.first_payment_checkbox.isChecked(),
+                **data,
+            )
         else:
             self._first_payment_paid = self.first_payment_checkbox.isChecked()
 
             policy = add_policy(
-                payments=payments, first_payment_paid=self._first_payment_paid, **data
+                payments=payments,
+                first_payment_paid=self._first_payment_paid,
+                **data,
             )
 
         return policy
@@ -243,7 +250,11 @@ class PolicyForm(BaseEditForm):
             dlg = PolicyMergeDialog(e.existing_policy, data, parent=self)
             if dlg.exec() == QDialog.Accepted:
                 merged = dlg.get_merged_data()
-                updated = update_policy(e.existing_policy, **merged)
+                updated = update_policy(
+                    e.existing_policy,
+                    first_payment_paid=self.first_payment_checkbox.isChecked(),
+                    **merged,
+                )
                 self.saved_instance = updated
                 show_info("Полис успешно объединён.")
                 path = (
