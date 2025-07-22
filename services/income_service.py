@@ -4,6 +4,8 @@ import logging
 from typing import Any
 
 from peewee import JOIN, Field
+from peewee import SqliteDatabase
+from database.db import db
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
 from services.payment_service import get_payment_by_id
 
@@ -217,7 +219,11 @@ def apply_income_filters(
                 JOIN.LEFT_OUTER,
                 on=(DealExecutor.executor == Executor.id),
             )
-        ).distinct()
+        )
+        if isinstance(db.obj, SqliteDatabase):
+            query = query.distinct()
+        else:
+            query = query.distinct(Income.id)
     return query
 
 
