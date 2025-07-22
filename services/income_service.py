@@ -4,6 +4,8 @@ import logging
 from typing import Any
 
 from peewee import JOIN, Field
+from peewee import SqliteDatabase
+from database.db import db
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
 from services.payment_service import get_payment_by_id
 
@@ -84,7 +86,15 @@ def get_incomes_page(
     else:
         field = order_by
 
-    query = query.order_by(field.desc() if order_dir == "desc" else field.asc())
+    order_fields = []
+    if (
+        column_filters
+        and Executor.full_name in column_filters
+        and not isinstance(db.obj, SqliteDatabase)
+    ):
+        order_fields.append(Income.id)
+    order_fields.append(field.desc() if order_dir == "desc" else field.asc())
+    query = query.order_by(*order_fields)
 
     offset = (page - 1) * per_page
     return query.limit(per_page).offset(offset)
@@ -217,7 +227,11 @@ def apply_income_filters(
                 JOIN.LEFT_OUTER,
                 on=(DealExecutor.executor == Executor.id),
             )
-        ).distinct()
+        )
+        if isinstance(db.obj, SqliteDatabase):
+            query = query.distinct()
+        else:
+            query = query.distinct(Income.id)
     return query
 
 
