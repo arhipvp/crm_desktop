@@ -86,7 +86,15 @@ def get_incomes_page(
     else:
         field = order_by
 
-    query = query.order_by(field.desc() if order_dir == "desc" else field.asc())
+    order_fields = []
+    if (
+        column_filters
+        and Executor.full_name in column_filters
+        and not isinstance(db.obj, SqliteDatabase)
+    ):
+        order_fields.append(Income.id)
+    order_fields.append(field.desc() if order_dir == "desc" else field.asc())
+    query = query.order_by(*order_fields)
 
     offset = (page - 1) * per_page
     return query.limit(per_page).offset(offset)
