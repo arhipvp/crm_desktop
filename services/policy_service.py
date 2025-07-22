@@ -340,7 +340,7 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
     # отметить платёж как оплаченный, если указано
     if first_payment_paid:
         first_payment = policy.payments.order_by(Payment.payment_date).first()
-        if first_payment:
+        if first_payment and first_payment.actual_payment_date is None:
             first_payment.actual_payment_date = first_payment.payment_date
             first_payment.save()
 
@@ -350,7 +350,7 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
 # ─────────────────────────── Обновление ───────────────────────────
 
 
-def update_policy(policy: Policy, **kwargs):
+def update_policy(policy: Policy, *, first_payment_paid: bool = False, **kwargs):
     """Обновить поля полиса.
 
     Args:
@@ -434,7 +434,7 @@ def update_policy(policy: Policy, **kwargs):
         exclude_id=policy.id,
     )
 
-    if not updates:
+    if not updates and not first_payment_paid:
         logger.info("ℹ️ update_policy: нет изменений для полиса #%s", policy.id)
         return policy
 
@@ -469,6 +469,12 @@ def update_policy(policy: Policy, **kwargs):
                 policy.save(only=[Policy.drive_folder_link])
         except Exception:
             logger.exception("Не удалось переименовать папку полиса")
+
+    if first_payment_paid:
+        first_payment = policy.payments.order_by(Payment.payment_date).first()
+        if first_payment and first_payment.actual_payment_date is None:
+            first_payment.actual_payment_date = first_payment.payment_date
+            first_payment.save()
 
     return policy
 
