@@ -36,7 +36,9 @@ class PolicyTableView(BaseTableView):
         self.setAcceptDrops(True)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setSortingEnabled(True)
-        self.table.horizontalHeader().sectionClicked.connect(self.on_section_clicked)
+        self.table.horizontalHeader().sortIndicatorChanged.connect(
+            self.on_sort_changed
+        )
 
         self.order_by = "start_date"
         self.order_dir = "asc"
@@ -244,12 +246,11 @@ class PolicyTableView(BaseTableView):
             self.total_count = total_count
             self.paginator.update(self.total_count, self.page, self.per_page)
 
-    def on_section_clicked(self, logicalIndex):
+    def on_sort_changed(self, logicalIndex: int, order: Qt.SortOrder):
         field = self.model.fields[logicalIndex].name
         if not hasattr(Policy, field):
             return
-        order = self.table.horizontalHeader().sortIndicatorOrder()
-        self.order_dir = "desc" if order == 1 else "asc"
+        self.order_dir = "desc" if order == Qt.DescendingOrder else "asc"
         self.order_by = field
         self.page = 1
         self.load_data()

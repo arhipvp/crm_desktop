@@ -40,7 +40,9 @@ class TaskTableView(BaseTableView):
         self.deal_id = deal_id
         self.table.setItemDelegate(StatusDelegate(self.table))
         self.table.verticalHeader().setVisible(False)  # убираем нумерацию строк
-        self.table.horizontalHeader().sectionClicked.connect(self.on_sort_requested)
+        self.table.horizontalHeader().sortIndicatorChanged.connect(
+            self.on_sort_changed
+        )
         # Кнопка «Редактировать» должна сразу открывать форму задачи
 
         # ────────────────── Панель фильтров ──────────────────
@@ -325,16 +327,3 @@ class TaskTableView(BaseTableView):
         self.sort_order = "desc" if order == Qt.DescendingOrder else "asc"
         self.load_data()
 
-    def on_sort_requested(self, column: int):
-        if not self.model or column >= len(self.model.fields):
-            return
-
-        field_name = self.model.fields[column].name
-
-        if self.sort_field == field_name:
-            self.sort_order = "desc" if self.sort_order == "asc" else "asc"
-        else:
-            self.sort_field = field_name
-            self.sort_order = "asc"
-
-        self.refresh()

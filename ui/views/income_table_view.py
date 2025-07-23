@@ -148,7 +148,9 @@ class IncomeTableView(BaseTableView):
         # разрешаем множественный выбор для массовых действий
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
-        self.table.horizontalHeader().sectionClicked.connect(self.on_sort_requested)
+        self.table.horizontalHeader().sortIndicatorChanged.connect(
+            self.on_sort_changed
+        )
         self.row_double_clicked.connect(self.open_detail)
         self.delete_callback = self.delete_selected
         self.load_data()
@@ -298,14 +300,8 @@ class IncomeTableView(BaseTableView):
         """Обработка изменения фильтра без прокси-модели."""
         self.on_filter_changed()
 
-    def on_sort_requested(self, column):
-        if column == self.current_sort_column:
-            self.current_sort_order = (
-                Qt.DescendingOrder
-                if self.current_sort_order == Qt.AscendingOrder
-                else Qt.AscendingOrder
-            )
-        else:
-            self.current_sort_column = column
-            self.current_sort_order = Qt.AscendingOrder
+    def on_sort_changed(self, column: int, order: Qt.SortOrder):
+        """Reload data after header sort change."""
+        self.current_sort_column = column
+        self.current_sort_order = order
         self.refresh()
