@@ -197,16 +197,18 @@ class IncomeTableView(BaseTableView):
         order_dir = (
             "desc" if self.current_sort_order == Qt.DescendingOrder else "asc"
         )
+        join_executor = order_field is Executor.full_name
 
         query = get_incomes_page(
             self.page,
             self.per_page,
             order_by=order_field,
             order_dir=order_dir,
+            join_executor=join_executor,
             **filters,
         )
         items = prefetch(query, Payment, Policy, Client, Deal, DealExecutor, Executor)
-        total = build_income_query(**filters).count()
+        total = build_income_query(join_executor=join_executor, **filters).count()
         logger.debug("\U0001F4E6 Загружено доходов: %d", len(items))
 
         self.set_model_class_and_items(self.model_class, items, total_count=total)
