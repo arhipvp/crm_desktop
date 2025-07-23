@@ -74,7 +74,9 @@ class DealTableView(BaseTableView):
         self.sort_order = "asc"  # 'asc' or 'desc'
         self.default_sort_field = "reminder_date"
 
-        self.table.horizontalHeader().sectionClicked.connect(self.on_sort_requested)
+        self.table.horizontalHeader().sortIndicatorChanged.connect(
+            self.on_sort_changed
+        )
         self.row_double_clicked.connect(self.open_detail)
 
         self.load_data()
@@ -173,16 +175,11 @@ class DealTableView(BaseTableView):
             dlg = DealDetailView(deal)
             dlg.exec()
 
-    def on_sort_requested(self, column):
-        # Получаем имя поля по индексу
-        field = self.model_class._meta.sorted_fields[column]
-        field_name = self.model.fields[column].name
+    def on_sort_changed(self, column: int, order: Qt.SortOrder):
+        """Refresh data after the user changed sort order."""
+        if not self.model or column >= len(self.model.fields):
+            return
 
-        if self.sort_field == field_name:
-            # Меняем порядок сортировки, если клик по тому же столбцу
-            self.sort_order = "desc" if self.sort_order == "asc" else "asc"
-        else:
-            # Клик по новому столбцу
-            self.sort_field = field_name
-            self.sort_order = "asc"
+        self.sort_field = self.model.fields[column].name
+        self.sort_order = "desc" if order == Qt.DescendingOrder else "asc"
         self.refresh()
