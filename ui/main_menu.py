@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QMenuBar, QMessageBox, QFileDialog
+from PySide6.QtWidgets import QMenuBar, QMessageBox
 from PySide6.QtGui import QAction, QKeySequence
 import subprocess
 import sys
@@ -68,12 +68,9 @@ class MainMenu(QMenuBar):
         help_menu.addAction(consultant_action)
 
     def export_to_csv(self):
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Сохранить как CSV", "", "CSV Files (*.csv)"
-        )
-        if file_path:
-            QMessageBox.information(self, "Экспорт", f"Сюда будет экспорт: {file_path}")
-            # 🔧 Здесь ты можешь вызвать свою функцию экспорта
+        mw = self.parent()
+        if mw and hasattr(mw, "export_current_view"):
+            mw.export_current_view()
 
     def close_app(self):
         self.parent().close()

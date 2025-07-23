@@ -53,6 +53,7 @@ class TaskTableView(BaseTableView):
                 "Показывать выполненные": self.on_filter_changed,
             },
             on_filter=self.on_filter_changed,
+            export_callback=self.export_csv,
             search_placeholder="Поиск…",
             settings_name=self.settings_id,
         )
