@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
     QTableView,
     QVBoxLayout,
     QWidget,
+    QFileDialog,
+    QMessageBox,
 )
 
 from ui.base.base_table_model import BaseTableModel
@@ -102,6 +104,7 @@ class BaseTableView(QWidget):
             search_callback=self._on_filter_controls_changed,
             checkbox_map=checkbox_map,
             on_filter=self._on_filter_controls_changed,
+            export_callback=self.export_csv,
             settings_name=self.settings_id,
         )
 
@@ -431,6 +434,19 @@ class BaseTableView(QWidget):
             return None
         return self.model.get_item(self._source_row(index))
 
+    def get_selected_objects(self) -> list:
+        if not self.model:
+            return []
+        sel = self.table.selectionModel().selectedRows()
+        if not sel:
+            index = self.table.currentIndex()
+            sel = [index] if index.isValid() else []
+        return [
+            self.model.get_item(self._source_row(i))
+            for i in sel
+            if i.isValid()
+        ]
+
     def open_selected_folder(self):
         """Открыть связанную папку для выбранной строки."""
         obj = self.get_selected_object()
@@ -441,6 +457,26 @@ class BaseTableView(QWidget):
         )
         if path:
             open_folder(path, parent=self)
+
+    def export_csv(self, path: str | None = None):
+        objs = self.get_selected_objects()
+        if not objs:
+            return
+        if path is None:
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Сохранить как CSV", "", "CSV Files (*.csv)"
+            )
+        if not path:
+            return
+        try:
+            from services.export_service import export_objects_to_csv
+
+            export_objects_to_csv(path, objs, self.model.fields)
+            QMessageBox.information(
+                self, "Экспорт", f"Экспортировано: {len(objs)}"
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Ошибка", str(exc))
 
     def _on_table_menu(self, pos):
         index = self.table.indexAt(pos)
