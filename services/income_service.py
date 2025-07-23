@@ -64,9 +64,16 @@ def get_incomes_page(
     column_filters: dict | None = None,
     *,
     only_received: bool = False,
+    join_executor: bool | None = None,
     **kwargs,
 ):
     """Получить страницу доходов по фильтрам."""
+    if join_executor is None:
+        join_executor = (
+            isinstance(order_by, Field)
+            and getattr(order_by, "model", None) is Executor
+        )
+
     query = build_income_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -74,7 +81,14 @@ def get_incomes_page(
         received_date_range=received_date_range,
         column_filters=column_filters,
         only_received=only_received,
+        join_executor=join_executor,
         **kwargs,
+    )
+    logger.debug(
+        "\U0001F50E built income query. join_executor=%s order_by=%s order_dir=%s",
+        join_executor,
+        getattr(order_by, 'name', order_by),
+        order_dir,
     )
 
     # --- сортировка ---
@@ -95,6 +109,7 @@ def get_incomes_page(
         order_fields.append(Income.id)
     order_fields.append(field.desc() if order_dir == "desc" else field.asc())
     query = query.order_by(*order_fields)
+    logger.debug("\U0001F4DD final SQL: %s", query.sql())
 
     offset = (page - 1) * per_page
     return query.limit(per_page).offset(offset)
@@ -173,6 +188,7 @@ def apply_income_filters(
     column_filters: dict | None = None,
     *,
     only_received: bool = False,
+    join_executor: bool = False,
 ):
     if not show_deleted:
         query = query.where(Income.is_deleted == False)
@@ -214,7 +230,7 @@ def apply_income_filters(
     query = apply_field_filters(query, field_filters)
     query = apply_column_filters(query, name_filters, Income)
 
-    if Executor.full_name in field_filters:
+    if Executor.full_name in field_filters or join_executor:
         query = (
             query.switch(Deal)
             .join(
@@ -243,6 +259,7 @@ def build_income_query(
     column_filters: dict[str, str] | None = None,
     *,
     only_received: bool = False,
+    join_executor: bool = False,
     **kwargs,
 ):
     query = (
@@ -265,6 +282,7 @@ def build_income_query(
         deal_id=kwargs.get("deal_id"),
         column_filters=column_filters,
         only_received=only_received,
+        join_executor=join_executor,
     )
 
     return query
