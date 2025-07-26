@@ -15,6 +15,7 @@ from ui.forms.income_update_dialog import IncomeUpdateDialog
 from ui.forms.policy_preview_dialog import PolicyPreviewDialog
 from ui.forms.client_form import ClientForm
 from database.models import Payment
+from services.validators import normalize_number
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ def _parse_amount(value) -> float:
     if value in (None, ""):
         return 0.0
     try:
-        return float(str(value).replace(" ", "").replace(",", "."))
+        return float(normalize_number(value))
     except Exception:
         return 0.0
 

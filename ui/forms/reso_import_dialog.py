@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 from database.models import Policy
 from services.reso_table_service import load_reso_table, import_reso_payouts
+from services.validators import normalize_number
 
 
 class ResoImportDialog(QDialog):
@@ -96,18 +97,14 @@ class ResoImportDialog(QDialog):
             amount = (
                 rows[amount_col]
                 .map(
-                    lambda v: float(str(v).replace(" ", "").replace(",", "."))
-                    if v not in (None, "")
-                    else 0.0
+                    lambda v: float(normalize_number(v)) if v not in (None, "") else 0.0
                 )
                 .sum()
             )
             prem = (
                 rows[prem_col]
                 .map(
-                    lambda v: float(str(v).replace(" ", "").replace(",", "."))
-                    if v not in (None, "")
-                    else 0.0
+                    lambda v: float(normalize_number(v)) if v not in (None, "") else 0.0
                 )
                 .sum()
             ) if prem_col in df.columns else 0.0
