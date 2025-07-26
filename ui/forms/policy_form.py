@@ -23,6 +23,7 @@ from services.policy_service import (
     update_policy,
     DuplicatePolicyError,
 )
+from services.validators import normalize_number
 from services.deal_service import get_all_deals, get_deals_by_client_id
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
 from ui.base.base_edit_form import BaseEditForm
@@ -344,7 +345,7 @@ class PolicyForm(BaseEditForm):
 
     def on_add_payment(self):
         date = self.pay_date_edit.date()
-        amount_text = self.pay_amount_edit.text().replace(",", ".")
+        amount_text = normalize_number(self.pay_amount_edit.text())
         try:
             amount = float(amount_text)
         except Exception:

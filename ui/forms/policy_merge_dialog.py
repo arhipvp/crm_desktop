@@ -12,6 +12,7 @@ import peewee
 
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
+from services.validators import normalize_number
 
 from database.models import Policy
 
@@ -112,12 +113,12 @@ class PolicyMergeDialog(QDialog):
 
             if isinstance(model_field, (peewee.IntegerField, peewee.AutoField, peewee.ForeignKeyField)):
                 try:
-                    data[field] = int(text)
+                    data[field] = int(normalize_number(text))
                 except ValueError:
                     data[field] = None
             elif isinstance(model_field, peewee.FloatField):
                 try:
-                    data[field] = float(text.replace(",", "."))
+                    data[field] = float(normalize_number(text))
                 except ValueError:
                     data[field] = None
             elif isinstance(model_field, peewee.DateField):

@@ -50,3 +50,16 @@ def normalize_company_name(name: str) -> str:
         return "-".join(p.capitalize() for p in word.split("-") if p)
 
     return " ".join(norm(p) for p in parts if p)
+
+
+def normalize_number(value: str | int | float | None) -> str | None:
+    """Нормализует строку с числом, убирая пробелы и меняя запятую на точку."""
+
+    if value is None:
+        return None
+    text = str(value)
+    text = re.sub(r"\s+", "", text)
+    text = text.replace("\u00a0", "")
+    text = text.replace(",", ".")
+    return text
+

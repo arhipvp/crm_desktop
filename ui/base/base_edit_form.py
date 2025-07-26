@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 
 from ui.common.date_utils import OptionalDateEdit, TypableDateEdit
 from ui.common.styled_widgets import styled_button
+from services.validators import normalize_number
 
 logger = logging.getLogger(__name__)
 
@@ -199,9 +200,11 @@ class BaseEditForm(QDialog):
                 field = self.model_class._meta.fields.get(lookup_name)
 
                 if isinstance(field, peewee.IntegerField):
-                    value = int(value) if value is not None else None
+                    if value is not None:
+                        value = int(normalize_number(value))
                 elif isinstance(field, peewee.FloatField):
-                    value = float(value) if value is not None else None
+                    if value is not None:
+                        value = float(normalize_number(value))
                 elif isinstance(field, peewee.DateField):
                     value = (
                         QDate.fromString(txt, "dd.MM.yyyy").toPython() if txt else None

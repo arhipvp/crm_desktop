@@ -17,6 +17,7 @@ from utils.logging_config import setup_logging
 from dotenv import load_dotenv
 from pathlib import Path
 from html import escape
+from services.validators import normalize_number
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -44,7 +45,7 @@ def _parse_float(text: str) -> float | None:
         .replace("р.", "")
         .replace("р", "")
     )
-    text = text.replace(" ", "").replace("\u00a0", "").replace(",", ".")
+    text = normalize_number(text)
     try:
         return float(text)
     except ValueError:
