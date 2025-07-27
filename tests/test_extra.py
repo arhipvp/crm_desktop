@@ -275,6 +275,20 @@ def test_apply_expense_filters_include_paid():
     ) == []
 
 
+def test_apply_expense_filters_date_range():
+    client = add_client(name='ED')
+    pol = add_policy(client_id=client.id, policy_number='PD', start_date=date(2025,1,1), end_date=date(2025,1,10))
+    pay = add_payment(policy_id=pol.id, amount=10, payment_date=date(2025,1,2))
+    exp1 = add_expense(payment_id=pay.id, amount=5, expense_type='agent', expense_date=date(2025,1,3))
+    exp2 = add_expense(payment_id=pay.id, amount=7, expense_type='agent', expense_date=date(2025,1,5))
+
+    query = apply_expense_filters(
+        Expense.select().join(Payment).join(Policy).join(Client),
+        expense_date_range=(date(2025,1,2), date(2025,1,4)),
+    )
+    assert list(query) == [exp1]
+
+
 def test_apply_income_filters_include_received():
     client = add_client(name='I')
     pol = add_policy(client_id=client.id, policy_number='IP1', start_date=date(2025,1,1), end_date=date(2025,1,10))
