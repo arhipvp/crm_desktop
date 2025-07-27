@@ -53,7 +53,7 @@ def normalize_company_name(name: str) -> str:
 
 
 def normalize_number(value: str | int | float | None) -> str | None:
-    """Нормализует строку с числом, убирая пробелы и меняя запятую на точку."""
+    """Нормализует строку с числом, убирая пробелы, буквы и меняя запятую на точку."""
 
     if value is None:
         return None
@@ -61,5 +61,7 @@ def normalize_number(value: str | int | float | None) -> str | None:
     text = re.sub(r"\s+", "", text)
     text = text.replace("\u00a0", "")
     text = text.replace(",", ".")
+    text = re.sub(r"[a-zA-Zа-яА-Я]+", "", text)
+    text = text.rstrip(".")
     return text
 
