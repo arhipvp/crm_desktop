@@ -142,6 +142,7 @@ def get_expenses_page(
     show_deleted: bool = False,
     deal_id: int = None,
     include_paid: bool = True,
+    expense_date_range=None,
     column_filters: dict[str, str] | None = None,
 ):
     """Вернуть страницу расходов с фильтрами.
@@ -153,6 +154,7 @@ def get_expenses_page(
         show_deleted: Учитывать удалённые записи.
         deal_id: Идентификатор сделки для фильтра.
         include_paid: Показывать оплаченные расходы.
+        expense_date_range: Период дат выплат (start, end).
 
     Returns:
         ModelSelect: Выборка расходов.
@@ -162,6 +164,7 @@ def get_expenses_page(
         show_deleted=show_deleted,
         deal_id=deal_id,
         include_paid=include_paid,
+        expense_date_range=expense_date_range,
         column_filters=column_filters,
     )
     offset = (page - 1) * per_page
@@ -174,6 +177,7 @@ def apply_expense_filters(
     show_deleted=False,
     deal_id=None,
     include_paid=True,
+    expense_date_range=None,
     column_filters: dict[str, str] | None = None,
     **kwargs,
 ):
@@ -188,6 +192,12 @@ def apply_expense_filters(
         )
     if not include_paid:
         query = query.where(Expense.expense_date.is_null(True))
+    if expense_date_range:
+        date_from, date_to = expense_date_range
+        if date_from:
+            query = query.where(Expense.expense_date >= date_from)
+        if date_to:
+            query = query.where(Expense.expense_date <= date_to)
 
     from services.query_utils import apply_column_filters
 
@@ -197,7 +207,12 @@ def apply_expense_filters(
 
 
 def build_expense_query(
-    search_text=None, show_deleted=False, deal_id=None, include_paid=True, **kwargs
+    search_text=None,
+    show_deleted=False,
+    deal_id=None,
+    include_paid=True,
+    expense_date_range=None,
+    **kwargs
 ):
     query = (
         Expense.select(Expense, Payment, Policy, Client)
@@ -211,6 +226,7 @@ def build_expense_query(
         show_deleted,
         deal_id,
         include_paid,
+        expense_date_range=expense_date_range,
         column_filters=kwargs.get("column_filters"),
     )
 
