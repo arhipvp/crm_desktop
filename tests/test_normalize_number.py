@@ -11,3 +11,5 @@ def test_normalize_number():
     assert normalize_number("6234.70p") == "6234.70"
     assert normalize_number("123руб.") == "123"
     assert normalize_number("456,78 р.") == "456.78"
+    assert normalize_number("4101.44RUB") == "4101.44"
+    assert normalize_number("4101.44 RUB") == "4101.44"
