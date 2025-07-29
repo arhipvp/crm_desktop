@@ -6,7 +6,9 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QHBoxLayout,
+    QLabel,
 )
+from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt, QDate
 import peewee
 
@@ -27,6 +29,12 @@ class PolicyMergeDialog(QDialog):
         self.setMinimumSize(640, 400)
 
         layout = QVBoxLayout(self)
+        layout.addWidget(
+            QLabel(
+                "Измените значения в колонке 'Новое значение'.\n"
+                "Итоговое значение отображается в последней колонке."
+            )
+        )
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(
             ["Поле", "Текущее", "Новое значение", "Итоговое"]
@@ -48,11 +56,14 @@ class PolicyMergeDialog(QDialog):
                 QTableWidgetItem(self._display_value(field, old_val)),
             )
             edit = QLineEdit("" if new_val is None else str(new_val))
+            edit.setPlaceholderText("оставить без изменений")
             self.table.setCellWidget(row, 2, edit)
             final = QTableWidgetItem()
             self.table.setItem(row, 3, final)
             self._update_final(row, field)
             edit.textChanged.connect(lambda _=None, r=row, f=field: self._update_final(r, f))
+
+        self.table.resizeColumnsToContents()
 
         btns = QHBoxLayout()
         self.merge_btn = QPushButton("Объединить")
@@ -95,6 +106,10 @@ class PolicyMergeDialog(QDialog):
         item = self.table.item(row, 3)
         if item is not None:
             item.setText(self._display_value(field, final_val))
+            old_val = getattr(self.existing, field, None)
+            changed = str(final_val) != str(old_val)
+            item.setBackground(QColor("#fff0b3") if changed else QColor())
+            widget.setStyleSheet("background:#fff0b3;" if changed else "")
 
     def get_merged_data(self) -> dict:
         data = {}
