@@ -193,6 +193,11 @@ def sync_calculations_from_sheet() -> int:
             "deductible": _to_float(item.get("deductible")),
             "note": item.get("note"),
         }
+
+        # skip rows where all params are empty
+        if all(v is None or v == "" for v in params.values()):
+            continue
+
         exists = DealCalculation.get_or_none(
             (DealCalculation.deal_id == deal_id)
             & (DealCalculation.insurance_company == params["insurance_company"])
