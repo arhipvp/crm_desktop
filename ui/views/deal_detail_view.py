@@ -278,7 +278,6 @@ class DealDetailView(QDialog):
         form.addRow("Напоминание:", self.reminder_date)
 
         info_group.setLayout(form)
-        main_layout.addWidget(info_group)
 
         # ---- Журнал -------------------------------------------------
         journal_group = QGroupBox("Журнал")
@@ -300,16 +299,15 @@ class DealDetailView(QDialog):
         journal_form.addRow("История:", self.calc_view)
 
         journal_group.setLayout(journal_form)
-        main_layout.addWidget(journal_group)
 
         self.btn_exec_task = styled_button("📤 Новая задача исполнителю")
         self.btn_exec_task.clicked.connect(self._on_new_exec_task)
-        main_layout.addWidget(self.btn_exec_task, alignment=Qt.AlignLeft)
 
         # ---- Расчёты ------------------------------------------------
         from ui.views.calculation_table_view import CalculationTableView
 
         calc_group = QGroupBox("Расчёты")
+        calc_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         calc_box = QVBoxLayout()
         btn_calc = styled_button(
             "➕ Запись",
@@ -320,9 +318,25 @@ class DealDetailView(QDialog):
         self._add_shortcut("Ctrl+Shift+A", self._on_add_calculation)
         calc_box.addWidget(btn_calc, alignment=Qt.AlignLeft)
         self.calc_table = CalculationTableView(parent=self, deal_id=self.instance.id)
-        calc_box.addWidget(self.calc_table)
+        self.calc_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        calc_box.addWidget(self.calc_table, 1)
         calc_group.setLayout(calc_box)
-        main_layout.addWidget(calc_group)
+
+        # объединяем информационные блоки и таблицу расчётов сплиттером,
+        # чтобы пользователь мог менять их высоту
+        upper_widget = QWidget()
+        upper_layout = QVBoxLayout(upper_widget)
+        upper_layout.setContentsMargins(0, 0, 0, 0)
+        upper_layout.addWidget(info_group)
+        upper_layout.addWidget(journal_group)
+        upper_layout.addWidget(self.btn_exec_task, alignment=Qt.AlignLeft)
+
+        self.calc_splitter = QSplitter(Qt.Vertical)
+        self.calc_splitter.addWidget(upper_widget)
+        self.calc_splitter.addWidget(calc_group)
+        self.calc_splitter.setStretchFactor(1, 1)
+
+        main_layout.addWidget(self.calc_splitter, 1)
 
         # Кнопки сохранения и обновления
         btn_save = styled_button("💾 Сохранить изменения", shortcut="Ctrl+Enter")
