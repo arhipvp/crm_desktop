@@ -1,0 +1,12 @@
+import pytest
+from services.validators import normalize_number, normalize_phone
+
+
+def test_normalize_number_basic():
+    assert normalize_number("12 345,67") == "12345.67"
+    assert normalize_number(None) is None
+    assert normalize_number("123руб.") == "123"
+
+
+def test_normalize_phone():
+    assert normalize_phone("8 (900) 111-22-33") == "+79001112233"
