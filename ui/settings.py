@@ -64,3 +64,17 @@ def set_app_settings(settings: dict) -> None:
     data = _load_data()
     data["app"] = settings
     _save_data(data)
+
+
+def get_window_settings(name: str) -> dict:
+    """Возвращает сохранённые настройки окна."""
+    data = _load_data()
+    return data.get("windows", {}).get(name, {})
+
+
+def set_window_settings(name: str, settings: dict) -> None:
+    """Сохраняет настройки окна."""
+    data = _load_data()
+    windows = data.setdefault("windows", {})
+    windows[name] = settings
+    _save_data(data)
