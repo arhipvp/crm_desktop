@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QScrollArea,
     QHeaderView,
     QMessageBox,
 )
@@ -136,9 +137,12 @@ class DealDetailView(QDialog):
         self.main_splitter = QSplitter(Qt.Horizontal)
         self.layout.addWidget(self.main_splitter, stretch=1)
 
+        self.info_scroll = QScrollArea()
+        self.info_scroll.setWidgetResizable(True)
         self.info_container = QWidget()
         self.info_layout = QVBoxLayout(self.info_container)
-        self.main_splitter.addWidget(self.info_container)
+        self.info_scroll.setWidget(self.info_container)
+        self.main_splitter.addWidget(self.info_scroll)
 
         self.tabs = QTabWidget()
         self.main_splitter.addWidget(self.tabs)
@@ -147,10 +151,22 @@ class DealDetailView(QDialog):
 
         self._init_tabs()
         self.tabs.currentChanged.connect(self._on_tab_changed)
+        self._update_splitter_orientation()
 
         # Быстрые действия
         self._init_actions()
         self._register_shortcuts()
+
+    def _update_splitter_orientation(self) -> None:
+        """Switch to vertical layout on narrow screens."""
+        if self.width() < 1100:
+            self.main_splitter.setOrientation(Qt.Vertical)
+        else:
+            self.main_splitter.setOrientation(Qt.Horizontal)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_splitter_orientation()
 
     def _on_tab_changed(self, index: int) -> None:
         """Refresh data when switching between tabs."""
