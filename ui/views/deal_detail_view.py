@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 import os
 import logging
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ from ui.forms.task_form import TaskForm
 from ui.views.payment_table_view import PaymentTableView
 from ui.views.policy_table_view import PolicyTableView
 from ui.views.task_table_view import TaskTableView  # ← наш переиспользуемый вид задач
+from ui import settings as ui_settings
 
 
 class _CalcHighlighter(QSyntaxHighlighter):
@@ -101,6 +103,8 @@ def _with_day_separators(text: str | None) -> str:
 
 
 class DealDetailView(QDialog):
+    SETTINGS_KEY = "deal_detail_view"
+
     def __init__(self, deal, parent=None):
         super().__init__(parent)
         # allow the window to be maximized like a regular application window
@@ -156,6 +160,7 @@ class DealDetailView(QDialog):
         # Быстрые действия
         self._init_actions()
         self._register_shortcuts()
+        self._load_settings()
 
     def _update_splitter_orientation(self) -> None:
         """Switch to vertical layout on narrow screens."""
@@ -573,6 +578,39 @@ class DealDetailView(QDialog):
         """Enable hotkeys for saving with closing and refreshing."""
         self._add_shortcut("Ctrl+Shift+Enter", self._on_save_and_close)
         self._add_shortcut("F5", self._on_refresh)
+
+    def _load_settings(self):
+        """Восстанавливает сохранённые параметры окна."""
+        st = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        geom = st.get("geometry")
+        if geom:
+            try:
+                self.restoreGeometry(base64.b64decode(geom))
+            except Exception:
+                pass
+        split = st.get("splitter")
+        if split:
+            try:
+                self.main_splitter.restoreState(base64.b64decode(split))
+            except Exception:
+                pass
+        idx = st.get("tab_index")
+        if idx is not None and 0 <= int(idx) < self.tabs.count():
+            self.tabs.setCurrentIndex(int(idx))
+        self._update_splitter_orientation()
+
+    def _save_settings(self):
+        """Сохраняет текущие параметры окна."""
+        st = {
+            "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
+            "splitter": base64.b64encode(self.main_splitter.saveState()).decode("ascii"),
+            "tab_index": self.tabs.currentIndex(),
+        }
+        ui_settings.set_window_settings(self.SETTINGS_KEY, st)
+
+    def closeEvent(self, event):
+        self._save_settings()
+        super().closeEvent(event)
 
     def _on_edit(self):
         form = DealForm(self.instance, parent=self)
