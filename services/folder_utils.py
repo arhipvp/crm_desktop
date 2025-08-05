@@ -305,7 +305,28 @@ def open_folder(
     if os.path.isdir(path_or_url):  # локальный каталог существует
         try:
             if sys.platform.startswith("win"):
-                os.startfile(path_or_url)  # type: ignore[attr-defined]
+                try:
+                    import win32com.client  # type: ignore[import-not-found]
+
+                    shell = win32com.client.Dispatch("Shell.Application")
+                    target = os.path.normcase(os.path.realpath(path_or_url))
+                    for window in shell.Windows():
+                        try:
+                            current = os.path.normcase(
+                                os.path.realpath(window.Document.Folder.Self.Path)
+                            )
+                            if current == target:
+                                window.Visible = True
+                                try:
+                                    window.Focus()  # type: ignore[attr-defined]
+                                except Exception:
+                                    pass
+                                return
+                        except Exception:
+                            continue
+                    shell.Open(path_or_url)
+                except Exception:
+                    os.startfile(path_or_url)  # type: ignore[attr-defined]
             elif sys.platform.startswith("darwin"):
                 subprocess.Popen(["open", path_or_url])
             else:
