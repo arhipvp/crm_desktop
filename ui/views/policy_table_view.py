@@ -39,6 +39,12 @@ class PolicyTableView(BaseTableView):
         self.table.horizontalHeader().sortIndicatorChanged.connect(
             self.on_sort_changed
         )
+        # Разрешаем "псевдо-редактирование" ячеек для копирования текста
+        self.table.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+            | QAbstractItemView.EditTrigger.SelectedClicked
+        )
 
         self.order_by = "start_date"
         self.order_dir = "asc"
@@ -306,7 +312,20 @@ class PolicyTableModel(BaseTableModel):
         if section < len(self.fields):
             return super().headerData(section, orientation, role)
         return self.headers[-1]
-        event.accept()
+
+    def flags(self, index):
+        flags = super().flags(index)
+        if not index.isValid():
+            return flags
+        if index.column() >= len(self.fields):
+            return flags & ~Qt.ItemIsEditable
+        field = self.fields[index.column()]
+        if field.name != "policy_number":
+            return flags & ~Qt.ItemIsEditable
+        return flags
+
+    def setData(self, index, value, role=Qt.EditRole):  # pragma: no cover - read only
+        return False
 
     def dropEvent(self, event):  # noqa: D401 - Qt override
         urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
