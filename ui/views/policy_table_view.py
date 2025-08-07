@@ -238,7 +238,12 @@ class PolicyTableView(BaseTableView):
         self.proxy_model.setSourceModel(self.model)
         self.table.setModel(self.proxy_model)
         try:
-            self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
+            # Показываем текущий индикатор сортировки, не выполняя
+            # повторную сортировку на уровне прокси‑модели (сортировку
+            # уже выполняет база данных).
+            self.table.horizontalHeader().setSortIndicator(
+                self.current_sort_column, self.current_sort_order
+            )
             self.table.resizeColumnsToContents()
         except NotImplementedError:
             pass
