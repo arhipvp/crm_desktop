@@ -160,6 +160,49 @@ def add_deal_from_policy(policy: Policy) -> Deal:
     return deal
 
 
+def add_deal_from_policies(policies: list[Policy]) -> Deal:
+    """Создаёт сделку и привязывает к ней несколько полисов.
+
+    Первая политика используется для формирования описания сделки,
+    аналогично :func:`add_deal_from_policy`, остальные полисы просто
+    привязываются к созданной сделке.
+
+    Parameters
+    ----------
+    policies: list[Policy]
+        Список полисов, которые необходимо объединить в одну сделку.
+
+    Returns
+    -------
+    Deal
+        Созданная сделка.
+    """
+
+    if not policies:
+        raise ValueError("Нет полисов для создания сделки")
+
+    first, *rest = policies
+    deal = add_deal_from_policy(first)
+
+    from services.folder_utils import move_policy_folder_to_deal
+
+    for policy in rest:
+        try:
+            new_path = move_policy_folder_to_deal(
+                policy.drive_folder_link,
+                policy.client.name,
+                deal.description,
+            )
+            if new_path:
+                policy.drive_folder_link = new_path
+        except Exception:
+            logger.exception("Не удалось переместить папку полиса")
+        policy.deal = deal
+        policy.save()
+
+    return deal
+
+
 # ──────────────────────────── Обновление ─────────────────────────────
 
 

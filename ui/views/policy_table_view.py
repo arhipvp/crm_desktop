@@ -162,16 +162,25 @@ class PolicyTableView(BaseTableView):
             show_error(str(e))
 
     def _on_make_deal(self):
-        policy = self.get_selected()
-        if not policy:
+        policies = self.get_selected_multiple()
+        if not policies:
             return
         try:
-            from services.deal_service import add_deal_from_policy, get_all_deals
+            from services.deal_service import (
+                add_deal_from_policy,
+                add_deal_from_policies,
+                get_all_deals,
+            )
             from services.policy_service import update_policy
             from ui.views.deal_detail_view import DealDetailView
             from utils.name_utils import extract_surname
 
-            if confirm("Привязать полис к существующей сделке?"):
+            question = (
+                "Привязать полис к существующей сделке?"
+                if len(policies) == 1
+                else f"Привязать {len(policies)} полис(ов) к существующей сделке?"
+            )
+            if confirm(question):
                 deals = list(get_all_deals())
                 if not deals:
                     show_error("Нет доступных сделок")
@@ -179,17 +188,21 @@ class PolicyTableView(BaseTableView):
 
                 labels = [f"{d.client.name} - {d.description}" for d in deals]
                 dlg = SearchDialog(labels, parent=self)
-                surname = extract_surname(policy.client.name)
+                surname = extract_surname(policies[0].client.name)
                 if surname:
                     dlg.search.setText(surname)
                 if dlg.exec() and dlg.selected_index:
                     idx = labels.index(dlg.selected_index)
                     deal = deals[idx]
-                    update_policy(policy, deal_id=deal.id)
+                    for p in policies:
+                        update_policy(p, deal_id=deal.id)
                     self.refresh()
                 return
 
-            deal = add_deal_from_policy(policy)
+            if len(policies) == 1:
+                deal = add_deal_from_policy(policies[0])
+            else:
+                deal = add_deal_from_policies(policies)
             self.refresh()
             dlg = DealDetailView(deal, parent=self)
             dlg.exec()
@@ -197,8 +210,8 @@ class PolicyTableView(BaseTableView):
             show_error(str(e))
 
     def _on_link_deal(self):
-        policy = self.get_selected()
-        if not policy:
+        policies = self.get_selected_multiple()
+        if not policies:
             return
         try:
             from services.deal_service import get_all_deals
@@ -214,7 +227,8 @@ class PolicyTableView(BaseTableView):
             if dlg.exec() and dlg.selected_index:
                 idx = labels.index(dlg.selected_index)
                 deal = deals[idx]
-                update_policy(policy, deal_id=deal.id)
+                for p in policies:
+                    update_policy(p, deal_id=deal.id)
                 self.refresh()
         except Exception as e:
             show_error(str(e))
