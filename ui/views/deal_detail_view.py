@@ -502,6 +502,17 @@ class DealDetailView(QDialog):
         if not tv or not tv.model:
             return
 
+        # Перемещаем столбец с заголовком в начало,
+        # как в основной таблице задач
+        try:
+            idx = tv.model.fields.index(Task.title)
+        except ValueError:
+            idx = -1
+        if idx > 0:
+            tv.model.fields.pop(idx)
+            tv.model.fields.insert(0, Task.title)
+            tv.model.layoutChanged.emit()
+
         header = tv.table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
 
