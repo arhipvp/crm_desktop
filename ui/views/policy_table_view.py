@@ -9,7 +9,7 @@ from services.policy_service import (
     attach_premium,
 )
 from PySide6.QtWidgets import QAbstractItemView
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QDate
 from ui.base.base_table_view import BaseTableView
 from ui.base.base_table_model import BaseTableModel
 from ui.common.message_boxes import confirm, show_error
@@ -166,33 +166,54 @@ class PolicyTableView(BaseTableView):
         if not policy:
             return
         try:
-            from services.deal_service import add_deal_from_policy, get_all_deals
-            from services.policy_service import update_policy
+            from ui.forms.deal_form import DealForm
             from ui.views.deal_detail_view import DealDetailView
-            from utils.name_utils import extract_surname
+            from services.policy_service import update_policy
 
-            if confirm("Привязать полис к существующей сделке?"):
-                deals = list(get_all_deals())
-                if not deals:
-                    show_error("Нет доступных сделок")
-                    return
+            form = DealForm(parent=self)
+            form.refresh_client_combo(policy.client_id)
 
-                labels = [f"{d.client.name} - {d.description}" for d in deals]
-                dlg = SearchDialog(labels, parent=self)
-                surname = extract_surname(policy.client.name)
-                if surname:
-                    dlg.search.setText(surname)
-                if dlg.exec() and dlg.selected_index:
-                    idx = labels.index(dlg.selected_index)
-                    deal = deals[idx]
+            if "start_date" in form.fields and policy.start_date:
+                form.fields["start_date"].setDate(
+                    QDate(
+                        policy.start_date.year,
+                        policy.start_date.month,
+                        policy.start_date.day,
+                    )
+                )
+
+            parts = []
+            if policy.insurance_type:
+                parts.append(policy.insurance_type)
+            if policy.vehicle_brand:
+                brand = policy.vehicle_brand
+                if policy.vehicle_model:
+                    brand += f" {policy.vehicle_model}"
+                parts.append(brand)
+            description = " ".join(parts).strip() or f"Из полиса {policy.policy_number}"
+
+            if "description" in form.fields:
+                form.fields["description"].setText(description)
+
+            info_parts = []
+            if policy.policy_number:
+                info_parts.append(policy.policy_number)
+            info_parts.extend(parts)
+            policy_info = " ".join(info_parts).strip()
+            calc_text = (
+                "Автоматически сгенеррированая сделка из полиса "
+                f"{policy_info}"
+            )
+            if "calculations" in form.fields:
+                form.fields["calculations"].setText(calc_text)
+
+            if form.exec():
+                deal = getattr(form, "saved_instance", None)
+                if deal:
                     update_policy(policy, deal_id=deal.id)
                     self.refresh()
-                return
-
-            deal = add_deal_from_policy(policy)
-            self.refresh()
-            dlg = DealDetailView(deal, parent=self)
-            dlg.exec()
+                    dlg = DealDetailView(deal, parent=self)
+                    dlg.exec()
         except Exception as e:
             show_error(str(e))
 
