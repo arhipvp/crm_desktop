@@ -9,7 +9,7 @@ from services.policy_service import (
     attach_premium,
 )
 from PySide6.QtWidgets import QAbstractItemView
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QDate
 from ui.base.base_table_view import BaseTableView
 from ui.base.base_table_model import BaseTableModel
 from ui.common.message_boxes import confirm, show_error
@@ -166,13 +166,10 @@ class PolicyTableView(BaseTableView):
         if not policies:
             return
         try:
-            from services.deal_service import (
-                add_deal_from_policy,
-                add_deal_from_policies,
-                get_all_deals,
-            )
+            from services.deal_service import get_all_deals
             from services.policy_service import update_policy
             from ui.views.deal_detail_view import DealDetailView
+            from ui.forms.deal_form import DealForm
             from utils.name_utils import extract_surname
 
             question = (
@@ -199,13 +196,45 @@ class PolicyTableView(BaseTableView):
                     self.refresh()
                 return
 
-            if len(policies) == 1:
-                deal = add_deal_from_policy(policies[0])
-            else:
-                deal = add_deal_from_policies(policies)
-            self.refresh()
-            dlg = DealDetailView(deal, parent=self)
-            dlg.exec()
+            first = policies[0]
+            form = DealForm(parent=self)
+            form.refresh_client_combo(first.client_id)
+
+            if first.start_date:
+                form.fields["start_date"].setDate(
+                    QDate(
+                        first.start_date.year,
+                        first.start_date.month,
+                        first.start_date.day,
+                    )
+                )
+
+            parts: list[str] = []
+            if first.insurance_type:
+                parts.append(first.insurance_type)
+            if first.vehicle_brand:
+                brand = first.vehicle_brand
+                if first.vehicle_model:
+                    brand += f" {first.vehicle_model}"
+                parts.append(brand)
+            description = " ".join(parts).strip() or f"Из полиса {first.policy_number}"
+            form.fields["description"].setText(description)
+
+            policy_numbers = ", ".join(p.policy_number for p in policies if p.policy_number)
+            calc_text = (
+                "Автоматически сгенеррированая сделка из полиса "
+                f"{policy_numbers}"
+            )
+            form.fields["calculations"].setText(calc_text)
+
+            if form.exec():
+                deal = getattr(form, "saved_instance", None)
+                if deal:
+                    for p in policies:
+                        update_policy(p, deal_id=deal.id)
+                    self.refresh()
+                    dlg = DealDetailView(deal, parent=self)
+                    dlg.exec()
         except Exception as e:
             show_error(str(e))
 
