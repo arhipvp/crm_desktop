@@ -12,8 +12,6 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
-    QGroupBox,
-    QSplitter,
     QSizePolicy,
     QTabWidget,
     QTextEdit,
@@ -22,6 +20,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QHeaderView,
     QMessageBox,
+    QToolButton,
 )
 from PySide6.QtGui import (
     QSyntaxHighlighter,
@@ -102,6 +101,34 @@ def _with_day_separators(text: str | None) -> str:
     return "\n".join(result)
 
 
+class CollapsibleWidget(QWidget):
+    """Простая collapsible-панель с кнопкой раскрытия."""
+
+    def __init__(self, title: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.toggle = QToolButton(text=title, checkable=True, checked=True)
+        self.toggle.setStyleSheet("QToolButton { border: none; }")
+        self.toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.toggle.setArrowType(Qt.DownArrow)
+        self.toggle.clicked.connect(self._on_toggled)
+
+        self.content = QWidget()
+        self.content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.toggle)
+        layout.addWidget(self.content)
+
+    def setContentLayout(self, layout: QVBoxLayout | QFormLayout | QHBoxLayout) -> None:
+        self.content.setLayout(layout)
+
+    def _on_toggled(self, checked: bool) -> None:
+        self.content.setVisible(checked)
+        self.toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
+
+
 class DealDetailView(QDialog):
     SETTINGS_KEY = "deal_detail_view"
 
@@ -137,41 +164,17 @@ class DealDetailView(QDialog):
         self.layout.addLayout(self.kpi_layout)
         self._init_kpi_panel()
 
-        # Основная область с разделением на информацию и остальные вкладки
-        self.main_splitter = QSplitter(Qt.Horizontal)
-        self.layout.addWidget(self.main_splitter, stretch=1)
-
-        self.info_scroll = QScrollArea()
-        self.info_scroll.setWidgetResizable(True)
-        self.info_container = QWidget()
-        self.info_layout = QVBoxLayout(self.info_container)
-        self.info_scroll.setWidget(self.info_container)
-        self.main_splitter.addWidget(self.info_scroll)
-
+        # Основные вкладки
         self.tabs = QTabWidget()
-        self.main_splitter.addWidget(self.tabs)
-        self.main_splitter.setStretchFactor(0, 0)
-        self.main_splitter.setStretchFactor(1, 1)
+        self.layout.addWidget(self.tabs, stretch=1)
 
         self._init_tabs()
         self.tabs.currentChanged.connect(self._on_tab_changed)
-        self._update_splitter_orientation()
 
         # Быстрые действия
         self._init_actions()
         self._register_shortcuts()
         self._load_settings()
-
-    def _update_splitter_orientation(self) -> None:
-        """Switch to vertical layout on narrow screens."""
-        if self.width() < 1100:
-            self.main_splitter.setOrientation(Qt.Vertical)
-        else:
-            self.main_splitter.setOrientation(Qt.Horizontal)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._update_splitter_orientation()
 
     def _on_tab_changed(self, index: int) -> None:
         """Refresh data when switching between tabs."""
@@ -227,16 +230,18 @@ class DealDetailView(QDialog):
             self.tabs.removeTab(0)
             w.deleteLater()
 
-        # 1) Информация — теперь находится в отдельной панели слева
-        main_layout = self.info_layout
-        while main_layout.count():
-            item = main_layout.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
-        main_layout.setContentsMargins(0, 0, 0, 0)
+        # ---------- Главная вкладка ---------------------------------
+        deal_tab = QWidget()
+        deal_layout = QVBoxLayout(deal_tab)
+        deal_layout.setContentsMargins(0, 0, 0, 0)
 
-        info_group = QGroupBox("Основная информация")
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+
+        info_panel = CollapsibleWidget("Основная информация")
         form = QFormLayout()
         form.setVerticalSpacing(2)
         form.setHorizontalSpacing(10)
@@ -260,27 +265,23 @@ class DealDetailView(QDialog):
         start_label = tight_label(format_date(self.instance.start_date))
         form.addRow("Старт:", start_label)
 
-        # Статус — редактируемое текстовое поле
         self.status_edit = QTextEdit(self.instance.status)
         self.status_edit.setFixedHeight(40)
         form.addRow("Статус:", self.status_edit)
 
-        # Описание — только для чтения
         self.desc_edit = QTextEdit(self.instance.description)
         self.desc_edit.setFixedHeight(60)
         self.desc_edit.setReadOnly(True)
         form.addRow("Описание:", self.desc_edit)
 
-        # Напоминание — редактируемая дата
         from ui.common.date_utils import TypableDateEdit
-
         self.reminder_date = TypableDateEdit(self.instance.reminder_date)
         form.addRow("Напоминание:", self.reminder_date)
 
-        info_group.setLayout(form)
+        info_panel.setContentLayout(form)
+        container_layout.addWidget(info_panel)
 
-        # ---- Журнал -------------------------------------------------
-        journal_group = QGroupBox("Журнал")
+        journal_panel = CollapsibleWidget("Журнал")
         journal_form = QFormLayout()
 
         self.calc_append = QTextEdit()
@@ -292,72 +293,40 @@ class DealDetailView(QDialog):
         self.calc_view.setReadOnly(True)
         self.calc_view.setFixedHeight(140)
         self.calc_view.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self.calc_view.setPlainText(
-            _with_day_separators(self.instance.calculations)
-        )
+        self.calc_view.setPlainText(_with_day_separators(self.instance.calculations))
         self._calc_highlighter = _CalcHighlighter(self.calc_view.document())
         journal_form.addRow("История:", self.calc_view)
-
-        journal_group.setLayout(journal_form)
 
         self.btn_exec_task = styled_button("📤 Новая задача исполнителю")
         self.btn_exec_task.clicked.connect(self._on_new_exec_task)
 
-        info_tab = QWidget()
-        info_tab_layout = QVBoxLayout(info_tab)
-        info_tab_layout.setContentsMargins(0, 0, 0, 0)
-        info_tab_layout.addWidget(info_group)
+        j_layout = QVBoxLayout()
+        j_layout.addLayout(journal_form)
+        j_layout.addWidget(self.btn_exec_task, alignment=Qt.AlignLeft)
+        journal_panel.setContentLayout(j_layout)
+        container_layout.addWidget(journal_panel)
 
-        journal_tab = QWidget()
-        journal_layout = QVBoxLayout(journal_tab)
-        journal_layout.setContentsMargins(0, 0, 0, 0)
-        journal_layout.addWidget(journal_group)
-        journal_layout.addWidget(self.btn_exec_task, alignment=Qt.AlignLeft)
-
-        info_tabs = QTabWidget()
-        info_tabs.addTab(info_tab, "Информация")
-        info_tabs.addTab(journal_tab, "Журнал")
-
-        # ---- Расчёты ------------------------------------------------
         from ui.views.calculation_table_view import CalculationTableView
-
-        calc_group = QGroupBox("Расчёты")
-        calc_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        calc_box = QVBoxLayout()
-        btn_calc = styled_button(
-            "➕ Запись",
-            tooltip="Добавить расчёт",
-            shortcut="Ctrl+Shift+A",
-        )
+        calc_panel = CollapsibleWidget("Расчёты")
+        calc_layout = QVBoxLayout()
+        btn_calc = styled_button("➕ Запись", tooltip="Добавить расчёт", shortcut="Ctrl+Shift+A")
         btn_calc.clicked.connect(self._on_add_calculation)
         self._add_shortcut("Ctrl+Shift+A", self._on_add_calculation)
-        calc_box.addWidget(btn_calc, alignment=Qt.AlignLeft)
+        calc_layout.addWidget(btn_calc, alignment=Qt.AlignLeft)
         self.calc_table = CalculationTableView(parent=self, deal_id=self.instance.id)
         self.calc_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        calc_box.addWidget(self.calc_table, 1)
-        calc_group.setLayout(calc_box)
+        calc_layout.addWidget(self.calc_table, 1)
+        calc_panel.setContentLayout(calc_layout)
+        container_layout.addWidget(calc_panel)
 
-        # объединяем вкладки информации и таблицу расчётов сплиттером,
-        # чтобы пользователь мог менять их высоту
-        upper_widget = QWidget()
-        upper_layout = QVBoxLayout(upper_widget)
-        upper_layout.setContentsMargins(0, 0, 0, 0)
-        upper_layout.addWidget(info_tabs)
+        container_layout.addStretch()
+        scroll.setWidget(container)
+        deal_layout.addWidget(scroll, 1)
 
-        self.calc_splitter = QSplitter(Qt.Vertical)
-        self.calc_splitter.addWidget(upper_widget)
-        self.calc_splitter.addWidget(calc_group)
-        self.calc_splitter.setStretchFactor(1, 1)
-
-        main_layout.addWidget(self.calc_splitter, 1)
-
-        # Кнопки сохранения и обновления
         btn_save = styled_button("💾 Сохранить изменения", shortcut="Ctrl+Enter")
         btn_save.clicked.connect(self._on_inline_save)
         self._add_shortcut("Ctrl+Enter", self._on_inline_save)
-        btn_save_close = styled_button(
-            "💾 Сохранить и закрыть", shortcut="Ctrl+Shift+Enter"
-        )
+        btn_save_close = styled_button("💾 Сохранить и закрыть", shortcut="Ctrl+Shift+Enter")
         btn_save_close.clicked.connect(self._on_save_and_close)
         btn_refresh = styled_button("🔄 Обновить", shortcut="F5")
         btn_refresh.clicked.connect(self._on_refresh)
@@ -366,77 +335,53 @@ class DealDetailView(QDialog):
         btn_row.addWidget(btn_save)
         btn_row.addWidget(btn_save_close)
         btn_row.addWidget(btn_refresh)
-        main_layout.addLayout(btn_row)
+        deal_layout.addLayout(btn_row)
 
-        # 3) Полисы
+        self.tabs.addTab(deal_tab, "Сделка")
 
+        # ---------- Полисы -----------------------------------------
         pol_tab = QWidget()
         pol_l = QVBoxLayout(pol_tab)
-
         hlayout = QHBoxLayout()
         btn_pol = styled_button("➕ Полис", tooltip="Добавить полис", shortcut="Ctrl+N")
         btn_pol.clicked.connect(self._on_add_policy)
         self._add_shortcut("Ctrl+N", self._on_add_policy)
         hlayout.addWidget(btn_pol)
-
-        btn_import = styled_button(
-            "📥 Импорт из JSON", tooltip="Импорт полиса по данным"
-        )
+        btn_import = styled_button("📥 Импорт из JSON", tooltip="Импорт полиса по данным")
         btn_import.clicked.connect(self._on_import_policy_json)
         hlayout.addWidget(btn_import)
-
         btn_ai = styled_button("🤖 Обработать с ИИ", tooltip="Распознать файлы полисов")
         btn_ai.clicked.connect(self._on_process_policies_ai)
         hlayout.addWidget(btn_ai)
-
         btn_ai_text = styled_button("🤖 Из текста", tooltip="Распознать текст полиса")
         btn_ai_text.clicked.connect(self._on_process_policy_text_ai)
         hlayout.addWidget(btn_ai_text)
-
         hlayout.addStretch()
         pol_l.addLayout(hlayout)
-
-        pol_view = PolicyTableView(
-            parent=self,
-            deal_id=self.instance.id,
-        )
+        pol_view = PolicyTableView(parent=self, deal_id=self.instance.id)
         pol_view.load_data()
         pol_l.addWidget(pol_view)
-
         self.pol_view = pol_view
         self.policy_tab_idx = self.tabs.addTab(pol_tab, "Полисы")
 
-        # 3) Платежи
+        # ---------- Платежи ---------------------------------------
         pay_tab = QWidget()
         pay_l = QVBoxLayout(pay_tab)
-        btn_pay = styled_button(
-            "➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+Shift+N"
-        )
+        btn_pay = styled_button("➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+Shift+N")
         btn_pay.clicked.connect(self._on_add_payment)
         self._add_shortcut("Ctrl+Shift+N", self._on_add_payment)
-        payments = list(get_payments_by_deal_id(self.instance.id))
-
-        pay_view = PaymentTableView(
-            parent=self,
-            deal_id=self.instance.id,
-        )
+        pay_l.addWidget(btn_pay, alignment=Qt.AlignLeft)
+        pay_view = PaymentTableView(parent=self, deal_id=self.instance.id)
         pay_view.load_data()
         pay_l.addWidget(pay_view)
-
         self.pay_view = pay_view
         self.payment_tab_idx = self.tabs.addTab(pay_tab, "Платежи")
 
-        # 4) Доходы
+        # ---------- Доходы ---------------------------------------
         from ui.views.income_table_view import IncomeTableView
-
         income_tab = QWidget()
         income_layout = QVBoxLayout(income_tab)
-
-        btn_income = styled_button(
-            "➕ Доход",
-            tooltip="Добавить доход",
-            shortcut="Ctrl+Alt+I",
-        )
+        btn_income = styled_button("➕ Доход", tooltip="Добавить доход", shortcut="Ctrl+Alt+I")
         btn_income.clicked.connect(self._on_add_income)
         self._add_shortcut("Ctrl+Alt+I", self._on_add_income)
         has_payments = len(get_payments_by_deal_id(self.instance.id)) > 0
@@ -444,68 +389,46 @@ class DealDetailView(QDialog):
         if not has_payments:
             btn_income.setToolTip("Нет доступных платежей для привязки")
         income_layout.addWidget(btn_income, alignment=Qt.AlignLeft)
-
         income_view = IncomeTableView(parent=self, deal_id=self.instance.id)
         income_view.load_data()
         income_layout.addWidget(income_view)
-
         self.income_view = income_view
         self.income_tab_idx = self.tabs.addTab(income_tab, "Доходы")
 
-        # 5) Расходы
+        # ---------- Расходы --------------------------------------
         from ui.views.expense_table_view import ExpenseTableView
-
         expense_tab = QWidget()
         expense_layout = QVBoxLayout(expense_tab)
-        btn_expense = styled_button(
-            "➕ Расход",
-            tooltip="Добавить расход",
-            shortcut="Ctrl+Alt+X",
-        )
+        btn_expense = styled_button("➕ Расход", tooltip="Добавить расход", shortcut="Ctrl+Alt+X")
         btn_expense.clicked.connect(self._on_add_expense)
         self._add_shortcut("Ctrl+Alt+X", self._on_add_expense)
         expense_layout.addWidget(btn_expense, alignment=Qt.AlignLeft)
-
         expense_view = ExpenseTableView(parent=self, deal_id=self.instance.id)
         expense_view.load_data()
         expense_layout.addWidget(expense_view)
-
         self.expense_view = expense_view
         self.expense_tab_idx = self.tabs.addTab(expense_tab, "Расходы")
 
-        # 4) Задачи — внедряем TaskTableView с фильтром по сделке
-        # ─── Задачи ───────────────────────────────────────────
+        # ---------- Задачи ---------------------------------------
         task_tab = QWidget()
         vbox = QVBoxLayout(task_tab)
-
-        btn_add_task = styled_button(
-            "➕ Задача",
-            tooltip="Добавить задачу",
-            shortcut="Ctrl+Alt+T",
-        )
+        btn_add_task = styled_button("➕ Задача", tooltip="Добавить задачу", shortcut="Ctrl+Alt+T")
         btn_add_task.clicked.connect(self._on_add_task)
         self._add_shortcut("Ctrl+Alt+T", self._on_add_task)
         vbox.addWidget(btn_add_task, alignment=Qt.AlignLeft)
-
-        # Подгружаем ТОЛЬКО задачи этой сделки
         from services.task_service import get_tasks_by_deal
-
         tasks = list(get_tasks_by_deal(self.instance.id))
-
         task_view = TaskTableView(parent=self, deal_id=self.instance.id)
         task_view.data_loaded.connect(self._adjust_task_columns)
         vbox.addWidget(task_view)
-
         task_view.set_model_class_and_items(Task, tasks, total_count=len(tasks))
         self._adjust_task_columns()
         sel = task_view.table.selectionModel()
         if sel:
             sel.selectionChanged.connect(task_view._update_actions_state)
             task_view._update_actions_state()
-
         task_view.table.setSortingEnabled(True)
         task_view.row_double_clicked.connect(self._on_task_double_clicked)
-
         self.task_view = task_view
         self.task_tab_idx = self.tabs.addTab(task_tab, "Задачи")
 
@@ -626,22 +549,14 @@ class DealDetailView(QDialog):
                 self.restoreGeometry(base64.b64decode(geom))
             except Exception:
                 pass
-        split = st.get("splitter")
-        if split:
-            try:
-                self.main_splitter.restoreState(base64.b64decode(split))
-            except Exception:
-                pass
         idx = st.get("tab_index")
         if idx is not None and 0 <= int(idx) < self.tabs.count():
             self.tabs.setCurrentIndex(int(idx))
-        self._update_splitter_orientation()
 
     def _save_settings(self):
         """Сохраняет текущие параметры окна."""
         st = {
             "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
-            "splitter": base64.b64encode(self.main_splitter.saveState()).decode("ascii"),
             "tab_index": self.tabs.currentIndex(),
         }
         ui_settings.set_window_settings(self.SETTINGS_KEY, st)
