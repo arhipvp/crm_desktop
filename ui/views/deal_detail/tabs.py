@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
 
 from database.models import Task
 from services.payment_service import get_payments_by_deal_id
-from services.task_service import get_tasks_by_deal
 from ui.common.date_utils import TypableDateEdit, format_date
 from ui.common.styled_widgets import styled_button
 from ..calculation_table_view import CalculationTableView
@@ -212,20 +211,20 @@ class DealTabsMixin:
         # ---------- Задачи ---------------------------------------
         task_tab = QWidget()
         vbox = QVBoxLayout(task_tab)
-        btn_add_task = styled_button("➕ Задача", tooltip="Добавить задачу", shortcut="Ctrl+Alt+T")
+        btn_add_task = styled_button(
+            "➕ Задача", tooltip="Добавить задачу", shortcut="Ctrl+Alt+T"
+        )
         btn_add_task.clicked.connect(self._on_add_task)
         self._add_shortcut("Ctrl+Alt+T", self._on_add_task)
         vbox.addWidget(btn_add_task, alignment=Qt.AlignLeft)
-        tasks = list(get_tasks_by_deal(self.instance.id))
-        task_view = TaskTableView(parent=self, deal_id=self.instance.id)
+
+        task_view = TaskTableView(
+            parent=self, deal_id=self.instance.id, autoload=False
+        )
         task_view.data_loaded.connect(self._adjust_task_columns)
         vbox.addWidget(task_view)
-        task_view.set_model_class_and_items(Task, tasks, total_count=len(tasks))
-        self._adjust_task_columns()
-        sel = task_view.table.selectionModel()
-        if sel:
-            sel.selectionChanged.connect(task_view._update_actions_state)
-            task_view._update_actions_state()
+        task_view.load_data()
+        task_view._update_actions_state()
         task_view.table.setSortingEnabled(True)
         task_view.row_double_clicked.connect(self._on_task_double_clicked)
         self.task_view = task_view

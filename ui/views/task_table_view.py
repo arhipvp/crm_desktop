@@ -26,9 +26,15 @@ from ui.views.task_detail_view import TaskDetailView
 
 
 class TaskTableView(BaseTableView):
-    """Таблица задач + фильтры + кнопка отправки в Telegram‑бот."""
+    """Таблица задач + фильтры и действия отправки."""
 
-    def __init__(self, parent=None, *, deal_id: int | None = None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        deal_id: int | None = None,
+        autoload: bool = True,
+    ) -> None:
         super().__init__(
             parent=parent,
             model_class=Task,
@@ -88,7 +94,8 @@ class TaskTableView(BaseTableView):
 
         sel = self.table.selectionModel()
         sel.selectionChanged.connect(self._update_actions_state)
-        self.load_data()
+        if autoload:
+            self.load_data()
 
     def _update_actions_state(self, *_):
         has_sel = bool(self.table.selectionModel().selectedRows())
@@ -191,8 +198,6 @@ class TaskTableView(BaseTableView):
     def load_data(self) -> None:
         logger.debug("📥 Используется метод загрузки: get_tasks_page")
 
-        # self.table.setModel(None)  # сброс до загрузки данных
-
         f = self.get_filters()
         logger.debug(
             "📋 Сортировка задач: field=%s, order=%s", self.sort_field, self.sort_order
@@ -234,16 +239,16 @@ class TaskTableView(BaseTableView):
             total = build_task_query(**f).count()
 
         self.set_model_class_and_items(Task, list(items), total_count=total)
-        self.table.sortByColumn(
-            self.get_column_index(self.sort_field),
-            Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder,
+
+        # сортировка без повторной загрузки данных
+        header = self.table.horizontalHeader()
+        self.current_sort_column = self.get_column_index(self.sort_field)
+        self.current_sort_order = (
+            Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder
         )
-
-        self.proxy_model.setSourceModel(self.model)
-        # self.table.setModel(self.proxy_model)
-
-        # DEBUG: поля модели
-        logger.debug("TaskTableView fields: %s", [f.name for f in self.model.fields])
+        header.blockSignals(True)
+        self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
+        header.blockSignals(False)
 
         # ───── ВАЖНО: переносим title в начало ─────
         if self.model:
