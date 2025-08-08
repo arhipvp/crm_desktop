@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from database.models import Task
-from services.deal_service import get_payments_by_deal_id
+from services.payment_service import get_payments_by_deal_id
 from services.task_service import get_tasks_by_deal
 from ui.common.date_utils import TypableDateEdit, format_date
 from ui.common.styled_widgets import styled_button
