@@ -8,7 +8,7 @@ from services.deal_service import build_deal_query, get_deals_page, mark_deal_de
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.deal_form import DealForm
-from ui.views.deal_detail_view import DealDetailView
+from ui.views.deal_detail import DealDetailView
 
 
 class DealTableModel(BaseTableModel):

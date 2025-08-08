@@ -168,7 +168,7 @@ class PolicyTableView(BaseTableView):
         try:
             from services.deal_service import get_all_deals
             from services.policy_service import update_policy
-            from ui.views.deal_detail_view import DealDetailView
+            from ui.views.deal_detail import DealDetailView
             from ui.forms.deal_form import DealForm
             from utils.name_utils import extract_surname
 

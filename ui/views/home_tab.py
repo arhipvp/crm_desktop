@@ -29,7 +29,7 @@ from services.dashboard_service import (
 
 from ui.views.task_detail_view import TaskDetailView
 from ui.views.policy_detail_view import PolicyDetailView
-from ui.views.deal_detail_view import DealDetailView
+from ui.views.deal_detail import DealDetailView
 
 
 class HomeTab(QWidget):
