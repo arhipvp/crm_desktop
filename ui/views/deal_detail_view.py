@@ -303,6 +303,21 @@ class DealDetailView(QDialog):
         self.btn_exec_task = styled_button("📤 Новая задача исполнителю")
         self.btn_exec_task.clicked.connect(self._on_new_exec_task)
 
+        info_tab = QWidget()
+        info_tab_layout = QVBoxLayout(info_tab)
+        info_tab_layout.setContentsMargins(0, 0, 0, 0)
+        info_tab_layout.addWidget(info_group)
+
+        journal_tab = QWidget()
+        journal_layout = QVBoxLayout(journal_tab)
+        journal_layout.setContentsMargins(0, 0, 0, 0)
+        journal_layout.addWidget(journal_group)
+        journal_layout.addWidget(self.btn_exec_task, alignment=Qt.AlignLeft)
+
+        info_tabs = QTabWidget()
+        info_tabs.addTab(info_tab, "Информация")
+        info_tabs.addTab(journal_tab, "Журнал")
+
         # ---- Расчёты ------------------------------------------------
         from ui.views.calculation_table_view import CalculationTableView
 
@@ -322,14 +337,12 @@ class DealDetailView(QDialog):
         calc_box.addWidget(self.calc_table, 1)
         calc_group.setLayout(calc_box)
 
-        # объединяем информационные блоки и таблицу расчётов сплиттером,
+        # объединяем вкладки информации и таблицу расчётов сплиттером,
         # чтобы пользователь мог менять их высоту
         upper_widget = QWidget()
         upper_layout = QVBoxLayout(upper_widget)
         upper_layout.setContentsMargins(0, 0, 0, 0)
-        upper_layout.addWidget(info_group)
-        upper_layout.addWidget(journal_group)
-        upper_layout.addWidget(self.btn_exec_task, alignment=Qt.AlignLeft)
+        upper_layout.addWidget(info_tabs)
 
         self.calc_splitter = QSplitter(Qt.Vertical)
         self.calc_splitter.addWidget(upper_widget)
