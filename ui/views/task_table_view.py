@@ -291,10 +291,12 @@ class TaskTableView(BaseTableView):
                 self.model.setData(
                     self.model.index(row, idx_policy), policy_txt, role=Qt.DisplayRole
                 )
-        # восстановление сортировки после обновления модели
+        # восстановление индикатора сортировки без вызова сигнала
         col = self.get_column_index(self.sort_field)
         order = Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder
-        self.table.horizontalHeader().setSortIndicator(col, order)
+        header.blockSignals(True)
+        header.setSortIndicator(col, order)
+        header.blockSignals(False)
 
         self._update_actions_state()
 
