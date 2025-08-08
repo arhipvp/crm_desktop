@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
-    QDialogButtonBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -20,12 +19,8 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QHeaderView,
     QMessageBox,
-    QToolButton,
 )
 from PySide6.QtGui import (
-    QSyntaxHighlighter,
-    QTextCharFormat,
-    QColor,
     QFontDatabase,
     QFont,
     QShortcut,
@@ -59,75 +54,14 @@ from ui.forms.income_form import IncomeForm
 from ui.forms.payment_form import PaymentForm
 from ui.forms.policy_form import PolicyForm
 from ui.forms.task_form import TaskForm
-from ui.views.payment_table_view import PaymentTableView
-from ui.views.policy_table_view import PolicyTableView
-from ui.views.task_table_view import TaskTableView  # ← наш переиспользуемый вид задач
+from ..payment_table_view import PaymentTableView
+from ..policy_table_view import PolicyTableView
+from ..task_table_view import TaskTableView  # ← наш переиспользуемый вид задач
 from ui import settings as ui_settings
 
 
-class _CalcHighlighter(QSyntaxHighlighter):
-    """Highlight timestamps at the beginning of each line."""
-
-    _regex = re.compile(r"^\[\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}\]")
-
-    def highlightBlock(self, text: str) -> None:
-        m = self._regex.match(text)
-        if m:
-            fmt = QTextCharFormat()
-            fmt.setForeground(QColor("blue"))
-            fmt.setFontWeight(QFont.Bold)
-            self.setFormat(m.start(), m.end() - m.start(), fmt)
-
-
-def _with_day_separators(text: str | None) -> str:
-    """Insert horizontal separators between different days in the journal."""
-    if not text:
-        return "\u2014"  # em dash as empty placeholder
-
-    lines = text.splitlines()
-    result: list[str] = []
-    prev_date = None
-    date_rx = re.compile(r"\[(\d{2}\.\d{2}\.\d{4})")
-
-    for line in lines:
-        m = date_rx.match(line)
-        if m:
-            cur_date = m.group(1)
-            if prev_date and cur_date != prev_date:
-                result.append("-" * 40)
-            prev_date = cur_date
-        result.append(line)
-
-    return "\n".join(result)
-
-
-class CollapsibleWidget(QWidget):
-    """Простая collapsible-панель с кнопкой раскрытия."""
-
-    def __init__(self, title: str, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.toggle = QToolButton(text=title, checkable=True, checked=True)
-        self.toggle.setStyleSheet("QToolButton { border: none; }")
-        self.toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-        self.toggle.setArrowType(Qt.DownArrow)
-        self.toggle.clicked.connect(self._on_toggled)
-
-        self.content = QWidget()
-        self.content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-
-        layout = QVBoxLayout(self)
-        layout.setSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.toggle)
-        layout.addWidget(self.content)
-
-    def setContentLayout(self, layout: QVBoxLayout | QFormLayout | QHBoxLayout) -> None:
-        self.content.setLayout(layout)
-
-    def _on_toggled(self, checked: bool) -> None:
-        self.content.setVisible(checked)
-        self.toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
-
+from .widgets import _CalcHighlighter, _with_day_separators, CollapsibleWidget
+from .dialogs import CloseDealDialog
 
 class DealDetailView(QDialog):
     SETTINGS_KEY = "deal_detail_view"
@@ -306,7 +240,7 @@ class DealDetailView(QDialog):
         journal_panel.setContentLayout(j_layout)
         container_layout.addWidget(journal_panel)
 
-        from ui.views.calculation_table_view import CalculationTableView
+        from ..calculation_table_view import CalculationTableView
         calc_panel = CollapsibleWidget("Расчёты")
         calc_layout = QVBoxLayout()
         btn_calc = styled_button("➕ Запись", tooltip="Добавить расчёт", shortcut="Ctrl+Shift+A")
@@ -378,7 +312,7 @@ class DealDetailView(QDialog):
         self.payment_tab_idx = self.tabs.addTab(pay_tab, "Платежи")
 
         # ---------- Доходы ---------------------------------------
-        from ui.views.income_table_view import IncomeTableView
+        from ..income_table_view import IncomeTableView
         income_tab = QWidget()
         income_layout = QVBoxLayout(income_tab)
         btn_income = styled_button("➕ Доход", tooltip="Добавить доход", shortcut="Ctrl+Alt+I")
@@ -396,7 +330,7 @@ class DealDetailView(QDialog):
         self.income_tab_idx = self.tabs.addTab(income_tab, "Доходы")
 
         # ---------- Расходы --------------------------------------
-        from ui.views.expense_table_view import ExpenseTableView
+        from ..expense_table_view import ExpenseTableView
         expense_tab = QWidget()
         expense_layout = QVBoxLayout(expense_tab)
         btn_expense = styled_button("➕ Расход", tooltip="Добавить расход", shortcut="Ctrl+Alt+X")
@@ -438,15 +372,15 @@ class DealDetailView(QDialog):
         if not tv or not tv.model:
             return
 
-        # Перемещаем столбец с заголовком в начало,
+        # Перемещаем столбец с заголовком на вторую позицию,
         # как в основной таблице задач
         try:
             idx = tv.model.fields.index(Task.title)
         except ValueError:
             idx = -1
-        if idx > 0:
+        if idx >= 0 and idx != 1:
             tv.model.fields.pop(idx)
-            tv.model.fields.insert(0, Task.title)
+            tv.model.fields.insert(1, Task.title)
             tv.model.layoutChanged.emit()
 
         header = tv.table.horizontalHeader()
@@ -951,22 +885,3 @@ class DealDetailView(QDialog):
         events.sort(key=lambda e: e[1])
         return events
 
-
-class CloseDealDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Закрытие сделки")
-        self.setModal(True)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Укажите причину закрытия:"))
-        self.reason_edit = QTextEdit()
-        layout.addWidget(self.reason_edit)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    def get_reason(self):
-        return self.reason_edit.toPlainText().strip()
