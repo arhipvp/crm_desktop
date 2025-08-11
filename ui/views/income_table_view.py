@@ -1,6 +1,7 @@
 import logging
 from peewee import prefetch
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QHeaderView, QAbstractItemView
 
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
@@ -55,12 +56,18 @@ class IncomeTableModel(BaseTableModel):
 
         obj = self.objects[index.row()]
         col = index.column()
-        if role != Qt.DisplayRole:
-            return None
 
         payment = getattr(obj, "payment", None)
         policy = getattr(payment, "policy", None) if payment else None
         deal = getattr(policy, "deal", None) if policy else None
+
+        if role == Qt.BackgroundRole:
+            if policy and (policy.contractor or "").strip():
+                return QBrush(QColor("#ffcccc"))
+            return None
+
+        if role != Qt.DisplayRole:
+            return None
 
         if col == 0:
             return policy.policy_number if policy else "—"
