@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QFont
 
 from ui.base.base_table_model import BaseTableModel
 
@@ -38,6 +38,10 @@ class DealTableModel(BaseTableModel):
         if not index.isValid():
             return None
         obj = self.objects[index.row()]
+        if role == Qt.FontRole and getattr(obj, "is_deleted", False):
+            font = QFont()
+            font.setStrikeOut(True)
+            return font
         if role == Qt.ForegroundRole and getattr(obj, "_executor", None):
             return QColor("red")
         col = index.column()
