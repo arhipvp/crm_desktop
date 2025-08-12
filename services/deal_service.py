@@ -367,9 +367,12 @@ def get_deals_page(
     **filters,
 ) -> ModelSelect:
     """Вернуть страницу сделок с указанными фильтрами."""
-    query = build_deal_query(column_filters=column_filters, **filters)
-
-    query = apply_deal_filters(query, search_text, show_deleted, column_filters)
+    query = build_deal_query(
+        search_text=search_text,
+        show_deleted=show_deleted,
+        column_filters=column_filters,
+        **filters,
+    )
 
     # 👉 Только один order_by
     if order_by and hasattr(Deal, order_by):
