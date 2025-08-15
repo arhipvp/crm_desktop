@@ -374,15 +374,15 @@ def get_deals_page(
         **filters,
     )
 
-    # 👉 Только один order_by
+    # 👉 Стабильная сортировка
     if order_by and hasattr(Deal, order_by):
         order_field = getattr(Deal, order_by)
         if order_dir == "desc":
-            query = query.order_by(order_field.desc())
+            query = query.order_by(order_field.desc(), Deal.id.desc())
         else:
-            query = query.order_by(order_field.asc())
+            query = query.order_by(order_field.asc(), Deal.id.asc())
     else:
-        query = query.order_by(Deal.start_date.desc())
+        query = query.order_by(Deal.start_date.desc(), Deal.id.desc())
 
     from peewee import prefetch
     from database.models import DealExecutor, Executor
