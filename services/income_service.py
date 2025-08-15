@@ -8,6 +8,8 @@ from peewee import SqliteDatabase
 from database.db import db
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
 from services.payment_service import get_payment_by_id
+from services import executor_service as es
+from services.telegram_service import notify_executor
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +116,24 @@ def get_incomes_page(
     offset = (page - 1) * per_page
     return query.limit(per_page).offset(offset)
 
+# Уведомления
+def _notify_income_received(income: Income) -> None:
+    payment = income.payment
+    if not payment:
+        return
+    policy = payment.policy
+    if not policy or not policy.deal_id:
+        return
+    ex = es.get_executor_for_deal(policy.deal_id)
+    if not ex or not es.is_approved(ex.tg_id):
+        return
+    deal = policy.deal
+    desc = f" — {deal.description}" if deal and deal.description else ""
+    text = (
+        f"💰 По вашей сделке #{deal.id}{desc} поступило вознаграждение {income.amount:g} по полису {policy.policy_number}"
+    )
+    notify_executor(ex.tg_id, text)
+
 
 # ─────────────────────────── Добавление ───────────────────────────
 
@@ -141,6 +161,8 @@ def add_income(**kwargs):
         logger.error("❌ Ошибка при создании дохода: %s", e)
         raise
 
+    if income.received_date:
+        _notify_income_received(income)
     return income
 
 
@@ -169,12 +191,15 @@ def update_income(income: Income, **kwargs):
     if not updates:
         return income
 
+    old_received = income.received_date
     for key, value in updates.items():
         setattr(income, key, value)
     logger.debug("💬 update_income: received_date=%r", updates.get("received_date"))
     logger.debug("💬 final obj: income.received_date = %r", income.received_date)
 
     income.save()
+    if old_received is None and income.received_date:
+        _notify_income_received(income)
     return income
 
 
