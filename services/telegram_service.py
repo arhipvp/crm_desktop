@@ -73,3 +73,15 @@ def notify_admin(text: str) -> None:
     except Exception as exc:
         logging.getLogger(__name__).warning("Failed to notify admin: %s", exc)
 
+
+def notify_executor(tg_id: int, text: str) -> None:
+    """Отправить уведомление исполнителю."""
+    if not _bot or not tg_id:
+        return
+    try:
+        _bot.send_message(tg_id, text, parse_mode=constants.ParseMode.HTML)
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Failed to notify executor %s: %s", tg_id, exc
+        )
+

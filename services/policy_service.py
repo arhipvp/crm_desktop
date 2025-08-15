@@ -11,6 +11,8 @@ from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.folder_utils import create_policy_folder, open_folder
 from services.payment_service import add_payment
+from services import executor_service as es
+from services.telegram_service import notify_executor
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +237,22 @@ def mark_policies_renewed(policy_ids: list[int]) -> int:
     )
 
 
+# Уведомления
+def _notify_policy_added(policy: Policy) -> None:
+    """Уведомить исполнителя сделки о добавленном полисе."""
+    if not policy.deal_id:
+        return
+    ex = es.get_executor_for_deal(policy.deal_id)
+    if not ex or not es.is_approved(ex.tg_id):
+        return
+    deal = get_deal_by_id(policy.deal_id)
+    if not deal:
+        return
+    desc = f" — {deal.description}" if deal.description else ""
+    text = f"📄 В вашу сделку #{deal.id}{desc} добавлен полис {policy.policy_number}"
+    notify_executor(ex.tg_id, text)
+
+
 # ─────────────────────────── Добавление ───────────────────────────
 
 
@@ -344,6 +362,7 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
             first_payment.actual_payment_date = first_payment.payment_date
             first_payment.save()
 
+    _notify_policy_added(policy)
     return policy
 
 
@@ -381,6 +400,7 @@ def update_policy(policy: Policy, *, first_payment_paid: bool = False, **kwargs)
     updates = {}
 
     old_number = policy.policy_number
+    old_deal_id = policy.deal_id
     old_deal_desc = policy.deal.description if policy.deal_id else None
     old_client_name = policy.client.name
 
@@ -476,6 +496,8 @@ def update_policy(policy: Policy, *, first_payment_paid: bool = False, **kwargs)
             first_payment.actual_payment_date = first_payment.payment_date
             first_payment.save()
 
+    if policy.deal_id and policy.deal_id != old_deal_id:
+        _notify_policy_added(policy)
     return policy
 
 

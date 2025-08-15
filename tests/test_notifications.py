@@ -1,0 +1,92 @@
+import datetime
+import pytest
+from peewee import SqliteDatabase
+
+from database.db import db
+from database.models import (
+    Client,
+    Deal,
+    Policy,
+    Payment,
+    Executor,
+    DealExecutor,
+    Income,
+)
+from services import policy_service as ps
+from services import executor_service as es
+import services.telegram_service as ts
+import services.income_service as ins
+
+
+@pytest.fixture()
+def setup_db(monkeypatch):
+    test_db = SqliteDatabase(':memory:')
+    db.initialize(test_db)
+    test_db.create_tables([Client, Deal, Policy, Payment, Executor, DealExecutor, Income])
+    monkeypatch.setattr(ps, "create_policy_folder", lambda *a, **k: None)
+    monkeypatch.setattr(ps, "open_folder", lambda *a, **k: None)
+    yield
+    test_db.drop_tables([Client, Deal, Policy, Payment, Executor, DealExecutor, Income])
+    test_db.close()
+
+
+def test_notify_on_policy_add(setup_db, monkeypatch):
+    client = Client.create(name='C')
+    deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
+    executor = Executor.create(full_name='E', tg_id=1, is_active=True)
+    DealExecutor.create(deal=deal, executor=executor, assigned_date=datetime.date.today())
+
+    sent = {}
+    monkeypatch.setattr(ps, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
+    monkeypatch.setattr(ps, "add_payment", lambda **kw: Payment.create(policy=kw['policy'], amount=kw['amount'], payment_date=kw['payment_date']))
+
+    ps.add_policy(
+        policy_number='P',
+        start_date=datetime.date.today(),
+        end_date=datetime.date.today(),
+        client=client,
+        deal=deal,
+        payments=[{"amount": 0, "payment_date": datetime.date.today()}],
+    )
+
+    assert sent.get('tg_id') == executor.tg_id
+    assert 'P' in sent.get('text', '')
+
+
+def test_notify_on_unassign(setup_db, monkeypatch):
+    client = Client.create(name='C')
+    deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
+    executor = Executor.create(full_name='E', tg_id=1, is_active=True)
+    DealExecutor.create(deal=deal, executor=executor, assigned_date=datetime.date.today())
+
+    sent = {}
+    monkeypatch.setattr(ts, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
+
+    es.unassign_executor(deal.id)
+
+    assert sent.get('tg_id') == executor.tg_id
+    assert str(deal.id) in sent.get('text', '')
+
+
+def test_notify_on_income_received(setup_db, monkeypatch):
+    client = Client.create(name='C')
+    deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
+    executor = Executor.create(full_name='E', tg_id=1, is_active=True)
+    DealExecutor.create(deal=deal, executor=executor, assigned_date=datetime.date.today())
+
+    policy = Policy.create(
+        client=client,
+        deal=deal,
+        policy_number='P',
+        start_date=datetime.date.today(),
+        end_date=datetime.date.today(),
+    )
+    payment = Payment.create(policy=policy, amount=0, payment_date=datetime.date.today())
+
+    sent = {}
+    monkeypatch.setattr(ins, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
+
+    ins.add_income(payment=payment, amount=10, received_date=datetime.date.today())
+
+    assert sent.get('tg_id') == executor.tg_id
+    assert 'P' in sent.get('text', '')

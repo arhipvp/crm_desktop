@@ -60,17 +60,35 @@ def approve_executor(tg_id: int) -> None:
 def assign_executor(deal_id: int, tg_id: int, note: str | None = None) -> None:
     """Привязать исполнителя к сделке."""
     executor = ensure_executor(tg_id)
+    old_executor = get_executor_for_deal(deal_id)
     with db.atomic():
         DealExecutor.delete().where(DealExecutor.deal_id == deal_id).execute()
-        DealExecutor.create(deal=deal_id, executor=executor, assigned_date=date.today(), note=note)
+        DealExecutor.create(
+            deal=deal_id, executor=executor, assigned_date=date.today(), note=note
+        )
     logger.info("Executor %s assigned to deal %s", tg_id, deal_id)
+    if old_executor and old_executor.tg_id != tg_id and is_approved(old_executor.tg_id):
+        from services.telegram_service import notify_executor
+
+        deal = Deal.get_or_none(Deal.id == deal_id)
+        desc = f" — {deal.description}" if deal and deal.description else ""
+        text = f"❎ Сделка #{deal_id}{desc} больше не закреплена за вами"
+        notify_executor(old_executor.tg_id, text)
 
 
 def unassign_executor(deal_id: int) -> None:
     """Отвязать исполнителя от сделки."""
+    ex = get_executor_for_deal(deal_id)
     cnt = DealExecutor.delete().where(DealExecutor.deal_id == deal_id).execute()
     if cnt:
         logger.info("Executor unassigned from deal %s", deal_id)
+        if ex and is_approved(ex.tg_id):
+            from services.telegram_service import notify_executor
+
+            deal = Deal.get_or_none(Deal.id == deal_id)
+            desc = f" — {deal.description}" if deal and deal.description else ""
+            text = f"❎ Сделка #{deal_id}{desc} больше не закреплена за вами"
+            notify_executor(ex.tg_id, text)
 
 
 def get_executor_for_deal(deal_id: int) -> Optional[Executor]:
