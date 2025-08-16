@@ -1,3 +1,5 @@
+from datetime import date
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -8,14 +10,19 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QCheckBox,
+    QComboBox,
+    QSpinBox,
 )
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QDoubleValidator
 from PySide6.QtCore import Qt, QDate
 import peewee
 
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.validators import normalize_number
+
+from ui.common.combo_helpers import create_client_combobox, create_deal_combobox
+from ui.common.date_utils import OptionalDateEdit, to_qdate
 
 from database.models import Policy
 
@@ -57,13 +64,67 @@ class PolicyMergeDialog(QDialog):
                 1,
                 QTableWidgetItem(self._display_value(field, old_val)),
             )
-            edit = QLineEdit("" if new_val is None else str(new_val))
-            edit.setPlaceholderText("оставить без изменений")
+
+            model_field = Policy._meta.fields.get(field)
+
+            if field == "client_id":
+                edit: QComboBox = create_client_combobox()
+                if new_val is not None:
+                    idx = edit.findData(int(new_val))
+                    if idx >= 0:
+                        edit.setCurrentIndex(idx)
+                edit.currentIndexChanged.connect(
+                    lambda _=None, r=row, f=field: self._update_final(r, f)
+                )
+            elif field == "deal_id":
+                edit = create_deal_combobox()
+                if new_val is not None:
+                    idx = edit.findData(int(new_val))
+                    if idx >= 0:
+                        edit.setCurrentIndex(idx)
+                edit.currentIndexChanged.connect(
+                    lambda _=None, r=row, f=field: self._update_final(r, f)
+                )
+            elif field in {"start_date", "end_date"}:
+                edit = OptionalDateEdit()
+                if isinstance(new_val, date):
+                    edit.setDate(to_qdate(new_val))
+                edit.dateChanged.connect(
+                    lambda _=None, r=row, f=field: self._update_final(r, f)
+                )
+            elif isinstance(
+                model_field,
+                (peewee.IntegerField, peewee.AutoField, peewee.BigIntegerField, peewee.SmallIntegerField),
+            ):
+                spin = QSpinBox()
+                spin.setMinimum(-1)
+                spin.setSpecialValueText("")
+                if new_val is not None:
+                    try:
+                        spin.setValue(int(new_val))
+                    except Exception:
+                        spin.setValue(-1)
+                edit = spin
+                spin.valueChanged.connect(
+                    lambda _=None, r=row, f=field: self._update_final(r, f)
+                )
+            elif isinstance(model_field, peewee.FloatField):
+                edit = QLineEdit("" if new_val is None else str(new_val))
+                edit.setValidator(QDoubleValidator())
+                edit.textChanged.connect(
+                    lambda _=None, r=row, f=field: self._update_final(r, f)
+                )
+            else:
+                edit = QLineEdit("" if new_val is None else str(new_val))
+                edit.setPlaceholderText("оставить без изменений")
+                edit.textChanged.connect(
+                    lambda _=None, r=row, f=field: self._update_final(r, f)
+                )
+
             self.table.setCellWidget(row, 2, edit)
             final = QTableWidgetItem()
             self.table.setItem(row, 3, final)
             self._update_final(row, field)
-            edit.textChanged.connect(lambda _=None, r=row, f=field: self._update_final(r, f))
 
         self.table.resizeColumnsToContents()
         self._apply_filter()
@@ -100,6 +161,8 @@ class PolicyMergeDialog(QDialog):
                 return str(deal) if deal else str(value)
             except Exception:
                 return str(value)
+        if isinstance(value, date):
+            return value.strftime("%d.%m.%Y")
         return str(value)
 
     def _apply_filter(self) -> None:
@@ -113,8 +176,18 @@ class PolicyMergeDialog(QDialog):
 
     def _update_final(self, row: int, field: str) -> None:
         widget = self.table.cellWidget(row, 2)
-        text = widget.text().strip()
-        final_val = text if text else getattr(self.existing, field, None)
+        if isinstance(widget, QComboBox):
+            val = widget.currentData()
+        elif isinstance(widget, OptionalDateEdit):
+            val = widget.date_or_none()
+        elif isinstance(widget, QSpinBox):
+            v = widget.value()
+            val = None if v == widget.minimum() else v
+        else:
+            text = widget.text().strip()
+            val = text if text else None
+
+        final_val = val if val is not None else getattr(self.existing, field, None)
         item = self.table.item(row, 3)
         if item is not None:
             item.setText(self._display_value(field, final_val))
@@ -135,6 +208,19 @@ class PolicyMergeDialog(QDialog):
             if not field:
                 continue
             widget = self.table.cellWidget(row, 2)
+
+            if isinstance(widget, QComboBox):
+                val = widget.currentData()
+                data[field] = int(val) if val is not None else None
+                continue
+            if isinstance(widget, OptionalDateEdit):
+                data[field] = widget.date_or_none()
+                continue
+            if isinstance(widget, QSpinBox):
+                v = widget.value()
+                data[field] = None if v == widget.minimum() else v
+                continue
+
             text = widget.text().strip()
             if text == "":
                 data[field] = None
@@ -142,7 +228,10 @@ class PolicyMergeDialog(QDialog):
 
             model_field = Policy._meta.fields.get(field)
 
-            if isinstance(model_field, (peewee.IntegerField, peewee.AutoField, peewee.ForeignKeyField)):
+            if isinstance(
+                model_field,
+                (peewee.IntegerField, peewee.AutoField, peewee.ForeignKeyField),
+            ):
                 try:
                     data[field] = int(normalize_number(text))
                 except ValueError:
