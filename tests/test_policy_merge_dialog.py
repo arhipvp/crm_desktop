@@ -2,10 +2,11 @@ import datetime
 import pytest
 from peewee import SqliteDatabase
 from PySide6.QtWidgets import QApplication, QComboBox
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Qt
 
 from database.db import db
-from database.models import Client, Deal, Policy
+from database.models import Client, Deal, Policy, Payment
+from services.policy_service import update_policy
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
 from ui.common.date_utils import OptionalDateEdit
 
@@ -25,12 +26,15 @@ def _find_row(dlg: PolicyMergeDialog, field: str) -> int:
     raise AssertionError(f"Row {field} not found")
 
 
-def test_policy_merge_dialog_display_and_filter():
+def test_policy_merge_dialog_display_and_filter(setup_db):
     _create_app()
-    existing = Policy(
+    client = Client.create(name="C")
+    existing = Policy.create(
+        client=client,
         policy_number="P1",
         insurance_company="Old",
         start_date=datetime.date(2024, 1, 1),
+        end_date=datetime.date(2024, 12, 31),
     )
     new_data = {
         "policy_number": "P1",
@@ -61,9 +65,9 @@ def test_policy_merge_dialog_display_and_filter():
 def setup_db():
     test_db = SqliteDatabase(':memory:')
     db.initialize(test_db)
-    test_db.create_tables([Client, Deal, Policy])
+    test_db.create_tables([Client, Deal, Policy, Payment])
     yield
-    test_db.drop_tables([Client, Deal, Policy])
+    test_db.drop_tables([Client, Deal, Policy, Payment])
     test_db.close()
 
 
@@ -106,3 +110,39 @@ def test_merge_dialog_dates_and_combos(setup_db):
     assert data['deal_id'] == deal.id
     assert data['start_date'] == datetime.date(2025, 1, 1)
     assert data['end_date'] == datetime.date(2025, 2, 1)
+
+
+def test_merge_dialog_payments_editing(setup_db):
+    _create_app()
+    c = Client.create(name="C")
+    start = datetime.date(2024, 1, 1)
+    end = datetime.date(2024, 12, 31)
+    policy = Policy.create(client=c, policy_number="P", start_date=start, end_date=end)
+    Payment.create(policy=policy, amount=100, payment_date=start)
+    Payment.create(policy=policy, amount=200, payment_date=start + datetime.timedelta(days=30))
+
+    draft = [
+        {"payment_date": start + datetime.timedelta(days=60), "amount": 300},
+        {"payment_date": start + datetime.timedelta(days=90), "amount": 400},
+    ]
+
+    dlg = PolicyMergeDialog(policy, {}, draft_payments=draft)
+    assert dlg.payments_table.rowCount() == 4
+
+    dlg.on_delete_payment(3)
+
+    new_date = start + datetime.timedelta(days=120)
+    dlg.pay_date_edit.setDate(QDate(new_date.year, new_date.month, new_date.day))
+    dlg.pay_amount_edit.setText("500")
+    dlg.on_add_payment()
+
+    dlg.first_payment_checkbox.setChecked(True)
+
+    payments = dlg.get_merged_payments()
+    amounts = sorted(p["amount"] for p in payments)
+    assert amounts == [100, 200, 300, 500]
+
+    update_policy(policy, payments=payments, first_payment_paid=True)
+    stored = list(policy.payments.order_by(Payment.payment_date))
+    assert [p.amount for p in stored] == [100, 200, 300, 500]
+    assert stored[0].actual_payment_date == stored[0].payment_date
