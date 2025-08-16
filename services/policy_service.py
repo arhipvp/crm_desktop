@@ -13,6 +13,7 @@ from services.folder_utils import create_policy_folder, open_folder
 from services.payment_service import add_payment, sync_policy_payments
 from services import executor_service as es
 from services.telegram_service import notify_executor
+from services.validators import normalize_policy_number
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,7 @@ def _check_duplicate_policy(
     if not policy_number:
         return
 
+    policy_number = normalize_policy_number(policy_number)
     cond = (Policy.policy_number == policy_number) & (Policy.is_deleted == False)
     if exclude_id is not None:
         cond &= Policy.id != exclude_id
@@ -306,6 +308,7 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
     # Обязателен номер полиса
     if not clean_data.get("policy_number"):
         raise ValueError("Поле 'policy_number' обязательно для заполнения.")
+    clean_data["policy_number"] = normalize_policy_number(clean_data["policy_number"])
 
     # Проверка: дата окончания обязательна
     start_date = clean_data.get("start_date")
@@ -443,13 +446,17 @@ def update_policy(
         if key == "client_id" and "client" not in kwargs:
             value = get_client_by_id(value) if value not in ("", None) else None
             key = "client"
+        if key == "policy_number" and value not in ("", None):
+            value = normalize_policy_number(value)
         if value not in ("", None):
             updates[key] = value
         elif key in {"contractor", "deal", "client"}:
             updates[key] = None
 
     # ────────── Проверка дубликата ──────────
-    new_number = updates.get("policy_number", policy.policy_number)
+    new_number = normalize_policy_number(
+        updates.get("policy_number", policy.policy_number)
+    )
     if "deal" in updates:
         new_deal = updates.get("deal")
         new_deal_id = new_deal.id if new_deal else None
