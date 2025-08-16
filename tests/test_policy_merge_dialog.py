@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QApplication, QComboBox
 from PySide6.QtCore import QDate, Qt
 
 from database.db import db
-from database.models import Client, Deal, Policy, Payment
+from database.models import Client, Deal, Policy, Payment, Income, Expense
 from services.policy_service import update_policy
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
 from ui.common.date_utils import OptionalDateEdit
@@ -65,9 +65,9 @@ def test_policy_merge_dialog_display_and_filter(setup_db):
 def setup_db():
     test_db = SqliteDatabase(':memory:')
     db.initialize(test_db)
-    test_db.create_tables([Client, Deal, Policy, Payment])
+    test_db.create_tables([Client, Deal, Policy, Payment, Income, Expense])
     yield
-    test_db.drop_tables([Client, Deal, Policy, Payment])
+    test_db.drop_tables([Client, Deal, Policy, Payment, Income, Expense])
     test_db.close()
 
 

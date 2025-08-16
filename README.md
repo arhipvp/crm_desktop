@@ -27,10 +27,13 @@ GOOGLE_SHEETS_CALCULATIONS_ID=1AbCdEfGh  # ID таблицы расчётов Go
 OPENAI_API_KEY=sk-example
 OPENAI_BASE_URL=https://api.openai.com/v1  # например, https://api.together.xyz/v1
 OPENAI_MODEL=gpt-4o  # например, gpt-3.5-turbo
+LOG_LEVEL=INFO  # уровень логирования (например, DEBUG)
 AI_POLICY_PROMPT=
 ```
 
 Переменная `ADMIN_CHAT_ID` задаёт Telegram‑ID администратора, которому бот отправляет уведомления.
+
+Переменная `LOG_LEVEL` управляет уровнем логов. Допустимые значения совпадают с уровнями модуля `logging` (например, `DEBUG`, `INFO`). По умолчанию используется `INFO`.
 
 ## Подготовка окружения
 

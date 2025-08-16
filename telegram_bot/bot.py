@@ -93,6 +93,10 @@ for part in re.split(r"[ ,]+", os.getenv("APPROVED_EXECUTOR_IDS", "").strip()):
 
 logger = logging.getLogger(__name__)
 
+# Допустимые параметры загружаемых файлов
+MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
+ALLOWED_SUFFIXES = {".pdf", ".jpg", ".jpeg", ".png"}
+
 # Задачи, ожидающие подтверждения администратора.
 # Храним чат исполнителя и его имя для уведомлений.
 pending_accept: dict[int, tuple[int, str]] = {}
@@ -567,7 +571,13 @@ async def h_file(update: Update, _ctx):
         return
     logger.info("File from %s for deal %s", msg.chat_id, deal_id)
 
-    ext = Path(tg_file.file_name or "").suffix if msg.document else ".jpg"
+    ext = Path(tg_file.file_name or "").suffix.lower() if msg.document else ".jpg"
+    if tg_file.file_size and tg_file.file_size > MAX_FILE_SIZE:
+        await msg.reply_text("⚠️ Файл слишком большой.")
+        return
+    if ext not in ALLOWED_SUFFIXES:
+        await msg.reply_text("⚠️ Недопустимый тип файла.")
+        return
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=ext)
     os.close(tmp_fd)
     logger.debug("Получен файл: %s", tg_file.file_name or tg_file.file_id)
