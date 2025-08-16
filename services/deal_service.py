@@ -92,8 +92,6 @@ def add_deal(**kwargs):
 
     # FK клиент
     clean_data["client"] = client
-    clean_data["is_deleted"] = False
-
     with db.atomic():
         deal: Deal = Deal.create(**clean_data)
         logger.info(
@@ -307,8 +305,7 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
 def mark_deal_deleted(deal_id: int):
     deal = Deal.get_or_none(Deal.id == deal_id)
     if deal:
-        deal.is_deleted = True
-        deal.save()
+        deal.soft_delete()
         try:
             from services.folder_utils import rename_deal_folder
 

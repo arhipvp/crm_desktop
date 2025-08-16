@@ -26,7 +26,6 @@ def add_calculation(deal_id: int, **kwargs) -> DealCalculation:
     data = {k: v for k, v in kwargs.items() if k in allowed}
     data.setdefault("created_at", datetime.utcnow())
     data["deal"] = deal
-    data["is_deleted"] = False
     entry = DealCalculation.create(**data)
     try:
         from services.telegram_service import notify_admin
@@ -48,8 +47,7 @@ def mark_calculation_deleted(entry_id: int) -> None:
     """Помечает расчёт удалённым."""
     entry = DealCalculation.get_or_none(DealCalculation.id == entry_id)
     if entry:
-        entry.is_deleted = True
-        entry.save()
+        entry.soft_delete()
     else:
         logger.warning("Calculation entry %s not found", entry_id)
 

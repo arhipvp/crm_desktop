@@ -104,8 +104,7 @@ def mark_payment_deleted(payment_id: int):
     """Пометить платёж удалённым."""
     payment = Payment.get_or_none(Payment.id == payment_id)
     if payment:
-        payment.is_deleted = True
-        payment.save()
+        payment.soft_delete()
     else:
         logger.warning("❗ Платёж с id=%s не найден для удаления", payment_id)
 
@@ -167,7 +166,7 @@ def add_payment(**kwargs):
         for field in allowed_fields
         if field in kwargs  # убрали фильтр по None
     }
-    payment = Payment.create(policy=policy, is_deleted=False, **clean_data)
+    payment = Payment.create(policy=policy, **clean_data)
     logger.info(
         "✅ Добавлен платёж #%s к полису #%s на сумму %.2f",
         payment.id,

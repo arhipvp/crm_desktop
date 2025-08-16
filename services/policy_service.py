@@ -183,8 +183,7 @@ def get_policies_page(
 def mark_policy_deleted(policy_id: int):
     policy = Policy.get_or_none(Policy.id == policy_id)
     if policy:
-        policy.is_deleted = True
-        policy.save()
+        policy.soft_delete()
         try:
             from services.folder_utils import rename_policy_folder
 
@@ -328,7 +327,7 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
 
     with db.atomic():
         # ────────── Создание полиса ──────────
-        policy = Policy.create(client=client, deal=deal, is_deleted=False, **clean_data)
+        policy = Policy.create(client=client, deal=deal, **clean_data)
         logger.info(
             "✅ Полис #%s создан для клиента '%s'", policy.policy_number, client.name
         )
@@ -555,7 +554,6 @@ def prolong_policy(original_policy: Policy) -> Policy:
         end_date=original_policy.end_date + timedelta(days=365),
         note=original_policy.note,
         status="новый",
-        is_deleted=False,
     )
 
     original_policy.renewed_to = new_policy.start_date
