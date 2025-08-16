@@ -10,7 +10,7 @@ from database.models import Payment, Policy
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.folder_utils import create_policy_folder, open_folder
-from services.payment_service import add_payment
+from services.payment_service import add_payment, merge_policy_payments
 from services import executor_service as es
 from services.telegram_service import notify_executor
 
@@ -369,11 +369,19 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
 # ─────────────────────────── Обновление ───────────────────────────
 
 
-def update_policy(policy: Policy, *, first_payment_paid: bool = False, **kwargs):
-    """Обновить поля полиса.
+def update_policy(
+    policy: Policy,
+    *,
+    first_payment_paid: bool = False,
+    payments: list[dict] | None = None,
+    **kwargs,
+):
+    """Обновить поля полиса и, при необходимости, добавить платежи.
 
     Args:
         policy: Изменяемый полис.
+        first_payment_paid: Отметить ли первый платёж как оплаченный.
+        payments: Список платежей для объединения.
         **kwargs: Новые значения полей.
 
     Returns:
@@ -454,7 +462,7 @@ def update_policy(policy: Policy, *, first_payment_paid: bool = False, **kwargs)
         exclude_id=policy.id,
     )
 
-    if not updates and not first_payment_paid:
+    if not updates and not first_payment_paid and not payments:
         logger.info("ℹ️ update_policy: нет изменений для полиса #%s", policy.id)
         return policy
 
@@ -489,6 +497,9 @@ def update_policy(policy: Policy, *, first_payment_paid: bool = False, **kwargs)
                 policy.save(only=[Policy.drive_folder_link])
         except Exception:
             logger.exception("Не удалось переименовать папку полиса")
+
+    if payments:
+        merge_policy_payments(policy, payments)
 
     if first_payment_paid:
         first_payment = policy.payments.order_by(Payment.payment_date).first()
