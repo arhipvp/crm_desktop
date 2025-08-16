@@ -86,17 +86,25 @@ def get_policy_by_number(policy_number: str):
     return Policy.get_or_none(Policy.policy_number == policy_number)
 
 
-def _check_duplicate_policy(policy_number: str, client_id: int, deal_id: int | None, data: dict, *, exclude_id: int | None = None) -> None:
+def _check_duplicate_policy(
+    policy_number: str,
+    client_id: int,
+    deal_id: int | None,
+    data: dict,
+    *,
+    exclude_id: int | None = None,
+) -> None:
     """Проверить наличие дубликата и, если найден, поднять ``ValueError``.
 
-    Сравниваются ключевые поля полиса. Если все совпадают - сообщение сообщает
-    об идентичности, иначе перечисляются отличающиеся поля.
+    Сравниваются ключевые поля полиса среди **не удалённых** записей. Если все
+    совпадают — сообщение сообщает об идентичности, иначе перечисляются
+    отличающиеся поля. Полисы, помеченные как удалённые, игнорируются.
     """
 
     if not policy_number:
         return
 
-    cond = Policy.policy_number == policy_number
+    cond = (Policy.policy_number == policy_number) & (Policy.is_deleted == False)
     if exclude_id is not None:
         cond &= Policy.id != exclude_id
 
