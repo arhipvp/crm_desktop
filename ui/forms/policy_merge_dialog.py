@@ -21,7 +21,6 @@ import peewee
 
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id, get_deals_by_client_id
-from services.validators import normalize_number
 
 from ui.common.combo_helpers import (
     create_client_combobox,
@@ -279,6 +278,7 @@ class PolicyMergeDialog(QDialog):
         hlayout.addWidget(self.pay_date_edit)
 
         self.pay_amount_edit = QLineEdit()
+        self.pay_amount_edit.setValidator(QDoubleValidator(0.0, 1e9, 2))
         hlayout.addWidget(QLabel("Сумма:"))
         hlayout.addWidget(self.pay_amount_edit)
 
@@ -314,14 +314,7 @@ class PolicyMergeDialog(QDialog):
 
     def on_add_payment(self) -> None:
         qd = self.pay_date_edit.date()
-        amt_text = normalize_number(self.pay_amount_edit.text())
-        try:
-            amt = float(amt_text)
-        except Exception:
-            from PySide6.QtWidgets import QMessageBox
-
-            QMessageBox.warning(self, "Ошибка", "Введите корректную сумму")
-            return
+        amt = float(self.pay_amount_edit.text())
         self._insert_payment_row(qd.toPython(), amt)
         self.pay_amount_edit.clear()
 
@@ -345,7 +338,7 @@ class PolicyMergeDialog(QDialog):
             if not qd.isValid():
                 continue
             try:
-                amount = float(normalize_number(amount_item.text()))
+                amount = float(amount_item.text())
             except Exception:
                 continue
             payments.append({
