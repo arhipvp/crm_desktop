@@ -4,7 +4,7 @@ import logging
 from datetime import timedelta
 from peewee import fn
 
-
+from database.db import db
 from database.models import Client  # если ещё не импортирован
 from database.models import Payment, Policy
 from services.client_service import get_client_by_id
@@ -323,11 +323,40 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
         clean_data,
     )
 
-    # ────────── Создание полиса ──────────
-    policy = Policy.create(client=client, deal=deal, is_deleted=False, **clean_data)
-    logger.info(
-        "✅ Полис #%s создан для клиента '%s'", policy.policy_number, client.name
-    )
+    with db.atomic():
+        # ────────── Создание полиса ──────────
+        policy = Policy.create(client=client, deal=deal, is_deleted=False, **clean_data)
+        logger.info(
+            "✅ Полис #%s создан для клиента '%s'", policy.policy_number, client.name
+        )
+
+        # ----------- Платежи ----------
+        if payments is not None and len(payments) > 0:
+            for p in payments:
+                add_payment(
+                    policy=policy,
+                    amount=p.get("amount", 0),
+                    payment_date=p.get("payment_date", policy.start_date),
+                )
+        else:
+            # Если список пуст или не передан — автонулевой платёж
+            add_payment(policy=policy, amount=0, payment_date=policy.start_date)
+            logger.info(
+                "💳 Авто-добавлен платёж с нулевой суммой для полиса #%s",
+                policy.policy_number,
+            )
+
+        # отметить платёж как оплаченный, если указано
+        if first_payment_paid:
+            first_payment = (
+                Payment.select()
+                .where((Payment.policy == policy) & (Payment.is_deleted == False))
+                .order_by(Payment.payment_date)
+                .first()
+            )
+            if first_payment and first_payment.actual_payment_date is None:
+                first_payment.actual_payment_date = first_payment.payment_date
+                first_payment.save()
 
     # ────────── Папка полиса ──────────
     deal_description = deal.description if deal else None
@@ -345,35 +374,6 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
 
     # ────────── Автоматические действия ──────────
     # Задача продления полиса больше не создаётся автоматически
-
-    # ----------- Платежи ----------
-
-    if payments is not None and len(payments) > 0:
-        for p in payments:
-            add_payment(
-                policy=policy,
-                amount=p.get("amount", 0),
-                payment_date=p.get("payment_date", policy.start_date),
-            )
-    else:
-        # Если список пуст или не передан — автонулевой платёж
-        add_payment(policy=policy, amount=0, payment_date=policy.start_date)
-        logger.info(
-            "💳 Авто-добавлен платёж с нулевой суммой для полиса #%s",
-            policy.policy_number,
-        )
-
-    # отметить платёж как оплаченный, если указано
-    if first_payment_paid:
-        first_payment = (
-            Payment.select()
-            .where((Payment.policy == policy) & (Payment.is_deleted == False))
-            .order_by(Payment.payment_date)
-            .first()
-        )
-        if first_payment and first_payment.actual_payment_date is None:
-            first_payment.actual_payment_date = first_payment.payment_date
-            first_payment.save()
 
     _notify_policy_added(policy)
     return policy
@@ -479,11 +479,26 @@ def update_policy(
         logger.info("ℹ️ update_policy: нет изменений для полиса #%s", policy.id)
         return policy
 
-    for key, value in updates.items():
-        setattr(policy, key, value)
-    logger.info("✏️ Обновление полиса #%s: %s", policy.id, updates)
-    policy.save()
-    logger.info("✅ Полис #%s успешно обновлён", policy.id)
+    with db.atomic():
+        for key, value in updates.items():
+            setattr(policy, key, value)
+        logger.info("✏️ Обновление полиса #%s: %s", policy.id, updates)
+        policy.save()
+        logger.info("✅ Полис #%s успешно обновлён", policy.id)
+
+        if payments:
+            sync_policy_payments(policy, payments)
+
+        if first_payment_paid:
+            first_payment = (
+                Payment.select()
+                .where((Payment.policy == policy))
+                .order_by(Payment.payment_date)
+                .first()
+            )
+            if first_payment and first_payment.actual_payment_date is None:
+                first_payment.actual_payment_date = first_payment.payment_date
+                first_payment.save()
 
     new_number = policy.policy_number
     new_deal_desc = policy.deal.description if policy.deal_id else None
@@ -510,20 +525,6 @@ def update_policy(
                 policy.save(only=[Policy.drive_folder_link])
         except Exception:
             logger.exception("Не удалось переименовать папку полиса")
-
-    if payments:
-        sync_policy_payments(policy, payments)
-
-    if first_payment_paid:
-        first_payment = (
-            Payment.select()
-            .where((Payment.policy == policy))
-            .order_by(Payment.payment_date)
-            .first()
-        )
-        if first_payment and first_payment.actual_payment_date is None:
-            first_payment.actual_payment_date = first_payment.payment_date
-            first_payment.save()
 
     if policy.deal_id and policy.deal_id != old_deal_id:
         _notify_policy_added(policy)

@@ -115,3 +115,26 @@ def test_sync_policy_payments_removes_zero_when_real_exists(setup_db):
         .count()
         == 1
     )
+
+
+def test_add_policy_rolls_back_on_payment_error(setup_db, monkeypatch):
+    client = Client.create(name="C")
+    d1 = datetime.date(2024, 1, 1)
+    d2 = datetime.date(2024, 2, 1)
+
+    def fail(**kw):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(policy_svc, "add_payment", fail)
+
+    with pytest.raises(RuntimeError):
+        policy_svc.add_policy(
+            client=client,
+            policy_number="P",
+            start_date=d1,
+            end_date=d2,
+            payments=[{"amount": 100, "payment_date": d1}],
+        )
+
+    assert Policy.select().count() == 0
+    assert Payment.select().count() == 0
