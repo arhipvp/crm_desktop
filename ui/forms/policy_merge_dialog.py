@@ -20,10 +20,14 @@ from PySide6.QtCore import Qt, QDate
 import peewee
 
 from services.client_service import get_client_by_id
-from services.deal_service import get_deal_by_id
+from services.deal_service import get_deal_by_id, get_deals_by_client_id
 from services.validators import normalize_number
 
-from ui.common.combo_helpers import create_client_combobox, create_deal_combobox
+from ui.common.combo_helpers import (
+    create_client_combobox,
+    create_deal_combobox,
+    populate_combo,
+)
 from ui.common.date_utils import OptionalDateEdit, to_qdate
 
 from database.models import Policy, Payment
@@ -80,6 +84,7 @@ class PolicyMergeDialog(QDialog):
 
             if field == "client_id":
                 edit: QComboBox = create_client_combobox()
+                self.client_combo = edit
                 if new_val is not None:
                     idx = edit.findData(int(new_val))
                     if idx >= 0:
@@ -87,8 +92,11 @@ class PolicyMergeDialog(QDialog):
                 edit.currentIndexChanged.connect(
                     lambda _=None, r=row, f=field: self._update_final(r, f)
                 )
+                edit.currentIndexChanged.connect(self._on_client_changed)
             elif field == "deal_id":
                 edit = create_deal_combobox()
+                self.deal_combo = edit
+                self.deal_row = row
                 if new_val is not None:
                     idx = edit.findData(int(new_val))
                     if idx >= 0:
@@ -136,6 +144,9 @@ class PolicyMergeDialog(QDialog):
             final = QTableWidgetItem()
             self.table.setItem(row, 3, final)
             self._update_final(row, field)
+
+        if hasattr(self, "client_combo"):
+            self._on_client_changed()
 
         self.table.resizeColumnsToContents()
         self._apply_filter()
@@ -212,6 +223,29 @@ class PolicyMergeDialog(QDialog):
             if key_item is not None:
                 key_item.setData(Qt.UserRole + 1, changed)
         self._apply_filter()
+
+    def _on_client_changed(self) -> None:
+        if not hasattr(self, "deal_combo"):
+            return
+        client_id = self.client_combo.currentData()
+        deals = (
+            list(get_deals_by_client_id(client_id))
+            if client_id is not None
+            else []
+        )
+        current_deal_id = self.deal_combo.currentData()
+        populate_combo(
+            self.deal_combo,
+            deals,
+            label_func=lambda d: f"{d.client.name} - {d.description} ",
+            id_attr="id",
+            placeholder="— Сделка —",
+        )
+        if current_deal_id in [d.id for d in deals]:
+            idx = self.deal_combo.findData(current_deal_id)
+            if idx >= 0:
+                self.deal_combo.setCurrentIndex(idx)
+        self._update_final(self.deal_row, "deal_id")
 
     # ------------------------------------------------------------------
     # Payments

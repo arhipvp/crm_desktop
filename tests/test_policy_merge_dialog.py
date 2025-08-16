@@ -112,6 +112,31 @@ def test_merge_dialog_dates_and_combos(setup_db):
     assert data['end_date'] == datetime.date(2025, 2, 1)
 
 
+def test_client_change_filters_deals(setup_db):
+    _create_app()
+    c1 = Client.create(name="C1")
+    c2 = Client.create(name="C2")
+    d1 = Deal.create(client=c1, description="D1", start_date=datetime.date(2024, 1, 1))
+    d2 = Deal.create(client=c2, description="D2", start_date=datetime.date(2024, 1, 1))
+    existing = Policy.create(client=c1, policy_number="P", start_date=datetime.date(2024, 1, 1))
+    new_data = {"client_id": c1.id, "deal_id": d1.id}
+    dlg = PolicyMergeDialog(existing, new_data)
+
+    row_client = _find_row(dlg, "client_id")
+    client_combo = dlg.table.cellWidget(row_client, 2)
+    row_deal = _find_row(dlg, "deal_id")
+    deal_combo = dlg.table.cellWidget(row_deal, 2)
+    assert isinstance(client_combo, QComboBox)
+    assert isinstance(deal_combo, QComboBox)
+
+    ids_before = {deal_combo.itemData(i) for i in range(deal_combo.count())}
+    assert d1.id in ids_before and d2.id not in ids_before
+
+    client_combo.setCurrentIndex(client_combo.findData(c2.id))
+    ids_after = {deal_combo.itemData(i) for i in range(deal_combo.count())}
+    assert d2.id in ids_after and d1.id not in ids_after
+
+
 def test_merge_dialog_payments_editing(setup_db):
     _create_app()
     c = Client.create(name="C")
