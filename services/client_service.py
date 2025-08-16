@@ -125,8 +125,6 @@ def add_client(**kwargs) -> Client:
             logger.warning("⚠️ Ошибка нормализации телефона '%s': %s", clean_data["phone"], e)
             raise
 
-    clean_data["is_deleted"] = False
-
     with db.atomic():
         client, _ = Client.get_or_create(name=name, defaults=clean_data)
 
@@ -231,8 +229,7 @@ def mark_client_deleted(client_id: int):
     """Помечает клиента как удалённого."""
     client = Client.get_or_none(Client.id == client_id)
     if client:
-        client.is_deleted = True
-        client.save()
+        client.soft_delete()
         try:
             from services.folder_utils import rename_client_folder
 

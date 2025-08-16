@@ -35,8 +35,7 @@ def get_income_by_id(income_id: int):
 def mark_income_deleted(income_id: int):
     income = Income.get_or_none(Income.id == income_id)
     if income:
-        income.is_deleted = True
-        income.save()
+        income.soft_delete()
     else:
         logger.warning("❗ Доход с id=%s не найден для удаления", income_id)
 
@@ -156,7 +155,7 @@ def add_income(**kwargs):
     }
 
     try:
-        income = Income.create(payment=payment, is_deleted=False, **clean_data)
+        income = Income.create(payment=payment, **clean_data)
     except Exception as e:
         logger.error("❌ Ошибка при создании дохода: %s", e)
         raise

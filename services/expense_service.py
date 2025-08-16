@@ -30,8 +30,7 @@ def get_expense_by_id(expense_id: int) -> Expense | None:
 def mark_expense_deleted(expense_id: int):
     expense = Expense.get_or_none(Expense.id == expense_id)
     if expense:
-        expense.is_deleted = True
-        expense.save()
+        expense.soft_delete()
     else:
         logger.warning("❗ Расход с id=%s не найден для удаления", expense_id)
 
@@ -83,7 +82,7 @@ def add_expense(**kwargs):
 
     try:
         return Expense.create(
-            payment=payment, policy_id=payment.policy_id, is_deleted=False, **clean_data
+            payment=payment, policy_id=payment.policy_id, **clean_data
         )
     except Exception as e:
         logger.error("❌ Ошибка при создании расхода: %s", e)

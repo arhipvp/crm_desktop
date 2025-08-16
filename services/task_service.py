@@ -58,7 +58,6 @@ def add_task(**kwargs):
         elif key == "policy" and hasattr(value, "id"):
             clean_data["policy_id"] = value.id
 
-    clean_data["is_deleted"] = False
     try:
         task = Task.create(**clean_data)
     except Exception as e:
@@ -161,8 +160,7 @@ def update_task(task: Task, **fields) -> Task:
 def mark_task_deleted(task: Task | int):
     task_obj = task if isinstance(task, Task) else Task.get_or_none(Task.id == task)
     if task_obj:
-        task_obj.is_deleted = True
-        task_obj.save()
+        task_obj.soft_delete()
         logger.info("🗑 Задача #%s помечена как удалённая", task_obj.id)
     else:
         logger.warning("❗ Задача %s не найдена для удаления", task)

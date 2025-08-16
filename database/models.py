@@ -19,8 +19,18 @@ class BaseModel(Model):
         database = db
 
 
-# ─────────────────────────── Клиент ────────────────────────────
-class Client(BaseModel):
+class SoftDeleteModel(BaseModel):
+    """Базовая модель с поддержкой мягкого удаления."""
+
+    is_deleted = BooleanField(default=False)
+
+    def soft_delete(self) -> None:
+        """Пометить запись как удалённую."""
+        self.is_deleted = True
+        self.save()
+
+
+class Client(SoftDeleteModel):
     name = CharField()
     phone = CharField(null=True)
     email = CharField(null=True)
@@ -28,13 +38,11 @@ class Client(BaseModel):
     note = TextField(null=True)
     drive_folder_path = CharField(null=True)  # локальный путь
     drive_folder_link = CharField(null=True)  # web-ссылка
-    is_deleted = BooleanField(default=False)
 
     def __str__(self) -> str:  # ← NEW
         return self.name
 
 
-# ─────────────────────────── Сделка ────────────────────────────
 class DealStatus:
     NEW = "новая"
     IN_PROGRESS = "в работе"
@@ -42,7 +50,7 @@ class DealStatus:
     FAILED = "отказ"
 
 
-class Deal(BaseModel):
+class Deal(SoftDeleteModel):
     reminder_date = DateField(null=True)
     client = ForeignKeyField(Client, backref="deals")
     status = CharField(default=DealStatus.NEW)
@@ -53,15 +61,13 @@ class Deal(BaseModel):
     drive_folder_path = CharField(null=True)
     drive_folder_link = CharField(null=True)
     start_date = DateField()
-    is_deleted = BooleanField(default=False)
 
     def __str__(self) -> str:  # NEW
         client = self.client.name if self.client_id else "—"
         return f"{client} — {self.description}"
 
 
-# ─────────────────────────── Полис ────────────────────────────
-class Policy(BaseModel):
+class Policy(SoftDeleteModel):
     client = ForeignKeyField(Client, backref="policies")
     deal = ForeignKeyField(Deal, backref="policies", null=True)
     policy_number = CharField(unique=True)
@@ -77,24 +83,20 @@ class Policy(BaseModel):
     note = TextField(null=True)
     drive_folder_link = CharField(null=True)
     renewed_to = CharField(null=True)  # Содержит номер нового полиса или "Нет"
-    is_deleted = BooleanField(default=False)
 
     def __str__(self) -> str:
         client_name = self.client.name if self.client_id else "—"
         return f"{client_name} — {self.policy_number}"
 
 
-# ─────────────────────────── Платёж ────────────────────────────
-class Payment(BaseModel):
+class Payment(SoftDeleteModel):
     policy = ForeignKeyField(Policy, backref="payments")
     amount = FloatField()
     payment_date = DateField()
     actual_payment_date = DateField(null=True)
-    is_deleted = BooleanField(default=False)
 
 
-# ─────────────────────────── Задача ────────────────────────────
-class Task(BaseModel):
+class Task(SoftDeleteModel):
     # --- контент ---
     title = CharField()
     due_date = DateField()
@@ -104,7 +106,6 @@ class Task(BaseModel):
 
     # --- статусы / удаления ---
     is_done = BooleanField(default=False)
-    is_deleted = BooleanField(default=False)
 
     # --- очередь / Telegram (NEW) ---
     dispatch_state = CharField(default="idle")  # idle | queued | sent
@@ -113,24 +114,20 @@ class Task(BaseModel):
     tg_message_id = BigIntegerField(null=True)  # id сообщения в TG
 
 
-# ─────────────────────────── Доход ────────────────────────────
-class Income(BaseModel):
+class Income(SoftDeleteModel):
     payment = ForeignKeyField(Payment, backref="incomes")
     amount = FloatField()
     received_date = DateField(null=True)  # None ⇒ ожидается
     commission_source = CharField(null=True)
     note = TextField(null=True)
-    is_deleted = BooleanField(default=False)
 
 
-# ─────────────────────────── Расход ────────────────────────────
-class Expense(BaseModel):
+class Expense(SoftDeleteModel):
     payment = ForeignKeyField(Payment, backref="expenses")
     amount = FloatField()
     expense_type = CharField()
     expense_date = DateField(null=True)  # None ⇒ ожидается
     note = TextField(null=True)
-    is_deleted = BooleanField(default=False)
     policy = ForeignKeyField(Policy, backref="expenses")
 
 
@@ -150,8 +147,7 @@ class DealExecutor(BaseModel):
 
 
 
-# ─────────────────────────── Расчёт по сделке ──────────────────────────
-class DealCalculation(BaseModel):
+class DealCalculation(SoftDeleteModel):
     deal = ForeignKeyField(Deal, backref="calc_entries")
     insurance_company = CharField(null=True)
     insurance_type = CharField(null=True)
@@ -160,6 +156,5 @@ class DealCalculation(BaseModel):
     deductible = FloatField(null=True)
     note = TextField(null=True)
     created_at = DateTimeField(default=datetime.utcnow)
-    is_deleted = BooleanField(default=False)
 
 
