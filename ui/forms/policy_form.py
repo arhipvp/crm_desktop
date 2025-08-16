@@ -1,5 +1,6 @@
 import logging
 from PySide6.QtCore import QDate
+from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import (
     QDialog,
     QDateEdit,
@@ -23,7 +24,9 @@ from services.policy_service import (
     update_policy,
     DuplicatePolicyError,
 )
+
 from services.validators import normalize_number, normalize_policy_number
+
 from services.deal_service import get_all_deals, get_deals_by_client_id
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
 from ui.base.base_edit_form import BaseEditForm
@@ -342,6 +345,7 @@ class PolicyForm(BaseEditForm):
         hlayout.addWidget(self.pay_date_edit)
 
         self.pay_amount_edit = QLineEdit()
+        self.pay_amount_edit.setValidator(QDoubleValidator(0.0, 1e9, 2))
         hlayout.addWidget(QLabel("Сумма:"))
         hlayout.addWidget(self.pay_amount_edit)
 
@@ -357,14 +361,7 @@ class PolicyForm(BaseEditForm):
 
     def on_add_payment(self):
         date = self.pay_date_edit.date()
-        amount_text = normalize_number(self.pay_amount_edit.text())
-        try:
-            amount = float(amount_text)
-        except Exception:
-            from PySide6.QtWidgets import QMessageBox
-
-            QMessageBox.warning(self, "Ошибка", "Введите корректную сумму")
-            return
+        amount = float(self.pay_amount_edit.text())
         # Добавить в черновой список
         self._draft_payments.append({"payment_date": date.toPython(), "amount": amount})
         row = self.payments_table.rowCount()
