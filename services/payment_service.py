@@ -218,6 +218,19 @@ def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
     if payments is None:
         return
 
+    zero_payments = [p for p in payments if p.get("amount") == 0]
+    if zero_payments and any(p.get("amount") not in (None, 0) for p in payments):
+        (
+            Payment.update(is_deleted=True)
+            .where(
+                (Payment.policy == policy)
+                & (Payment.amount == 0)
+                & (Payment.is_deleted == False)
+            )
+            .execute()
+        )
+        payments = [p for p in payments if p.get("amount") != 0]
+
     existing = {
         (p.payment_date, p.amount): p
         for p in policy.payments.where(Payment.is_deleted == False)
