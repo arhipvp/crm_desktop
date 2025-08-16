@@ -129,7 +129,9 @@ def test_merge_dialog_payments_editing(setup_db):
     dlg = PolicyMergeDialog(policy, {}, draft_payments=draft)
     assert dlg.payments_table.rowCount() == 4
 
-    dlg.on_delete_payment(3)
+    # Удаляем один существующий платёж и один из черновиков
+    dlg.on_delete_payment(1)  # удаляем платёж 200
+    dlg.on_delete_payment(2)  # удаляем черновой платёж 400
 
     new_date = start + datetime.timedelta(days=120)
     dlg.pay_date_edit.setDate(QDate(new_date.year, new_date.month, new_date.day))
@@ -140,9 +142,16 @@ def test_merge_dialog_payments_editing(setup_db):
 
     payments = dlg.get_merged_payments()
     amounts = sorted(p["amount"] for p in payments)
-    assert amounts == [100, 200, 300, 500]
+    assert amounts == [100, 300, 500]
 
     update_policy(policy, payments=payments, first_payment_paid=True)
     stored = list(policy.payments.order_by(Payment.payment_date))
-    assert [p.amount for p in stored] == [100, 200, 300, 500]
+    assert [p.amount for p in stored] == [100, 300, 500]
     assert stored[0].actual_payment_date == stored[0].payment_date
+    # Проверяем, что платёж 200 удалён
+    assert (
+        Payment.select()
+        .where((Payment.policy == policy) & (Payment.amount == 200))
+        .count()
+        == 0
+    )

@@ -296,6 +296,11 @@ class PolicyMergeDialog(QDialog):
             self.payments_table.removeRow(row)
 
     def get_merged_payments(self) -> list[dict]:
+        """Вернуть итоговый список платежей после добавлений и удалений.
+
+        Возвращаемые платежи отсортированы по дате, что упрощает дальнейшее
+        сравнение и синхронизацию с базой данных.
+        """
         payments: list[dict] = []
         for row in range(self.payments_table.rowCount()):
             date_item = self.payments_table.item(row, 0)
@@ -313,7 +318,7 @@ class PolicyMergeDialog(QDialog):
                 "payment_date": qd.toPython(),
                 "amount": amount,
             })
-        return payments
+        return sorted(payments, key=lambda p: p["payment_date"])
 
     def get_merged_data(self) -> dict:
         data = {}

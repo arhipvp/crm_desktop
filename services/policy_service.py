@@ -10,7 +10,7 @@ from database.models import Payment, Policy
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.folder_utils import create_policy_folder, open_folder
-from services.payment_service import add_payment, merge_policy_payments
+from services.payment_service import add_payment, sync_policy_payments
 from services import executor_service as es
 from services.telegram_service import notify_executor
 
@@ -365,7 +365,12 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
 
     # отметить платёж как оплаченный, если указано
     if first_payment_paid:
-        first_payment = policy.payments.order_by(Payment.payment_date).first()
+        first_payment = (
+            Payment.select()
+            .where((Payment.policy == policy) & (Payment.is_deleted == False))
+            .order_by(Payment.payment_date)
+            .first()
+        )
         if first_payment and first_payment.actual_payment_date is None:
             first_payment.actual_payment_date = first_payment.payment_date
             first_payment.save()
@@ -507,10 +512,15 @@ def update_policy(
             logger.exception("Не удалось переименовать папку полиса")
 
     if payments:
-        merge_policy_payments(policy, payments)
+        sync_policy_payments(policy, payments)
 
     if first_payment_paid:
-        first_payment = policy.payments.order_by(Payment.payment_date).first()
+        first_payment = (
+            Payment.select()
+            .where((Payment.policy == policy))
+            .order_by(Payment.payment_date)
+            .first()
+        )
         if first_payment and first_payment.actual_payment_date is None:
             first_payment.actual_payment_date = first_payment.payment_date
             first_payment.save()

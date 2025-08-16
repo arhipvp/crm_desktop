@@ -27,30 +27,33 @@ def setup_db(monkeypatch):
     test_db.close()
 
 
-def test_merge_policy_payments_adds_missing(setup_db):
+def test_sync_policy_payments_adds_and_removes(setup_db):
     client = Client.create(name="C")
     d1 = datetime.date(2024, 1, 1)
     d2 = datetime.date(2024, 2, 1)
-    policy = Policy.create(client=client, policy_number="P", start_date=d1, end_date=d2)
-    Payment.create(policy=policy, amount=100, payment_date=d1)
+    d3 = datetime.date(2024, 3, 1)
+    policy = Policy.create(client=client, policy_number="P", start_date=d1, end_date=d3)
+    p1 = Payment.create(policy=policy, amount=100, payment_date=d1)
+    p2 = Payment.create(policy=policy, amount=200, payment_date=d2)
 
-    pay_svc.merge_policy_payments(
+    pay_svc.sync_policy_payments(
         policy,
         [
-            {"amount": 100, "payment_date": d1},
-            {"amount": 200, "payment_date": d2},
+            {"amount": 100, "payment_date": d1},  # остаётся
+            {"amount": 300, "payment_date": d3},  # новый
         ],
     )
 
     payments = list(policy.payments)
-    assert len(payments) == 2
     assert {(p.payment_date, p.amount) for p in payments} == {
         (d1, 100),
-        (d2, 200),
+        (d3, 300),
     }
+    # Проверяем, что второй платеж удалён
+    assert Payment.select().where(Payment.id == p2.id).count() == 0
 
 
-def test_update_policy_adds_payments_and_marks_first_paid(setup_db):
+def test_update_policy_syncs_payments_and_marks_first_paid(setup_db):
     client = Client.create(name="C")
     d1 = datetime.date(2024, 1, 1)
     d2 = datetime.date(2024, 2, 1)
@@ -62,14 +65,28 @@ def test_update_policy_adds_payments_and_marks_first_paid(setup_db):
         end_date=d3,
     )
     Payment.create(policy=policy, amount=100, payment_date=d1)
+    Payment.create(policy=policy, amount=200, payment_date=d2)
 
     policy_svc.update_policy(
         policy,
-        payments=[{"amount": 200, "payment_date": d2}],
+        payments=[
+            {"amount": 200, "payment_date": d2},  # остаётся
+            {"amount": 300, "payment_date": d3},  # новый
+        ],
         first_payment_paid=True,
     )
 
     payments = list(policy.payments.order_by(Payment.payment_date))
-    assert len(payments) == 2
+    assert [(p.payment_date, p.amount) for p in payments] == [
+        (d2, 200),
+        (d3, 300),
+    ]
+    # Первый платёж (d2) помечен как оплаченный
     assert payments[0].actual_payment_date == payments[0].payment_date
-    assert payments[1].amount == 200 and payments[1].payment_date == d2
+    # Удалённый платёж (d1)
+    assert (
+        Payment.select()
+        .where((Payment.policy == policy) & (Payment.payment_date == d1))
+        .count()
+        == 0
+    )
