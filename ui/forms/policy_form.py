@@ -226,6 +226,7 @@ class PolicyForm(BaseEditForm):
         if self.instance:
             policy = update_policy(
                 self.instance,
+                payments=payments,
                 first_payment_paid=self.first_payment_checkbox.isChecked(),
                 **data,
             )
@@ -253,6 +254,7 @@ class PolicyForm(BaseEditForm):
                 merged = dlg.get_merged_data()
                 updated = update_policy(
                     e.existing_policy,
+                    payments=self._draft_payments if self._draft_payments else None,
                     first_payment_paid=self.first_payment_checkbox.isChecked(),
                     **merged,
                 )

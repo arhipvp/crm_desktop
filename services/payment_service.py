@@ -205,6 +205,32 @@ def add_payment(**kwargs):
     return payment
 
 
+def merge_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
+    """Добавить в полис недостающие платежи по дате и сумме.
+
+    Args:
+        policy: Полис, к которому добавляются платежи.
+        payments: Список словарей ``{"payment_date", "amount"}``.
+    """
+    if not payments:
+        return
+
+    existing = {
+        (p.payment_date, p.amount)
+        for p in policy.payments.where(Payment.is_deleted == False)
+    }
+    for data in payments:
+        payment_date = data.get("payment_date")
+        amount = data.get("amount")
+        if payment_date is None or amount is None:
+            continue
+        key = (payment_date, amount)
+        if key in existing:
+            continue
+        add_payment(policy=policy, payment_date=payment_date, amount=amount)
+        existing.add(key)
+
+
 # ─────────────────────────── Обновление ───────────────────────────
 
 
