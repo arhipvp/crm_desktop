@@ -65,3 +65,8 @@ def normalize_number(value: str | int | float | None) -> str | None:
     text = text.rstrip(".")
     return text
 
+
+def normalize_policy_number(text: str) -> str:
+    """Убирает пробелы и приводит номер полиса к верхнему регистру."""
+    return re.sub(r"\s+", "", text or "").upper()
+

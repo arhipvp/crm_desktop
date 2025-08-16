@@ -21,7 +21,7 @@ import peewee
 
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id, get_deals_by_client_id
-from services.validators import normalize_number
+from services.validators import normalize_number, normalize_policy_number
 
 from ui.common.combo_helpers import (
     create_client_combobox,
@@ -378,6 +378,10 @@ class PolicyMergeDialog(QDialog):
             text = widget.text().strip()
             if text == "":
                 data[field] = None
+                continue
+
+            if field == "policy_number":
+                data[field] = normalize_policy_number(text)
                 continue
 
             model_field = Policy._meta.fields.get(field)

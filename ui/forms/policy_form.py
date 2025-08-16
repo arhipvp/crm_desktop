@@ -23,7 +23,7 @@ from services.policy_service import (
     update_policy,
     DuplicatePolicyError,
 )
-from services.validators import normalize_number
+from services.validators import normalize_number, normalize_policy_number
 from services.deal_service import get_all_deals, get_deals_by_client_id
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
 from ui.base.base_edit_form import BaseEditForm
@@ -179,6 +179,9 @@ class PolicyForm(BaseEditForm):
     # ---------- сбор данных ----------
     def collect_data(self) -> dict:
         data = super().collect_data()
+
+        if "policy_number" in data:
+            data["policy_number"] = normalize_policy_number(data["policy_number"])
 
         # клиент — либо зафиксированный, либо из комбобокса
         if self._forced_client is not None:
