@@ -6,6 +6,7 @@ from datetime import date
 from peewee import JOIN, ModelSelect  # обязательно
 from peewee import fn
 
+from database.db import db
 from database.models import Client, Expense, Income, Payment, Policy
 
 logger = logging.getLogger(__name__)
@@ -144,6 +145,7 @@ def add_payment(**kwargs):
         Payment: Созданный платёж.
     """
     from services.income_service import add_income
+    from services.expense_service import add_expense
 
     policy = kwargs.get("policy") or Policy.get_or_none(
         Policy.id == kwargs.get("policy_id")
@@ -167,42 +169,41 @@ def add_payment(**kwargs):
         for field in allowed_fields
         if field in kwargs  # убрали фильтр по None
     }
-    payment = Payment.create(policy=policy, is_deleted=False, **clean_data)
-    logger.info(
-        "✅ Добавлен платёж #%s к полису #%s на сумму %.2f",
-        payment.id,
-        policy.policy_number,
-        payment.amount,
-    )
-    try:
-        # При создании платежа доход добавляется автоматически, но без суммы.
-        # Сумма будет указана отдельно после фактического получения средств.
-        add_income(payment=payment, amount=0, policy=policy)
-    except Exception as e:
-        logger.error("❌ Ошибка при добавлении дохода: %s", e)
-
-    # Автоматическая выплата контрагенту
-    from services.expense_service import add_expense
 
     contractor = (policy.contractor or "").strip()  # строка из полиса
-    if contractor:  # есть значение → считаем контрагентом
-        try:
-            add_expense(
-                payment=payment,
-                amount=0,
-                expense_type="контрагент",
-                note=f"выплата контрагенту {contractor}",
-            )
-            logger.info(
-                "💸 Авто-расход контрагенту: платёж #%s ↔ полис #%s (%s)",
-                payment.id,
-                policy.id,
-                contractor,
-            )
-        except Exception as e:
-            logger.error("❌ Ошибка при добавлении расхода: %s", e)
 
-    return payment
+    try:
+        with db.atomic():
+            payment = Payment.create(policy=policy, is_deleted=False, **clean_data)
+            logger.info(
+                "✅ Добавлен платёж #%s к полису #%s на сумму %.2f",
+                payment.id,
+                policy.policy_number,
+                payment.amount,
+            )
+
+            # При создании платежа доход добавляется автоматически, но без суммы.
+            # Сумма будет указана отдельно после фактического получения средств.
+            add_income(payment=payment, amount=0, policy=policy)
+
+            if contractor:  # есть значение → считаем контрагентом
+                add_expense(
+                    payment=payment,
+                    amount=0,
+                    expense_type="контрагент",
+                    note=f"выплата контрагенту {contractor}",
+                )
+                logger.info(
+                    "💸 Авто-расход контрагенту: платёж #%s ↔ полис #%s (%s)",
+                    payment.id,
+                    policy.id,
+                    contractor,
+                )
+
+        return payment
+    except Exception:
+        logger.exception("❌ Ошибка при добавлении платежа")
+        raise
 
 
 def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
