@@ -249,13 +249,20 @@ class PolicyForm(BaseEditForm):
                 self.saved_instance = saved
                 self.accept()
         except DuplicatePolicyError as e:
-            dlg = PolicyMergeDialog(e.existing_policy, data, parent=self)
+            dlg = PolicyMergeDialog(
+                e.existing_policy,
+                data,
+                draft_payments=self._draft_payments,
+                first_payment_paid=self.first_payment_checkbox.isChecked(),
+                parent=self,
+            )
             if dlg.exec() == QDialog.Accepted:
                 merged = dlg.get_merged_data()
+                merged_payments = dlg.get_merged_payments()
                 updated = update_policy(
                     e.existing_policy,
-                    payments=self._draft_payments if self._draft_payments else None,
-                    first_payment_paid=self.first_payment_checkbox.isChecked(),
+                    payments=merged_payments if merged_payments else None,
+                    first_payment_paid=dlg.first_payment_checkbox.isChecked(),
                     **merged,
                 )
                 self.saved_instance = updated

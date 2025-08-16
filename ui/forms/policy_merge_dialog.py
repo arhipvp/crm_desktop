@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QSpinBox,
+    QGroupBox,
+    QDateEdit,
 )
 from PySide6.QtGui import QColor, QDoubleValidator
 from PySide6.QtCore import Qt, QDate
@@ -24,14 +26,23 @@ from services.validators import normalize_number
 from ui.common.combo_helpers import create_client_combobox, create_deal_combobox
 from ui.common.date_utils import OptionalDateEdit, to_qdate
 
-from database.models import Policy
+from database.models import Policy, Payment
 
 
 class PolicyMergeDialog(QDialog):
-    def __init__(self, existing: Policy, new_data: dict, parent=None):
+    def __init__(
+        self,
+        existing: Policy,
+        new_data: dict,
+        draft_payments: list[dict] | None = None,
+        first_payment_paid: bool = False,
+        parent=None,
+    ):
         super().__init__(parent)
         self.existing = existing
         self.new_data = new_data
+        self._draft_payments = draft_payments or []
+        self._first_payment_paid = first_payment_paid
         self.setWindowTitle("Объединение полиса")
         # окно объединения было довольно узким, увеличиваем стандартный размер
         self.setMinimumSize(640, 400)
@@ -129,6 +140,8 @@ class PolicyMergeDialog(QDialog):
         self.table.resizeColumnsToContents()
         self._apply_filter()
 
+        self._build_payments_section(layout)
+
         btns = QHBoxLayout()
         self.merge_btn = QPushButton("Объединить")
         self.merge_btn.clicked.connect(self.accept)
@@ -199,6 +212,108 @@ class PolicyMergeDialog(QDialog):
             if key_item is not None:
                 key_item.setData(Qt.UserRole + 1, changed)
         self._apply_filter()
+
+    # ------------------------------------------------------------------
+    # Payments
+    # ------------------------------------------------------------------
+
+    def _build_payments_section(self, layout: QVBoxLayout) -> None:
+        group = QGroupBox("Платежи")
+        vbox = QVBoxLayout(group)
+        self.payments_table = QTableWidget(0, 3)
+        self.payments_table.setHorizontalHeaderLabels([
+            "Дата платежа",
+            "Сумма",
+            "",
+        ])
+        vbox.addWidget(self.payments_table)
+
+        for p in (
+            self.existing.payments.where(Payment.is_deleted == False)
+            .order_by(Payment.payment_date)
+        ):
+            self._insert_payment_row(p.payment_date, p.amount)
+
+        for p in self._draft_payments:
+            self._insert_payment_row(p.get("payment_date"), p.get("amount"))
+
+        hlayout = QHBoxLayout()
+        self.pay_date_edit = QDateEdit()
+        self.pay_date_edit.setCalendarPopup(True)
+        self.pay_date_edit.setDate(QDate.currentDate())
+        hlayout.addWidget(QLabel("Дата:"))
+        hlayout.addWidget(self.pay_date_edit)
+
+        self.pay_amount_edit = QLineEdit()
+        hlayout.addWidget(QLabel("Сумма:"))
+        hlayout.addWidget(self.pay_amount_edit)
+
+        btn = QPushButton("Добавить платёж")
+        btn.clicked.connect(self.on_add_payment)
+        hlayout.addWidget(btn)
+        vbox.addLayout(hlayout)
+
+        self.first_payment_checkbox = QCheckBox("Первый платёж уже оплачен")
+        if not self._first_payment_paid:
+            first = (
+                self.existing.payments.where(Payment.is_deleted == False)
+                .order_by(Payment.payment_date)
+                .first()
+            )
+            self._first_payment_paid = bool(first and first.actual_payment_date)
+        self.first_payment_checkbox.setChecked(self._first_payment_paid)
+        vbox.addWidget(self.first_payment_checkbox)
+
+        layout.addWidget(group)
+
+    def _insert_payment_row(self, dt, amount) -> None:
+        if dt is None or amount is None:
+            return
+        row = self.payments_table.rowCount()
+        self.payments_table.insertRow(row)
+        qd = QDate(dt.year, dt.month, dt.day)
+        self.payments_table.setItem(row, 0, QTableWidgetItem(qd.toString("dd.MM.yyyy")))
+        self.payments_table.setItem(row, 1, QTableWidgetItem(f"{amount:.2f}"))
+        del_btn = QPushButton("Удалить")
+        del_btn.clicked.connect(lambda _, r=row: self.on_delete_payment(r))
+        self.payments_table.setCellWidget(row, 2, del_btn)
+
+    def on_add_payment(self) -> None:
+        qd = self.pay_date_edit.date()
+        amt_text = normalize_number(self.pay_amount_edit.text())
+        try:
+            amt = float(amt_text)
+        except Exception:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(self, "Ошибка", "Введите корректную сумму")
+            return
+        self._insert_payment_row(qd.toPython(), amt)
+        self.pay_amount_edit.clear()
+
+    def on_delete_payment(self, row: int) -> None:
+        if 0 <= row < self.payments_table.rowCount():
+            self.payments_table.removeRow(row)
+
+    def get_merged_payments(self) -> list[dict]:
+        payments: list[dict] = []
+        for row in range(self.payments_table.rowCount()):
+            date_item = self.payments_table.item(row, 0)
+            amount_item = self.payments_table.item(row, 1)
+            if not date_item or not amount_item:
+                continue
+            qd = QDate.fromString(date_item.text(), "dd.MM.yyyy")
+            if not qd.isValid():
+                continue
+            try:
+                amount = float(normalize_number(amount_item.text()))
+            except Exception:
+                continue
+            payments.append({
+                "payment_date": qd.toPython(),
+                "amount": amount,
+            })
+        return payments
 
     def get_merged_data(self) -> dict:
         data = {}
