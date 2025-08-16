@@ -19,6 +19,9 @@ def setup_logging() -> None:
     logs_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
     os.makedirs(logs_dir, exist_ok=True)
 
+    level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+
     fmt = logging.Formatter(
         "%(asctime)s | %(levelname)-8s | %(name)s │ %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
@@ -31,18 +34,20 @@ def setup_logging() -> None:
         encoding="utf-8",
     )
     file_h.setFormatter(fmt)
+    file_h.setLevel(level)
 
     console_h = logging.StreamHandler()
     console_h.setFormatter(fmt)
+    console_h.setLevel(level)
 
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=level,
         handlers=[file_h, console_h],
         force=True,  # перезаписываем базовую конфигурацию
         format="%(asctime)s | %(levelname)-8s | %(name)20s │ %(message)s",
     )
 
-    logging.getLogger().setLevel(logging.DEBUG)
+    logging.getLogger().setLevel(level)
 
     # Скрываем SELECT-запросы от peewee
     peewee_logger = logging.getLogger("peewee")
