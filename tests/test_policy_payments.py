@@ -90,3 +90,28 @@ def test_update_policy_syncs_payments_and_marks_first_paid(setup_db):
         .count()
         == 0
     )
+
+
+def test_sync_policy_payments_removes_zero_when_real_exists(setup_db):
+    client = Client.create(name="C")
+    d0 = datetime.date(2024, 1, 1)
+    d1 = datetime.date(2024, 2, 1)
+    policy = Policy.create(client=client, policy_number="P", start_date=d0, end_date=d1)
+    zero_payment = Payment.create(policy=policy, amount=0, payment_date=d0)
+
+    pay_svc.sync_policy_payments(
+        policy,
+        [
+            {"amount": 0, "payment_date": d0},
+            {"amount": 100, "payment_date": d1},
+        ],
+    )
+
+    payments = list(policy.payments.where(Payment.is_deleted == False))
+    assert {(p.payment_date, p.amount) for p in payments} == {(d1, 100)}
+    assert (
+        Payment.select()
+        .where((Payment.id == zero_payment.id) & (Payment.is_deleted == True))
+        .count()
+        == 1
+    )
