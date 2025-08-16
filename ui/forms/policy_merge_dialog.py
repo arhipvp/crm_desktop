@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QHBoxLayout,
     QLabel,
+    QCheckBox,
 )
 from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt, QDate
@@ -35,6 +36,9 @@ class PolicyMergeDialog(QDialog):
                 "Итоговое значение отображается в последней колонке."
             )
         )
+        self.show_only_changes_cb = QCheckBox("Показывать только изменения")
+        self.show_only_changes_cb.toggled.connect(self._apply_filter)
+        layout.addWidget(self.show_only_changes_cb)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(
             ["Поле", "Текущее", "Новое значение", "Итоговое"]
@@ -43,8 +47,6 @@ class PolicyMergeDialog(QDialog):
 
         for field, new_val in new_data.items():
             old_val = getattr(existing, field, None)
-            if str(old_val or "") == str(new_val or ""):
-                continue
             row = self.table.rowCount()
             self.table.insertRow(row)
             item = QTableWidgetItem(self._prettify_field(field))
@@ -64,6 +66,7 @@ class PolicyMergeDialog(QDialog):
             edit.textChanged.connect(lambda _=None, r=row, f=field: self._update_final(r, f))
 
         self.table.resizeColumnsToContents()
+        self._apply_filter()
 
         btns = QHBoxLayout()
         self.merge_btn = QPushButton("Объединить")
@@ -99,6 +102,15 @@ class PolicyMergeDialog(QDialog):
                 return str(value)
         return str(value)
 
+    def _apply_filter(self) -> None:
+        show_only = self.show_only_changes_cb.isChecked()
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 0)
+            if item is None:
+                continue
+            changed = bool(item.data(Qt.UserRole + 1))
+            self.table.setRowHidden(row, show_only and not changed)
+
     def _update_final(self, row: int, field: str) -> None:
         widget = self.table.cellWidget(row, 2)
         text = widget.text().strip()
@@ -110,6 +122,10 @@ class PolicyMergeDialog(QDialog):
             changed = str(final_val) != str(old_val)
             item.setBackground(QColor("#fff0b3") if changed else QColor())
             widget.setStyleSheet("background:#fff0b3;" if changed else "")
+            key_item = self.table.item(row, 0)
+            if key_item is not None:
+                key_item.setData(Qt.UserRole + 1, changed)
+        self._apply_filter()
 
     def get_merged_data(self) -> dict:
         data = {}
