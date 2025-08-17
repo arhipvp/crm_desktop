@@ -1,3 +1,5 @@
+import base64
+
 from PySide6.QtWidgets import (
     QDialog,
     QMainWindow,
@@ -6,6 +8,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 from utils.screen_utils import get_scaled_size
+
+from ui import settings as ui_settings
 
 from ui.forms.import_policy_json_form import ImportPolicyJsonForm
 from ui.main_menu import MainMenu
@@ -36,6 +40,8 @@ class MainWindow(QMainWindow):
         self.init_tabs()
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
+        self._load_settings()
+
     def init_tabs(self):
         self.tab_widget = QTabWidget()
         self.setCentralWidget(self.tab_widget)
@@ -62,6 +68,18 @@ class MainWindow(QMainWindow):
         ):
             if hasattr(tab, "data_loaded"):
                 tab.data_loaded.connect(self.show_count)
+
+    def _load_settings(self):
+        st = ui_settings.get_window_settings("MainWindow")
+        geom = st.get("geometry")
+        if geom:
+            try:
+                self.restoreGeometry(base64.b64decode(geom))
+            except Exception:
+                pass
+        idx = st.get("last_tab")
+        if idx is not None and 0 <= int(idx) < self.tab_widget.count():
+            self.tab_widget.setCurrentIndex(int(idx))
 
     def show_count(self, count: int):
         self.status_bar.showMessage(f"Записей: {count}")
@@ -109,3 +127,11 @@ class MainWindow(QMainWindow):
 
         dlg = AiConsultantDialog(self)
         dlg.exec()
+
+    def closeEvent(self, event):
+        st = {
+            "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
+            "last_tab": self.tab_widget.currentIndex(),
+        }
+        ui_settings.set_window_settings("MainWindow", st)
+        super().closeEvent(event)
