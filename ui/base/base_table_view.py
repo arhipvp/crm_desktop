@@ -2,7 +2,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from PySide6.QtCore import QDate, Qt, Signal, QSortFilterProxyModel
+from PySide6.QtCore import QDate, Qt, Signal, QSortFilterProxyModel, QTimer
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -157,16 +157,15 @@ class BaseTableView(QWidget):
 
         self.table.setModel(None)  # Пока модель не установлена
         self.table.setSortingEnabled(True)
+        header = self.table.horizontalHeader()
         # запоминаем изменения сортировки пользователя
-        self.table.horizontalHeader().sortIndicatorChanged.connect(
-            self._on_sort_indicator_changed
-        )
-        self.table.horizontalHeader().sectionResized.connect(
-            self._on_section_resized
-        )
+        header.sortIndicatorChanged.connect(self._on_sort_indicator_changed)
+        header.sectionResized.connect(self._on_section_resized)
+        header.setContextMenuPolicy(Qt.CustomContextMenu)
+        header.customContextMenuRequested.connect(self._on_header_menu)
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setAlternatingRowColors(True)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_table_menu)
         self.left_layout.addWidget(self.table)
@@ -208,7 +207,7 @@ class BaseTableView(QWidget):
             for i in range(self.model.columnCount())
         ]
         self.column_filters.set_headers(headers, prev_texts)
-        self.load_table_settings()
+        QTimer.singleShot(0, self.load_table_settings)
 
     def load_data(self):
         if not self.model_class or not self.get_page_func:
@@ -492,6 +491,21 @@ class BaseTableView(QWidget):
         act_folder.triggered.connect(self.open_selected_folder)
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
+    def _on_header_menu(self, pos):
+        header = self.table.horizontalHeader()
+        menu = QMenu(self)
+        for i in range(header.count()):
+            text = header.model().headerData(i, Qt.Horizontal)
+            action = menu.addAction(str(text))
+            action.setCheckable(True)
+            action.setChecked(not header.isSectionHidden(i))
+            action.toggled.connect(lambda checked, i=i: self._toggle_column(i, checked))
+        menu.exec(header.mapToGlobal(pos))
+
+    def _toggle_column(self, index: int, visible: bool):
+        self.table.setColumnHidden(index, not visible)
+        self.save_table_settings()
+
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
         """Сохраняет текущую сортировку таблицы."""
         self.current_sort_column = column
@@ -505,10 +519,12 @@ class BaseTableView(QWidget):
         """Сохраняет настройки сортировки и ширины колонок."""
         header = self.table.horizontalHeader()
         widths = {i: header.sectionSize(i) for i in range(header.count())}
+        hidden = [i for i in range(header.count()) if self.table.isColumnHidden(i)]
         settings = {
             "sort_column": self.current_sort_column,
             "sort_order": self.current_sort_order.value,
             "column_widths": widths,
+            "hidden_columns": hidden,
         }
         ui_settings.set_table_settings(self.settings_id, settings)
 
@@ -518,21 +534,24 @@ class BaseTableView(QWidget):
         saved = ui_settings.get_table_settings(self.settings_id)
         if not saved:
             return
-        for idx, width in saved.get("column_widths", {}).items():
-            idx = int(idx)
-            if idx < header.count():
-                header.resizeSection(idx, width)
         column = saved.get("sort_column")
         order = saved.get("sort_order")
         if column is not None and order is not None:
             try:
-                self.table.horizontalHeader().setSortIndicator(
-                    int(column), Qt.SortOrder(order)
-                )
+                header.setSortIndicator(int(column), Qt.SortOrder(order))
                 self.current_sort_column = int(column)
                 self.current_sort_order = Qt.SortOrder(order)
             except Exception:
                 pass
+        for idx, width in saved.get("column_widths", {}).items():
+            idx = int(idx)
+            if idx < header.count():
+                header.resizeSection(idx, width)
+        model_columns = self.table.model().columnCount()
+        for idx in saved.get("hidden_columns", []):
+            idx = int(idx)
+            if idx < model_columns:
+                self.table.setColumnHidden(idx, True)
 
     def closeEvent(self, event):
         self.save_table_settings()
