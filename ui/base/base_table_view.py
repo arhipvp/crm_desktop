@@ -22,7 +22,7 @@ from ui.common.styled_widgets import styled_button
 from ui.common.column_proxy_model import ColumnFilterProxyModel
 from ui.common.column_filter_row import ColumnFilterRow
 from ui import settings as ui_settings
-from services.folder_utils import open_folder
+from services.folder_utils import open_folder, copy_text_to_clipboard
 
 
 class BaseTableView(QWidget):
@@ -486,9 +486,14 @@ class BaseTableView(QWidget):
         act_open = menu.addAction("Открыть/редактировать")
         act_delete = menu.addAction("Удалить")
         act_folder = menu.addAction("Открыть папку")
+        text = str(index.data() or "")
+        act_copy = menu.addAction("Копировать значение")
         act_open.triggered.connect(self._on_edit)
         act_delete.triggered.connect(self._on_delete)
         act_folder.triggered.connect(self.open_selected_folder)
+        act_copy.triggered.connect(
+            lambda: copy_text_to_clipboard(text, parent=self)
+        )
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def _on_header_menu(self, pos):
