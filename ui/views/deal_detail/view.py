@@ -15,6 +15,7 @@ from services.policy_service import get_policies_by_deal_id
 from services.income_service import build_income_query
 from services.expense_service import get_expenses_by_deal
 from utils.screen_utils import get_scaled_size
+from ui.forms.client_form import ClientForm
 
 from .actions import DealActionsMixin
 from .tabs import DealTabsMixin
@@ -39,10 +40,13 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self.layout = QVBoxLayout(self)
         self._shortcuts: list[QShortcut] = []
 
-        header = QLabel(f"<h1>Сделка #{deal.id}</h1>")
-        header.setTextFormat(Qt.RichText)
-        header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.layout.addWidget(header)
+        self.header = QLabel(
+            f"<h1><a href='#client'>{deal.client.name}</a> — Сделка #{deal.id}</h1>"
+        )
+        self.header.setTextFormat(Qt.RichText)
+        self.header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.header.linkActivated.connect(self._on_client_link)
+        self.layout.addWidget(self.header)
 
         self.kpi_layout = QHBoxLayout()
         self.layout.addLayout(self.kpi_layout)
@@ -111,3 +115,16 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             lbl.setTextFormat(Qt.RichText)
             self.kpi_layout.addWidget(lbl)
         self.kpi_layout.addStretch()
+
+    def _on_client_link(self, _link: str) -> None:
+        form = ClientForm(self.instance.client, parent=self)
+        if form.exec():
+            self.instance.client = form.instance
+            self.setWindowTitle(
+                f"Сделка #{self.instance.id} — {self.instance.client.name}: {self.instance.description}"
+            )
+            self.header.setText(
+                f"<h1><a href='#client'>{self.instance.client.name}</a> — Сделка #{self.instance.id}</h1>"
+            )
+            self._init_kpi_panel()
+            self._init_tabs()
