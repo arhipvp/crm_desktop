@@ -163,7 +163,8 @@ class DealTabsMixin:
         pol_view.load_data()
         pol_l.addWidget(pol_view)
         self.pol_view = pol_view
-        self.policy_tab_idx = self.tabs.addTab(pol_tab, "Полисы")
+        pol_cnt = getattr(self, "cnt_policies", 0)
+        self.policy_tab_idx = self.tabs.addTab(pol_tab, f"Полисы ({pol_cnt})")
 
         # ---------- Платежи ---------------------------------------
         pay_tab = QWidget()
@@ -176,7 +177,8 @@ class DealTabsMixin:
         pay_view.load_data()
         pay_l.addWidget(pay_view)
         self.pay_view = pay_view
-        self.payment_tab_idx = self.tabs.addTab(pay_tab, "Платежи")
+        pay_cnt = getattr(self, "cnt_payments", 0)
+        self.payment_tab_idx = self.tabs.addTab(pay_tab, f"Платежи ({pay_cnt})")
 
         # ---------- Доходы ---------------------------------------
         income_tab = QWidget()
@@ -193,7 +195,10 @@ class DealTabsMixin:
         income_view.load_data()
         income_layout.addWidget(income_view)
         self.income_view = income_view
-        self.income_tab_idx = self.tabs.addTab(income_tab, "Доходы")
+        income_cnt = getattr(self, "cnt_income", 0)
+        self.income_tab_idx = self.tabs.addTab(
+            income_tab, f"Доходы ({income_cnt})"
+        )
 
         # ---------- Расходы --------------------------------------
         expense_tab = QWidget()
@@ -206,7 +211,10 @@ class DealTabsMixin:
         expense_view.load_data()
         expense_layout.addWidget(expense_view)
         self.expense_view = expense_view
-        self.expense_tab_idx = self.tabs.addTab(expense_tab, "Расходы")
+        expense_cnt = getattr(self, "cnt_expense", 0)
+        self.expense_tab_idx = self.tabs.addTab(
+            expense_tab, f"Расходы ({expense_cnt})"
+        )
 
         # ---------- Задачи ---------------------------------------
         task_tab = QWidget()
@@ -228,7 +236,8 @@ class DealTabsMixin:
         task_view.table.setSortingEnabled(True)
         task_view.row_double_clicked.connect(self._on_task_double_clicked)
         self.task_view = task_view
-        self.task_tab_idx = self.tabs.addTab(task_tab, "Задачи")
+        task_cnt = getattr(self, "cnt_tasks", 0)
+        self.task_tab_idx = self.tabs.addTab(task_tab, f"Задачи ({task_cnt})")
 
     def _adjust_task_columns(self, *_):
         """Настройка колонок таблицы задач во вкладке сделки."""

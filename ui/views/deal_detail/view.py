@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
 from services.deal_service import get_tasks_by_deal_id
 from services.payment_service import get_payments_by_deal_id
 from services.policy_service import get_policies_by_deal_id
+from services.income_service import build_income_query
+from services.expense_service import get_expenses_by_deal
 from utils.screen_utils import get_scaled_size
 
 from .actions import DealActionsMixin
@@ -83,6 +85,14 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         cnt_policies = len(get_policies_by_deal_id(self.instance.id))
         cnt_payments = len(get_payments_by_deal_id(self.instance.id))
         cnt_tasks = len(get_tasks_by_deal_id(self.instance.id))
+        cnt_income = build_income_query(deal_id=self.instance.id).count()
+        cnt_expense = get_expenses_by_deal(self.instance.id).count()
+
+        self.cnt_policies = cnt_policies
+        self.cnt_payments = cnt_payments
+        self.cnt_tasks = cnt_tasks
+        self.cnt_income = cnt_income
+        self.cnt_expense = cnt_expense
 
         from services import executor_service as es
 
@@ -92,6 +102,8 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         for text in [
             f"Полисов: <b>{cnt_policies}</b>",
             f"Платежей: <b>{cnt_payments}</b>",
+            f"Доходов: <b>{cnt_income}</b>",
+            f"Расходов: <b>{cnt_expense}</b>",
             f"Задач: <b>{cnt_tasks}</b>",
             f"<span style='color:red; font-weight:bold'>Исполнитель: {executor_name}</span>",
         ]:

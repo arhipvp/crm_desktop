@@ -147,6 +147,7 @@ class DealActionsMixin:
             self.setWindowTitle(
                 f"Сделка #{self.instance.id} — {self.instance.client.name}: {self.instance.description}"
             )
+            self._init_kpi_panel()
             self._init_tabs()
 
     def _on_add_policy(self):
@@ -161,11 +162,13 @@ class DealActionsMixin:
             forced_deal=self.instance,
         )
         if form.exec():
+            self._init_kpi_panel()
             self._init_tabs()  # перерисовать KPI + таблицы
 
     def _on_add_payment(self):
         form = PaymentForm(parent=self)
         if form.exec():
+            self._init_kpi_panel()
             self._init_tabs()
 
     def _on_add_task(self):
@@ -175,8 +178,8 @@ class DealActionsMixin:
             if idx >= 0:
                 form.deal_combo.setCurrentIndex(idx)
         if form.exec():
-            self.task_view.refresh()  # загрузит только задачи сделки
             self._init_kpi_panel()
+            self._init_tabs()
 
     def _on_new_exec_task(self):
         form = TaskForm(parent=self, forced_deal=self.instance)
@@ -197,9 +200,8 @@ class DealActionsMixin:
                 show_error("Исполнитель не привязан")
             else:
                 queue_task(task.id)
-            if hasattr(self, "task_view"):
-                self.task_view.refresh()
             self._init_kpi_panel()
+            self._init_tabs()
 
     def _open_folder(self):
         path = self.instance.drive_folder_path or self.instance.drive_folder_link
@@ -392,8 +394,8 @@ class DealActionsMixin:
     def _on_task_double_clicked(self, task):
         form = TaskForm(task, parent=self)
         if form.exec():
-            self.task_view.refresh()
             self._init_kpi_panel()
+            self._init_tabs()
 
     def _on_add_calculation(self):
         from ui.forms.calculation_form import CalculationForm
@@ -405,6 +407,7 @@ class DealActionsMixin:
     def _on_add_income(self):
         dlg = IncomeForm(parent=self, deal_id=self.instance.id)
         if dlg.exec():
+            self._init_kpi_panel()
             self._init_tabs()
 
     def _on_prev_deal(self):
@@ -428,6 +431,7 @@ class DealActionsMixin:
 
         dlg = ExpenseForm(parent=self, deal_id=self.instance.id)
         if dlg.exec():
+            self._init_kpi_panel()
             self._init_tabs()
 
     def _on_close_deal(self):
@@ -451,6 +455,7 @@ class DealActionsMixin:
             forced_deal=self.instance,
         )
         if dlg.exec():
+            self._init_kpi_panel()
             self._init_tabs()
 
     def _on_process_policies_ai(self):
@@ -462,6 +467,7 @@ class DealActionsMixin:
             forced_deal=self.instance,
         )
         if dlg.exec():
+            self._init_kpi_panel()
             self._init_tabs()
 
     def _on_process_policy_text_ai(self):
@@ -473,6 +479,7 @@ class DealActionsMixin:
             forced_deal=self.instance,
         )
         if dlg.exec():
+            self._init_kpi_panel()
             self._init_tabs()
 
     def _on_delay_to_event(self):
