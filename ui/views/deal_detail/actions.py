@@ -84,6 +84,13 @@ class DealActionsMixin:
         self._add_shortcut("Alt+Right", self._on_next_deal)
         box.addWidget(btn_next)
 
+        has_prev = get_prev_deal(self.instance)
+        has_next = get_next_deal(self.instance)
+        btn_prev.setEnabled(has_prev is not None)
+        btn_next.setEnabled(has_next is not None)
+        self.btn_prev = btn_prev
+        self.btn_next = btn_next
+
         if not self.instance.is_closed:
             btn_delay = styled_button("⏳ Отложить", shortcut="Ctrl+Shift+N")
             btn_delay.clicked.connect(self._on_delay_to_event)
@@ -325,6 +332,10 @@ class DealActionsMixin:
         else:
             self.btn_exec.setText("Привязать исполнителя")
 
+    def _update_nav_buttons(self):
+        self.btn_prev.setEnabled(get_prev_deal(self.instance) is not None)
+        self.btn_next.setEnabled(get_next_deal(self.instance) is not None)
+
     def _open_whatsapp(self):
         from services.client_service import (
             format_phone_for_whatsapp,
@@ -390,6 +401,7 @@ class DealActionsMixin:
             )
             self._init_kpi_panel()
             self._init_tabs()
+            self._update_nav_buttons()
 
     def _on_task_double_clicked(self, task):
         form = TaskForm(task, parent=self)
