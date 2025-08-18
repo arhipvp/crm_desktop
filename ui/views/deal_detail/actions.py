@@ -131,6 +131,24 @@ class DealActionsMixin:
         ui_settings.set_window_settings(self.SETTINGS_KEY, st)
 
     def closeEvent(self, event):
+        status = self.status_edit.toPlainText().strip()
+        reminder = (
+            self.reminder_date.date().toPython()
+            if self.reminder_date.date().isValid()
+            else None
+        )
+        calc_text = self.calc_append.toPlainText().strip()
+
+        if (
+            status != (self.instance.status or "")
+            or reminder != self.instance.reminder_date
+            or calc_text
+        ):
+            if not confirm("Сохранить изменения?"):
+                event.ignore()
+                return
+            self._on_inline_save()
+
         self._save_settings()
         super().closeEvent(event)
 
