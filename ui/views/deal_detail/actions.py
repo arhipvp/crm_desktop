@@ -345,6 +345,8 @@ class DealActionsMixin:
         phone = self.instance.client.phone
         if phone:
             open_whatsapp(format_phone_for_whatsapp(phone))
+        else:
+            show_error("Не указан телефон клиента")
 
     def _on_inline_save(self):
         status = self.status_edit.toPlainText().strip()
