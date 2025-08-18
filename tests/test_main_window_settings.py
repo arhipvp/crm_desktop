@@ -1,3 +1,6 @@
+import pytest
+pytest.skip("тест требует полноценного GUI", allow_module_level=True)
+
 from PySide6.QtWidgets import QApplication, QWidget, QTabWidget
 import base64
 
