@@ -10,6 +10,7 @@ from services.income_service import (
     mark_income_deleted,
     mark_incomes_deleted,
     get_incomes_page,
+    get_income_highlight_color,
 )
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
@@ -62,9 +63,8 @@ class IncomeTableModel(BaseTableModel):
         deal = getattr(policy, "deal", None) if policy else None
 
         if role == Qt.BackgroundRole:
-            if policy and (policy.contractor or "").strip():
-                return QBrush(QColor("#ffcccc"))
-            return None
+            color = get_income_highlight_color(obj)
+            return QBrush(QColor(color)) if color else None
 
         if role != Qt.DisplayRole:
             return None
