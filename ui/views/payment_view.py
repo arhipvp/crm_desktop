@@ -48,8 +48,12 @@ class PaymentView(QWidget):
         self.search_input.setPlaceholderText(
             "Поиск по номеру полиса или имени клиента..."
         )
-        self.search_input.textChanged.connect(self.reset_pagination)
+        self.search_input.returnPressed.connect(self.reset_pagination)
         control_layout.addWidget(self.search_input)
+
+        self.clear_search_btn = QPushButton("Очистить")
+        self.clear_search_btn.clicked.connect(self.clear_search)
+        control_layout.addWidget(self.clear_search_btn)
 
         control_layout.addStretch()
         self.layout.addLayout(control_layout)
@@ -72,6 +76,10 @@ class PaymentView(QWidget):
     def reset_pagination(self):
         self.current_page = 1
         self.load_payments()
+
+    def clear_search(self):
+        self.search_input.clear()
+        self.reset_pagination()
 
     def load_payments(self):
         search_text = self.search_input.text().strip().lower()
