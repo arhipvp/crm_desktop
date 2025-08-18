@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QInputDialog
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QInputDialog, QProgressDialog
 
 from database.models import Deal
 from services.deal_service import (
@@ -286,8 +286,15 @@ class DealActionsMixin:
         dest = self._ensure_local_folder()
         if not dest:
             return
-        for src in files:
-            move_file_to_folder(src, dest)
+        dlg = QProgressDialog("Перенос...", "Отмена", 0, len(files), self)
+        try:
+            for i, src in enumerate(files, 1):
+                if dlg.wasCanceled():
+                    break
+                move_file_to_folder(src, dest)
+                dlg.setValue(i)
+        finally:
+            dlg.close()
 
     def dragEnterEvent(self, event):  # noqa: D401 - Qt override
         """Qt drag enter handler."""
