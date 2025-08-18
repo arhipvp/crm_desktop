@@ -1,6 +1,19 @@
 import os
 import signal
 import pytest
+from peewee import SqliteDatabase
+
+from database.db import db
+from database.models import (
+    Client,
+    Policy,
+    Payment,
+    Income,
+    Expense,
+    Deal,
+    Executor,
+    DealExecutor,
+)
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -31,3 +44,13 @@ def pytest_runtest_logstart(nodeid, location):
 
 def pytest_runtest_logfinish(nodeid, location):
     print(f"-- FINISH {nodeid}")
+
+
+@pytest.fixture()
+def in_memory_db(monkeypatch):
+    test_db = SqliteDatabase(':memory:')
+    db.initialize(test_db)
+    test_db.create_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor])
+    yield
+    test_db.drop_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor])
+    test_db.close()

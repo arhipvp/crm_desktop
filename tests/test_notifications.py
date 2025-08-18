@@ -1,8 +1,5 @@
 import datetime
 import pytest
-from peewee import SqliteDatabase
-
-from database.db import db
 from database.models import (
     Client,
     Deal,
@@ -18,19 +15,10 @@ import services.telegram_service as ts
 import services.income_service as ins
 
 
-@pytest.fixture()
-def setup_db(monkeypatch):
-    test_db = SqliteDatabase(':memory:')
-    db.initialize(test_db)
-    test_db.create_tables([Client, Deal, Policy, Payment, Executor, DealExecutor, Income])
+def test_notify_on_policy_add(in_memory_db, monkeypatch):
     monkeypatch.setattr(ps, "create_policy_folder", lambda *a, **k: None)
     monkeypatch.setattr(ps, "open_folder", lambda *a, **k: None)
-    yield
-    test_db.drop_tables([Client, Deal, Policy, Payment, Executor, DealExecutor, Income])
-    test_db.close()
 
-
-def test_notify_on_policy_add(setup_db, monkeypatch):
     client = Client.create(name='C')
     deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
     executor = Executor.create(full_name='E', tg_id=1, is_active=True)
@@ -53,7 +41,7 @@ def test_notify_on_policy_add(setup_db, monkeypatch):
     assert 'P' in sent.get('text', '')
 
 
-def test_notify_on_unassign(setup_db, monkeypatch):
+def test_notify_on_unassign(in_memory_db, monkeypatch):
     client = Client.create(name='C')
     deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
     executor = Executor.create(full_name='E', tg_id=1, is_active=True)
@@ -68,7 +56,7 @@ def test_notify_on_unassign(setup_db, monkeypatch):
     assert str(deal.id) in sent.get('text', '')
 
 
-def test_notify_on_income_received(setup_db, monkeypatch):
+def test_notify_on_income_received(in_memory_db, monkeypatch):
     client = Client.create(name='C')
     deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
     executor = Executor.create(full_name='E', tg_id=1, is_active=True)
