@@ -1,11 +1,12 @@
 import pytest
-pytest.skip("тест требует полноценного GUI", allow_module_level=True)
 
 from PySide6.QtWidgets import QApplication, QWidget, QTabWidget
 import base64
 
 from ui.main_window import MainWindow
 from ui import settings as ui_settings
+
+pytestmark = pytest.mark.slow
 
 
 def _create_app():
