@@ -8,5 +8,11 @@ def test_normalize_number_basic():
     assert normalize_number("123руб.") == "123"
 
 
+def test_normalize_number_extra_cases():
+    assert normalize_number("12\u00a0345.") == "12345"
+    assert normalize_number(100) == "100"
+    assert normalize_number(10.5) == "10.5"
+
+
 def test_normalize_phone():
     assert normalize_phone("8 (900) 111-22-33") == "+79001112233"
