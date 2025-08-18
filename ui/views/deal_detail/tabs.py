@@ -27,6 +27,7 @@ from .widgets import _CalcHighlighter, _with_day_separators, CollapsibleWidget
 
 class DealTabsMixin:
     def _init_tabs(self):
+        current = self.tabs.currentIndex()
         # удаляем старые вкладки
         while self.tabs.count():
             w = self.tabs.widget(0)
@@ -238,6 +239,8 @@ class DealTabsMixin:
         self.task_view = task_view
         task_cnt = getattr(self, "cnt_tasks", 0)
         self.task_tab_idx = self.tabs.addTab(task_tab, f"Задачи ({task_cnt})")
+
+        self.tabs.setCurrentIndex(min(current, self.tabs.count() - 1))
 
     def _adjust_task_columns(self, *_):
         """Настройка колонок таблицы задач во вкладке сделки."""
