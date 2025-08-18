@@ -14,6 +14,7 @@ from services import executor_service as es
 import services.telegram_service as ts
 import services.income_service as ins
 
+pytestmark = pytest.mark.slow
 
 def test_notify_on_policy_add(in_memory_db, monkeypatch):
     monkeypatch.setattr(ps, "create_policy_folder", lambda *a, **k: None)
