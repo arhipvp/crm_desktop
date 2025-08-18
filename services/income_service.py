@@ -13,6 +13,22 @@ from services.telegram_service import notify_executor
 
 logger = logging.getLogger(__name__)
 
+# ──────────────────────── вспомогательные утилиты ────────────────────────
+
+def get_income_highlight_color(income: Income) -> str | None:
+    """Вернуть цвет подсветки строки дохода.
+
+    Если у связанного полиса указан контрагент, возвращается розовый цвет
+    ``"#ffcccc"``. В противном случае возвращается ``None``.
+    """
+
+    payment = getattr(income, "payment", None)
+    policy = getattr(payment, "policy", None) if payment else None
+    contractor = getattr(policy, "contractor", "") if policy else ""
+    if contractor and contractor.strip():
+        return "#ffcccc"
+    return None
+
 # ───────────────────────── базовые CRUD ─────────────────────────
 
 def get_all_incomes():
