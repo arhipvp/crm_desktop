@@ -39,7 +39,13 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self.layout = QVBoxLayout(self)
         self._shortcuts: list[QShortcut] = []
 
-        header = QLabel(f"<h1>Сделка #{deal.id}</h1>")
+        status = self.instance.status or "Без статуса"
+        color_map = {"Закрыта": "#d9534f", "Активна": "#5cb85c"}
+        color = color_map.get(status, "#6c757d")
+        header = QLabel(
+            f"<h1><span style='background:{color};padding:2px 6px;color:#fff'>"
+            f"{status}</span> Сделка #{deal.id}</h1>"
+        )
         header.setTextFormat(Qt.RichText)
         header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.layout.addWidget(header)
