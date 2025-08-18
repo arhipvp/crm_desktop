@@ -1,7 +1,7 @@
 import datetime
 import pytest
 from peewee import SqliteDatabase
-from PySide6.QtWidgets import QApplication, QComboBox
+from PySide6.QtWidgets import QComboBox
 from PySide6.QtCore import QDate, Qt
 
 from database.db import db
@@ -9,13 +9,6 @@ from database.models import Client, Deal, Policy, Payment, Income, Expense
 from services.policy_service import update_policy
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
 from ui.common.date_utils import OptionalDateEdit
-
-
-def _create_app():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
 
 
 def _find_row(dlg: PolicyMergeDialog, field: str) -> int:
@@ -26,8 +19,7 @@ def _find_row(dlg: PolicyMergeDialog, field: str) -> int:
     raise AssertionError(f"Row {field} not found")
 
 
-def test_policy_merge_dialog_display_and_filter(setup_db):
-    _create_app()
+def test_policy_merge_dialog_display_and_filter(qapp, setup_db):
     client = Client.create(name="C")
     existing = Policy.create(
         client=client,
@@ -71,8 +63,7 @@ def setup_db():
     test_db.close()
 
 
-def test_merge_dialog_dates_and_combos(setup_db):
-    _create_app()
+def test_merge_dialog_dates_and_combos(qapp, setup_db):
     c1 = Client.create(name='Old')
     c2 = Client.create(name='New')
     deal = Deal.create(client=c2, description='D', start_date=datetime.date(2024, 1, 1))
@@ -112,8 +103,7 @@ def test_merge_dialog_dates_and_combos(setup_db):
     assert data['end_date'] == datetime.date(2025, 2, 1)
 
 
-def test_client_change_filters_deals(setup_db):
-    _create_app()
+def test_client_change_filters_deals(qapp, setup_db):
     c1 = Client.create(name="C1")
     c2 = Client.create(name="C2")
     d1 = Deal.create(client=c1, description="D1", start_date=datetime.date(2024, 1, 1))
@@ -137,8 +127,7 @@ def test_client_change_filters_deals(setup_db):
     assert d2.id in ids_after and d1.id not in ids_after
 
 
-def test_merge_dialog_payments_editing(setup_db):
-    _create_app()
+def test_merge_dialog_payments_editing(qapp, setup_db):
     c = Client.create(name="C")
     start = datetime.date(2024, 1, 1)
     end = datetime.date(2024, 12, 31)

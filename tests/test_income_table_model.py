@@ -1,19 +1,11 @@
 import datetime
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush
-from PySide6.QtWidgets import QApplication
 
 from database.models import Policy, Payment, Income
 from ui.views.income_table_view import IncomeTableModel
 
-def _create_app():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-def test_row_highlight_with_contractor():
-    _create_app()
+def test_row_highlight_with_contractor(qapp):
     policy = Policy(policy_number="123", contractor="Some Corp", start_date=datetime.date.today())
     payment = Payment(policy=policy, amount=100, payment_date=datetime.date.today())
     income = Income(payment=payment, amount=10, received_date=datetime.date.today())
@@ -22,8 +14,7 @@ def test_row_highlight_with_contractor():
     brush = model.data(idx, Qt.BackgroundRole)
     assert isinstance(brush, QBrush)
 
-def test_row_no_highlight_without_contractor():
-    _create_app()
+def test_row_no_highlight_without_contractor(qapp):
     policy = Policy(policy_number="456", contractor=None, start_date=datetime.date.today())
     payment = Payment(policy=policy, amount=100, payment_date=datetime.date.today())
     income = Income(payment=payment, amount=10, received_date=datetime.date.today())

@@ -1,19 +1,11 @@
-from PySide6.QtWidgets import QApplication, QWidget, QTabWidget
+from PySide6.QtWidgets import QWidget, QTabWidget
 import base64
 
 from ui.main_window import MainWindow
 from ui import settings as ui_settings
 
 
-def _create_app():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-
-def test_main_window_restores_geometry_and_tab(tmp_path, monkeypatch):
-    _create_app()
+def test_main_window_restores_geometry_and_tab(qapp, tmp_path, monkeypatch):
     monkeypatch.setattr(ui_settings, "SETTINGS_PATH", tmp_path / "ui_settings.json")
 
     def dummy_init_tabs(self):
@@ -25,7 +17,7 @@ def test_main_window_restores_geometry_and_tab(tmp_path, monkeypatch):
     monkeypatch.setattr(MainWindow, "init_tabs", dummy_init_tabs)
     monkeypatch.setattr(MainWindow, "on_tab_changed", lambda self, index: None)
 
-    app = QApplication.instance()
+    app = qapp
     w1 = MainWindow()
     w1.show()
     app.processEvents()

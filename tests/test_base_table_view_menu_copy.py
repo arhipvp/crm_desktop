@@ -1,19 +1,11 @@
 import peewee
-from PySide6.QtWidgets import QApplication, QTableView, QMenu
+from PySide6.QtWidgets import QTableView, QMenu
 from PySide6.QtCore import QPoint
 
 from ui.base.base_table_view import BaseTableView
 
 
-def _create_app():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-
-def test_copy_menu_item(monkeypatch):
-    _create_app()
+def test_copy_menu_item(qapp, monkeypatch):
 
     db = peewee.SqliteDatabase(":memory:")
 

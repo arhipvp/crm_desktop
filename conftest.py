@@ -1,10 +1,17 @@
 import os
 import signal
 import pytest
+from PySide6.QtWidgets import QApplication
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 _TEST_TIMEOUT = int(os.environ.get("PYTEST_TIMEOUT", "60"))
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    app = QApplication.instance() or QApplication([])
+    yield app
 
 
 @pytest.fixture(autouse=True)
