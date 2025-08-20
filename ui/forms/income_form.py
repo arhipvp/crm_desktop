@@ -8,6 +8,7 @@ from __future__ import annotations
   делает это через _prefill_payment_in_form). Поле после этого
   становится read‑only, чтобы пользователь не мог изменить привязку.
 """
+from PySide6.QtCore import QDate
 from PySide6.QtWidgets import QLabel
 
 from services.income_service import add_income, create_stub_income, update_income
@@ -22,6 +23,7 @@ class IncomeForm(BaseEditForm):
 
     def __init__(self, instance=None, parent=None, deal_id=None):
         self.deal_id = deal_id
+        self._is_new = instance is None
         if instance:
             inst = instance
         else:
@@ -70,6 +72,9 @@ class IncomeForm(BaseEditForm):
         self.form_layout.insertRow(0, "Платёж:", self.payment_combo)
 
         self.received_date_edit = OptionalDateEdit()
+        if self._is_new or getattr(self.instance, "received_date", None) is None:
+            # если дата не была заполнена ранее — ставим сегодняшнюю
+            self.received_date_edit.setDate(QDate.currentDate())
         self.fields["received_date"] = self.received_date_edit
         self.form_layout.addRow("Дата получения:", self.received_date_edit)
 
