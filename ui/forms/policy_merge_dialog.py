@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QDateEdit,
 )
-from PySide6.QtGui import QColor, QDoubleValidator
+from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt, QDate
 import peewee
 
@@ -131,7 +131,6 @@ class PolicyMergeDialog(QDialog):
                 )
             elif isinstance(model_field, peewee.FloatField):
                 edit = QLineEdit("" if new_val is None else str(new_val))
-                edit.setValidator(QDoubleValidator())
                 edit.textChanged.connect(
                     lambda _=None, r=row, f=field: self._update_final(r, f)
                 )
@@ -281,7 +280,6 @@ class PolicyMergeDialog(QDialog):
         hlayout.addWidget(self.pay_date_edit)
 
         self.pay_amount_edit = QLineEdit()
-        self.pay_amount_edit.setValidator(QDoubleValidator(0.0, 1e9, 2))
         hlayout.addWidget(QLabel("Сумма:"))
         hlayout.addWidget(self.pay_amount_edit)
 
@@ -317,7 +315,7 @@ class PolicyMergeDialog(QDialog):
 
     def on_add_payment(self) -> None:
         qd = self.pay_date_edit.date()
-        amt = float(self.pay_amount_edit.text())
+        amt = float(normalize_number(self.pay_amount_edit.text()))
         self._insert_payment_row(qd.toPython(), amt)
         self.pay_amount_edit.clear()
 
