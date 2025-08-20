@@ -23,12 +23,16 @@ logger = logging.getLogger(__name__)
 
 class IncomeTableModel(BaseTableModel):
     VIRTUAL_FIELDS = [
-        "payment_info",
+        "policy_number",
         "deal_desc",
         "client_name",
-        "contractor",
+        "policy_start",
+        "payment_amount",
+        "payment_date",
+        "payment_income_total",
         "amount",
         "received",
+        "executor",
     ]
 
     def __init__(self, objects, model_class, parent=None):
@@ -43,6 +47,7 @@ class IncomeTableModel(BaseTableModel):
             "Дата начала",
             "Сумма платежа",
             "Дата платежа",
+            "Доход по платежу",
             "Сумма комиссии",
             "Дата получения",
             "Исполнитель",
@@ -92,14 +97,20 @@ class IncomeTableModel(BaseTableModel):
                 else "—"
             )
         elif col == 6:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+            if payment:
+                incomes = payment.incomes.where(Income.is_deleted == False)
+                total = sum(inc.amount for inc in incomes)
+                return f"{total:,.2f} ₽"
+            return "0 ₽"
         elif col == 7:
+            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+        elif col == 8:
             return (
                 obj.received_date.strftime("%d.%m.%Y")
                 if obj.received_date
                 else "—"
             )
-        elif col == 8:
+        elif col == 9:
             if deal and getattr(deal, "executors", None):
                 ex = deal.executors[0].executor
                 return ex.full_name if ex else "—"
@@ -121,9 +132,10 @@ class IncomeTableView(BaseTableView):
         3: Policy.start_date,
         4: Payment.amount,
         5: Payment.payment_date,
-        6: Income.amount,
-        7: Income.received_date,
-        8: Executor.full_name,
+        6: None,
+        7: Income.amount,
+        8: Income.received_date,
+        9: Executor.full_name,
     }
     def __init__(self, parent=None, deal_id=None):
         checkbox_map = {
@@ -145,7 +157,7 @@ class IncomeTableView(BaseTableView):
             self._on_column_filter_changed_db
         )
         self.deal_id = deal_id
-        self.default_sort_column = 7
+        self.default_sort_column = 8
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
@@ -188,6 +200,8 @@ class IncomeTableView(BaseTableView):
         """Собрать фильтры по столбцам в виде {Field: text}."""
         result: dict = {}
         for col, field in self.COLUMN_FIELD_MAP.items():
+            if field is None:
+                continue
             text = self.column_filters.get_text(col)
             if text:
                 result[field] = text
@@ -201,6 +215,8 @@ class IncomeTableView(BaseTableView):
         order_field = self.COLUMN_FIELD_MAP.get(
             self.current_sort_column, Income.received_date
         )
+        if order_field is None:
+            order_field = Income.received_date
         order_dir = (
             "desc" if self.current_sort_order == Qt.DescendingOrder else "asc"
         )
