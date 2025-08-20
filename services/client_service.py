@@ -131,8 +131,17 @@ def add_client(**kwargs) -> Client:
             client.drive_folder_path = folder_path
             client.drive_folder_link = folder_link
             client.save()
-        except Exception as e:
+        except PermissionError as e:
+            logger.error(
+                "❌ Недостаточно прав для создания папки клиента: %s", e
+            )
+        except OSError as e:
             logger.error("❌ Ошибка создания папки клиента: %s", e)
+        except Exception:
+            logger.exception(
+                "❌ Неожиданная ошибка при создании папки клиента"
+            )
+            raise
 
         return client
 
