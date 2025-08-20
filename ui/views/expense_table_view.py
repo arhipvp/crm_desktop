@@ -24,6 +24,7 @@ class ExpenseTableModel(BaseTableModel):
             'Полис',
             'Сделка',
             'Клиент',
+            'Контрагент',
             'Дата начала',
             'Тип расхода',
             'Сумма платежа',
@@ -63,32 +64,34 @@ class ExpenseTableModel(BaseTableModel):
         elif col == 2:
             return policy.client.name if policy and policy.client else "—"
         elif col == 3:
+            return policy.contractor if policy and policy.contractor else "—"
+        elif col == 4:
             return (
                 policy.start_date.strftime("%d.%m.%Y")
                 if policy and policy.start_date
                 else "—"
             )
-        elif col == 4:
-            return obj.expense_type or "—"
         elif col == 5:
+            return obj.expense_type or "—"
+        elif col == 6:
             return (
                 f"{payment.amount:,.2f} ₽" if payment and payment.amount else "0 ₽"
             )
-        elif col == 6:
+        elif col == 7:
             return (
                 payment.payment_date.strftime("%d.%m.%Y")
                 if payment and payment.payment_date
                 else "—"
             )
-        elif col == 7:
+        elif col == 8:
             if payment:
                 incomes = payment.incomes.where(Income.is_deleted == False)
                 total = sum(inc.amount for inc in incomes)
                 return f"{total:,.2f} ₽"
             return "0 ₽"
-        elif col == 8:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
         elif col == 9:
+            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+        elif col == 10:
             return (
                 obj.expense_date.strftime("%d.%m.%Y")
                 if obj.expense_date
@@ -107,7 +110,7 @@ class ExpenseTableView(BaseTableView):
         self.form_class = ExpenseForm  # соответствующая форма
         self.virtual_fields = ["policy_num", "deal_desc", "client_name", "contractor"]
 
-        self.default_sort_column = 9
+        self.default_sort_column = 10
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
