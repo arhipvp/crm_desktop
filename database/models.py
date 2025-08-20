@@ -31,7 +31,7 @@ class SoftDeleteModel(BaseModel):
 
 
 class Client(SoftDeleteModel):
-    name = CharField()
+    name = CharField(index=True)
     phone = CharField(null=True)
     email = CharField(null=True)
     is_company = BooleanField(default=False)
