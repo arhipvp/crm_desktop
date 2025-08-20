@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QAbstractItemView
 
-from database.models import Expense
+from database.models import Expense, Income
 from services.expense_service import (
     build_expense_query,
     get_expenses_page,
@@ -28,6 +28,7 @@ class ExpenseTableModel(BaseTableModel):
             'Тип расхода',
             'Сумма платежа',
             'Дата платежа',
+            'Доход по платежу',
             'Сумма расхода',
             'Дата выплаты',
         ]
@@ -80,8 +81,14 @@ class ExpenseTableModel(BaseTableModel):
                 else "—"
             )
         elif col == 7:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+            if payment:
+                incomes = payment.incomes.where(Income.is_deleted == False)
+                total = sum(inc.amount for inc in incomes)
+                return f"{total:,.2f} ₽"
+            return "0 ₽"
         elif col == 8:
+            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+        elif col == 9:
             return (
                 obj.expense_date.strftime("%d.%m.%Y")
                 if obj.expense_date
@@ -100,7 +107,7 @@ class ExpenseTableView(BaseTableView):
         self.form_class = ExpenseForm  # соответствующая форма
         self.virtual_fields = ["policy_num", "deal_desc", "client_name", "contractor"]
 
-        self.default_sort_column = 8
+        self.default_sort_column = 9
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
