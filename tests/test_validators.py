@@ -14,5 +14,11 @@ def test_normalize_number_extra_cases():
     assert normalize_number(10.5) == "10.5"
 
 
+def test_normalize_number_math_expressions():
+    assert normalize_number("5+5") == "10"
+    assert normalize_number("10*10") == "100"
+    assert normalize_number("10*10%") == "1"
+
+
 def test_normalize_phone():
     assert normalize_phone("8 (900) 111-22-33") == "+79001112233"

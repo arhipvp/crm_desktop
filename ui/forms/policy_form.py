@@ -1,6 +1,5 @@
 import logging
 from PySide6.QtCore import QDate
-from PySide6.QtGui import QDoubleValidator
 from PySide6.QtWidgets import (
     QDialog,
     QDateEdit,
@@ -345,7 +344,6 @@ class PolicyForm(BaseEditForm):
         hlayout.addWidget(self.pay_date_edit)
 
         self.pay_amount_edit = QLineEdit()
-        self.pay_amount_edit.setValidator(QDoubleValidator(0.0, 1e9, 2))
         hlayout.addWidget(QLabel("Сумма:"))
         hlayout.addWidget(self.pay_amount_edit)
 
@@ -361,7 +359,7 @@ class PolicyForm(BaseEditForm):
 
     def on_add_payment(self):
         date = self.pay_date_edit.date()
-        amount = float(self.pay_amount_edit.text())
+        amount = float(normalize_number(self.pay_amount_edit.text()))
         # Добавить в черновой список
         self._draft_payments.append({"payment_date": date.toPython(), "amount": amount})
         row = self.payments_table.rowCount()

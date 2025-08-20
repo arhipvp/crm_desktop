@@ -1,5 +1,7 @@
 """Валидаторы и нормализаторы входных данных."""
 
+import ast
+import operator as op
 import re
 
 
@@ -53,17 +55,54 @@ def normalize_company_name(name: str) -> str:
 
 
 def normalize_number(value: str | int | float | None) -> str | None:
-    """Нормализует строку с числом, убирая пробелы, буквы и меняя запятую на точку."""
+    """Нормализует строку с числом и поддерживает простые выражения.
+
+    Помимо удаления пробелов/букв и замены запятой на точку теперь можно
+    вводить простые математические выражения и проценты, например ``10*10``
+    или ``5+5``. Процент записывается как ``10%`` и интерпретируется как
+    ``10/100``.
+    """
 
     if value is None:
         return None
+
     text = str(value)
     text = re.sub(r"\s+", "", text)
     text = text.replace("\u00a0", "")
     text = text.replace(",", ".")
     text = re.sub(r"[a-zA-Zа-яА-Я]+", "", text)
     text = text.rstrip(".")
-    return text
+
+    if text == "":
+        return text
+
+    expr = re.sub(r"(\d+(?:\.\d+)?)%", r"(\1/100)", text)
+
+    try:
+        node = ast.parse(expr, mode="eval").body
+
+        allowed = {
+            ast.Add: op.add,
+            ast.Sub: op.sub,
+            ast.Mult: op.mul,
+            ast.Div: op.truediv,
+        }
+
+        def _eval(n):
+            if isinstance(n, ast.Constant):
+                return n.value
+            if isinstance(n, ast.UnaryOp) and isinstance(n.op, ast.USub):
+                return -_eval(n.operand)
+            if isinstance(n, ast.BinOp) and type(n.op) in allowed:
+                return allowed[type(n.op)](_eval(n.left), _eval(n.right))
+            raise ValueError("Недопустимое выражение")
+
+        result = _eval(node)
+        if isinstance(result, float) and result.is_integer():
+            result = int(result)
+        return str(result)
+    except Exception:
+        return text
 
 
 def normalize_policy_number(text: str) -> str:
