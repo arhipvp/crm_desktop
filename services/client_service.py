@@ -4,7 +4,7 @@ import logging
 import re
 import urllib.parse
 import webbrowser
-from peewee import ModelSelect
+from peewee import ModelSelect, fn
 
 from database.models import Client, Deal, db
 from services.folder_utils import create_client_drive_folder, rename_client_folder
@@ -64,26 +64,24 @@ def get_clients_page(
 
 
 def find_similar_clients(name: str) -> list[Client]:
-    """Return active clients with a name matching *name* by full name or
-    by first two components (usually фамилия + имя)."""
+    """Найти активных клиентов с совпадающим именем.
 
-    norm = normalize_full_name(name)
+    Поиск ведётся по полному совпадению нормализованного имени
+    либо по совпадению первых двух компонентов (обычно фамилия + имя).
+    """
+
+    norm = normalize_full_name(name).lower()
     tokens = norm.split()
     search_first_two = " ".join(tokens[:2]) if tokens else ""
 
-    result = []
-    for client in Client.select().where(Client.is_deleted == False):
-        client_norm = normalize_full_name(client.name)
-        if client_norm == norm:
-            result.append(client)
-            continue
+    lc_name = fn.LOWER(Client.name)
+    condition = lc_name == norm
+    if search_first_two:
+        condition |= lc_name.startswith(f"{search_first_two} ")
+        condition |= lc_name == search_first_two
 
-        client_tokens = client_norm.split()
-        client_first_two = " ".join(client_tokens[:2]) if client_tokens else ""
-        if search_first_two and client_first_two == search_first_two:
-            result.append(client)
-
-    return result
+    query = Client.select().where((Client.is_deleted == False) & condition)
+    return list(query)
 
 
 def _check_duplicate_phone(phone: str, *, exclude_id: int | None = None) -> None:
