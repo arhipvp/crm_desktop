@@ -1,6 +1,6 @@
 from peewee import Field
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QTableView
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QTimer
 
 class ColumnFilterRow(QWidget):
     """Строка фильтров по столбцам таблицы."""
@@ -10,6 +10,7 @@ class ColumnFilterRow(QWidget):
     def __init__(self, parent=None, *, linked_view: QTableView | None = None):
         super().__init__(parent)
         self._editors = []
+        self._timers = []
         self.setLayout(QHBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(3)
@@ -31,10 +32,14 @@ class ColumnFilterRow(QWidget):
         ``column_field_map`` позволяет скрывать фильтры для некоторых колонок,
         если в словаре указано ``None``.
         """
-        # очистка старых редакторов
+        # очистка старых редакторов и таймеров
         for e in self._editors:
             e.deleteLater()
         self._editors.clear()
+        for t in self._timers:
+            t.stop()
+            t.deleteLater()
+        self._timers.clear()
         while self.layout().count():
             item = self.layout().takeAt(0)
             if item.widget():
@@ -44,13 +49,22 @@ class ColumnFilterRow(QWidget):
         for idx, h in enumerate(headers):
             le = QLineEdit(self)
             le.setPlaceholderText(str(h))
-            le.textChanged.connect(
-                lambda text, col=idx: self.filter_changed.emit(col, text)
+
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(300)
+            timer.timeout.connect(
+                lambda col=idx, editor=le: self.filter_changed.emit(
+                    col, editor.text()
+                )
             )
+            le.textChanged.connect(lambda _text, t=timer: t.start())
+
             if column_field_map and column_field_map.get(idx) is None:
                 le.setVisible(False)
             self.layout().addWidget(le)
             self._editors.append(le)
+            self._timers.append(timer)
             if texts and idx < len(texts):
                 le.blockSignals(True)
                 le.setText(texts[idx])
