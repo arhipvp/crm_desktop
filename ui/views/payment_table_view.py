@@ -44,8 +44,19 @@ class PaymentTableView(BaseTableView):
         )
         self.model_class = Payment  # или Client, Policy и т.д.
         self.form_class = PaymentForm
+
+        # параметры сортировки по умолчанию
+        self.default_sort_column = 2
+        self.current_sort_column = self.default_sort_column
+        self.current_sort_order = Qt.AscendingOrder
+        self.order_by = Payment.payment_date
+        self.order_dir = "asc"
+
         # разрешаем множественный выбор для массовых действий
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.table.horizontalHeader().sortIndicatorChanged.connect(
+            self.on_sort_changed
+        )
 
         # кнопка массового подтверждения оплаты
         self.mark_paid_btn = styled_button(
@@ -79,7 +90,15 @@ class PaymentTableView(BaseTableView):
 
         # 2) получаем страницу и общее количество
         logger.debug("📊 Фильтры платежей: %s", filters)
-        items = list(get_payments_page(self.page, self.per_page, **filters))
+        items = list(
+            get_payments_page(
+                self.page,
+                self.per_page,
+                order_by=self.order_by,
+                order_dir=self.order_dir,
+                **filters,
+            )
+        )
 
         total_sum = sum(p.amount for p in items)
         if items:
@@ -87,12 +106,25 @@ class PaymentTableView(BaseTableView):
         else:
             self.paginator.set_summary("")
 
-        total = build_payment_query(**filters).count()
+        total = build_payment_query(
+            order_by=self.order_by, order_dir=self.order_dir, **filters
+        ).count()
 
         logger.debug("📦 Загружено платежей: %d", len(items))
 
         # 3) обновляем модель и пагинатор через базовый метод
         self.set_model_class_and_items(Payment, items, total_count=total)
+        # после загрузки данных восстанавливаем индикатор сортировки
+        self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
+
+    def on_sort_changed(self, column: int, order: Qt.SortOrder):
+        field = self.COLUMN_FIELD_MAP.get(column)
+        if field is None:
+            return
+        self.order_dir = "desc" if order == Qt.DescendingOrder else "asc"
+        self.order_by = field
+        self.page = 1
+        self.load_data()
 
     def on_filter_changed(self, *args, **kwargs):
         self.paginator.set_summary("")

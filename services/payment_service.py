@@ -50,6 +50,8 @@ def get_payments_page(
     deal_id: int | None = None,
     include_paid: bool = True,
     column_filters: dict | None = None,
+    order_by: str | Field = Payment.payment_date,
+    order_dir: str = "asc",
     **filters,
 ) -> ModelSelect:
     """Получить страницу платежей по заданным фильтрам."""
@@ -59,10 +61,19 @@ def get_payments_page(
         deal_id=deal_id,
         include_paid=include_paid,
         column_filters=column_filters,
+        order_by=order_by,
+        order_dir=order_dir,
         **filters,
     )
+    if isinstance(order_by, str):
+        order_field = getattr(Payment, order_by, Payment.payment_date)
+    else:
+        order_field = order_by
+    order_expr = (
+        order_field.desc() if order_dir == "desc" else order_field.asc()
+    )
     offset = (page - 1) * per_page
-    return query.order_by(Payment.payment_date.asc()).offset(offset).limit(per_page)
+    return query.order_by(order_expr).offset(offset).limit(per_page)
 
 
 def mark_payment_deleted(payment_id: int):
@@ -284,6 +295,8 @@ def build_payment_query(
     deal_id: int | None = None,
     include_paid: bool = True,
     column_filters: dict | None = None,
+    order_by: str | Field | None = None,
+    order_dir: str = "asc",
     **filters,
 ) -> ModelSelect:
     """Сконструировать базовый запрос платежей с агрегатами."""
