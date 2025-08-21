@@ -73,13 +73,21 @@ def mark_payment_deleted(payment_id: int):
 
 
 def mark_payments_paid(payment_ids: list[int], paid_date: date | None = None) -> int:
-    """Массово отметить платежи как оплаченные."""
+    """
+    Массово отметить платежи как оплаченные.
+
+    Если дата не указана, используется текущая. Обновляются только платежи,
+    у которых ещё нет фактической даты оплаты.
+    """
     if not payment_ids:
         return 0
-    paid_date = paid_date or date(1900, 1, 2)
+    paid_date = paid_date or date.today()
     return (
         Payment.update(actual_payment_date=paid_date)
-        .where(Payment.id.in_(payment_ids))
+        .where(
+            (Payment.id.in_(payment_ids))
+            & Payment.actual_payment_date.is_null(True)
+        )
         .execute()
     )
 
