@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QTableView
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QTimer
 
 class ColumnFilterRow(QWidget):
     """Строка фильтров по столбцам таблицы."""
@@ -34,7 +34,11 @@ class ColumnFilterRow(QWidget):
         for idx, h in enumerate(headers):
             le = QLineEdit(self)
             le.setPlaceholderText(str(h))
-            le.textChanged.connect(lambda text, col=idx: self.filter_changed.emit(col, text))
+            timer = QTimer(le)
+            timer.setInterval(300)
+            timer.setSingleShot(True)
+            timer.timeout.connect(lambda col=idx, edit=le: self.filter_changed.emit(col, edit.text()))
+            le.textChanged.connect(lambda _=None, t=timer: t.start())
             self.layout().addWidget(le)
             self._editors.append(le)
             if texts and idx < len(texts):
