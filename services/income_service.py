@@ -267,9 +267,6 @@ def apply_income_filters(
             else:
                 name_filters[str(key)] = val
 
-    query = apply_field_filters(query, field_filters)
-    query = apply_column_filters(query, name_filters, Income)
-
     if Executor.full_name in field_filters or join_executor:
         query = (
             query.switch(Deal)
@@ -288,6 +285,9 @@ def apply_income_filters(
             query = query.distinct()
         else:
             query = query.distinct(Income.id)
+
+    query = apply_field_filters(query, field_filters)
+    query = apply_column_filters(query, name_filters, Income)
     return query
 
 
