@@ -115,7 +115,7 @@ def test_sync_policy_payments_removes_zero_when_real_exists(in_memory_db, monkey
         ],
     )
 
-    payments = list(policy.payments.where(Payment.is_deleted == False))
+    payments = list(policy.payments.where(pay_svc.ACTIVE))
     assert {(p.payment_date, p.amount) for p in payments} == {(d1, 100)}
     assert (
         Payment.select()

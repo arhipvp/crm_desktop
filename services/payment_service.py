@@ -8,6 +8,8 @@ from peewee import JOIN, ModelSelect, fn
 from database.db import db
 from database.models import Client, Expense, Income, Payment, Policy
 
+ACTIVE = Payment.is_deleted == False
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,14 +18,12 @@ logger = logging.getLogger(__name__)
 
 def get_all_payments() -> ModelSelect:
     """Вернуть все платежи без удалённых."""
-    return Payment.select().where(Payment.is_deleted == False)
+    return Payment.select().where(ACTIVE)
 
 
 def get_payments_by_policy_id(policy_id: int) -> ModelSelect:
     """Получить платежи по полису."""
-    return Payment.select().where(
-        (Payment.policy_id == policy_id) & (Payment.is_deleted == False)
-    )
+    return Payment.select().where((Payment.policy_id == policy_id) & ACTIVE)
 
 
 def get_payment_by_id(payment_id: int) -> Payment | None:
@@ -36,7 +36,7 @@ def get_payments_by_client_id(client_id: int) -> ModelSelect:
     return (
         Payment.select()
         .join(Policy)
-        .where((Policy.client == client_id) & (Payment.is_deleted == False))
+        .where((Policy.client == client_id) & ACTIVE)
     )
 
 
@@ -156,18 +156,14 @@ def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
     if zero_payments and any(p.get("amount") not in (None, 0) for p in payments):
         (
             Payment.update(is_deleted=True)
-            .where(
-                (Payment.policy == policy)
-                & (Payment.amount == 0)
-                & (Payment.is_deleted == False)
-            )
+            .where((Payment.policy == policy) & (Payment.amount == 0) & ACTIVE)
             .execute()
         )
         payments = [p for p in payments if p.get("amount") != 0]
 
     existing = {
         (p.payment_date, p.amount): p
-        for p in policy.payments.where(Payment.is_deleted == False)
+        for p in policy.payments.where(ACTIVE)
     }
     incoming: set[tuple[date, float]] = set()
 
@@ -232,7 +228,7 @@ def apply_payment_filters(
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
     if not show_deleted:
-        query = query.where(Payment.is_deleted == False)
+        query = query.where(ACTIVE)
     if search_text:
         query = query.where(
             (Policy.policy_number.contains(search_text))
@@ -286,6 +282,6 @@ def get_payments_by_deal_id(deal_id: int) -> ModelSelect:
     return (
         Payment.select()
         .join(Policy)
-        .where((Policy.deal_id == deal_id) & (Payment.is_deleted == False))
+        .where((Policy.deal_id == deal_id) & ACTIVE)
         .order_by(Payment.payment_date.asc())
     )
