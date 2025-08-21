@@ -138,6 +138,7 @@ class IncomeTableView(BaseTableView):
             form_class=IncomeForm,
             entity_name="Доход",
             checkbox_map=checkbox_map,
+            date_filter_field="received_date",
         )
         # Переопределяем обработку фильтров по столбцам: только БД
         try:
@@ -166,25 +167,20 @@ class IncomeTableView(BaseTableView):
         self.load_data()
 
     def get_filters(self) -> dict:
-        filters = {
-            "search_text": self.filter_controls.get_search_text(),
-            "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "include_received": self.filter_controls.is_checked("Показывать выплаченные"),
-        }
+        filters = super().get_filters()
+        filters.update(
+            {
+                "include_received": self.filter_controls.is_checked(
+                    "Показывать выплаченные"
+                )
+            }
+        )
         if self.deal_id:
             filters["deal_id"] = self.deal_id
-
-        date_from = getattr(self.filter_controls, "_date_from", None)
-        date_to = getattr(self.filter_controls, "_date_to", None)
-        if date_from and date_to:
-            from_date = date_from.date_or_none()
-            to_date = date_to.date_or_none()
-            if from_date or to_date:
-                filters["received_date_range"] = (from_date, to_date)
-
-        filters["column_filters"] = self.get_column_filters()
-        logger.debug("\U0001F4C3 column_filters=%s", filters["column_filters"])
-
+        date_range = filters.pop("received_date", None)
+        if date_range:
+            filters["received_date_range"] = date_range
+        logger.debug("\U0001F4C3 column_filters=%s", filters.get("column_filters"))
         return filters
 
     def get_column_filters(self) -> dict:
