@@ -10,22 +10,18 @@ from database.models import Client, Deal, Policy, Task
 def get_basic_stats() -> dict:
     """Получить общее количество записей по основным сущностям."""
     return {
-        "clients": Client.select().where(Client.is_deleted == False).count(),
-        "deals": Deal.select().where(Deal.is_deleted == False).count(),
-        "policies": Policy.select().where(Policy.is_deleted == False).count(),
-        "tasks": Task.select().where(Task.is_deleted == False).count(),
+        "clients": Client.active().count(),
+        "deals": Deal.active().count(),
+        "policies": Policy.active().count(),
+        "tasks": Task.active().count(),
     }
 
 
 def count_assistant_tasks() -> int:
     """Количество задач, отправленных ассистенту в Telegram."""
     return (
-        Task.select()
-        .where(
-            (Task.dispatch_state == "sent")
-            & (Task.is_deleted == False)
-            & (Task.is_done == False)
-        )
+        Task.active()
+        .where((Task.dispatch_state == "sent") & (Task.is_done == False))
         .count()
     )
 
@@ -33,30 +29,22 @@ def count_assistant_tasks() -> int:
 def count_sent_tasks() -> int:
     """Количество задач, отправленных в Telegram (по ``queued_at``)."""
     return (
-        Task.select()
-        .where(Task.queued_at.is_null(False) & (Task.is_deleted == False))
-        .count()
+        Task.active().where(Task.queued_at.is_null(False)).count()
     )
 
 
 def count_working_tasks() -> int:
     """Количество задач, находящихся у помощника в работе."""
     return (
-        Task.select()
-        .where(Task.tg_chat_id.is_null(False) & (Task.is_deleted == False))
-        .count()
+        Task.active().where(Task.tg_chat_id.is_null(False)).count()
     )
 
 
 def count_unconfirmed_tasks() -> int:
     """Количество задач с заметкой, но не подтверждённых пользователем."""
     return (
-        Task.select()
-        .where(
-            Task.note.is_null(False)
-            & (Task.is_done == False)
-            & (Task.is_deleted == False)
-        )
+        Task.active()
+        .where(Task.note.is_null(False) & (Task.is_done == False))
         .count()
     )
 
@@ -64,8 +52,8 @@ def count_unconfirmed_tasks() -> int:
 def get_upcoming_tasks(limit: int = 10) -> list[Task]:
     """Ближайшие невыполненные задачи."""
     base = (
-        Task.select()
-        .where((Task.is_done == False) & (Task.is_deleted == False))
+        Task.active()
+        .where(Task.is_done == False)
         .order_by(Task.due_date.asc())
         .limit(limit)
     )
@@ -75,10 +63,9 @@ def get_upcoming_tasks(limit: int = 10) -> list[Task]:
 def get_expiring_policies(limit: int = 10) -> list[Policy]:
     """Полисы, срок действия которых скоро заканчивается."""
     base = (
-        Policy.select()
+        Policy.active()
         .where(
-            (Policy.is_deleted == False)
-            & (Policy.end_date.is_null(False))
+            (Policy.end_date.is_null(False))
             & (
                 Policy.renewed_to.is_null(True)
                 | (Policy.renewed_to == "")
@@ -94,10 +81,9 @@ def get_expiring_policies(limit: int = 10) -> list[Policy]:
 def get_upcoming_deal_reminders(limit: int = 10) -> list[Deal]:
     """Ближайшие напоминания по открытым сделкам."""
     base = (
-        Deal.select()
+        Deal.active()
         .where(
-            (Deal.is_deleted == False)
-            & (Deal.is_closed == False)
+            (Deal.is_closed == False)
             & (Deal.reminder_date.is_null(False))
         )
         .order_by(Deal.reminder_date.asc())
@@ -114,10 +100,10 @@ def get_deal_reminder_counts(days: int = 14) -> dict:
     end_date = today + timedelta(days=days - 1)
 
     query = (
-        Deal.select(Deal.reminder_date, fn.COUNT(Deal.id).alias("cnt"))
+        Deal.active()
+        .select(Deal.reminder_date, fn.COUNT(Deal.id).alias("cnt"))
         .where(
-            (Deal.is_deleted == False)
-            & (Deal.is_closed == False)
+            (Deal.is_closed == False)
             & (Deal.reminder_date.is_null(False))
             & (Deal.reminder_date.between(today, end_date))
         )

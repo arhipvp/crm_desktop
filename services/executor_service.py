@@ -98,26 +98,16 @@ def get_executor_for_deal(deal_id: int) -> Optional[Executor]:
 
 def get_deals_for_executor(tg_id: int, *, only_with_tasks: bool = False) -> List[Deal]:
     query = (
-        Deal.select()
+        Deal.active()
         .join(DealExecutor, on=(Deal.id == DealExecutor.deal))
         .join(Executor)
-        .where(
-            (Executor.tg_id == tg_id)
-            & (Deal.is_deleted == False)
-            & (Deal.is_closed == False)
-        )
+        .where((Executor.tg_id == tg_id) & (Deal.is_closed == False))
     )
 
     if only_with_tasks:
         from database.models import Task  # локальный импорт во избежание циклов
-        query = (
-            query.join(Task, JOIN.INNER, on=(Deal.id == Task.deal))
-            .where(
-                (Task.is_deleted == False)
-                & (Task.dispatch_state == "queued")
-            )
-            .distinct()
-        )
+        task_subq = Task.active().where(Task.dispatch_state == "queued").select(Task.deal)
+        query = query.where(Deal.id.in_(task_subq))
 
     return list(query)
 

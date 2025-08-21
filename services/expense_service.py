@@ -13,14 +13,12 @@ from services.payment_service import get_payment_by_id
 
 def get_all_expenses():
     """Вернуть все расходы без пометки удаления."""
-    return Expense.select().where(Expense.is_deleted == False)
+    return Expense.active()
 
 
 def get_pending_expenses():
     """Расходы без даты списания."""
-    return Expense.select().where(
-        (Expense.is_deleted == False) & (Expense.expense_date.is_null(True))
-    )
+    return Expense.active().where(Expense.expense_date.is_null(True))
 
 
 def get_expense_by_id(expense_id: int) -> Expense | None:
@@ -178,15 +176,12 @@ def get_expenses_page(
 def apply_expense_filters(
     query,
     search_text=None,
-    show_deleted=False,
     deal_id=None,
     include_paid=True,
     expense_date_range=None,
     column_filters: dict[str, str] | None = None,
     **kwargs,
 ):
-    if not show_deleted:
-        query = query.where(Expense.is_deleted == False)
     if deal_id:
         query = query.where(Policy.deal_id == deal_id)
     if search_text:
@@ -218,8 +213,9 @@ def build_expense_query(
     expense_date_range=None,
     **kwargs
 ):
+    base = Expense.active() if not show_deleted else Expense.select()
     query = (
-        Expense.select(Expense, Payment, Policy, Client)
+        base.select(Expense, Payment, Policy, Client)
         .join(Payment)
         .join(Policy)
         .join(Client)
@@ -227,7 +223,6 @@ def build_expense_query(
     return apply_expense_filters(
         query,
         search_text,
-        show_deleted,
         deal_id,
         include_paid,
         expense_date_range=expense_date_range,
@@ -245,10 +240,11 @@ def get_expenses_by_deal(deal_id: int):
         ModelSelect: Выборка расходов по сделке.
     """
     return (
-        Expense.select(Expense, Payment, Policy, Client)
+        Expense.active()
+        .select(Expense, Payment, Policy, Client)
         .join(Payment)
         .join(Policy)
         .join(Client)
-        .where((Policy.deal_id == deal_id) & (Expense.is_deleted == False))
+        .where(Policy.deal_id == deal_id)
         .order_by(Expense.expense_date.asc())
     )

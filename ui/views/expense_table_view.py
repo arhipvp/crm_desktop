@@ -85,7 +85,7 @@ class ExpenseTableModel(BaseTableModel):
             )
         elif col == 8:
             if payment:
-                incomes = payment.incomes.where(Income.is_deleted == False)
+                incomes = Income.active().where(Income.payment == payment)
                 total = sum(inc.amount for inc in incomes)
                 return f"{total:,.2f} ₽"
             return "0 ₽"

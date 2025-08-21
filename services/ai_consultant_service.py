@@ -10,10 +10,10 @@ logger = logging.getLogger(__name__)
 def _gather_context(limit: int = 5) -> str:
     """Return short context about DB state."""
     try:
-        clients = [c.name for c in Client.select().where(Client.is_deleted == False).limit(limit)]
-        deals = [str(d) for d in Deal.select().where(Deal.is_deleted == False).limit(limit)]
-        policies = [p.policy_number for p in Policy.select().where(Policy.is_deleted == False).limit(limit)]
-        tasks = [t.title for t in Task.select().where(Task.is_deleted == False).limit(limit)]
+        clients = [c.name for c in Client.active().limit(limit)]
+        deals = [str(d) for d in Deal.active().limit(limit)]
+        policies = [p.policy_number for p in Policy.active().limit(limit)]
+        tasks = [t.title for t in Task.active().limit(limit)]
     except Exception as exc:
         logger.error("Failed to build DB context: %s", exc)
         return ""

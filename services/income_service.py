@@ -34,14 +34,12 @@ def get_income_highlight_color(income: Income) -> str | None:
 
 def get_all_incomes():
     """Вернуть все доходы без удалённых."""
-    return Income.select().where(Income.is_deleted == False)
+    return Income.active()
 
 
 def get_pending_incomes():
     """Доходы, которые ещё не получены."""
-    return Income.select().where(
-        (Income.is_deleted == False) & (Income.received_date.is_null(True))
-    )
+    return Income.active().where(Income.received_date.is_null(True))
 
 
 def get_income_by_id(income_id: int):
@@ -226,7 +224,6 @@ def update_income(income: Income, **kwargs):
 def apply_income_filters(
     query,
     search_text="",
-    show_deleted=False,
     include_received=True,
     received_date_range=None,
     deal_id=None,
@@ -235,8 +232,6 @@ def apply_income_filters(
     only_received: bool = False,
     join_executor: bool = False,
 ):
-    if not show_deleted:
-        query = query.where(Income.is_deleted == False)
     if search_text:
         query = query.where(
             (Policy.policy_number.contains(search_text))
@@ -307,8 +302,10 @@ def build_income_query(
     join_executor: bool = False,
     **kwargs,
 ):
+    base = Income.active() if not show_deleted else Income.select()
     query = (
-        Income.select(Income, Payment, Policy, Client, Deal)
+        base
+        .select(Income, Payment, Policy, Client, Deal)
         .join(Payment, on=(Income.payment == Payment.id))
         .switch(Payment)
         .join(Policy, on=(Payment.policy == Policy.id))
@@ -321,7 +318,6 @@ def build_income_query(
     query = apply_income_filters(
         query=query,
         search_text=search_text,
-        show_deleted=show_deleted,
         include_received=include_received,
         received_date_range=received_date_range,
         deal_id=kwargs.get("deal_id"),
