@@ -55,3 +55,14 @@ class ColumnFilterRow(QWidget):
     def set_text(self, column: int, text: str) -> None:
         if 0 <= column < len(self._editors):
             self._editors[column].setText(text)
+
+    def get_all_texts(self) -> list[str]:
+        """Возвращает список текстов всех полей фильтра."""
+        return [e.text().strip() for e in self._editors]
+
+    def set_all_texts(self, texts: list[str]) -> None:
+        """Устанавливает тексты для всех полей фильтра."""
+        for idx, editor in enumerate(self._editors):
+            editor.blockSignals(True)
+            editor.setText(texts[idx] if idx < len(texts) else "")
+            editor.blockSignals(False)
