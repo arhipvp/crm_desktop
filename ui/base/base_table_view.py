@@ -4,6 +4,7 @@ logger = logging.getLogger(__name__)
 
 from peewee import Field
 from PySide6.QtCore import QDate, Qt, Signal, QTimer
+from PySide6.QtConcurrent import QtConcurrent
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -233,6 +234,7 @@ class BaseTableView(QWidget):
     def load_data(self):
         if not self.model_class or not self.get_page_func:
             return
+
         progress = QProgressDialog("Загрузка...", "Отмена", 0, 0, self)
         progress.setWindowModality(Qt.WindowModal)
         progress.setAutoClose(False)
@@ -240,35 +242,50 @@ class BaseTableView(QWidget):
         progress.show()
         QApplication.processEvents()
 
+        filters = self.get_filters()
         cancelled = False
-        try:
-            # 1. Собираем фильтры
-            filters = self.get_filters()
 
-            # 2. Загружаем данные
+        def run() -> tuple[list, int]:
             items = self.get_page_func(self.page, self.per_page, **filters)
-            cancelled = progress.wasCanceled()
-            if not cancelled:
-                total = (
-                    self.get_total_func(**filters)
-                    if self.get_total_func
-                    else len(items)
-                )
-                cancelled = progress.wasCanceled()
-        except Exception as exc:
-            logger.exception("Ошибка при загрузке данных")
-            QMessageBox.critical(self, "Ошибка", str(exc))
-            return
-        finally:
+            total = (
+                self.get_total_func(**filters)
+                if self.get_total_func
+                else len(items)
+            )
+            return list(items), total
+
+        future = QtConcurrent.run(run)
+
+        def check_finished():
+            if not future.isFinished():
+                return
+            timer.stop()
+            progress.close()
+            if cancelled or future.isCanceled():
+                return
+            try:
+                items, total = future.result()
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("Ошибка при загрузке данных")
+                QMessageBox.critical(self, "Ошибка", str(exc))
+                return
+            self.set_model_class_and_items(
+                self.model_class, items, total_count=total
+            )
+
+        timer = QTimer(self)
+        timer.setInterval(100)
+        timer.timeout.connect(check_finished)
+        timer.start()
+
+        def on_cancel():
+            nonlocal cancelled
+            cancelled = True
+            future.cancel()
+            timer.stop()
             progress.close()
 
-        if cancelled:
-            return
-
-        # 3. Обновляем таблицу и пагинатор
-        self.set_model_class_and_items(
-            self.model_class, list(items), total_count=total
-        )
+        progress.canceled.connect(on_cancel)
 
     def refresh(self):
         self.load_data()
