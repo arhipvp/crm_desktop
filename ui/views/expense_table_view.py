@@ -4,15 +4,8 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
 
-from peewee import fn
-
-from database.models import Client, Deal, Expense, Income, Payment, Policy
-from services.expense_service import (
-    build_expense_query,
-    get_expenses_page,
-    mark_expense_deleted,
-    mark_expenses_deleted,
-)
+from database.models import Client, Deal, Expense, Payment, Policy
+from services import expense_service
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
@@ -124,7 +117,7 @@ class ExpenseTableView(BaseTableView):
         5: Expense.expense_type,
         6: Payment.amount,
         7: Payment.payment_date,
-        8: Income.amount,
+        8: expense_service.INCOME_TOTAL,
         9: Expense.amount,
         10: Expense.expense_date,
     }
@@ -185,7 +178,7 @@ class ExpenseTableView(BaseTableView):
 
         # 2) получаем страницу и общее количество
         items = list(
-            get_expenses_page(
+            expense_service.get_expenses_page(
                 self.page,
                 self.per_page,
                 order_by=self.order_by,
@@ -198,7 +191,7 @@ class ExpenseTableView(BaseTableView):
             self.paginator.set_summary(f"Сумма: {total_sum:.2f} ₽")
         else:
             self.paginator.set_summary("")
-        total = build_expense_query(
+        total = expense_service.build_expense_query(
             order_by=self.order_by, order_dir=self.order_dir, **filters
         ).count()
 
@@ -209,8 +202,6 @@ class ExpenseTableView(BaseTableView):
         field = self.COLUMN_FIELD_MAP.get(column)
         if field is None:
             return
-        if column == 8:
-            field = fn.SUM(Income.amount)
         self.current_sort_column = column
         self.current_sort_order = order
         self.order_by = field
@@ -255,10 +246,10 @@ class ExpenseTableView(BaseTableView):
         if confirm(message):
             try:
                 if len(expenses) == 1:
-                    mark_expense_deleted(expenses[0].id)
+                    expense_service.mark_expense_deleted(expenses[0].id)
                 else:
                     ids = [exp.id for exp in expenses]
-                    mark_expenses_deleted(ids)
+                    expense_service.mark_expenses_deleted(ids)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
