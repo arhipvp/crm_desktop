@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QTableView
 from PySide6.QtCore import Signal
 
 class ColumnFilterRow(QWidget):
@@ -6,12 +6,18 @@ class ColumnFilterRow(QWidget):
 
     filter_changed = Signal(int, str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, linked_view: QTableView | None = None):
         super().__init__(parent)
         self._editors = []
         self.setLayout(QHBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(3)
+
+        if linked_view is not None:
+            scroll = linked_view.horizontalScrollBar()
+            scroll.valueChanged.connect(self.sync_scroll)
+            # синхронизируем позицию при инициализации
+            self.sync_scroll(scroll.value())
 
     def set_headers(self, headers: list[str], texts: list[str] | None = None):
         """Создаёт по одному полю ввода на каждый столбец."""
@@ -36,6 +42,10 @@ class ColumnFilterRow(QWidget):
                 le.setText(texts[idx])
                 le.blockSignals(False)
         self.layout().addStretch()
+
+    def sync_scroll(self, offset: int) -> None:
+        """Сдвигает строку фильтров при прокрутке связанной таблицы."""
+        self.layout().setContentsMargins(-offset, 0, 0, 0)
 
     def get_text(self, column: int) -> str:
         if 0 <= column < len(self._editors):
