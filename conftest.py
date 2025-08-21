@@ -1,7 +1,13 @@
 import os
 import signal
+import sys
+from pathlib import Path
+
 import pytest
 from peewee import SqliteDatabase
+
+# ensure project root is on sys.path when running tests
+sys.path.append(str(Path(__file__).resolve().parent))
 
 from database.db import db
 from database.models import (

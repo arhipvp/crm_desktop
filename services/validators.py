@@ -104,6 +104,7 @@ def normalize_number(value: str | int | float | None) -> str | None:
             result = int(result)
         return str(result)
     except (SyntaxError, ValueError, TypeError) as exc:
+        # Преобразуем любые ошибки разбора в ValueError для вызывающего кода
         raise ValueError(f"Некорректное выражение: {text}") from exc
 
 

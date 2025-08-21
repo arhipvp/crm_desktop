@@ -36,8 +36,8 @@ if __name__ == "__main__":
         style_path = os.path.join(os.path.dirname(__file__), "resources", "style.qss")
         with open(style_path, "r", encoding="utf-8") as f:
             app.setStyleSheet(f.read())
-    except Exception as e:
-        logger.info("Не удалось загрузить стиль: %s", e)
+    except OSError as e:
+        logger.warning("Не удалось загрузить стиль: %s", e)
 
     window = MainWindow()
     window.show()

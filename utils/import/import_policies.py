@@ -6,11 +6,11 @@ import logging
 from openpyxl import load_workbook
 from PySide6.QtWidgets import QApplication
 
-from database.db import db
-from database.models import Policy
-from services.client_service import get_or_create_client_by_name
-from services.policy_service import add_policy
-from ui.common.client_import_dialog import ClientImportDialog
+from ...database.db import db
+from ...database.models import Policy
+from ...services.client_service import get_or_create_client_by_name
+from ...services.policy_service import add_policy
+from ...ui.common.client_import_dialog import ClientImportDialog
 
 EXCEL_FILENAME = "policies_import.xlsx"
 
