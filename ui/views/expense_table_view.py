@@ -152,11 +152,20 @@ class ExpenseTableView(BaseTableView):
             filters["deal_id"] = self.deal_id
 
         # 2) получаем страницу и общее количество
-        items = get_expenses_page(self.page, self.per_page, **filters)
+        items = list(get_expenses_page(self.page, self.per_page, **filters))
+        total_sum = sum(e.amount for e in items)
+        if items:
+            self.paginator.set_summary(f"Сумма: {total_sum:.2f} ₽")
+        else:
+            self.paginator.set_summary("")
         total = build_expense_query(**filters).count()
 
         # 3) обновляем модель и пагинатор
-        self.set_model_class_and_items(Expense, list(items), total_count=total)
+        self.set_model_class_and_items(Expense, items, total_count=total)
+
+    def on_filter_changed(self, *args, **kwargs):
+        self.paginator.set_summary("")
+        super().on_filter_changed(*args, **kwargs)
 
     def get_selected(self):
         idx = self.table.currentIndex()
