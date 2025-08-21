@@ -3,7 +3,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from peewee import Field
-from PySide6.QtCore import QDate, Qt, Signal, QTimer
+from PySide6.QtCore import QDate, Qt, Signal, QTimer, QSortFilterProxyModel
 from PySide6.QtConcurrent import QtConcurrent
 from PySide6.QtWidgets import (
     QApplication,
@@ -169,6 +169,7 @@ class BaseTableView(QWidget):
 
         # Таблица
         self.table = QTableView()
+        self.proxy_model = QSortFilterProxyModel(self)
         self.table.setEditTriggers(QTableView.NoEditTriggers)
 
         self.table.setModel(None)  # Пока модель не установлена
@@ -207,7 +208,8 @@ class BaseTableView(QWidget):
         ]
 
         self.model = BaseTableModel(items, model_class)
-        self.table.setModel(self.model)
+        self.proxy_model.setSourceModel(self.model)
+        self.table.setModel(self.proxy_model)
 
         # Безопасная попытка resize
         try:
@@ -503,7 +505,7 @@ class BaseTableView(QWidget):
 
     def _source_row(self, view_index):
         """Возвращает номер строки в исходной модели для индекса из таблицы."""
-        return view_index.row()
+        return self.proxy_model.mapToSource(view_index).row()
 
     # BaseTableView
     def get_selected_object(self):
