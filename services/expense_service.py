@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 from database.models import Client, Deal, Expense, Income, Payment, Policy
 from services.payment_service import get_payment_by_id
 
+INCOME_TOTAL = fn.COALESCE(fn.SUM(Income.amount), 0).alias("income_total")
+
 # ─────────────────────────── CRUD ────────────────────────────
 
 
@@ -209,22 +211,22 @@ def apply_expense_filters(
 
     field_filters = {}
     name_filters = {}
-    income_filter = None
     if column_filters:
         for key, val in column_filters.items():
-            if key is Income.amount:
-                income_filter = val
+            if key is Income.amount or key is INCOME_TOTAL:
+                field_filters[INCOME_TOTAL] = val
             elif isinstance(key, Field):
                 field_filters[key] = val
             else:
                 name_filters[str(key)] = val
 
+    income_total_filter = field_filters.pop(INCOME_TOTAL, None)
     query = apply_field_filters(query, field_filters)
     query = apply_column_filters(query, name_filters, Expense)
 
-    if income_filter:
+    if income_total_filter:
         query = query.having(
-            fn.SUM(Income.amount).cast("TEXT").contains(income_filter)
+            INCOME_TOTAL.cast("TEXT").contains(income_total_filter)
         )
 
     return query
@@ -249,7 +251,7 @@ def build_expense_query(
             Policy,
             Client,
             Deal,
-            fn.SUM(Income.amount).alias("income_total"),
+            INCOME_TOTAL,
         )
         .join(Payment)
         .join(Policy)
