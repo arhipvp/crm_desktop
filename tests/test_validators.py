@@ -20,5 +20,12 @@ def test_normalize_number_math_expressions():
     assert normalize_number("10*10%") == "1"
 
 
+def test_normalize_number_invalid_expressions():
+    with pytest.raises(ValueError, match="Некорректное выражение"):
+        normalize_number("5//2")
+    with pytest.raises(ValueError, match="Некорректное выражение"):
+        normalize_number("abc")
+
+
 def test_normalize_phone():
     assert normalize_phone("8 (900) 111-22-33") == "+79001112233"

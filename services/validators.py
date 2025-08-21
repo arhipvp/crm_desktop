@@ -66,14 +66,16 @@ def normalize_number(value: str | int | float | None) -> str | None:
     if value is None:
         return None
 
-    text = str(value)
-    text = re.sub(r"\s+", "", text)
+    original = str(value)
+    text = re.sub(r"\s+", "", original)
     text = text.replace("\u00a0", "")
     text = text.replace(",", ".")
     text = re.sub(r"[a-zA-Zа-яА-Я]+", "", text)
     text = text.rstrip(".")
 
     if text == "":
+        if original.strip() != "":
+            raise ValueError(f"Некорректное выражение: {original}")
         return text
 
     expr = re.sub(r"(\d+(?:\.\d+)?)%", r"(\1/100)", text)
@@ -101,8 +103,8 @@ def normalize_number(value: str | int | float | None) -> str | None:
         if isinstance(result, float) and result.is_integer():
             result = int(result)
         return str(result)
-    except Exception:
-        return text
+    except (SyntaxError, ValueError, TypeError) as exc:
+        raise ValueError(f"Некорректное выражение: {text}") from exc
 
 
 def normalize_policy_number(text: str) -> str:
