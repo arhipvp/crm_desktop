@@ -1,7 +1,7 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QAbstractItemView
 
-from database.models import Expense, Income
+from database.models import Client, Deal, Expense, Income, Payment, Policy
 from services.expense_service import (
     build_expense_query,
     get_expenses_page,
@@ -100,6 +100,20 @@ class ExpenseTableModel(BaseTableModel):
 
 
 class ExpenseTableView(BaseTableView):
+    COLUMN_FIELD_MAP = {
+        0: Policy.policy_number,
+        1: Deal.description,
+        2: Client.name,
+        3: Policy.contractor,
+        4: Policy.start_date,
+        5: Expense.expense_type,
+        6: Payment.amount,
+        7: Payment.payment_date,
+        8: None,
+        9: Expense.amount,
+        10: Expense.expense_date,
+    }
+
     def __init__(self, parent=None, deal_id=None):
         checkbox_map = {
             "Показывать выплаченные": self.load_data,
@@ -118,7 +132,12 @@ class ExpenseTableView(BaseTableView):
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
+        self.order_by = Expense.expense_date
+        self.order_dir = "desc"
 
+        self.table.horizontalHeader().sortIndicatorChanged.connect(
+            self.on_sort_changed
+        )
         self.row_double_clicked.connect(self.open_detail)
 
         # разрешаем множественный выбор для массовых действий
@@ -150,16 +169,37 @@ class ExpenseTableView(BaseTableView):
             filters["deal_id"] = self.deal_id
 
         # 2) получаем страницу и общее количество
-        items = list(get_expenses_page(self.page, self.per_page, **filters))
+        items = list(
+            get_expenses_page(
+                self.page,
+                self.per_page,
+                order_by=self.order_by,
+                order_dir=self.order_dir,
+                **filters,
+            )
+        )
         total_sum = sum(e.amount for e in items)
         if items:
             self.paginator.set_summary(f"Сумма: {total_sum:.2f} ₽")
         else:
             self.paginator.set_summary("")
-        total = build_expense_query(**filters).count()
+        total = build_expense_query(
+            order_by=self.order_by, order_dir=self.order_dir, **filters
+        ).count()
 
         # 3) обновляем модель и пагинатор
         self.set_model_class_and_items(Expense, items, total_count=total)
+
+    def on_sort_changed(self, column: int, order: Qt.SortOrder):
+        field = self.COLUMN_FIELD_MAP.get(column)
+        if field is None:
+            return
+        self.current_sort_column = column
+        self.current_sort_order = order
+        self.order_by = field
+        self.order_dir = "desc" if order == Qt.DescendingOrder else "asc"
+        self.page = 1
+        self.load_data()
 
     def on_filter_changed(self, *args, **kwargs):
         self.paginator.set_summary("")
@@ -169,7 +209,7 @@ class ExpenseTableView(BaseTableView):
         idx = self.table.currentIndex()
         if not idx.isValid():
             return None
-        return self.model.get_item(idx.row())
+        return self.model.get_item(self._source_row(idx))
 
     def get_selected_multiple(self):
         indexes = self.table.selectionModel().selectedRows()
@@ -213,17 +253,31 @@ class ExpenseTableView(BaseTableView):
             dlg.exec()
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
+        prev_texts = [
+            self.column_filters.get_text(i)
+            for i in range(len(self.column_filters._editors))
+        ]
         self.model = ExpenseTableModel(items, model_class)
         self.proxy_model.setSourceModel(self.model)
         self.table.setModel(self.proxy_model)
         try:
-            self.table.sortByColumn(self.default_sort_column, self.default_sort_order)
+            self.table.horizontalHeader().setSortIndicator(
+                self.current_sort_column, self.current_sort_order
+            )
             self.table.resizeColumnsToContents()
         except NotImplementedError:
             pass
         if total_count is not None:
             self.total_count = total_count
             self.paginator.update(self.total_count, self.page, self.per_page)
+        headers = [
+            self.model.headerData(i, Qt.Horizontal)
+            for i in range(self.model.columnCount())
+        ]
+        self.column_filters.set_headers(
+            headers, prev_texts, self.COLUMN_FIELD_MAP
+        )
+        QTimer.singleShot(0, self.load_table_settings)
 
     def get_base_query(self):
         if self.deal_id:
