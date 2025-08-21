@@ -209,6 +209,8 @@ class BaseTableView(QWidget):
             for i in range(self.model.columnCount())
         ]
         self.column_filters.set_headers(headers, prev_texts)
+        for i in range(self.table.model().columnCount()):
+            self.column_filters.set_editor_visible(i, not self.table.isColumnHidden(i))
         QTimer.singleShot(0, self.load_table_settings)
 
     def load_data(self):
@@ -537,6 +539,7 @@ class BaseTableView(QWidget):
 
     def _toggle_column(self, index: int, visible: bool):
         self.table.setColumnHidden(index, not visible)
+        self.column_filters.set_editor_visible(index, visible)
         self.save_table_settings()
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
@@ -587,6 +590,9 @@ class BaseTableView(QWidget):
             idx = int(idx)
             if idx < model_columns:
                 self.table.setColumnHidden(idx, True)
+                self.column_filters.set_editor_visible(idx, False)
+        for i in range(model_columns):
+            self.column_filters.set_editor_visible(i, not self.table.isColumnHidden(i))
         texts = saved.get("column_filter_texts", [])
         if texts:
             self.column_filters.set_all_texts(texts)

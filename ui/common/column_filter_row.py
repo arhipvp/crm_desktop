@@ -8,13 +8,14 @@ class ColumnFilterRow(QWidget):
 
     def __init__(self, parent=None, *, linked_view: QTableView | None = None):
         super().__init__(parent)
-        self._editors = []
+        self._editors: list[QLineEdit] = []
+        self.linked_view = linked_view
         self.setLayout(QHBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(3)
 
-        if linked_view is not None:
-            scroll = linked_view.horizontalScrollBar()
+        if self.linked_view is not None:
+            scroll = self.linked_view.horizontalScrollBar()
             scroll.valueChanged.connect(self.sync_scroll)
             # синхронизируем позицию при инициализации
             self.sync_scroll(scroll.value())
@@ -55,6 +56,11 @@ class ColumnFilterRow(QWidget):
     def set_text(self, column: int, text: str) -> None:
         if 0 <= column < len(self._editors):
             self._editors[column].setText(text)
+
+    def set_editor_visible(self, index: int, visible: bool) -> None:
+        """Отображает или скрывает поле фильтра по индексу."""
+        if 0 <= index < len(self._editors):
+            self._editors[index].setVisible(visible)
 
     def get_all_texts(self) -> list[str]:
         """Возвращает список текстов всех полей фильтра."""
