@@ -1,6 +1,7 @@
 """Сервис работы с расходами."""
 
 import logging
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,8 @@ def add_expense(**kwargs):
         for field in allowed_fields
         if field in kwargs and kwargs[field] not in ("", None)
     }
+    if "amount" in clean_data:
+        clean_data["amount"] = Decimal(str(clean_data["amount"]))
 
     try:
         return Expense.create(
@@ -118,6 +121,8 @@ def update_expense(expense: Expense, **kwargs):
             if key == "payment_id" and not kwargs.get("payment"):
                 value = get_payment_by_id(value)
                 key = "payment"
+            if key == "amount" and value is not None:
+                value = Decimal(str(value))
             updates[key] = value
 
     if not updates:

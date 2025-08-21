@@ -2,6 +2,7 @@
 
 import logging
 from datetime import date
+from decimal import Decimal
 
 from peewee import JOIN, ModelSelect, fn
 
@@ -117,6 +118,8 @@ def add_payment(**kwargs):
 
     allowed_fields = {"amount", "payment_date", "actual_payment_date"}
     clean_data = {f: kwargs[f] for f in allowed_fields if f in kwargs}
+    if "amount" in clean_data:
+        clean_data["amount"] = Decimal(str(clean_data["amount"]))
 
     contractor = (policy.contractor or "").strip()
 
@@ -131,13 +134,13 @@ def add_payment(**kwargs):
             )
 
             # Доход добавляется автоматически, но с нулевой суммой
-            add_income(payment=payment, amount=0, policy=policy)
+            add_income(payment=payment, amount=Decimal("0"), policy=policy)
 
             # Авто-расход контрагенту (если указан в полисе)
             if contractor:
                 add_expense(
                     payment=payment,
-                    amount=0,
+                    amount=Decimal("0"),
                     expense_type="контрагент",
                     note=f"выплата контрагенту {contractor}",
                 )
@@ -160,30 +163,43 @@ def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
         return
 
     # Удаляем нулевые при наличии ненулевых
-    zero_payments = [p for p in payments if p.get("amount") == 0]
-    if zero_payments and any(p.get("amount") not in (None, 0) for p in payments):
+    zero_payments = [
+        p for p in payments if Decimal(str(p.get("amount", 0))) == Decimal("0")
+    ]
+    if zero_payments and any(
+        Decimal(str(p.get("amount", 0))) != Decimal("0") for p in payments
+    ):
         (
             Payment.update(is_deleted=True)
-            .where((Payment.policy == policy) & (Payment.amount == 0) & ACTIVE)
+            .where(
+                (Payment.policy == policy)
+                & (Payment.amount == Decimal("0"))
+                & ACTIVE
+            )
             .execute()
         )
-        payments = [p for p in payments if p.get("amount") != 0]
+        payments = [
+            p for p in payments if Decimal(str(p.get("amount", 0))) != Decimal("0")
+        ]
 
     existing = {
         (p.payment_date, p.amount): p
         for p in policy.payments.where(ACTIVE)
     }
-    incoming: set[tuple[date, float]] = set()
+    incoming: set[tuple[date, Decimal]] = set()
 
     for data in payments:
         payment_date = data.get("payment_date")
         amount = data.get("amount")
         if payment_date is None or amount is None:
             continue
+        amount = Decimal(str(amount))
         key = (payment_date, amount)
         incoming.add(key)
         if key not in existing:
-            add_payment(policy=policy, payment_date=payment_date, amount=amount)
+            add_payment(
+                policy=policy, payment_date=payment_date, amount=amount
+            )
 
     for key, payment in existing.items():
         if key not in incoming:
@@ -212,6 +228,8 @@ def update_payment(payment: Payment, **kwargs) -> Payment:
             if key == "policy_id" and not kwargs.get("policy"):
                 value = Policy.get_or_none(Policy.id == value)
                 key = "policy"
+            if key == "amount" and value is not None:
+                value = Decimal(str(value))
             updates[key] = value
 
     if not updates:
