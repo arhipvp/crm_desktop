@@ -59,13 +59,11 @@ def mark_incomes_deleted(income_ids: list[int]) -> int:
     """Массово пометить доходы удалёнными."""
     if not income_ids:
         return 0
-    count = 0
-    for iid in income_ids:
-        before = Income.get_or_none(Income.id == iid)
-        if before and not before.is_deleted:
-            mark_income_deleted(iid)
-            count += 1
-    return count
+    return (
+        Income.update(is_deleted=True)
+        .where(Income.id.in_(income_ids))
+        .execute()
+    )
 
 
 def get_incomes_page(
