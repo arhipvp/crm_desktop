@@ -3,7 +3,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from peewee import Field
-from PySide6.QtCore import QDate, Qt, Signal, QSortFilterProxyModel, QTimer
+from PySide6.QtCore import QDate, Qt, Signal, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -22,7 +22,6 @@ from ui.base.base_table_model import BaseTableModel
 from ui.common.filter_controls import FilterControls
 from ui.common.paginator import Paginator
 from ui.common.styled_widgets import styled_button
-from ui.common.column_proxy_model import ColumnFilterProxyModel
 from ui.common.column_filter_row import ColumnFilterRow
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
@@ -188,8 +187,6 @@ class BaseTableView(QWidget):
         self.column_filters = ColumnFilterRow(linked_view=self.table)
         self.column_filters.filter_changed.connect(self._on_column_filter_changed)
         self.left_layout.insertWidget(self.left_layout.count() - 1, self.column_filters)
-        self.proxy_model = ColumnFilterProxyModel(self)
-        self.table.setModel(self.proxy_model)
 
         # Пагинация
         self.paginator = Paginator(
@@ -207,8 +204,7 @@ class BaseTableView(QWidget):
         ]
 
         self.model = BaseTableModel(items, model_class)
-        self.proxy_model.setSourceModel(self.model)
-        self.table.setModel(self.proxy_model)
+        self.table.setModel(self.model)
 
         # Безопасная попытка resize
         try:
@@ -296,7 +292,6 @@ class BaseTableView(QWidget):
         self.load_data()
 
     def _on_column_filter_changed(self, column: int, text: str):
-        self.proxy_model.set_filter(column, text)
         self.on_filter_changed()
         self.save_table_settings()
 
@@ -489,7 +484,7 @@ class BaseTableView(QWidget):
 
     def _source_row(self, view_index):
         """Возвращает номер строки в исходной модели для индекса из таблицы."""
-        return self.proxy_model.mapToSource(view_index).row()
+        return view_index.row()
 
     # BaseTableView
     def get_selected_object(self):
@@ -631,8 +626,6 @@ class BaseTableView(QWidget):
         texts = saved.get("column_filter_texts", [])
         if texts:
             self.column_filters.set_all_texts(texts)
-            for i, text in enumerate(texts):
-                self.proxy_model.set_filter(i, text)
         per_page = saved.get("per_page")
         need_reload = False
         if per_page is not None:
