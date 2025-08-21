@@ -4,13 +4,8 @@ import sys
 import logging
 
 from openpyxl import load_workbook
-
-# Добавляем путь к корню проекта
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-sys.path.append(BASE_DIR)
 from PySide6.QtWidgets import QApplication
 
-# Теперь корректные импорты
 from database.db import db
 from database.models import Policy
 from services.client_service import get_or_create_client_by_name
