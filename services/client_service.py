@@ -305,5 +305,5 @@ def build_client_query(
     search_text: str = "", show_deleted: bool = False, column_filters: dict[str, str] | None = None
 ):
     """Создаёт выборку клиентов с учётом фильтров."""
-    query = Client.select()
-    return apply_client_filters(query, search_text, show_deleted, column_filters)
+    query = Client.active() if not show_deleted else Client.select()
+    return apply_client_filters(query, search_text, column_filters)
