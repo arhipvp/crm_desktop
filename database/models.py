@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from peewee import (
     Model,
     BigIntegerField,
@@ -43,7 +44,7 @@ class Client(SoftDeleteModel):
         return self.name
 
 
-class DealStatus:
+class DealStatus(str, Enum):
     NEW = "новая"
     IN_PROGRESS = "в работе"
     SUCCESS = "успешна"
