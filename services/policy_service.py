@@ -15,6 +15,9 @@ from services import executor_service as es
 from services.telegram_service import notify_executor
 from services.validators import normalize_policy_number
 
+
+ACTIVE = Policy.is_deleted == False
+
 logger = logging.getLogger(__name__)
 
 # ─────────────────────────── Исключения ───────────────────────────
@@ -42,7 +45,7 @@ def get_all_policies():
     Returns:
         ModelSelect: Выборка полисов.
     """
-    return Policy.select().where(Policy.is_deleted == False)
+    return Policy.select().where(ACTIVE)
 
 
 def get_policies_by_client_id(client_id: int):
@@ -54,9 +57,7 @@ def get_policies_by_client_id(client_id: int):
     Returns:
         ModelSelect: Выборка полисов клиента.
     """
-    return Policy.select().where(
-        (Policy.client_id == client_id) & (Policy.is_deleted == False)
-    )
+    return Policy.select().where((Policy.client_id == client_id) & ACTIVE)
 
 
 def get_policies_by_deal_id(deal_id: int):
@@ -70,7 +71,7 @@ def get_policies_by_deal_id(deal_id: int):
     """
     return (
         Policy.select()
-        .where((Policy.deal_id == deal_id) & (Policy.is_deleted == False))
+        .where((Policy.deal_id == deal_id) & ACTIVE)
         .order_by(Policy.start_date.asc())
     )
 
@@ -106,7 +107,7 @@ def _check_duplicate_policy(
         return
 
     policy_number = normalize_policy_number(policy_number)
-    cond = (Policy.policy_number == policy_number) & (Policy.is_deleted == False)
+    cond = (Policy.policy_number == policy_number) & ACTIVE
     if exclude_id is not None:
         cond &= Policy.id != exclude_id
 
@@ -577,7 +578,7 @@ def apply_policy_filters(
     if client_id is not None:
         query = query.where(Policy.client == client_id)
     if not show_deleted:
-        query = query.where(Policy.is_deleted == False)
+        query = query.where(ACTIVE)
     if not include_renewed:
         query = query.where(
             (Policy.renewed_to.is_null(True))
@@ -631,7 +632,7 @@ def get_policy_by_id(policy_id: int) -> Policy | None:
     Returns:
         Policy | None: Найденный полис или ``None``.
     """
-    return Policy.get_or_none((Policy.id == policy_id) & (Policy.is_deleted == False))
+    return Policy.get_or_none((Policy.id == policy_id) & ACTIVE)
 
 
 def get_unique_policy_field_values(field_name: str) -> list[str]:
