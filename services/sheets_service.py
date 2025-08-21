@@ -198,15 +198,18 @@ def sync_calculations_from_sheet() -> int:
         if all(v is None or v == "" for v in params.values()):
             continue
 
-        exists = DealCalculation.get_or_none(
-            (DealCalculation.deal_id == deal_id)
-            & (DealCalculation.insurance_company == params["insurance_company"])
-            & (DealCalculation.insurance_type == params["insurance_type"])
-            & (DealCalculation.insured_amount == params["insured_amount"])
-            & (DealCalculation.premium == params["premium"])
-            & (DealCalculation.deductible == params["deductible"])
-            & (DealCalculation.note == params["note"])
-            & (DealCalculation.is_deleted == False)
+        exists = (
+            DealCalculation.active()
+            .where(
+                (DealCalculation.deal_id == deal_id)
+                & (DealCalculation.insurance_company == params["insurance_company"])
+                & (DealCalculation.insurance_type == params["insurance_type"])
+                & (DealCalculation.insured_amount == params["insured_amount"])
+                & (DealCalculation.premium == params["premium"])
+                & (DealCalculation.deductible == params["deductible"])
+                & (DealCalculation.note == params["note"])
+            )
+            .get_or_none()
         )
         if exists:
             continue

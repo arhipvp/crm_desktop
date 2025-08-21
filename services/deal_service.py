@@ -38,22 +38,20 @@ logger = logging.getLogger(__name__)
 
 def get_all_deals():
     """Возвращает все сделки, кроме помеченных как удалённые."""
-    return Deal.select().where(Deal.is_deleted == False)
+    return Deal.active()
 
 
 def get_open_deals():
     """Открытые (не закрытые) сделки, не помеченные как удалённые."""
-    return Deal.select().where((Deal.is_closed == False) & (Deal.is_deleted == False))
+    return Deal.active().where(Deal.is_closed == False)
 
 
 def get_deals_by_client_id(client_id: int):
-    return Deal.select().where(
-        (Deal.client_id == client_id) & (Deal.is_deleted == False)
-    )
+    return Deal.active().where(Deal.client_id == client_id)
 
 
 def get_deal_by_id(deal_id: int) -> Deal | None:
-    return Deal.get_or_none((Deal.id == deal_id) & (Deal.is_deleted == False))
+    return Deal.active().where(Deal.id == deal_id).get_or_none()
 
 
 # ──────────────────────────── Добавление ─────────────────────────────
@@ -338,11 +336,8 @@ def mark_deal_deleted(deal_id: int):
 def apply_deal_filters(
     query,
     search_text: str = "",
-    show_deleted: bool = False,
     column_filters: dict | None = None,
 ):
-    if not show_deleted:
-        query = query.where(Deal.is_deleted == False)
     if search_text:
         query = query.where(
             (Deal.description.contains(search_text))
@@ -419,8 +414,8 @@ def get_deals_page(
 def get_open_deals_page(page: int = 1, per_page: int = 50) -> ModelSelect:
     """Возвращает открытые сделки постранично."""
     return (
-        Deal.select()
-        .where((Deal.is_closed == False) & (Deal.is_deleted == False))
+        Deal.active()
+        .where(Deal.is_closed == False)
         .order_by(Deal.start_date.desc())
         .paginate(page, per_page)
     )
@@ -431,14 +426,12 @@ def get_open_deals_page(page: int = 1, per_page: int = 50) -> ModelSelect:
 
 def get_policies_by_deal_id(deal_id: int) -> ModelSelect:
     """Вернуть полисы, привязанные к сделке."""
-    return Policy.select().where(
-        (Policy.deal == deal_id) & (Policy.is_deleted == False)
-    )
+    return Policy.active().where(Policy.deal == deal_id)
 
 
 def get_tasks_by_deal_id(deal_id: int) -> ModelSelect:
     """Вернуть задачи, связанные со сделкой."""
-    return Task.select().where((Task.deal == deal_id) & (Task.is_deleted == False))
+    return Task.active().where(Task.deal == deal_id)
 
 
 def build_deal_query(
@@ -448,9 +441,10 @@ def build_deal_query(
     column_filters: dict | None = None,
 ) -> ModelSelect:
     """Базовый запрос сделок с фильтрами по статусам."""
-    query = Deal.select().join(Client)
+    base = Deal.active() if not show_deleted else Deal.select()
+    query = base.join(Client)
 
-    query = apply_deal_filters(query, search_text, show_deleted, column_filters)
+    query = apply_deal_filters(query, search_text, column_filters)
 
     if not show_closed:
         query = query.where(Deal.is_closed == False)

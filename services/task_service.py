@@ -18,12 +18,12 @@ from services.deal_service import get_deal_by_id  # re-export
 # ───────────────────────── базовые CRUD ─────────────────────────
 def get_all_tasks():
     """Вернуть все задачи без удалённых."""
-    return Task.select().where(Task.is_deleted == False)
+    return Task.active()
 
 
 def get_pending_tasks():
     """Невыполненные активные задачи."""
-    return Task.select().where((Task.is_done == False) & (Task.is_deleted == False))
+    return Task.active().where(Task.is_done == False)
 
 
 def add_task(**kwargs):
@@ -169,7 +169,7 @@ def mark_task_deleted(task: Task | int):
 # ─────────────────────── очередь Telegram ───────────────────────
 def queue_task(task_id: int):
     """Поставить задачу в очередь (idle → queued)."""
-    t = Task.get_or_none(Task.id == task_id, Task.is_deleted == False)
+    t = Task.active().where(Task.id == task_id).get_or_none()
     if t and t.dispatch_state == "idle":
         t.dispatch_state = "queued"
         t.queued_at = _dt.datetime.utcnow()
@@ -188,9 +188,7 @@ def queue_task(task_id: int):
 
 def get_clients_with_queued_tasks() -> list[Client]:
     """Вернуть уникальных клиентов с задачами в состоянии ``queued``."""
-    base = Task.select().where(
-        (Task.dispatch_state == "queued") & (Task.is_deleted == False)
-    )
+    base = Task.active().where(Task.dispatch_state == "queued")
     tasks = prefetch(base, Deal, Policy, Client)
 
     seen: set[int] = set()
@@ -211,13 +209,13 @@ def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
     """Выдать следующую задачу из очереди, фильтруя по клиенту."""
     with db.atomic():
         query = (
-            Task.select(Task.id)
+            Task.active()
+            .select(Task.id)
             .join(Deal, JOIN.LEFT_OUTER)
             .switch(Task)
             .join(Policy, JOIN.LEFT_OUTER)
             .where(
                 (Task.dispatch_state == "queued")
-                & (Task.is_deleted == False)
                 & ((Deal.client_id == client_id) | (Policy.client_id == client_id))
             )
             .order_by(Task.queued_at.asc())
@@ -253,11 +251,10 @@ def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
 def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
     """Вернуть сделки клиента, у которых есть задачи в очереди."""
     base = (
-        Task.select()
+        Task.active()
         .join(Deal)
         .where(
             (Task.dispatch_state == "queued")
-            & (Task.is_deleted == False)
             & (Deal.client_id == client_id)
         )
     )
@@ -274,13 +271,7 @@ def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
 
 def get_all_deals_with_queued_tasks() -> list[Deal]:
     """Вернуть все сделки, у которых есть задачи в очереди."""
-    base = (
-        Task.select()
-        .join(Deal)
-        .where(
-            (Task.dispatch_state == "queued") & (Task.is_deleted == False)
-        )
-    )
+    base = Task.active().join(Deal).where(Task.dispatch_state == "queued")
     tasks = prefetch(base, Deal, Client)
 
     seen: set[int] = set()
@@ -296,10 +287,10 @@ def pop_next_by_deal(chat_id: int, deal_id: int) -> Task | None:
     """Выдать следующую задачу из очереди для сделки."""
     with db.atomic():
         query = (
-            Task.select(Task.id)
+            Task.active()
+            .select(Task.id)
             .where(
                 (Task.dispatch_state == "queued")
-                & (Task.is_deleted == False)
                 & (Task.deal_id == deal_id)
             )
             .order_by(Task.queued_at.asc())
@@ -336,10 +327,10 @@ def pop_all_by_deal(chat_id: int, deal_id: int) -> list[Task]:
     """Выдать все задачи из очереди для сделки."""
     with db.atomic():
         query = (
-            Task.select(Task.id)
+            Task.active()
+            .select(Task.id)
             .where(
                 (Task.dispatch_state == "queued")
-                & (Task.is_deleted == False)
                 & (Task.deal_id == deal_id)
             )
             .order_by(Task.queued_at.asc())
@@ -371,8 +362,9 @@ def pop_all_by_deal(chat_id: int, deal_id: int) -> list[Task]:
 def pop_next(chat_id: int) -> Task | None:
     with db.atomic():
         query = (
-            Task.select(Task.id)
-            .where((Task.dispatch_state == "queued") & (Task.is_deleted == False))
+            Task.active()
+            .select(Task.id)
+            .where(Task.dispatch_state == "queued")
             .order_by(Task.queued_at.asc())
             .limit(1)
         )
@@ -399,7 +391,7 @@ def pop_next(chat_id: int) -> Task | None:
 
 
 def return_to_queue(task_id: int):
-    t = Task.get_or_none(Task.id == task_id, Task.is_deleted == False)
+    t = Task.active().where(Task.id == task_id).get_or_none()
     if t and t.dispatch_state == "sent":
         t.dispatch_state = "queued"
         t.tg_chat_id = None
@@ -416,7 +408,7 @@ def return_to_queue(task_id: int):
 
 def notify_task(task_id: int) -> None:
     """Переотправить уведомление исполнителю по задаче."""
-    t = Task.get_or_none(Task.id == task_id, Task.is_deleted == False)
+    t = Task.active().where(Task.id == task_id).get_or_none()
     if not t or t.is_done:
         return
     if t.dispatch_state == "sent":
@@ -484,11 +476,9 @@ def build_task_query(
     sort_order="asc",
     column_filters: dict[str, str] | None = None,
 ):
-    query = Task.select()
+    query = Task.active() if not include_deleted else Task.select()
     if not include_done:
         query = query.where(Task.is_done == False)
-    if not include_deleted:
-        query = query.where(Task.is_deleted == False)
     if only_queued:
         query = query.where(Task.dispatch_state == "queued")
     if search_text:
@@ -566,8 +556,8 @@ def get_pending_tasks_page(page: int, per_page: int):
     """
     offset = (page - 1) * per_page
     return (
-        Task.select()
-        .where((Task.is_done == False) & (Task.is_deleted == False))
+        Task.active()
+        .where(Task.is_done == False)
         .offset(offset)
         .limit(per_page)
     )
@@ -581,10 +571,9 @@ def get_queued_tasks_by_deal(deal_id: int) -> list[Task]:
     )
 
     base = (
-        Task.select()
+        Task.active()
         .where(
             (Task.dispatch_state == "queued")
-            & (Task.is_deleted == False)
             & (
                 (Task.deal_id == deal_id)
                 | (Task.policy_id.in_(policy_subq))
@@ -597,8 +586,8 @@ def get_queued_tasks_by_deal(deal_id: int) -> list[Task]:
 def get_all_queued_tasks() -> list[Task]:
     """Вернуть все задачи в состоянии ``queued`` с предзагрузкой связей."""
     base = (
-        Task.select()
-        .where((Task.dispatch_state == "queued") & (Task.is_deleted == False))
+        Task.active()
+        .where(Task.dispatch_state == "queued")
         .order_by(Task.queued_at.asc())
     )
     return list(prefetch(base, Deal, Policy, Client))
@@ -608,12 +597,8 @@ def pop_task_by_id(chat_id: int, task_id: int) -> Task | None:
     """Выдать задачу по id, если она в очереди."""
     with db.atomic():
         task = (
-            Task.select()
-            .where(
-                (Task.id == task_id)
-                & (Task.is_deleted == False)
-                & (Task.dispatch_state == "queued")
-            )
+            Task.active()
+            .where((Task.id == task_id) & (Task.dispatch_state == "queued"))
             .first()
         )
         if not task:
@@ -653,12 +638,8 @@ def get_tasks_by_deal(deal_id: int) -> list[Task]:
         .where(Policy.deal_id == deal_id)
     )
 
-    return Task.select().where(
-        (
-            (Task.deal_id == deal_id)
-            | (Task.policy_id.in_(policy_subq))
-        )
-        & (Task.is_deleted == False)
+    return Task.active().where(
+        (Task.deal_id == deal_id) | (Task.policy_id.in_(policy_subq))
     )
 
 
@@ -670,13 +651,12 @@ def get_incomplete_tasks_by_deal(deal_id: int) -> list[Task]:
     )
 
     base = (
-        Task.select()
+        Task.active()
         .where(
             (
                 (Task.deal_id == deal_id)
                 | (Task.policy_id.in_(policy_subq))
             )
-            & (Task.is_deleted == False)
             & (Task.is_done == False)
         )
     )
@@ -701,13 +681,12 @@ def get_incomplete_tasks_for_executor(tg_id: int) -> list[Task]:
     )
 
     base = (
-        Task.select()
+        Task.active()
         .where(
             (
-                (Task.deal_id.in_(deal_ids)) |
-                (Task.policy_id.in_(policy_subq))
+                (Task.deal_id.in_(deal_ids))
+                | (Task.policy_id.in_(policy_subq))
             )
-            & (Task.is_deleted == False)
             & (Task.is_done == False)
         )
     )
@@ -717,12 +696,8 @@ def get_incomplete_tasks_for_executor(tg_id: int) -> list[Task]:
 def get_incomplete_task(task_id: int) -> Task | None:
     """Вернуть невыполненную задачу с предзагрузкой связей."""
     base = (
-        Task.select()
-        .where(
-            (Task.id == task_id)
-            & (Task.is_deleted == False)
-            & (Task.is_done == False)
-        )
+        Task.active()
+        .where((Task.id == task_id) & (Task.is_done == False))
     )
     result = list(prefetch(base, Deal, Policy, Client))
     return result[0] if result else None

@@ -21,7 +21,6 @@ import peewee
 
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id, get_deals_by_client_id
-from services.payment_service import ACTIVE as PAYMENT_ACTIVE
 from services.validators import normalize_number, normalize_policy_number
 
 
@@ -264,7 +263,8 @@ class PolicyMergeDialog(QDialog):
         vbox.addWidget(self.payments_table)
 
         for p in (
-            self.existing.payments.where(PAYMENT_ACTIVE)
+            Payment.active()
+            .where(Payment.policy == self.existing)
             .order_by(Payment.payment_date)
         ):
             self._insert_payment_row(p.payment_date, p.amount)
@@ -291,7 +291,8 @@ class PolicyMergeDialog(QDialog):
         self.first_payment_checkbox = QCheckBox("Первый платёж уже оплачен")
         if not self._first_payment_paid:
             first = (
-                self.existing.payments.where(PAYMENT_ACTIVE)
+                Payment.active()
+                .where(Payment.policy == self.existing)
                 .order_by(Payment.payment_date)
                 .first()
             )

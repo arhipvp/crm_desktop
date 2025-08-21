@@ -31,12 +31,12 @@ class DuplicatePhoneError(ValueError):
 
 def get_all_clients() -> ModelSelect:
     """Вернуть выборку всех активных клиентов."""
-    return Client.select().where(Client.is_deleted == False)
+    return Client.active()
 
 
 def get_client_by_id(client_id: int) -> Client | None:
     """Получить клиента по его идентификатору."""
-    return Client.get_or_none((Client.id == client_id) & (Client.is_deleted == False))
+    return Client.active().where(Client.id == client_id).get_or_none()
 
 
 def get_client_by_phone(phone: str) -> Client | None:
@@ -45,7 +45,7 @@ def get_client_by_phone(phone: str) -> Client | None:
         phone = normalize_phone(phone)
     except ValueError:
         return None
-    return Client.get_or_none((Client.phone == phone) & (Client.is_deleted == False))
+    return Client.active().where(Client.phone == phone).get_or_none()
 
 
 def get_clients_page(
@@ -56,8 +56,8 @@ def get_clients_page(
     column_filters: dict[str, str] | None = None,
 ) -> ModelSelect:
     """Получить страницу клиентов с учётом фильтров."""
-    query = Client.select()
-    query = apply_client_filters(query, search_text, show_deleted, column_filters)
+    query = Client.active() if not show_deleted else Client.select()
+    query = apply_client_filters(query, search_text, column_filters)
 
     offset = (page - 1) * per_page
     return query.order_by(Client.name.asc()).limit(per_page).offset(offset)
@@ -80,17 +80,17 @@ def find_similar_clients(name: str) -> list[Client]:
         condition |= lc_name.startswith(f"{search_first_two} ")
         condition |= lc_name == search_first_two
 
-    query = Client.select().where((Client.is_deleted == False) & condition)
+    query = Client.active().where(condition)
     return list(query)
 
 
 def _check_duplicate_phone(phone: str, *, exclude_id: int | None = None) -> None:
     if not phone:
         return
-    cond = (Client.phone == phone) & (Client.is_deleted == False)
+    query = Client.active().where(Client.phone == phone)
     if exclude_id is not None:
-        cond &= Client.id != exclude_id
-    existing = Client.get_or_none(cond)
+        query = query.where(Client.id != exclude_id)
+    existing = query.get_or_none()
     if existing:
         raise DuplicatePhoneError(phone, existing)
 
@@ -210,12 +210,9 @@ def update_client(client: Client, **kwargs) -> Client:
 def apply_client_filters(
     query: ModelSelect,
     search_text: str,
-    show_deleted: bool,
     column_filters: dict[str, str] | None = None,
 ) -> ModelSelect:
-    """Применяет фильтры поиска и удаления к выборке клиентов."""
-    if not show_deleted:
-        query = query.where(Client.is_deleted == False)
+    """Применяет фильтры поиска к выборке клиентов."""
     if search_text:
         query = query.where(
             (Client.name.contains(search_text))

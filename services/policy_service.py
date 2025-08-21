@@ -16,7 +16,6 @@ from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.folder_utils import create_policy_folder, open_folder
 from services.payment_service import (
-    ACTIVE as PAYMENT_ACTIVE,
     add_payment,
     sync_policy_payments,
 )
@@ -25,7 +24,6 @@ from services.telegram_service import notify_executor
 from services.validators import normalize_policy_number
 
 
-ACTIVE = Policy.is_deleted == False
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +52,7 @@ def get_all_policies():
     Returns:
         ModelSelect: Выборка полисов.
     """
-    return Policy.select().where(ACTIVE)
+    return Policy.active()
 
 
 def get_policies_by_client_id(client_id: int):
@@ -66,7 +64,7 @@ def get_policies_by_client_id(client_id: int):
     Returns:
         ModelSelect: Выборка полисов клиента.
     """
-    return Policy.select().where((Policy.client_id == client_id) & ACTIVE)
+    return Policy.active().where(Policy.client_id == client_id)
 
 
 def get_policies_by_deal_id(deal_id: int):
@@ -79,8 +77,8 @@ def get_policies_by_deal_id(deal_id: int):
         ModelSelect: Выборка полисов.
     """
     return (
-        Policy.select()
-        .where((Policy.deal_id == deal_id) & ACTIVE)
+        Policy.active()
+        .where(Policy.deal_id == deal_id)
         .order_by(Policy.start_date.asc())
     )
 
@@ -116,11 +114,11 @@ def _check_duplicate_policy(
         return
 
     policy_number = normalize_policy_number(policy_number)
-    cond = (Policy.policy_number == policy_number) & ACTIVE
+    query = Policy.active().where(Policy.policy_number == policy_number)
     if exclude_id is not None:
-        cond &= Policy.id != exclude_id
+        query = query.where(Policy.id != exclude_id)
 
-    existing = Policy.get_or_none(cond)
+    existing = query.get_or_none()
     if not existing:
         return
 
@@ -365,8 +363,8 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
         # отметить платёж как оплаченный, если указано
         if first_payment_paid:
             first_payment = (
-                Payment.select()
-                .where((Payment.policy == policy) & PAYMENT_ACTIVE)
+                Payment.active()
+                .where(Payment.policy == policy)
                 .order_by(Payment.payment_date)
                 .first()
             )
@@ -579,7 +577,6 @@ def prolong_policy(original_policy: Policy) -> Policy:
 def apply_policy_filters(
     query,
     search_text: str = "",
-    show_deleted: bool = False,
     deal_id: int | None = None,
     client_id: int | None = None,
     include_renewed: bool = True,
@@ -590,8 +587,6 @@ def apply_policy_filters(
         query = query.where(Policy.deal_id == deal_id)
     if client_id is not None:
         query = query.where(Policy.client == client_id)
-    if not show_deleted:
-        query = query.where(ACTIVE)
     if not include_renewed:
         query = query.where(
             (Policy.renewed_to.is_null(True))
@@ -636,11 +631,11 @@ def build_policy_query(
     **filters,
 ):
     """Сформировать запрос для выборки полисов с фильтрами."""
-    query = Policy.select(Policy, Client).join(Client)
+    base = Policy.active() if not show_deleted else Policy.select()
+    query = base.select(Policy, Client).join(Client)
     return apply_policy_filters(
         query,
         search_text,
-        show_deleted,
         deal_id,
         client_id,
         include_renewed,
@@ -658,7 +653,7 @@ def get_policy_by_id(policy_id: int) -> Policy | None:
     Returns:
         Policy | None: Найденный полис или ``None``.
     """
-    return Policy.get_or_none((Policy.id == policy_id) & ACTIVE)
+    return Policy.active().where(Policy.id == policy_id).get_or_none()
 
 
 def get_unique_policy_field_values(field_name: str) -> list[str]:
@@ -696,8 +691,9 @@ def attach_premium(policies: list[Policy]) -> None:
         return
     ids = [p.id for p in policies]
     sub = (
-        Payment.select(Payment.policy, fn.SUM(Payment.amount).alias("total"))
-        .where((Payment.policy.in_(ids)) & PAYMENT_ACTIVE)
+        Payment.active()
+        .select(Payment.policy, fn.SUM(Payment.amount).alias("total"))
+        .where(Payment.policy.in_(ids))
         .group_by(Payment.policy)
     )
     totals = {row.policy_id: row.total for row in sub}

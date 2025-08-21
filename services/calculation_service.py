@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def add_calculation(deal_id: int, **kwargs) -> DealCalculation:
-    deal = Deal.get_or_none((Deal.id == deal_id) & (Deal.is_deleted == False))
+    deal = Deal.active().where(Deal.id == deal_id).get_or_none()
     if not deal:
         raise ValueError("Deal not found")
 
@@ -37,9 +37,8 @@ def add_calculation(deal_id: int, **kwargs) -> DealCalculation:
 
 
 def get_calculations(deal_id: int, show_deleted: bool = False) -> ModelSelect:
-    query = DealCalculation.select().where(DealCalculation.deal_id == deal_id)
-    if not show_deleted:
-        query = query.where(DealCalculation.is_deleted == False)
+    base = DealCalculation.active() if not show_deleted else DealCalculation.select()
+    query = base.where(DealCalculation.deal_id == deal_id)
     return query.order_by(DealCalculation.created_at.desc())
 
 
@@ -72,7 +71,7 @@ def update_calculation(entry: DealCalculation, **kwargs) -> DealCalculation:
     }
     updates = {k: v for k, v in kwargs.items() if k in allowed}
     if "deal_id" in updates:
-        deal = Deal.get_or_none((Deal.id == updates["deal_id"]) & (Deal.is_deleted == False))
+        deal = Deal.active().where(Deal.id == updates["deal_id"]).get_or_none()
         if not deal:
             raise ValueError("Deal not found")
         entry.deal = deal

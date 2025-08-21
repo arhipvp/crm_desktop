@@ -9,7 +9,8 @@ from peewee import JOIN, ModelSelect, fn, Field
 from database.db import db
 from database.models import Client, Expense, Income, Payment, Policy
 
-ACTIVE = Payment.is_deleted == False
+# Выражение для активных платежей (не удалённых)
+ACTIVE = Payment.active()._where
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +20,12 @@ logger = logging.getLogger(__name__)
 
 def get_all_payments() -> ModelSelect:
     """Вернуть все платежи без удалённых."""
-    return Payment.select().where(ACTIVE)
+    return Payment.active()
 
 
 def get_payments_by_policy_id(policy_id: int) -> ModelSelect:
     """Получить платежи по полису."""
-    return Payment.select().where((Payment.policy_id == policy_id) & ACTIVE)
+    return Payment.active().where(Payment.policy_id == policy_id)
 
 
 def get_payment_by_id(payment_id: int) -> Payment | None:
@@ -35,9 +36,9 @@ def get_payment_by_id(payment_id: int) -> Payment | None:
 def get_payments_by_client_id(client_id: int) -> ModelSelect:
     """Платежи клиента через связанные полисы."""
     return (
-        Payment.select()
+        Payment.active()
         .join(Policy)
-        .where((Policy.client == client_id) & ACTIVE)
+        .where(Policy.client == client_id)
     )
 
 
@@ -169,13 +170,14 @@ def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
     if zero_payments and any(
         Decimal(str(p.get("amount", 0))) != Decimal("0") for p in payments
     ):
+        subq = (
+            Payment.active()
+            .where((Payment.policy == policy) & (Payment.amount == Decimal("0")))
+            .select(Payment.id)
+        )
         (
             Payment.update(is_deleted=True)
-            .where(
-                (Payment.policy == policy)
-                & (Payment.amount == Decimal("0"))
-                & ACTIVE
-            )
+            .where(Payment.id.in_(subq))
             .execute()
         )
         payments = [
@@ -184,7 +186,7 @@ def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
 
     existing = {
         (p.payment_date, p.amount): p
-        for p in policy.payments.where(ACTIVE)
+        for p in Payment.active().where(Payment.policy == policy)
     }
     incoming: set[tuple[date, Decimal]] = set()
 
@@ -245,7 +247,6 @@ def update_payment(payment: Payment, **kwargs) -> Payment:
 def apply_payment_filters(
     query: ModelSelect,
     search_text: str = "",
-    show_deleted: bool = False,
     deal_id: int | None = None,
     include_paid: bool = True,
     column_filters: dict | None = None,
@@ -253,8 +254,6 @@ def apply_payment_filters(
     """Фильтры для выборки платежей."""
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
-    if not show_deleted:
-        query = query.where(ACTIVE)
     if search_text:
         query = query.where(
             (Policy.policy_number.contains(search_text))
@@ -293,8 +292,9 @@ def build_payment_query(
         Expense.payment == Payment.id
     )
 
+    base = Payment.active() if not show_deleted else Payment.select()
     query = (
-        Payment.select(
+        base.select(
             Payment,
             Payment.id,
             Payment.amount,
@@ -309,7 +309,7 @@ def build_payment_query(
     )
 
     query = apply_payment_filters(
-        query, search_text, show_deleted, deal_id, include_paid, column_filters
+        query, search_text=search_text, deal_id=deal_id, include_paid=include_paid, column_filters=column_filters
     )
     return query
 
@@ -317,8 +317,8 @@ def build_payment_query(
 def get_payments_by_deal_id(deal_id: int) -> ModelSelect:
     """Платежи, относящиеся к сделке."""
     return (
-        Payment.select()
+        Payment.active()
         .join(Policy)
-        .where((Policy.deal_id == deal_id) & ACTIVE)
+        .where(Policy.deal_id == deal_id)
         .order_by(Payment.payment_date.asc())
     )
