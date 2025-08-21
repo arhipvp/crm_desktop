@@ -2,6 +2,7 @@
 
 import logging
 from typing import Any
+from decimal import Decimal
 
 from peewee import JOIN, Field
 from peewee import SqliteDatabase
@@ -169,6 +170,8 @@ def add_income(**kwargs):
         for field in allowed_fields
         if field in kwargs and kwargs[field] not in ("", None)
     }
+    if "amount" in clean_data:
+        clean_data["amount"] = Decimal(str(clean_data["amount"]))
 
     try:
         income = Income.create(payment=payment, **clean_data)
@@ -201,6 +204,8 @@ def update_income(income: Income, **kwargs):
             if key == "payment_id" and not kwargs.get("payment"):
                 value = get_payment_by_id(value)
                 key = "payment"
+            if key == "amount" and value is not None:
+                value = Decimal(str(value))
             updates[key] = value
 
     if not updates:
