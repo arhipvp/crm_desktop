@@ -169,7 +169,7 @@ class BaseTableView(QWidget):
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_table_menu)
         self.left_layout.addWidget(self.table)
-        self.column_filters = ColumnFilterRow()
+        self.column_filters = ColumnFilterRow(linked_view=self.table)
         self.column_filters.filter_changed.connect(self._on_column_filter_changed)
         self.left_layout.insertWidget(self.left_layout.count() - 1, self.column_filters)
         self.proxy_model = ColumnFilterProxyModel(self)
