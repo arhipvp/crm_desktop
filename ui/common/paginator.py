@@ -27,6 +27,9 @@ class Paginator(QWidget):
 
         layout.addStretch()
 
+        self.summary_label = QLabel("")
+        layout.addWidget(self.summary_label)
+
     def update(self, total_count: int, page: int, per_page: int | None = None):
         """Обновить состояние пагинатора с учётом общего числа записей."""
         if per_page is not None:
@@ -60,3 +63,6 @@ class Paginator(QWidget):
     def prev_clicked(self):
         if self.on_prev:
             self.on_prev()
+
+    def set_summary(self, text: str):
+        self.summary_label.setText(text)

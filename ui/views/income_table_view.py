@@ -221,11 +221,22 @@ class IncomeTableView(BaseTableView):
             join_executor=join_executor,
             **filters,
         )
-        items = prefetch(query, Payment, Policy, Client, Deal, DealExecutor, Executor)
+        items = list(
+            prefetch(query, Payment, Policy, Client, Deal, DealExecutor, Executor)
+        )
+        total_sum = sum(i.amount for i in items)
+        if items:
+            self.paginator.set_summary(f"Сумма: {total_sum:.2f} ₽")
+        else:
+            self.paginator.set_summary("")
         total = build_income_query(join_executor=join_executor, **filters).count()
         logger.debug("\U0001F4E6 Загружено доходов: %d", len(items))
 
         self.set_model_class_and_items(self.model_class, items, total_count=total)
+
+    def on_filter_changed(self, *args, **kwargs):
+        self.paginator.set_summary("")
+        super().on_filter_changed(*args, **kwargs)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         """Устанавливает модель таблицы и применяет сохранённые настройки."""

@@ -66,15 +66,24 @@ class PaymentTableView(BaseTableView):
 
         # 2) получаем страницу и общее количество
         logger.debug("📊 Фильтры платежей: %s", filters)
+        items = list(get_payments_page(self.page, self.per_page, **filters))
 
-        items = get_payments_page(self.page, self.per_page, **filters)
+        total_sum = sum(p.amount for p in items)
+        if items:
+            self.paginator.set_summary(f"Сумма: {total_sum:.2f} ₽")
+        else:
+            self.paginator.set_summary("")
 
         total = build_payment_query(**filters).count()
 
         logger.debug("📦 Загружено платежей: %d", len(items))
 
         # 3) обновляем модель и пагинатор через базовый метод
-        self.set_model_class_and_items(Payment, list(items), total_count=total)
+        self.set_model_class_and_items(Payment, items, total_count=total)
+
+    def on_filter_changed(self, *args, **kwargs):
+        self.paginator.set_summary("")
+        super().on_filter_changed(*args, **kwargs)
 
     def get_selected(self):
         idx = self.table.currentIndex()
