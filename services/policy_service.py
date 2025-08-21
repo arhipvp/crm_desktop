@@ -10,7 +10,11 @@ from database.models import Payment, Policy
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.folder_utils import create_policy_folder, open_folder
-from services.payment_service import add_payment, sync_policy_payments
+from services.payment_service import (
+    ACTIVE as PAYMENT_ACTIVE,
+    add_payment,
+    sync_policy_payments,
+)
 from services import executor_service as es
 from services.telegram_service import notify_executor
 from services.validators import normalize_policy_number
@@ -353,7 +357,7 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
         if first_payment_paid:
             first_payment = (
                 Payment.select()
-                .where((Payment.policy == policy) & (Payment.is_deleted == False))
+                .where((Payment.policy == policy) & PAYMENT_ACTIVE)
                 .order_by(Payment.payment_date)
                 .first()
             )
@@ -671,7 +675,7 @@ def attach_premium(policies: list[Policy]) -> None:
     ids = [p.id for p in policies]
     sub = (
         Payment.select(Payment.policy, fn.SUM(Payment.amount).alias("total"))
-        .where((Payment.policy.in_(ids)) & (Payment.is_deleted == False))
+        .where((Payment.policy.in_(ids)) & PAYMENT_ACTIVE)
         .group_by(Payment.policy)
     )
     totals = {row.policy_id: row.total for row in sub}
