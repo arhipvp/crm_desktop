@@ -84,3 +84,8 @@ class ColumnFilterRow(QWidget):
             editor.blockSignals(True)
             editor.setText(texts[idx] if idx < len(texts) else "")
             editor.blockSignals(False)
+
+    def set_editor_visible(self, index: int, visible: bool) -> None:
+        """Управляет видимостью поля фильтра по его индексу."""
+        if 0 <= index < len(self._editors):
+            self._editors[index].setVisible(visible)
