@@ -2,6 +2,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from peewee import Field
 from PySide6.QtCore import QDate, Qt, Signal, QSortFilterProxyModel, QTimer
 from PySide6.QtWidgets import (
     QApplication,
@@ -30,6 +31,10 @@ from services.folder_utils import open_folder, copy_text_to_clipboard
 class BaseTableView(QWidget):
     row_double_clicked = Signal(object)  # объект строки по двойному клику
     data_loaded = Signal(int)  # сигнал о загрузке данных (количество)
+
+    # Соответствие индекса столбца полю модели. Значение ``None`` скрывает
+    # фильтр для соответствующего столбца.
+    COLUMN_FIELD_MAP: dict[int, Field | None] = {}
 
     def _on_filter_controls_changed(self, *args, **kwargs):
         """Безопасно обрабатывает изменение фильтров во время инициализации."""
@@ -220,7 +225,9 @@ class BaseTableView(QWidget):
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(headers, prev_texts)
+        self.column_filters.set_headers(
+            headers, prev_texts, self.COLUMN_FIELD_MAP
+        )
         QTimer.singleShot(0, self.load_table_settings)
 
     def load_data(self):
@@ -291,14 +298,22 @@ class BaseTableView(QWidget):
         self.on_filter_changed()
         self.save_table_settings()
 
-    def get_column_filters(self) -> dict[str, str]:
+    def get_column_filters(self) -> dict[Field, str]:
+        """Собирает фильтры по столбцам с учётом ``COLUMN_FIELD_MAP``."""
         if not hasattr(self, "model") or not self.model:
             return {}
-        filters: dict[str, str] = {}
-        for i, field in enumerate(self.model.fields):
+
+        filters: dict[Field, str] = {}
+        for i in range(self.model.columnCount()):
             text = self.column_filters.get_text(i)
-            if text:
-                filters[field.name] = text
+            if not text:
+                continue
+
+            field = self.COLUMN_FIELD_MAP.get(
+                i, self.model.fields[i] if i < len(self.model.fields) else None
+            )
+            if isinstance(field, Field):
+                filters[field] = text
         return filters
 
     def get_filters(self) -> dict:

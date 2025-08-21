@@ -4,7 +4,7 @@ import logging
 from datetime import date
 from decimal import Decimal
 
-from peewee import JOIN, ModelSelect, fn
+from peewee import JOIN, ModelSelect, fn, Field
 
 from database.db import db
 from database.models import Client, Expense, Income, Payment, Policy
@@ -48,7 +48,7 @@ def get_payments_page(
     show_deleted: bool = False,
     deal_id: int | None = None,
     include_paid: bool = True,
-    column_filters: dict[str, str] | None = None,
+    column_filters: dict | None = None,
     **filters,
 ) -> ModelSelect:
     """Получить страницу платежей по заданным фильтрам."""
@@ -248,7 +248,7 @@ def apply_payment_filters(
     show_deleted: bool = False,
     deal_id: int | None = None,
     include_paid: bool = True,
-    column_filters: dict[str, str] | None = None,
+    column_filters: dict | None = None,
 ) -> ModelSelect:
     """Фильтры для выборки платежей."""
     if deal_id is not None:
@@ -263,8 +263,19 @@ def apply_payment_filters(
     if not include_paid:
         query = query.where(Payment.actual_payment_date.is_null(True))
 
-    from services.query_utils import apply_column_filters
-    query = apply_column_filters(query, column_filters, Payment)
+    from services.query_utils import apply_column_filters, apply_field_filters
+
+    field_filters: dict[Field, str] = {}
+    name_filters: dict[str, str] = {}
+    if column_filters:
+        for key, val in column_filters.items():
+            if isinstance(key, Field):
+                field_filters[key] = val
+            else:
+                name_filters[str(key)] = val
+
+    query = apply_field_filters(query, field_filters)
+    query = apply_column_filters(query, name_filters, Payment)
     return query
 
 
@@ -273,7 +284,7 @@ def build_payment_query(
     show_deleted: bool = False,
     deal_id: int | None = None,
     include_paid: bool = True,
-    column_filters: dict[str, str] | None = None,
+    column_filters: dict | None = None,
     **filters,
 ) -> ModelSelect:
     """Сконструировать базовый запрос платежей с агрегатами."""
