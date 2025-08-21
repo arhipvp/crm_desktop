@@ -1,8 +1,10 @@
 import logging
+from datetime import date
 
 logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
 
 from database.models import Payment, Policy
@@ -198,6 +200,15 @@ class PaymentTableModel(BaseTableModel):
 
         obj = self.objects[index.row()]
         col = index.column()
+
+        if role == Qt.BackgroundRole:
+            if (
+                obj.actual_payment_date is None
+                and obj.payment_date
+                and obj.payment_date < date.today()
+            ):
+                return QBrush(QColor("#ffcccc"))
+            return None
 
         # Виртуальные поля — после стандартных
         if col >= len(self.fields):

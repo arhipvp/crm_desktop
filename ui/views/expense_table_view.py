@@ -1,4 +1,7 @@
+from datetime import date
+
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
 
 from peewee import fn
@@ -47,7 +50,7 @@ class ExpenseTableModel(BaseTableModel):
         return super().headerData(section, orientation, role)
 
     def data(self, index, role=Qt.DisplayRole):
-        if not index.isValid() or role != Qt.DisplayRole:
+        if not index.isValid():
             return None
 
         obj = self.objects[index.row()]
@@ -56,6 +59,19 @@ class ExpenseTableModel(BaseTableModel):
         if not policy and payment:
             policy = getattr(payment, "policy", None)
         deal = getattr(policy, "deal", None) if policy else None
+
+        if role == Qt.BackgroundRole:
+            payment_date = getattr(payment, "payment_date", None)
+            if (
+                obj.expense_date is None
+                and payment_date
+                and payment_date < date.today()
+            ):
+                return QBrush(QColor("#ffcccc"))
+            return None
+
+        if role != Qt.DisplayRole:
+            return None
 
         col = index.column()
 
