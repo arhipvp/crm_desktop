@@ -260,7 +260,13 @@ def build_expense_query(
         .join(Deal, JOIN.LEFT_OUTER)
         .switch(Payment)
         .join(Income, JOIN.LEFT_OUTER)
-        .group_by(Expense.id)
+        .group_by(
+            Expense.id,
+            Payment.id,
+            Policy.id,
+            Client.id,
+            Deal.id,
+        )
     )
     query = apply_expense_filters(
         query,
