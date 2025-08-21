@@ -71,11 +71,15 @@ class ColumnFilterRow(QWidget):
             self._editors[column].setText(text)
 
     def get_all_texts(self) -> list[str]:
-        """Возвращает список текстов всех полей фильтра."""
-        return [e.text().strip() for e in self._editors]
+        """Возвращает список текущих текстов всех полей фильтра."""
+        return [self.get_text(i) for i in range(len(self._editors))]
 
     def set_all_texts(self, texts: list[str]) -> None:
-        """Устанавливает тексты для всех полей фильтра."""
+        """Устанавливает тексты для всех полей фильтра.
+
+        Сигналы временно блокируются, чтобы не запускать фильтрацию
+        при восстановлении сохранённых значений.
+        """
         for idx, editor in enumerate(self._editors):
             editor.blockSignals(True)
             editor.setText(texts[idx] if idx < len(texts) else "")

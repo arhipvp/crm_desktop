@@ -2,7 +2,12 @@
 
 import logging
 from datetime import timedelta
+
 from peewee import fn, JOIN, Field
+
+from decimal import Decimal
+from peewee import fn
+
 
 from database.db import db
 from database.models import Client  # если ещё не импортирован
@@ -342,12 +347,16 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
             for p in payments:
                 add_payment(
                     policy=policy,
-                    amount=p.get("amount", 0),
+                    amount=Decimal(str(p.get("amount", 0))),
                     payment_date=p.get("payment_date", policy.start_date),
                 )
         else:
             # Если список пуст или не передан — автонулевой платёж
-            add_payment(policy=policy, amount=0, payment_date=policy.start_date)
+            add_payment(
+                policy=policy,
+                amount=Decimal("0"),
+                payment_date=policy.start_date,
+            )
             logger.info(
                 "💳 Авто-добавлен платёж с нулевой суммой для полиса #%s",
                 policy.policy_number,
@@ -693,4 +702,4 @@ def attach_premium(policies: list[Policy]) -> None:
     )
     totals = {row.policy_id: row.total for row in sub}
     for p in policies:
-        setattr(p, "_premium", totals.get(p.id, 0) or 0)
+        setattr(p, "_premium", totals.get(p.id, Decimal("0")) or Decimal("0"))

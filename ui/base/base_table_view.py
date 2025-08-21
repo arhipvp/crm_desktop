@@ -92,6 +92,13 @@ class BaseTableView(QWidget):
         self.per_page = 30
         self.total_count = 0
 
+        # восстановим сохранённое значение per_page, если оно было
+        saved_settings = ui_settings.get_table_settings(self.settings_id) or {}
+        try:
+            self.per_page = int(saved_settings.get("per_page", self.per_page))
+        except (TypeError, ValueError):
+            pass
+
         # --- мастер-детал макет ---
         self.outer_layout = QVBoxLayout(self)
         self.splitter = QSplitter()
@@ -183,7 +190,12 @@ class BaseTableView(QWidget):
         self.table.setModel(self.proxy_model)
 
         # Пагинация
-        self.paginator = Paginator(on_prev=self.prev_page, on_next=self.next_page)
+        self.paginator = Paginator(
+            on_prev=self.prev_page,
+            on_next=self.next_page,
+            per_page=self.per_page,
+        )
+        self.paginator.per_page_changed.connect(self._on_per_page_changed)
         self.left_layout.addWidget(self.paginator)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
@@ -274,9 +286,17 @@ class BaseTableView(QWidget):
             self.page -= 1
             self.load_data()
 
+    def _on_per_page_changed(self, per_page: int):
+        """Обработка изменения количества записей на странице."""
+        self.per_page = per_page
+        self.page = 1
+        self.save_table_settings()
+        self.load_data()
+
     def _on_column_filter_changed(self, column: int, text: str):
         self.proxy_model.set_filter(column, text)
         self.on_filter_changed()
+        self.save_table_settings()
 
     def get_column_filters(self) -> dict[Field, str]:
         """Собирает фильтры по столбцам с учётом ``COLUMN_FIELD_MAP``."""
@@ -575,6 +595,7 @@ class BaseTableView(QWidget):
             "column_widths": widths,
             "hidden_columns": hidden,
             "column_filter_texts": texts,
+            "per_page": self.per_page,
         }
         ui_settings.set_table_settings(self.settings_id, settings)
 
@@ -597,7 +618,8 @@ class BaseTableView(QWidget):
             idx = int(idx)
             if idx < header.count():
                 header.resizeSection(idx, width)
-        model_columns = self.table.model().columnCount()
+        model = self.table.model()
+        model_columns = model.columnCount() if model else 0
         for idx in saved.get("hidden_columns", []):
             idx = int(idx)
             if idx < model_columns:
@@ -607,6 +629,19 @@ class BaseTableView(QWidget):
             self.column_filters.set_all_texts(texts)
             for i, text in enumerate(texts):
                 self.proxy_model.set_filter(i, text)
+        per_page = saved.get("per_page")
+        need_reload = False
+        if per_page is not None:
+            try:
+                per_page = int(per_page)
+                if per_page != self.per_page:
+                    self.per_page = per_page
+                    need_reload = True
+            except (TypeError, ValueError):
+                pass
+        self.paginator.update(self.total_count, self.page, self.per_page)
+        if need_reload:
+            self.load_data()
 
     def closeEvent(self, event):
         self.save_table_settings()

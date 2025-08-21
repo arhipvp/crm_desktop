@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from peewee import (
     Model,
     BigIntegerField,
@@ -6,7 +7,7 @@ from peewee import (
     CharField,
     DateField,
     DateTimeField,
-    FloatField,
+    DecimalField,
     ForeignKeyField,
     TextField,
 )
@@ -43,7 +44,7 @@ class Client(SoftDeleteModel):
         return self.name
 
 
-class DealStatus:
+class DealStatus(str, Enum):
     NEW = "новая"
     IN_PROGRESS = "в работе"
     SUCCESS = "успешна"
@@ -91,7 +92,7 @@ class Policy(SoftDeleteModel):
 
 class Payment(SoftDeleteModel):
     policy = ForeignKeyField(Policy, backref="payments")
-    amount = FloatField()
+    amount = DecimalField(max_digits=12, decimal_places=2)
     payment_date = DateField()
     actual_payment_date = DateField(null=True)
 
@@ -116,7 +117,7 @@ class Task(SoftDeleteModel):
 
 class Income(SoftDeleteModel):
     payment = ForeignKeyField(Payment, backref="incomes")
-    amount = FloatField()
+    amount = DecimalField(max_digits=12, decimal_places=2)
     received_date = DateField(null=True)  # None ⇒ ожидается
     commission_source = CharField(null=True)
     note = TextField(null=True)
@@ -124,7 +125,7 @@ class Income(SoftDeleteModel):
 
 class Expense(SoftDeleteModel):
     payment = ForeignKeyField(Payment, backref="expenses")
-    amount = FloatField()
+    amount = DecimalField(max_digits=12, decimal_places=2)
     expense_type = CharField()
     expense_date = DateField(null=True)  # None ⇒ ожидается
     note = TextField(null=True)
@@ -151,9 +152,9 @@ class DealCalculation(SoftDeleteModel):
     deal = ForeignKeyField(Deal, backref="calc_entries")
     insurance_company = CharField(null=True)
     insurance_type = CharField(null=True)
-    insured_amount = FloatField(null=True)
-    premium = FloatField(null=True)
-    deductible = FloatField(null=True)
+    insured_amount = DecimalField(max_digits=12, decimal_places=2, null=True)
+    premium = DecimalField(max_digits=12, decimal_places=2, null=True)
+    deductible = DecimalField(max_digits=12, decimal_places=2, null=True)
     note = TextField(null=True)
     created_at = DateTimeField(default=datetime.utcnow)
 

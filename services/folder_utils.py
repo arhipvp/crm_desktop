@@ -157,12 +157,12 @@ def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
                 sub == folder_name or sub.endswith(folder_name)
             ):
                 logger.debug(">>> [match] found subfolder: %s", sub_path)
-                os.startfile(sub_path)
+                open_folder(sub_path, parent=parent)
                 return
 
         # Или просто открыть саму папку клиента
         logger.info(">>> [fallback] opening client root folder: %s", client_path)
-        os.startfile(client_path)
+        open_folder(client_path, parent=parent)
         return
 
     # Локальной папки нет
@@ -179,7 +179,7 @@ def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
 
                 chosen = QFileDialog.getExistingDirectory(parent, "Укажите папку клиента")
                 if chosen:
-                    os.startfile(chosen)
+                    open_folder(chosen, parent=parent)
             except Exception:
                 logger.exception("Ошибка выбора папки")
         return

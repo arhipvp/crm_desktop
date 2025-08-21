@@ -7,11 +7,11 @@ from playhouse.shortcuts import Cast
 
 
 def _apply_contains_filters(
-    query: ModelSelect, items: Iterable[tuple[Field | None, str]]
+    query: ModelSelect, items: Iterable[tuple[Field, str]]
 ) -> ModelSelect:
     """Internal helper to apply ``contains`` filters to a query."""
     for field, value in items:
-        if not value or not isinstance(field, Field):
+        if not value:
             continue
         query = query.where(Cast(field, "TEXT").contains(value))
     return query
@@ -31,8 +31,10 @@ def apply_column_filters(
     """
     if not column_filters:
         return query
-    items: Iterator[tuple[Field | None, str]] = (
-        (getattr(model, name, None), value) for name, value in column_filters.items()
+    items: Iterator[tuple[Field, str]] = (
+        (field, value)
+        for name, value in column_filters.items()
+        if (field := getattr(model, name, None)) is not None and isinstance(field, Field)
     )
     return _apply_contains_filters(query, items)
 
