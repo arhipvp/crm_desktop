@@ -4,9 +4,11 @@ logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import QDate, Qt, Signal, QSortFilterProxyModel, QTimer
 from PySide6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QHeaderView,
     QMenu,
+    QProgressDialog,
     QSplitter,
     QTableView,
     QVBoxLayout,
@@ -212,16 +214,42 @@ class BaseTableView(QWidget):
     def load_data(self):
         if not self.model_class or not self.get_page_func:
             return
+        progress = QProgressDialog("Загрузка...", "Отмена", 0, 0, self)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+        progress.show()
+        QApplication.processEvents()
 
-        # 1. Собираем фильтры
-        filters = self.get_filters()
+        cancelled = False
+        try:
+            # 1. Собираем фильтры
+            filters = self.get_filters()
 
-        # 2. Загружаем данные
-        items = self.get_page_func(self.page, self.per_page, **filters)
-        total = self.get_total_func(**filters) if self.get_total_func else len(items)
+            # 2. Загружаем данные
+            items = self.get_page_func(self.page, self.per_page, **filters)
+            cancelled = progress.wasCanceled()
+            if not cancelled:
+                total = (
+                    self.get_total_func(**filters)
+                    if self.get_total_func
+                    else len(items)
+                )
+                cancelled = progress.wasCanceled()
+        except Exception as exc:
+            logger.exception("Ошибка при загрузке данных")
+            QMessageBox.critical(self, "Ошибка", str(exc))
+            return
+        finally:
+            progress.close()
+
+        if cancelled:
+            return
 
         # 3. Обновляем таблицу и пагинатор
-        self.set_model_class_and_items(self.model_class, list(items), total_count=total)
+        self.set_model_class_and_items(
+            self.model_class, list(items), total_count=total
+        )
 
     def refresh(self):
         self.load_data()
