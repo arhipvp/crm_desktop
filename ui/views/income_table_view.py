@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 from peewee import prefetch
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
@@ -66,6 +67,13 @@ class IncomeTableModel(BaseTableModel):
         deal = getattr(policy, "deal", None) if policy else None
 
         if role == Qt.BackgroundRole:
+            payment_date = getattr(payment, "payment_date", None)
+            if (
+                obj.received_date is None
+                and payment_date
+                and payment_date < date.today()
+            ):
+                return QBrush(QColor("#ffcccc"))
             color = get_income_highlight_color(obj)
             return QBrush(QColor(color)) if color else None
 
