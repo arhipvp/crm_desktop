@@ -3,11 +3,11 @@
 import logging
 from decimal import Decimal
 
-from peewee import Field, JOIN
+from peewee import Field, JOIN, fn
 
 logger = logging.getLogger(__name__)
 
-from database.models import Client, Deal, Expense, Payment, Policy
+from database.models import Client, Deal, Expense, Income, Payment, Policy
 from services.payment_service import get_payment_by_id
 
 # ─────────────────────────── CRUD ────────────────────────────
@@ -209,15 +209,23 @@ def apply_expense_filters(
 
     field_filters = {}
     name_filters = {}
+    income_filter = None
     if column_filters:
         for key, val in column_filters.items():
-            if isinstance(key, Field):
+            if key is Income.amount:
+                income_filter = val
+            elif isinstance(key, Field):
                 field_filters[key] = val
             else:
                 name_filters[str(key)] = val
 
     query = apply_field_filters(query, field_filters)
     query = apply_column_filters(query, name_filters, Expense)
+
+    if income_filter:
+        query = query.having(
+            fn.SUM(Income.amount).cast("TEXT").contains(income_filter)
+        )
 
     return query
 
@@ -235,12 +243,22 @@ def build_expense_query(
 ):
     base = Expense.active() if not show_deleted else Expense.select()
     query = (
-        base.select(Expense, Payment, Policy, Client, Deal)
+        base.select(
+            Expense,
+            Payment,
+            Policy,
+            Client,
+            Deal,
+            fn.SUM(Income.amount).alias("income_total"),
+        )
         .join(Payment)
         .join(Policy)
         .join(Client)
         .switch(Policy)
         .join(Deal, JOIN.LEFT_OUTER)
+        .switch(Payment)
+        .join(Income, JOIN.LEFT_OUTER)
+        .group_by(Expense.id)
     )
     query = apply_expense_filters(
         query,
