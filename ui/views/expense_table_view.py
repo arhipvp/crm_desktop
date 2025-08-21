@@ -105,7 +105,11 @@ class ExpenseTableView(BaseTableView):
             "Показывать выплаченные": self.load_data,
         }
         self.deal_id = deal_id
-        super().__init__(parent=parent, checkbox_map=checkbox_map)
+        super().__init__(
+            parent=parent,
+            checkbox_map=checkbox_map,
+            date_filter_field="expense_date",
+        )
         self.model_class = Expense  # или Client, Policy и т.д.
         self.form_class = ExpenseForm  # соответствующая форма
         self.virtual_fields = ["policy_num", "deal_desc", "client_name", "contractor"]
@@ -134,15 +138,9 @@ class ExpenseTableView(BaseTableView):
         )
         if self.deal_id:
             filters["deal_id"] = self.deal_id
-
-        date_from = getattr(self.filter_controls, "_date_from", None)
-        date_to = getattr(self.filter_controls, "_date_to", None)
-        if date_from and date_to:
-            from_date = date_from.date_or_none()
-            to_date = date_to.date_or_none()
-            if from_date or to_date:
-                filters["expense_date_range"] = (from_date, to_date)
-
+        date_range = filters.pop("expense_date", None)
+        if date_range:
+            filters["expense_date_range"] = date_range
         return filters
 
     def load_data(self):

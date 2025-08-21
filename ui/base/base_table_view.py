@@ -51,6 +51,7 @@ class BaseTableView(QWidget):
         delete_callback=None,
         can_restore=True,
         restore_callback=None,
+        date_filter_field=None,
         filter_func=None,
         custom_actions=None,
         detail_view_class=None,
@@ -108,6 +109,7 @@ class BaseTableView(QWidget):
             on_filter=self._on_filter_controls_changed,
             export_callback=self.export_csv,
             settings_name=self.settings_id,
+            date_filter_field=date_filter_field,
         )
 
         self.left_layout.addWidget(self.filter_controls)

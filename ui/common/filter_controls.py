@@ -61,16 +61,20 @@ class FilterControls(QWidget):
         # Поиск
         self._search = SearchBox(search_callback)
         self._search.search_input.setPlaceholderText(search_placeholder)
-        self._date_from = OptionalDateEdit()
-        self._date_to = OptionalDateEdit()
-        if on_filter:
-            self._date_from.dateChanged.connect(on_filter)
-            self._date_to.dateChanged.connect(on_filter)
 
-        layout.addWidget(QLabel("С:"))
-        layout.addWidget(self._date_from)
-        layout.addWidget(QLabel("По:"))
-        layout.addWidget(self._date_to)
+        self._date_filter_field = date_filter_field
+        if date_filter_field:
+            self._date_from = OptionalDateEdit()
+            self._date_to = OptionalDateEdit()
+            if on_filter:
+                self._date_from.dateChanged.connect(on_filter)
+                self._date_to.dateChanged.connect(on_filter)
+
+            layout.addWidget(QLabel("С:"))
+            layout.addWidget(self._date_from)
+            layout.addWidget(QLabel("По:"))
+            layout.addWidget(self._date_to)
+
         layout.addWidget(self._search)
 
         # Чекбоксы
@@ -78,18 +82,6 @@ class FilterControls(QWidget):
         if checkbox_map:
             self._cbx = CheckboxFilters(checkbox_map, self)
             layout.addWidget(self._cbx)
-
-        # Дата-фильтр
-        self._date_filter_field = date_filter_field
-        if date_filter_field:
-            self._date_edit = OptionalDateEdit()
-            self._date_edit.setCalendarPopup(True)
-            self._date_edit.setDisplayFormat("dd.MM.yyyy")
-            self._date_edit.setDate(QDate.currentDate())
-            if on_filter:
-                self._date_edit.dateChanged.connect(on_filter)
-            layout.addWidget(QLabel("Срок до:"))
-            layout.addWidget(self._date_edit)
 
         # Дополнительные виджеты
         for label, widget in extra_widgets:
@@ -152,10 +144,10 @@ class FilterControls(QWidget):
         self._search.clear()
         if self._cbx:
             self._cbx.clear()
-        self._date_from.clear()
-        self._date_to.clear()
-        if hasattr(self, "_date_edit"):
-            self._date_edit.clear()
+        if hasattr(self, "_date_from"):
+            self._date_from.clear()
+        if hasattr(self, "_date_to"):
+            self._date_to.clear()
 
     # ------------------------------------------------------------------
     # Persistence helpers
@@ -198,10 +190,10 @@ class FilterControls(QWidget):
 
     def _connect_save_signals(self):
         self._search.search_input.textChanged.connect(self._save_current_filters)
-        self._date_from.dateChanged.connect(self._save_current_filters)
-        self._date_to.dateChanged.connect(self._save_current_filters)
-        if hasattr(self, "_date_edit"):
-            self._date_edit.dateChanged.connect(self._save_current_filters)
+        if hasattr(self, "_date_from"):
+            self._date_from.dateChanged.connect(self._save_current_filters)
+        if hasattr(self, "_date_to"):
+            self._date_to.dateChanged.connect(self._save_current_filters)
         if self._cbx:
             for cb in self._cbx.checkboxes.values():
                 cb.stateChanged.connect(self._save_current_filters)

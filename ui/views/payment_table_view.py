@@ -31,6 +31,7 @@ class PaymentTableView(BaseTableView):
             parent=parent,
             model_class=Payment,
             checkbox_map=checkbox_map,
+            date_filter_field="payment_date",
         )
         self.model_class = Payment  # или Client, Policy и т.д.
         self.form_class = PaymentForm
@@ -58,6 +59,9 @@ class PaymentTableView(BaseTableView):
         )
         if self.deal_id is not None:
             filters["deal_id"] = self.deal_id
+        date_range = filters.pop("payment_date", None)
+        if date_range:
+            filters["payment_date_range"] = date_range
         return filters
 
     def load_data(self):
