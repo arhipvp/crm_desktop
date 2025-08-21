@@ -29,6 +29,11 @@ class SoftDeleteModel(BaseModel):
         self.is_deleted = True
         self.save()
 
+    @classmethod
+    def active(cls):
+        """Условие для выборки только не удалённых записей."""
+        return cls.is_deleted == False
+
 
 class Client(SoftDeleteModel):
     name = CharField(index=True)

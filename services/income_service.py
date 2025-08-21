@@ -33,13 +33,13 @@ def get_income_highlight_color(income: Income) -> str | None:
 
 def get_all_incomes():
     """Вернуть все доходы без удалённых."""
-    return Income.select().where(Income.is_deleted == False)
+    return Income.select().where(Income.active())
 
 
 def get_pending_incomes():
     """Доходы, которые ещё не получены."""
     return Income.select().where(
-        (Income.is_deleted == False) & (Income.received_date.is_null(True))
+        Income.active() & (Income.received_date.is_null(True))
     )
 
 
@@ -60,13 +60,11 @@ def mark_incomes_deleted(income_ids: list[int]) -> int:
     """Массово пометить доходы удалёнными."""
     if not income_ids:
         return 0
-    count = 0
-    for iid in income_ids:
-        before = Income.get_or_none(Income.id == iid)
-        if before and not before.is_deleted:
-            mark_income_deleted(iid)
-            count += 1
-    return count
+    return (
+        Income.update(is_deleted=True)
+        .where((Income.id.in_(income_ids)) & Income.active())
+        .execute()
+    )
 
 
 def get_incomes_page(
@@ -231,7 +229,7 @@ def apply_income_filters(
     join_executor: bool = False,
 ):
     if not show_deleted:
-        query = query.where(Income.is_deleted == False)
+        query = query.where(Income.active())
     if search_text:
         query = query.where(
             (Policy.policy_number.contains(search_text))

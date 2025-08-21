@@ -12,13 +12,13 @@ from services.payment_service import get_payment_by_id
 
 def get_all_expenses():
     """Вернуть все расходы без пометки удаления."""
-    return Expense.select().where(Expense.is_deleted == False)
+    return Expense.select().where(Expense.active())
 
 
 def get_pending_expenses():
     """Расходы без даты списания."""
     return Expense.select().where(
-        (Expense.is_deleted == False) & (Expense.expense_date.is_null(True))
+        Expense.active() & (Expense.expense_date.is_null(True))
     )
 
 
@@ -39,13 +39,11 @@ def mark_expenses_deleted(expense_ids: list[int]) -> int:
     """Массово пометить расходы удалёнными."""
     if not expense_ids:
         return 0
-    count = 0
-    for eid in expense_ids:
-        before = Expense.get_or_none(Expense.id == eid)
-        if before and not before.is_deleted:
-            mark_expense_deleted(eid)
-            count += 1
-    return count
+    return (
+        Expense.update(is_deleted=True)
+        .where((Expense.id.in_(expense_ids)) & Expense.active())
+        .execute()
+    )
 
 
 # ─────────────────────────── Добавление ───────────────────────────
@@ -181,7 +179,7 @@ def apply_expense_filters(
     **kwargs,
 ):
     if not show_deleted:
-        query = query.where(Expense.is_deleted == False)
+        query = query.where(Expense.active())
     if deal_id:
         query = query.where(Policy.deal_id == deal_id)
     if search_text:
@@ -244,6 +242,6 @@ def get_expenses_by_deal(deal_id: int):
         .join(Payment)
         .join(Policy)
         .join(Client)
-        .where((Policy.deal_id == deal_id) & (Expense.is_deleted == False))
+        .where((Policy.deal_id == deal_id) & Expense.active())
         .order_by(Expense.expense_date.asc())
     )

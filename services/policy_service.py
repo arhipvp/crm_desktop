@@ -10,17 +10,12 @@ from database.models import Payment, Policy
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.folder_utils import create_policy_folder, open_folder
-from services.payment_service import (
-    ACTIVE as PAYMENT_ACTIVE,
-    add_payment,
-    sync_policy_payments,
-)
+from services.payment_service import add_payment, sync_policy_payments
 from services import executor_service as es
 from services.telegram_service import notify_executor
 from services.validators import normalize_policy_number
 
 
-ACTIVE = Policy.is_deleted == False
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +44,7 @@ def get_all_policies():
     Returns:
         ModelSelect: Выборка полисов.
     """
-    return Policy.select().where(ACTIVE)
+    return Policy.select().where(Policy.active())
 
 
 def get_policies_by_client_id(client_id: int):
@@ -61,7 +56,7 @@ def get_policies_by_client_id(client_id: int):
     Returns:
         ModelSelect: Выборка полисов клиента.
     """
-    return Policy.select().where((Policy.client_id == client_id) & ACTIVE)
+    return Policy.select().where((Policy.client_id == client_id) & Policy.active())
 
 
 def get_policies_by_deal_id(deal_id: int):
@@ -75,7 +70,7 @@ def get_policies_by_deal_id(deal_id: int):
     """
     return (
         Policy.select()
-        .where((Policy.deal_id == deal_id) & ACTIVE)
+        .where((Policy.deal_id == deal_id) & Policy.active())
         .order_by(Policy.start_date.asc())
     )
 
@@ -111,7 +106,7 @@ def _check_duplicate_policy(
         return
 
     policy_number = normalize_policy_number(policy_number)
-    cond = (Policy.policy_number == policy_number) & ACTIVE
+    cond = (Policy.policy_number == policy_number) & Policy.active()
     if exclude_id is not None:
         cond &= Policy.id != exclude_id
 
@@ -357,7 +352,7 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
         if first_payment_paid:
             first_payment = (
                 Payment.select()
-                .where((Payment.policy == policy) & PAYMENT_ACTIVE)
+                .where((Payment.policy == policy) & Payment.active())
                 .order_by(Payment.payment_date)
                 .first()
             )
@@ -582,7 +577,7 @@ def apply_policy_filters(
     if client_id is not None:
         query = query.where(Policy.client == client_id)
     if not show_deleted:
-        query = query.where(ACTIVE)
+        query = query.where(Policy.active())
     if not include_renewed:
         query = query.where(
             (Policy.renewed_to.is_null(True))
@@ -636,7 +631,7 @@ def get_policy_by_id(policy_id: int) -> Policy | None:
     Returns:
         Policy | None: Найденный полис или ``None``.
     """
-    return Policy.get_or_none((Policy.id == policy_id) & ACTIVE)
+    return Policy.get_or_none((Policy.id == policy_id) & Policy.active())
 
 
 def get_unique_policy_field_values(field_name: str) -> list[str]:
@@ -675,7 +670,7 @@ def attach_premium(policies: list[Policy]) -> None:
     ids = [p.id for p in policies]
     sub = (
         Payment.select(Payment.policy, fn.SUM(Payment.amount).alias("total"))
-        .where((Payment.policy.in_(ids)) & PAYMENT_ACTIVE)
+        .where((Payment.policy.in_(ids)) & Payment.active())
         .group_by(Payment.policy)
     )
     totals = {row.policy_id: row.total for row in sub}
