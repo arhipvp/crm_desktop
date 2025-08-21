@@ -173,9 +173,11 @@ class BaseTableView(QWidget):
         self.table.setModel(None)  # Пока модель не установлена
         self.table.setSortingEnabled(True)
         header = self.table.horizontalHeader()
+        header.setSectionsMovable(True)
         # запоминаем изменения сортировки пользователя
         header.sortIndicatorChanged.connect(self._on_sort_indicator_changed)
         header.sectionResized.connect(self._on_section_resized)
+        header.sectionMoved.connect(self._on_section_moved)
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self._on_header_menu)
         self.table.setSelectionBehavior(QTableView.SelectRows)
@@ -581,17 +583,22 @@ class BaseTableView(QWidget):
     def _on_section_resized(self, *_):
         self.save_table_settings()
 
+    def _on_section_moved(self, *_):
+        self.save_table_settings()
+
     def save_table_settings(self):
         """Сохраняет настройки сортировки и ширины колонок."""
         header = self.table.horizontalHeader()
         widths = {i: header.sectionSize(i) for i in range(header.count())}
         hidden = [i for i in range(header.count()) if self.table.isColumnHidden(i)]
+        order = [header.visualIndex(i) for i in range(header.count())]
         texts = self.column_filters.get_all_texts()
         settings = {
             "sort_column": self.current_sort_column,
             "sort_order": self.current_sort_order.value,
             "column_widths": widths,
             "hidden_columns": hidden,
+            "column_order": order,
             "column_filter_texts": texts,
             "per_page": self.per_page,
         }
@@ -612,6 +619,18 @@ class BaseTableView(QWidget):
                 self.current_sort_order = Qt.SortOrder(order)
             except Exception:
                 pass
+        order_list = saved.get("column_order")
+        if order_list and len(order_list) == header.count():
+            header.blockSignals(True)
+            try:
+                for logical, visual in sorted(
+                    enumerate(order_list), key=lambda x: x[1]
+                ):
+                    current_visual = header.visualIndex(logical)
+                    if current_visual != visual:
+                        header.moveSection(current_visual, visual)
+            finally:
+                header.blockSignals(False)
         for idx, width in saved.get("column_widths", {}).items():
             idx = int(idx)
             if idx < header.count():
