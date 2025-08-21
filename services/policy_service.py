@@ -2,11 +2,11 @@
 
 import logging
 from datetime import timedelta
-from peewee import fn
+from peewee import fn, JOIN, Field
 
 from database.db import db
 from database.models import Client  # если ещё не импортирован
-from database.models import Payment, Policy
+from database.models import Payment, Policy, Deal
 from services.client_service import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.folder_utils import create_policy_folder, open_folder
@@ -575,7 +575,7 @@ def apply_policy_filters(
     client_id: int | None = None,
     include_renewed: bool = True,
     without_deal_only: bool = False,
-    column_filters: dict[str, str] | None = None,
+    column_filters: dict | None = None,
 ):
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
@@ -597,9 +597,22 @@ def apply_policy_filters(
             | (Client.name.contains(search_text))
         )
 
-    from services.query_utils import apply_column_filters
+    from services.query_utils import apply_column_filters, apply_field_filters
 
-    query = apply_column_filters(query, column_filters, Policy)
+    field_filters: dict[Field, str] = {}
+    name_filters: dict[str, str] = {}
+    if column_filters:
+        for key, val in column_filters.items():
+            if isinstance(key, Field):
+                field_filters[key] = val
+            else:
+                name_filters[str(key)] = val
+
+    if Deal.description in field_filters:
+        query = query.switch(Policy).join(Deal, JOIN.LEFT_OUTER)
+
+    query = apply_field_filters(query, field_filters)
+    query = apply_column_filters(query, name_filters, Policy)
     return query
 
 
@@ -610,7 +623,7 @@ def build_policy_query(
     client_id: int | None = None,
     include_renewed: bool = True,
     without_deal_only: bool = False,
-    column_filters: dict[str, str] | None = None,
+    column_filters: dict | None = None,
     **filters,
 ):
     """Сформировать запрос для выборки полисов с фильтрами."""

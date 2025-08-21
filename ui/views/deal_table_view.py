@@ -3,7 +3,7 @@ from PySide6.QtGui import QColor, QFont
 
 from ui.base.base_table_model import BaseTableModel
 
-from database.models import Deal
+from database.models import Deal, Client, Executor
 from services.deal_service import build_deal_query, get_deals_page, mark_deal_deleted
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
@@ -61,6 +61,18 @@ class DealTableModel(BaseTableModel):
 
 
 class DealTableView(BaseTableView):
+    COLUMN_FIELD_MAP = {
+        0: Deal.reminder_date,
+        1: Client.name,
+        2: Deal.status,
+        3: Deal.description,
+        4: Deal.calculations,
+        5: Deal.start_date,
+        6: Deal.is_closed,
+        7: Deal.closed_reason,
+        8: Executor.full_name,
+    }
+
     def __init__(self, parent=None):
         checkboxes = {
             "Показывать удалённые": self.on_filter_changed,
@@ -133,7 +145,9 @@ class DealTableView(BaseTableView):
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(headers)
+        self.column_filters.set_headers(
+            headers, column_field_map=self.COLUMN_FIELD_MAP
+        )
 
         # какой столбец сейчас является полем сортировки?
         col = self.get_column_index(self.sort_field)

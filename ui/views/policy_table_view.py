@@ -1,4 +1,4 @@
-from database.models import Policy
+from database.models import Policy, Client, Deal
 from services.policy_service import (
     build_policy_query,
     get_policies_page,
@@ -9,7 +9,7 @@ from services.policy_service import (
     attach_premium,
 )
 from PySide6.QtWidgets import QAbstractItemView
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import Qt, QDate, QTimer
 from ui.base.base_table_view import BaseTableView
 from ui.base.base_table_model import BaseTableModel
 from ui.common.message_boxes import confirm, show_error
@@ -20,6 +20,25 @@ from ui.common.styled_widgets import styled_button
 
 
 class PolicyTableView(BaseTableView):
+    COLUMN_FIELD_MAP = {
+        0: Client.name,
+        1: Deal.description,
+        2: Policy.policy_number,
+        3: Policy.insurance_type,
+        4: Policy.insurance_company,
+        5: Policy.contractor,
+        6: Policy.sales_channel,
+        7: Policy.start_date,
+        8: Policy.end_date,
+        9: Policy.vehicle_brand,
+        10: Policy.vehicle_model,
+        11: Policy.vehicle_vin,
+        12: Policy.note,
+        13: None,  # drive_folder_link
+        14: Policy.renewed_to,
+        15: None,  # premium
+    }
+
     def __init__(self, parent=None, deal_id=None, **kwargs):
         self.deal_id = deal_id
         checkbox_map = {
@@ -299,6 +318,15 @@ class PolicyTableView(BaseTableView):
         if total_count is not None:
             self.total_count = total_count
             self.paginator.update(self.total_count, self.page, self.per_page)
+
+        headers = [
+            self.model.headerData(i, Qt.Horizontal)
+            for i in range(self.model.columnCount())
+        ]
+        self.column_filters.set_headers(
+            headers, column_field_map=self.COLUMN_FIELD_MAP
+        )
+        QTimer.singleShot(0, self.load_table_settings)
 
     def on_sort_changed(self, logicalIndex: int, order: Qt.SortOrder):
         field = self.model.fields[logicalIndex].name

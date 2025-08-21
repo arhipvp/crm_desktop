@@ -1,3 +1,4 @@
+from peewee import Field
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QTableView
 from PySide6.QtCore import Signal
 
@@ -19,8 +20,17 @@ class ColumnFilterRow(QWidget):
             # синхронизируем позицию при инициализации
             self.sync_scroll(scroll.value())
 
-    def set_headers(self, headers: list[str], texts: list[str] | None = None):
-        """Создаёт по одному полю ввода на каждый столбец."""
+    def set_headers(
+        self,
+        headers: list[str],
+        texts: list[str] | None = None,
+        column_field_map: dict[int, Field | None] | None = None,
+    ):
+        """Создаёт по одному полю ввода на каждый столбец.
+
+        ``column_field_map`` позволяет скрывать фильтры для некоторых колонок,
+        если в словаре указано ``None``.
+        """
         # очистка старых редакторов
         for e in self._editors:
             e.deleteLater()
@@ -34,7 +44,11 @@ class ColumnFilterRow(QWidget):
         for idx, h in enumerate(headers):
             le = QLineEdit(self)
             le.setPlaceholderText(str(h))
-            le.textChanged.connect(lambda text, col=idx: self.filter_changed.emit(col, text))
+            le.textChanged.connect(
+                lambda text, col=idx: self.filter_changed.emit(col, text)
+            )
+            if column_field_map and column_field_map.get(idx) is None:
+                le.setVisible(False)
             self.layout().addWidget(le)
             self._editors.append(le)
             if texts and idx < len(texts):

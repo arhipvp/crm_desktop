@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QAbstractItemView
 
-from database.models import Payment
+from database.models import Payment, Policy
 from services.payment_service import (
     build_payment_query,
     get_payments_page,
@@ -21,6 +21,15 @@ from ui.views.payment_detail_view import PaymentDetailView
 
 
 class PaymentTableView(BaseTableView):
+    COLUMN_FIELD_MAP = {
+        0: Policy.policy_number,
+        1: Payment.amount,
+        2: Payment.payment_date,
+        3: Payment.actual_payment_date,
+        4: None,
+        5: None,
+    }
+
     def __init__(self, parent=None, deal_id=None, **kwargs):
         self.deal_id = deal_id
         checkbox_map = {
