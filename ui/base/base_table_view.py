@@ -525,11 +525,13 @@ class BaseTableView(QWidget):
         header = self.table.horizontalHeader()
         widths = {i: header.sectionSize(i) for i in range(header.count())}
         hidden = [i for i in range(header.count()) if self.table.isColumnHidden(i)]
+        texts = self.column_filters.get_all_texts()
         settings = {
             "sort_column": self.current_sort_column,
             "sort_order": self.current_sort_order.value,
             "column_widths": widths,
             "hidden_columns": hidden,
+            "column_filter_texts": texts,
         }
         ui_settings.set_table_settings(self.settings_id, settings)
 
@@ -557,6 +559,11 @@ class BaseTableView(QWidget):
             idx = int(idx)
             if idx < model_columns:
                 self.table.setColumnHidden(idx, True)
+        texts = saved.get("column_filter_texts", [])
+        if texts:
+            self.column_filters.set_all_texts(texts)
+            for i, text in enumerate(texts):
+                self.proxy_model.set_filter(i, text)
 
     def closeEvent(self, event):
         self.save_table_settings()
