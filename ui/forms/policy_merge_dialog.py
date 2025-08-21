@@ -218,7 +218,7 @@ class PolicyMergeDialog(QDialog):
             item.setText(self._display_value(field, final_val))
             old_val = getattr(self.existing, field, None)
             changed = str(final_val) != str(old_val)
-            item.setBackground(QColor("#fff0b3") if changed else QColor())
+            item.setBackground(QColor("#fff0b3") if changed else Qt.white)
             widget.setStyleSheet("background:#fff0b3;" if changed else "")
             key_item = self.table.item(row, 0)
             if key_item is not None:
