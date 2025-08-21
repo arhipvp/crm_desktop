@@ -3,9 +3,11 @@
 import logging
 from decimal import Decimal
 
+from peewee import Field, JOIN
+
 logger = logging.getLogger(__name__)
 
-from database.models import Client, Expense, Payment, Policy
+from database.models import Client, Deal, Expense, Payment, Policy
 from services.payment_service import get_payment_by_id
 
 # ─────────────────────────── CRUD ────────────────────────────
@@ -143,7 +145,9 @@ def get_expenses_page(
     deal_id: int = None,
     include_paid: bool = True,
     expense_date_range=None,
-    column_filters: dict[str, str] | None = None,
+    column_filters: dict | None = None,
+    order_by: str | Field = Expense.expense_date,
+    order_dir: str = "desc",
 ):
     """Вернуть страницу расходов с фильтрами.
 
@@ -155,6 +159,9 @@ def get_expenses_page(
         deal_id: Идентификатор сделки для фильтра.
         include_paid: Показывать оплаченные расходы.
         expense_date_range: Период дат выплат (start, end).
+        column_filters: Фильтры по столбцам.
+        order_by: Поле сортировки.
+        order_dir: Направление сортировки ("asc" или "desc").
 
     Returns:
         ModelSelect: Выборка расходов.
@@ -166,9 +173,11 @@ def get_expenses_page(
         include_paid=include_paid,
         expense_date_range=expense_date_range,
         column_filters=column_filters,
+        order_by=order_by,
+        order_dir=order_dir,
     )
     offset = (page - 1) * per_page
-    return query.order_by(Expense.expense_date.desc()).limit(per_page).offset(offset)
+    return query.limit(per_page).offset(offset)
 
 
 def apply_expense_filters(
@@ -177,7 +186,7 @@ def apply_expense_filters(
     deal_id=None,
     include_paid=True,
     expense_date_range=None,
-    column_filters: dict[str, str] | None = None,
+    column_filters: dict | None = None,
     **kwargs,
 ):
     if deal_id:
@@ -196,9 +205,19 @@ def apply_expense_filters(
         if date_to:
             query = query.where(Expense.expense_date <= date_to)
 
-    from services.query_utils import apply_column_filters
+    from services.query_utils import apply_column_filters, apply_field_filters
 
-    query = apply_column_filters(query, column_filters, Expense)
+    field_filters = {}
+    name_filters = {}
+    if column_filters:
+        for key, val in column_filters.items():
+            if isinstance(key, Field):
+                field_filters[key] = val
+            else:
+                name_filters[str(key)] = val
+
+    query = apply_field_filters(query, field_filters)
+    query = apply_column_filters(query, name_filters, Expense)
 
     return query
 
@@ -209,23 +228,36 @@ def build_expense_query(
     deal_id=None,
     include_paid=True,
     expense_date_range=None,
-    **kwargs
+    column_filters: dict | None = None,
+    order_by: str | Field | None = None,
+    order_dir: str = "desc",
+    **kwargs,
 ):
     base = Expense.active() if not show_deleted else Expense.select()
     query = (
-        base.select(Expense, Payment, Policy, Client)
+        base.select(Expense, Payment, Policy, Client, Deal)
         .join(Payment)
         .join(Policy)
         .join(Client)
+        .switch(Policy)
+        .join(Deal, JOIN.LEFT_OUTER)
     )
-    return apply_expense_filters(
+    query = apply_expense_filters(
         query,
         search_text,
         deal_id,
         include_paid,
         expense_date_range=expense_date_range,
-        column_filters=kwargs.get("column_filters"),
+        column_filters=column_filters,
     )
+    if order_by:
+        if isinstance(order_by, str):
+            field = getattr(Expense, order_by, Expense.expense_date)
+        else:
+            field = order_by
+        order_expr = field.desc() if order_dir == "desc" else field.asc()
+        query = query.order_by(order_expr)
+    return query
 
 
 def get_expenses_by_deal(deal_id: int):
