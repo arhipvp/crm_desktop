@@ -240,6 +240,13 @@ class TaskTableView(BaseTableView):
 
         self.set_model_class_and_items(Task, list(items), total_count=total)
 
+        # при смене модели selectionModel пересоздаётся и теряет подключение
+        # к обработчику выбора, поэтому подключаем сигнал заново, чтобы
+        # действия (в том числе «Напомнить») корректно активировались
+        self.table.selectionModel().selectionChanged.connect(
+            self._update_actions_state
+        )
+
         # сортировка без повторной загрузки данных
         header = self.table.horizontalHeader()
         self.current_sort_column = self.get_column_index(self.sort_field)
