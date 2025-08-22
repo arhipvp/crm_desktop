@@ -8,11 +8,13 @@ from database.models import (
     Executor,
     DealExecutor,
     Income,
+    Task,
 )
 from services import policy_service as ps
 from services import executor_service as es
 import services.telegram_service as ts
 import services.income_service as ins
+import services.task_service as tsvc
 
 pytestmark = pytest.mark.slow
 
@@ -79,3 +81,28 @@ def test_notify_on_income_received(in_memory_db, monkeypatch):
 
     assert sent.get('tg_id') == executor.tg_id
     assert 'P' in sent.get('text', '')
+
+
+def test_notify_task_resends_message(in_memory_db, monkeypatch):
+    client = Client.create(name='C')
+    deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
+    task = Task.create(
+        title='T',
+        due_date=datetime.date.today(),
+        deal=deal,
+        dispatch_state='sent',
+        tg_chat_id=99,
+    )
+
+    sent = {}
+
+    def fake_send_exec_task(t, tg_id):
+        sent['task_id'] = t.id
+        sent['tg_id'] = tg_id
+
+    monkeypatch.setattr(ts, 'send_exec_task', fake_send_exec_task)
+
+    tsvc.notify_task(task.id)
+
+    assert sent == {'task_id': task.id, 'tg_id': 99}
+    assert Task.get_by_id(task.id).dispatch_state == 'sent'

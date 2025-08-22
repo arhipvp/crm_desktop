@@ -19,6 +19,7 @@ from database.models import (
     Deal,
     Executor,
     DealExecutor,
+    Task,
 )
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -56,7 +57,7 @@ def pytest_runtest_logfinish(nodeid, location):
 def in_memory_db(monkeypatch):
     test_db = SqliteDatabase(':memory:')
     db.initialize(test_db)
-    test_db.create_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor])
+    test_db.create_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor, Task])
     yield
-    test_db.drop_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor])
+    test_db.drop_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor, Task])
     test_db.close()
