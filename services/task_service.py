@@ -412,7 +412,16 @@ def notify_task(task_id: int) -> None:
     if not t or t.is_done:
         return
     if t.dispatch_state == "sent":
-        return_to_queue(task_id)
+        if t.tg_chat_id:
+            try:
+                from services.telegram_service import send_exec_task
+
+                send_exec_task(t, t.tg_chat_id)
+                logger.info("🔔 Напоминание отправлено по задаче #%s", t.id)
+            except Exception:
+                logger.debug("Failed to resend task", exc_info=True)
+        else:
+            return_to_queue(task_id)
     elif t.dispatch_state == "idle":
         queue_task(task_id)
 
