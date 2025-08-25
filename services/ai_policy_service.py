@@ -4,6 +4,7 @@ import os
 from typing import List, Tuple, Callable
 
 import openai
+from jsonschema import ValidationError, validate
 from PyPDF2 import PdfReader
 
 DEFAULT_PROMPT = """Ты — ассистент, отвечающий за импорт данных из страховых полисов в CRM. На основе загруженного документа (PDF, скан или текст) необходимо сформировать один JSON строго по следующему шаблону:
@@ -119,6 +120,65 @@ REMINDER = (
     "Ответ должен содержать только один валидный JSON без каких-либо пояснений."
 )
 
+# JSON‑схема результата для функции OpenAI и валидации ответа
+POLICY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "client_name": {"type": "string"},
+        "policy": {
+            "type": "object",
+            "properties": {
+                "policy_number": {"type": "string"},
+                "insurance_type": {"type": "string"},
+                "insurance_company": {"type": "string"},
+                "contractor": {"type": "string"},
+                "sales_channel": {"type": "string"},
+                "start_date": {"type": "string"},
+                "end_date": {"type": "string"},
+                "vehicle_brand": {"type": "string"},
+                "vehicle_model": {"type": "string"},
+                "vehicle_vin": {"type": "string"},
+                "note": {"type": "string"},
+            },
+            "required": [
+                "policy_number",
+                "insurance_type",
+                "insurance_company",
+                "contractor",
+                "sales_channel",
+                "start_date",
+                "end_date",
+                "vehicle_brand",
+                "vehicle_model",
+                "vehicle_vin",
+                "note",
+            ],
+            "additionalProperties": False,
+        },
+        "payments": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "amount": {"type": "number"},
+                    "payment_date": {"type": "string"},
+                    "actual_payment_date": {"type": "string"},
+                },
+                "required": ["amount", "payment_date", "actual_payment_date"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["client_name", "policy", "payments"],
+    "additionalProperties": False,
+}
+
+POLICY_FUNCTION = {
+    "name": "extract_policy",
+    "description": "Структурированный JSON результата распознавания полиса",
+    "parameters": POLICY_SCHEMA,
+}
+
 
 def _read_text(path: str) -> str:
     """Extract text from a PDF or text file."""
@@ -136,24 +196,6 @@ def _read_text(path: str) -> str:
     except Exception:
         with open(path, "rb") as f:
             return f.read().decode("utf-8", "ignore")
-
-
-def _extract_json_from_answer(answer: str) -> dict:
-    """Return the first JSON object found in the given answer."""
-    try:
-        return json.loads(answer)
-    except Exception:
-        try:
-            start = answer.index("{")
-        except ValueError as exc:
-            raise ValueError("No JSON object found") from exc
-
-        decoder = json.JSONDecoder()
-        try:
-            obj, _ = decoder.raw_decode(answer[start:])
-            return obj
-        except Exception as exc:
-            raise ValueError(f"Failed to parse JSON: {exc}") from exc
 
 
 class AiPolicyError(ValueError):
@@ -175,19 +217,31 @@ def _chat(messages: List[dict], progress_cb: Callable[[str, str], None] | None =
 
     if progress_cb:
         stream = client.chat.completions.create(
-            model=model, messages=messages, temperature=0, stream=True
+            model=model,
+            messages=messages,
+            temperature=0,
+            stream=True,
+            functions=[POLICY_FUNCTION],
+            function_call={"name": POLICY_FUNCTION["name"]},
         )
         parts: List[str] = []
         for chunk in stream:
-            part = chunk.choices[0].delta.content or ""
+            delta = chunk.choices[0].delta
+            func = delta.get("function_call") if delta else None
+            part = func.get("arguments") if func else ""
             if part:
                 parts.append(part)
                 progress_cb("assistant", part)
         return "".join(parts)
+
     resp = client.chat.completions.create(
-        model=model, messages=messages, temperature=0
+        model=model,
+        messages=messages,
+        temperature=0,
+        functions=[POLICY_FUNCTION],
+        function_call={"name": POLICY_FUNCTION["name"]},
     )
-    return resp.choices[0].message.content
+    return resp.choices[0].message.function_call.arguments
 
 
 def recognize_policy_interactive(
@@ -213,12 +267,24 @@ def recognize_policy_interactive(
         answer = _chat(messages, progress_cb)
         messages.append({"role": "assistant", "content": answer})
         try:
-            data = _extract_json_from_answer(answer)
-        except Exception as exc:
+            data = json.loads(answer)
+            validate(instance=data, schema=POLICY_SCHEMA)
+        except json.JSONDecodeError as exc:
             if attempt == MAX_ATTEMPTS - 1:
                 transcript = _log_conversation("text", messages)
                 raise AiPolicyError(
                     f"Failed to parse JSON: {exc}", messages, transcript
+                ) from exc
+            if progress_cb:
+                progress_cb("user", REMINDER)
+            messages.append({"role": "user", "content": REMINDER})
+            continue
+        except ValidationError as exc:
+            logger.warning("Schema validation error at %s: %s", list(exc.path), exc.message)
+            if attempt == MAX_ATTEMPTS - 1:
+                transcript = _log_conversation("text", messages)
+                raise AiPolicyError(
+                    f"Schema validation error: {exc.message}", messages, transcript
                 ) from exc
             if progress_cb:
                 progress_cb("user", REMINDER)
