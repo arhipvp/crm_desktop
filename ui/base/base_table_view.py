@@ -170,6 +170,8 @@ class BaseTableView(QWidget):
         # Таблица
         self.table = QTableView()
         self.proxy_model = QSortFilterProxyModel(self)
+        self.proxy_model.setSortRole(Qt.UserRole)
+        self.proxy_model.setDynamicSortFilter(True)
         self.table.setEditTriggers(QTableView.NoEditTriggers)
 
         self.table.setModel(None)  # Пока модель не установлена
