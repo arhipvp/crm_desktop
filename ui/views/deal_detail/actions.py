@@ -22,6 +22,7 @@ from services.folder_utils import (
 )
 from services.payment_service import get_payments_by_deal_id
 from services.policy_service import get_policies_by_deal_id
+from services.task_service import get_incomplete_tasks_by_deal, mark_done
 from ui import settings as ui_settings
 from ui.common.message_boxes import confirm, show_error, show_info
 from ui.common.styled_widgets import styled_button
@@ -532,7 +533,16 @@ class DealActionsMixin:
         dlg = DealNextEventDialog(events, parent=self)
         if dlg.exec():
             reminder = dlg.get_reminder_date()
-            update_deal(self.instance, reminder_date=reminder, status=str(reminder.year))
+            update_deal(
+                self.instance, reminder_date=reminder, status=str(reminder.year)
+            )
+            tasks = get_incomplete_tasks_by_deal(self.instance.id)
+            if tasks and confirm(
+                f"Отметить {len(tasks)} задач(и) выполненными?"
+            ):
+                for t in tasks:
+                    mark_done(t.id)
+                self._init_tabs()
             self.accept()
 
     def _collect_upcoming_events(self) -> list[tuple[str, date]]:
