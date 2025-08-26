@@ -25,6 +25,19 @@ def get_pending_expenses():
     return Expense.active().where(Expense.expense_date.is_null(True))
 
 
+def get_expense_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
+    """Подсчитать количество открытых и закрытых расходов по сделке."""
+    base = (
+        Expense.active()
+        .join(Payment)
+        .join(Policy)
+        .where(Policy.deal_id == deal_id)
+    )
+    open_count = base.where(Expense.expense_date.is_null(True)).count()
+    closed_count = base.where(Expense.expense_date.is_null(False)).count()
+    return open_count, closed_count
+
+
 def get_expense_by_id(expense_id: int) -> Expense | None:
     """Получить расход по идентификатору."""
     return Expense.get_or_none(Expense.id == expense_id)

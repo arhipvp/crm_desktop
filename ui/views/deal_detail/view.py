@@ -9,11 +9,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from services.deal_service import get_tasks_by_deal_id
-from services.payment_service import get_payments_by_deal_id
-from services.policy_service import get_policies_by_deal_id
-from services.income_service import build_income_query
-from services.expense_service import get_expenses_by_deal
+from services.task_service import get_task_counts_by_deal_id
+from services.payment_service import get_payment_counts_by_deal_id
+from services.policy_service import get_policy_counts_by_deal_id
+from services.income_service import get_income_counts_by_deal_id
+from services.expense_service import get_expense_counts_by_deal_id
 from utils.screen_utils import get_scaled_size
 
 from .actions import DealActionsMixin
@@ -88,17 +88,28 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             if w:
                 w.deleteLater()
 
-        cnt_policies = len(get_policies_by_deal_id(self.instance.id))
-        cnt_payments = len(get_payments_by_deal_id(self.instance.id))
-        cnt_tasks = len(get_tasks_by_deal_id(self.instance.id))
-        cnt_income = build_income_query(deal_id=self.instance.id).count()
-        cnt_expense = get_expenses_by_deal(self.instance.id).count()
+        pol_open, pol_closed = get_policy_counts_by_deal_id(self.instance.id)
+        pay_open, pay_closed = get_payment_counts_by_deal_id(self.instance.id)
+        task_open, task_closed = get_task_counts_by_deal_id(self.instance.id)
+        inc_open, inc_closed = get_income_counts_by_deal_id(self.instance.id)
+        exp_open, exp_closed = get_expense_counts_by_deal_id(self.instance.id)
 
-        self.cnt_policies = cnt_policies
-        self.cnt_payments = cnt_payments
-        self.cnt_tasks = cnt_tasks
-        self.cnt_income = cnt_income
-        self.cnt_expense = cnt_expense
+        cnt_policies = pol_open + pol_closed
+        cnt_payments = pay_open + pay_closed
+        cnt_tasks = task_open + task_closed
+        cnt_income = inc_open + inc_closed
+        cnt_expense = exp_open + exp_closed
+
+        self.cnt_policies_open = pol_open
+        self.cnt_policies_closed = pol_closed
+        self.cnt_payments_open = pay_open
+        self.cnt_payments_closed = pay_closed
+        self.cnt_tasks_open = task_open
+        self.cnt_tasks_closed = task_closed
+        self.cnt_income_open = inc_open
+        self.cnt_income_closed = inc_closed
+        self.cnt_expense_open = exp_open
+        self.cnt_expense_closed = exp_closed
 
         from services import executor_service as es
 
@@ -117,3 +128,34 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             lbl.setTextFormat(Qt.RichText)
             self.kpi_layout.addWidget(lbl)
         self.kpi_layout.addStretch()
+
+        if hasattr(self, "tabs"):
+            self._update_tab_titles()
+
+    def _update_tab_titles(self) -> None:
+        """Обновить заголовки вкладок с актуальными счётчиками."""
+        if getattr(self, "policy_tab_idx", None) is not None:
+            self.tabs.setTabText(
+                self.policy_tab_idx,
+                f"Полисы {self.cnt_policies_open} ({self.cnt_policies_closed})",
+            )
+        if getattr(self, "payment_tab_idx", None) is not None:
+            self.tabs.setTabText(
+                self.payment_tab_idx,
+                f"Платежи {self.cnt_payments_open} ({self.cnt_payments_closed})",
+            )
+        if getattr(self, "income_tab_idx", None) is not None:
+            self.tabs.setTabText(
+                self.income_tab_idx,
+                f"Доходы {self.cnt_income_open} ({self.cnt_income_closed})",
+            )
+        if getattr(self, "expense_tab_idx", None) is not None:
+            self.tabs.setTabText(
+                self.expense_tab_idx,
+                f"Расходы {self.cnt_expense_open} ({self.cnt_expense_closed})",
+            )
+        if getattr(self, "task_tab_idx", None) is not None:
+            self.tabs.setTabText(
+                self.task_tab_idx,
+                f"Задачи {self.cnt_tasks_open} ({self.cnt_tasks_closed})",
+            )

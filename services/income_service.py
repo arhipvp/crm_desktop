@@ -42,6 +42,19 @@ def get_pending_incomes():
     return Income.active().where(Income.received_date.is_null(True))
 
 
+def get_income_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
+    """Подсчитать количество открытых и закрытых доходов по сделке."""
+    base = (
+        Income.active()
+        .join(Payment)
+        .join(Policy)
+        .where(Policy.deal_id == deal_id)
+    )
+    open_count = base.where(Income.received_date.is_null(True)).count()
+    closed_count = base.where(Income.received_date.is_null(False)).count()
+    return open_count, closed_count
+
+
 def get_income_by_id(income_id: int):
     """Получить доход по идентификатору."""
     return Income.get_or_none(Income.id == income_id)
