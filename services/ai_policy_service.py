@@ -225,19 +225,23 @@ def _chat(messages: List[dict], progress_cb: Callable[[str, str], None] | None =
     model = os.getenv("OPENAI_MODEL", "gpt-4o")
     client = openai.OpenAI(api_key=api_key, base_url=base_url)
 
+    tools = [{"type": "function", "function": POLICY_FUNCTION}]
+    tool_choice = {"type": "function", "function": {"name": POLICY_FUNCTION["name"]}}
+
     if progress_cb:
         stream = client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=0,
             stream=True,
-            functions=[POLICY_FUNCTION],
-            function_call={"name": POLICY_FUNCTION["name"]},
+            tools=tools,
+            tool_choice=tool_choice,
         )
         parts: List[str] = []
         for chunk in stream:
-            delta = chunk.choices[0].delta
-            func = delta.get("function_call") if delta else None
+            delta = chunk.choices[0].delta if chunk.choices else None
+            tool_calls = delta.get("tool_calls") if delta else None
+            func = tool_calls[0].get("function") if tool_calls else None
             part = func.get("arguments") if func else ""
             if part:
                 parts.append(part)
@@ -248,10 +252,10 @@ def _chat(messages: List[dict], progress_cb: Callable[[str, str], None] | None =
         model=model,
         messages=messages,
         temperature=0,
-        functions=[POLICY_FUNCTION],
-        function_call={"name": POLICY_FUNCTION["name"]},
+        tools=tools,
+        tool_choice=tool_choice,
     )
-    return resp.choices[0].message.function_call.arguments
+    return resp.choices[0].message.tool_calls[0].function.arguments
 
 
 def recognize_policy_interactive(
