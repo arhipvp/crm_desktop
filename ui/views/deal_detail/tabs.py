@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
 )
 
 from database.models import Task
-from services.payment_service import get_payments_by_deal_id
 from ui.common.date_utils import TypableDateEdit, format_date
 from ui.common.styled_widgets import styled_button
 from ..calculation_table_view import CalculationTableView
@@ -164,8 +163,11 @@ class DealTabsMixin:
         pol_view.load_data()
         pol_l.addWidget(pol_view)
         self.pol_view = pol_view
-        pol_cnt = getattr(self, "cnt_policies", 0)
-        self.policy_tab_idx = self.tabs.addTab(pol_tab, f"Полисы ({pol_cnt})")
+        pol_open = getattr(self, "cnt_policies_open", 0)
+        pol_closed = getattr(self, "cnt_policies_closed", 0)
+        self.policy_tab_idx = self.tabs.addTab(
+            pol_tab, f"Полисы {pol_open} ({pol_closed})"
+        )
 
         # ---------- Платежи ---------------------------------------
         pay_tab = QWidget()
@@ -178,8 +180,11 @@ class DealTabsMixin:
         pay_view.load_data()
         pay_l.addWidget(pay_view)
         self.pay_view = pay_view
-        pay_cnt = getattr(self, "cnt_payments", 0)
-        self.payment_tab_idx = self.tabs.addTab(pay_tab, f"Платежи ({pay_cnt})")
+        pay_open = getattr(self, "cnt_payments_open", 0)
+        pay_closed = getattr(self, "cnt_payments_closed", 0)
+        self.payment_tab_idx = self.tabs.addTab(
+            pay_tab, f"Платежи {pay_open} ({pay_closed})"
+        )
 
         # ---------- Доходы ---------------------------------------
         income_tab = QWidget()
@@ -187,7 +192,10 @@ class DealTabsMixin:
         btn_income = styled_button("➕ Доход", tooltip="Добавить доход", shortcut="Ctrl+Alt+I")
         btn_income.clicked.connect(self._on_add_income)
         self._add_shortcut("Ctrl+Alt+I", self._on_add_income)
-        has_payments = len(get_payments_by_deal_id(self.instance.id)) > 0
+        has_payments = (
+            getattr(self, "cnt_payments_open", 0)
+            + getattr(self, "cnt_payments_closed", 0)
+        ) > 0
         btn_income.setEnabled(has_payments)
         if not has_payments:
             btn_income.setToolTip("Нет доступных платежей для привязки")
@@ -196,9 +204,10 @@ class DealTabsMixin:
         income_view.load_data()
         income_layout.addWidget(income_view)
         self.income_view = income_view
-        income_cnt = getattr(self, "cnt_income", 0)
+        inc_open = getattr(self, "cnt_income_open", 0)
+        inc_closed = getattr(self, "cnt_income_closed", 0)
         self.income_tab_idx = self.tabs.addTab(
-            income_tab, f"Доходы ({income_cnt})"
+            income_tab, f"Доходы {inc_open} ({inc_closed})"
         )
 
         # ---------- Расходы --------------------------------------
@@ -212,9 +221,10 @@ class DealTabsMixin:
         expense_view.load_data()
         expense_layout.addWidget(expense_view)
         self.expense_view = expense_view
-        expense_cnt = getattr(self, "cnt_expense", 0)
+        exp_open = getattr(self, "cnt_expense_open", 0)
+        exp_closed = getattr(self, "cnt_expense_closed", 0)
         self.expense_tab_idx = self.tabs.addTab(
-            expense_tab, f"Расходы ({expense_cnt})"
+            expense_tab, f"Расходы {exp_open} ({exp_closed})"
         )
 
         # ---------- Задачи ---------------------------------------
@@ -237,8 +247,11 @@ class DealTabsMixin:
         task_view.table.setSortingEnabled(True)
         task_view.row_double_clicked.connect(self._on_task_double_clicked)
         self.task_view = task_view
-        task_cnt = getattr(self, "cnt_tasks", 0)
-        self.task_tab_idx = self.tabs.addTab(task_tab, f"Задачи ({task_cnt})")
+        task_open = getattr(self, "cnt_tasks_open", 0)
+        task_closed = getattr(self, "cnt_tasks_closed", 0)
+        self.task_tab_idx = self.tabs.addTab(
+            task_tab, f"Задачи {task_open} ({task_closed})"
+        )
 
         self.tabs.setCurrentIndex(min(current, self.tabs.count() - 1))
 

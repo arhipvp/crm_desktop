@@ -1,7 +1,7 @@
 """Сервис управления страховыми полисами."""
 
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from peewee import JOIN, Field, fn
@@ -77,6 +77,19 @@ def get_policies_by_deal_id(deal_id: int):
         .where(Policy.deal_id == deal_id)
         .order_by(Policy.start_date.asc())
     )
+
+
+def get_policy_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
+    """Подсчитать количество открытых и закрытых полисов по сделке."""
+    today = date.today()
+    base = Policy.active().where(Policy.deal_id == deal_id)
+    open_count = base.where(
+        (Policy.end_date.is_null(True)) | (Policy.end_date >= today)
+    ).count()
+    closed_count = base.where(
+        (Policy.end_date.is_null(False)) & (Policy.end_date < today)
+    ).count()
+    return open_count, closed_count
 
 
 def get_policy_by_number(policy_number: str):

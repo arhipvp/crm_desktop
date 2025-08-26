@@ -335,3 +335,11 @@ def get_payments_by_deal_id(deal_id: int) -> ModelSelect:
         .where(Policy.deal_id == deal_id)
         .order_by(Payment.payment_date.asc())
     )
+
+
+def get_payment_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
+    """Подсчитать количество открытых и закрытых платежей по сделке."""
+    base = Payment.active().join(Policy).where(Policy.deal_id == deal_id)
+    open_count = base.where(Payment.actual_payment_date.is_null(True)).count()
+    closed_count = base.where(Payment.actual_payment_date.is_null(False)).count()
+    return open_count, closed_count

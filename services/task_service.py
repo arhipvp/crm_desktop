@@ -26,6 +26,21 @@ def get_pending_tasks():
     return Task.active().where(Task.is_done == False)
 
 
+def get_task_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
+    """Подсчитать количество открытых и закрытых задач по сделке.
+
+    Args:
+        deal_id: Идентификатор сделки.
+
+    Returns:
+        tuple[int, int]: ``(open_count, closed_count)``.
+    """
+    base = Task.active().where(Task.deal_id == deal_id)
+    open_count = base.where(Task.is_done == False).count()
+    closed_count = base.where(Task.is_done == True).count()
+    return open_count, closed_count
+
+
 def add_task(**kwargs):
     """Создать задачу.
 
