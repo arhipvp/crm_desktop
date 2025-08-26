@@ -4,8 +4,20 @@ import os
 from typing import List, Tuple, Callable
 
 import openai
-from jsonschema import ValidationError, validate
 from PyPDF2 import PdfReader
+
+logger = logging.getLogger(__name__)
+
+try:
+    from jsonschema import ValidationError, validate
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    ValidationError = Exception
+
+    def validate(instance, schema):  # type: ignore[unused-argument]
+        """Fallback validate if jsonschema is missing."""
+        logger.warning(
+            "Пакет 'jsonschema' не установлен, проверка схемы пропущена"
+        )
 
 DEFAULT_PROMPT = """Ты — ассистент, отвечающий за импорт данных из страховых полисов в CRM. На основе загруженного документа (PDF, скан или текст) необходимо сформировать один JSON строго по следующему шаблону:
 {
@@ -102,8 +114,6 @@ payments
 def _get_prompt() -> str:
     """Return system prompt for policy recognition."""
     return os.getenv("AI_POLICY_PROMPT", DEFAULT_PROMPT)
-
-logger = logging.getLogger(__name__)
 
 
 def _log_conversation(path: str, messages: List[dict]) -> str:
