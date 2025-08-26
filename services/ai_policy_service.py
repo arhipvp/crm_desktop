@@ -240,9 +240,13 @@ def _chat(messages: List[dict], progress_cb: Callable[[str, str], None] | None =
         parts: List[str] = []
         for chunk in stream:
             delta = chunk.choices[0].delta if chunk.choices else None
-            tool_calls = delta.get("tool_calls") if delta else None
-            func = tool_calls[0].get("function") if tool_calls else None
-            part = func.get("arguments") if func else ""
+            tool_calls = delta.tool_calls if delta else None
+            if not tool_calls:
+                continue
+            func = tool_calls[0].function if tool_calls else None
+            if not func:
+                continue
+            part = func.arguments or ""
             if part:
                 parts.append(part)
                 progress_cb("assistant", part)
