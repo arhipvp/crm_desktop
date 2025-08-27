@@ -189,6 +189,7 @@ class BaseTableView(QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_table_menu)
+        self.table.doubleClicked.connect(self._on_row_double_clicked)
         self.left_layout.addWidget(self.table)
         self.column_filters = ColumnFilterRow(linked_view=self.table)
         self.column_filters.filter_changed.connect(self._on_column_filter_changed)
@@ -559,6 +560,12 @@ class BaseTableView(QWidget):
             )
         except Exception as exc:
             QMessageBox.critical(self, "Ошибка", str(exc))
+
+    def _on_row_double_clicked(self, index):
+        if not index.isValid():
+            return
+        obj = self.model.get_item(self._source_row(index))
+        self.row_double_clicked.emit(obj)
 
     def _on_table_menu(self, pos):
         index = self.table.indexAt(pos)
