@@ -47,3 +47,39 @@ def apply_field_filters(
         return query
     return _apply_contains_filters(query, field_filters.items())
 
+
+def apply_search_and_filters(
+    query: ModelSelect,
+    model: type[Model],
+    search_text: str = "",
+    column_filters: dict[Field | str, str] | None = None,
+) -> ModelSelect:
+    """Apply substring search and column/field filters to a query.
+
+    Parameters:
+        query: Исходный запрос Peewee.
+        model: Класс модели для извлечения полей по именам.
+        search_text: Текст для поиска по всем полям модели.
+        column_filters: Словарь "имя поля или Field → значение".
+    """
+    if search_text:
+        fields = [f for f in model._meta.sorted_fields if isinstance(f, Field)]
+        condition = None
+        for field in fields:
+            expr = Cast(field, "TEXT").contains(search_text)
+            condition = expr if condition is None else (condition | expr)
+        if condition is not None:
+            query = query.where(condition)
+
+    field_filters: dict[Field, str] = {}
+    name_filters: dict[str, str] = {}
+    if column_filters:
+        for key, val in column_filters.items():
+            if isinstance(key, Field):
+                field_filters[key] = val
+            else:
+                name_filters[str(key)] = val
+
+    query = apply_field_filters(query, field_filters)
+    query = apply_column_filters(query, name_filters, model)
+    return query

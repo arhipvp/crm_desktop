@@ -9,6 +9,7 @@ from peewee import ModelSelect, fn
 from database.models import Client, Deal, db
 from services.folder_utils import create_client_drive_folder, rename_client_folder
 from services.validators import normalize_phone, normalize_full_name
+from services.query_utils import apply_search_and_filters
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ def get_clients_page(
 ) -> ModelSelect:
     """Получить страницу клиентов с учётом фильтров."""
     query = Client.active() if not show_deleted else Client.select()
-    query = apply_client_filters(query, search_text, column_filters)
+    query = apply_search_and_filters(query, Client, search_text, column_filters)
 
     offset = (page - 1) * per_page
     return query.order_by(Client.name.asc()).limit(per_page).offset(offset)
@@ -207,23 +208,6 @@ def update_client(client: Client, **kwargs) -> Client:
     return client
 
 
-def apply_client_filters(
-    query: ModelSelect,
-    search_text: str,
-    column_filters: dict[str, str] | None = None,
-) -> ModelSelect:
-    """Применяет фильтры поиска к выборке клиентов."""
-    if search_text:
-        query = query.where(
-            (Client.name.contains(search_text))
-            | (Client.phone.contains(search_text))
-            | (Client.email.contains(search_text))
-            | (Client.note.contains(search_text))
-        )
-    from services.query_utils import apply_column_filters
-
-    query = apply_column_filters(query, column_filters, Client)
-    return query
 
 
 # ──────────────────────────── Удаление ─────────────────────────────
@@ -306,4 +290,4 @@ def build_client_query(
 ):
     """Создаёт выборку клиентов с учётом фильтров."""
     query = Client.active() if not show_deleted else Client.select()
-    return apply_client_filters(query, search_text, column_filters)
+    return apply_search_and_filters(query, Client, search_text, column_filters)
