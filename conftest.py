@@ -6,6 +6,9 @@ from pathlib import Path
 import pytest
 from peewee import SqliteDatabase
 
+# Force tests to use in-memory SQLite by default to avoid touching any real DB.
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+
 # ensure project root is on sys.path when running tests
 sys.path.append(str(Path(__file__).resolve().parent))
 
@@ -55,9 +58,25 @@ def pytest_runtest_logfinish(nodeid, location):
 
 @pytest.fixture()
 def in_memory_db(monkeypatch):
-    test_db = SqliteDatabase(':memory:')
-    db.initialize(test_db)
+    # If db is not initialized yet, bind it to a fresh in-memory DB.
+    # If it is already initialized (e.g., by an early init_from_env reading the
+    # default DATABASE_URL we set above), reuse that handle.
+    test_db = getattr(db, "obj", None)
+    if test_db is None:
+        test_db = SqliteDatabase(":memory:")
+        db.initialize(test_db)
+    else:
+        # Safety guard: never run tests against a non in-memory DB.
+        from peewee import SqliteDatabase as _Sqlite
+        if not (isinstance(test_db, _Sqlite) and getattr(test_db, "database", None) == ":memory:"):
+            raise RuntimeError("Refusing to run tests on a non in-memory database")
+
     test_db.create_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor, Task])
-    yield
-    test_db.drop_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor, Task])
-    test_db.close()
+    try:
+        yield
+    finally:
+        test_db.drop_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor, Task])
+        try:
+            test_db.close()
+        except Exception:
+            pass
