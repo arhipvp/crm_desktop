@@ -1,3 +1,4 @@
+* { font-family: "Roboto"; }
 /* 📌 Общий стиль таблиц */
 QHeaderView::section {
     font-weight: bold;

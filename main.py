@@ -10,6 +10,7 @@ dotenv_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=dotenv_path)
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QFontDatabase, QFont
 
 from database.init import init_from_env
 from services import executor_service as es
@@ -33,6 +34,10 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
 
     try:
+        fonts_dir = os.path.join(os.path.dirname(__file__), "resources", "fonts")
+        QFontDatabase.addApplicationFont(os.path.join(fonts_dir, "Roboto-Regular.ttf"))
+        app.setFont(QFont("Roboto", 10))
+
         style_path = os.path.join(os.path.dirname(__file__), "resources", "style.qss")
         with open(style_path, "r", encoding="utf-8") as f:
             app.setStyleSheet(f.read())
