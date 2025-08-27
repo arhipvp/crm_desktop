@@ -305,16 +305,20 @@ class PolicyTableView(BaseTableView):
         self.model = PolicyTableModel(items, model_class)
         self.proxy_model.setSourceModel(self.model)
         self.table.setModel(self.proxy_model)
+        header = self.table.horizontalHeader()
+        header.blockSignals(True)
         try:
             # Показываем текущий индикатор сортировки, не выполняя
             # повторную сортировку на уровне прокси‑модели (сортировку
             # уже выполняет база данных).
-            self.table.horizontalHeader().setSortIndicator(
+            header.setSortIndicator(
                 self.current_sort_column, self.current_sort_order
             )
             self.table.resizeColumnsToContents()
         except NotImplementedError:
             pass
+        finally:
+            header.blockSignals(False)
         if total_count is not None:
             self.total_count = total_count
             self.paginator.update(self.total_count, self.page, self.per_page)
