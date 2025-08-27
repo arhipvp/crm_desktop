@@ -4,10 +4,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QMessageBox, QAbstractItemView, QHeaderView
 
 from database.models import Task
+from ui.base.base_table_model import BaseTableModel
 from services.task_service import (
     build_task_query,
     get_tasks_page,
@@ -23,6 +24,21 @@ from ui.common.filter_controls import FilterControls
 from ui.common.styled_widgets import styled_button
 from ui.forms.task_form import TaskForm
 from ui.views.task_detail_view import TaskDetailView
+
+
+class TaskTableModel(BaseTableModel):
+    VISIBLE_FIELDS = [
+        Task.title,
+        Task.due_date,
+        Task.deal,
+        Task.policy,
+        Task.dispatch_state,
+    ]
+
+    def __init__(self, objects, model_class, parent=None):
+        super().__init__(objects, model_class, parent)
+        self.fields = self.VISIBLE_FIELDS
+        self.headers = [f.name for f in self.fields]
 
 
 class TaskTableView(BaseTableView):
@@ -222,9 +238,6 @@ class TaskTableView(BaseTableView):
                 deal_id=self.deal_id,
                 column_filters=f.get("column_filters"),
             ).count()
-
-            # items = items.order_by(Task.due_date).paginate(self.page, self.per_page)
-
         else:
             items = get_tasks_page(
                 page=self.page,
@@ -238,7 +251,36 @@ class TaskTableView(BaseTableView):
             )
             total = build_task_query(**f).count()
 
-        self.set_model_class_and_items(Task, list(items), total_count=total)
+        prev_texts = [
+            self.column_filters.get_text(i)
+            for i in range(len(self.column_filters._editors))
+        ]
+
+        items = list(items)
+        self.model = TaskTableModel(items, Task)
+        self.proxy_model.setSourceModel(self.model)
+        self.table.setModel(self.proxy_model)
+
+        try:
+            self.table.sortByColumn(
+                self.current_sort_column, self.current_sort_order
+            )
+            self.table.resizeColumnsToContents()
+        except NotImplementedError:
+            pass
+
+        self.total_count = total
+        self.paginator.update(self.total_count, self.page, self.per_page)
+        self.data_loaded.emit(self.total_count)
+
+        headers = [
+            self.model.headerData(i, Qt.Horizontal)
+            for i in range(self.model.columnCount())
+        ]
+        self.column_filters.set_headers(
+            headers, prev_texts, self.COLUMN_FIELD_MAP
+        )
+        QTimer.singleShot(0, self.load_table_settings)
 
         # при смене модели selectionModel пересоздаётся и теряет подключение
         # к обработчику выбора, поэтому подключаем сигнал заново, чтобы
