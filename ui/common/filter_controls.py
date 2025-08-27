@@ -119,6 +119,10 @@ class FilterControls(QWidget):
         """Возвращает текст из поля поиска (без пробелов)."""
         return self._search.get_text().strip()
 
+    def focus_search(self) -> None:
+        """Устанавливает фокус на поле поиска."""
+        self._search.search_input.setFocus()
+
     def is_checked(self, label: str) -> bool:
         """Проверяет, установлен ли чекбокс с заданной меткой."""
         return self._cbx.is_checked(label) if self._cbx else False
