@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.date_utils import OptionalDateEdit, TypableDateEdit
+from ui.common.message_boxes import confirm
 from ui.common.styled_widgets import styled_button
 from services.validators import normalize_number
 
@@ -50,6 +51,7 @@ class BaseEditForm(QDialog):
         self.model_class = model_class or type(instance)
         self.entity_name = entity_name
         self.fields: dict[str, object] = {}
+        self._dirty = False
 
         self.setWindowTitle(
             f"Редактировать {entity_name}" if instance else f"Добавить {entity_name}"
@@ -69,6 +71,7 @@ class BaseEditForm(QDialog):
         # Размеры формы определяем по содержимому
         self.adjustSize()
         self.setMinimumHeight(self.height())
+        self._dirty = False
 
     # ------------------------------------------------------------------
     # UI helpers
@@ -87,6 +90,16 @@ class BaseEditForm(QDialog):
         btns.addWidget(self.save_btn)
         btns.addWidget(self.cancel_btn)
         self.layout.addLayout(btns)
+
+    # ------------------------------------------------------------------
+    # Events
+    # ------------------------------------------------------------------
+    def closeEvent(self, event):
+        if self._dirty:
+            if not confirm("Есть несохранённые изменения. Закрыть без сохранения?"):
+                event.ignore()
+                return
+        super().closeEvent(event)
 
     # ------------------------------------------------------------------
     # Build form
@@ -140,6 +153,15 @@ class BaseEditForm(QDialog):
             self.fields[field_name] = widget
             self.form_layout.addRow(QLabel(self._prettify(field_name)), widget)
 
+            if isinstance(widget, QLineEdit):
+                widget.textChanged.connect(self._mark_dirty)
+            elif isinstance(widget, QCheckBox):
+                widget.stateChanged.connect(self._mark_dirty)
+            elif isinstance(widget, QComboBox):
+                widget.currentIndexChanged.connect(self._mark_dirty)
+            elif isinstance(widget, QDateEdit):
+                widget.dateChanged.connect(self._mark_dirty)
+
             # вызов хука update_context, если он определён
         if hasattr(self, "update_context"):
             self.update_context()
@@ -147,6 +169,9 @@ class BaseEditForm(QDialog):
     # ------------------------------------------------------------------
     # Utils
     # ------------------------------------------------------------------
+    def _mark_dirty(self, *_):
+        self._dirty = True
+
     def _prettify(self, name: str) -> str:
         return name.replace("_", " ").capitalize() + ":"
 
@@ -242,6 +267,7 @@ class BaseEditForm(QDialog):
             saved = self.save_data()
             if saved:
                 self.saved_instance = saved
+                self._dirty = False
                 self.accept()
         except Exception:
             logger.exception("❌ Ошибка при сохранении в %s", self.__class__.__name__)
