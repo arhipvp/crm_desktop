@@ -103,8 +103,17 @@ class PaymentTableView(BaseTableView):
         )
 
         total_sum = sum(p.amount for p in items)
+        overdue_sum = sum(
+            p.amount
+            for p in items
+            if p.actual_payment_date is None
+            and p.payment_date
+            and p.payment_date < date.today()
+        )
         if items:
-            self.paginator.set_summary(f"Сумма: {total_sum:.2f} ₽")
+            self.paginator.set_summary(
+                f"Сумма: {total_sum:.2f} ₽ (Просрочено: {overdue_sum:.2f} ₽)"
+            )
         else:
             self.paginator.set_summary("")
 
@@ -208,6 +217,15 @@ class PaymentTableModel(BaseTableModel):
                 and obj.payment_date < date.today()
             ):
                 return QBrush(QColor("#ffcccc"))
+            return None
+
+        if role == Qt.ForegroundRole:
+            if (
+                obj.actual_payment_date is None
+                and obj.payment_date
+                and obj.payment_date < date.today()
+            ):
+                return QColor("red")
             return None
 
         # Виртуальные поля — после стандартных
