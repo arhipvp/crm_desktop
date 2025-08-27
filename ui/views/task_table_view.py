@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox, QAbstractItemView
+from PySide6.QtWidgets import QMessageBox, QAbstractItemView, QHeaderView
 
 from database.models import Task
 from services.task_service import (
@@ -304,6 +304,11 @@ class TaskTableView(BaseTableView):
         header.blockSignals(True)
         header.setSortIndicator(col, order)
         header.blockSignals(False)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        for col in range(1, header.count()):
+            header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+        self.table.resizeColumnsToContents()
 
         self._update_actions_state()
 
