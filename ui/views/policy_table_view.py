@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QAbstractItemView
 from PySide6.QtCore import Qt, QDate, QTimer
 from ui.base.base_table_view import BaseTableView
 from ui.base.base_table_model import BaseTableModel
+from ui.base.table_controller import TableController
 from ui.common.message_boxes import confirm, show_error
 from ui.common.search_dialog import SearchDialog
 from ui.forms.policy_form import PolicyForm
@@ -45,11 +46,36 @@ class PolicyTableView(BaseTableView):
             "Показывать продленное": self.on_filter_changed,
             "Показывать только полисы без сделок": self.on_filter_changed,
         }
+
+        self.order_by = "start_date"
+        self.order_dir = "asc"
+
+        def _get_page(page, per_page, **f):
+            items = list(
+                get_policies_page(
+                    page,
+                    per_page,
+                    order_by=self.order_by,
+                    order_dir=self.order_dir,
+                    **f,
+                )
+            )
+            attach_premium(items)
+            return items
+
+        controller = TableController(
+            self,
+            model_class=Policy,
+            get_page_func=_get_page,
+            get_total_func=lambda **f: build_policy_query(**f).count(),
+            filter_func=self._apply_filters,
+        )
+
         super().__init__(
             parent=parent,
-            model_class=Policy,
             form_class=PolicyForm,
             checkbox_map=checkbox_map,
+            controller=controller,
             **kwargs,
         )
         self.setAcceptDrops(True)
@@ -58,15 +84,11 @@ class PolicyTableView(BaseTableView):
         self.table.horizontalHeader().sortIndicatorChanged.connect(
             self.on_sort_changed
         )
-        # Разрешаем "псевдо-редактирование" ячеек для копирования текста
         self.table.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked
             | QAbstractItemView.EditTrigger.EditKeyPressed
             | QAbstractItemView.EditTrigger.SelectedClicked
         )
-
-        self.order_by = "start_date"
-        self.order_dir = "asc"
 
         self.mark_renewed_btn = styled_button("Полис продлен (без привязки)")
         idx = self.button_row.count() - 1
@@ -90,8 +112,7 @@ class PolicyTableView(BaseTableView):
 
         self.load_data()
 
-    def get_filters(self) -> dict:
-        filters = super().get_filters()
+    def _apply_filters(self, filters: dict) -> dict:
         filters.update(
             {
                 "include_renewed": self.filter_controls.is_checked("Показывать продленное"),
@@ -101,21 +122,6 @@ class PolicyTableView(BaseTableView):
         if self.deal_id is not None:
             filters["deal_id"] = self.deal_id
         return filters
-
-    def load_data(self):
-        filters = self.get_filters()
-        items = list(
-            get_policies_page(
-                self.page,
-                self.per_page,
-                order_by=self.order_by,
-                order_dir=self.order_dir,
-                **filters,
-            )
-        )
-        attach_premium(items)
-        total = build_policy_query(**filters).count()
-        self.set_model_class_and_items(Policy, items, total_count=total)
 
     def get_selected(self):
         idx = self.table.currentIndex()
