@@ -32,6 +32,8 @@ class FilterControls(QWidget):
         Название поля даты для фильтрации (например, "due_date"), по умолчанию None.
     on_filter : callable, optional
         Универсальная функция, вызываемая при изменении фильтров (дата/чекбоксы).
+    reset_callback : callable, optional
+        Функция, вызываемая после очистки фильтров, по умолчанию None.
     parent : QWidget, optional
         Родительский виджет.
     settings_name : str, optional
@@ -47,6 +49,7 @@ class FilterControls(QWidget):
         extra_widgets=None,
         date_filter_field: str | None = None,
         on_filter=None,
+        reset_callback=None,
         parent=None,
         settings_name: str | None = None,
     ):
@@ -94,6 +97,18 @@ class FilterControls(QWidget):
             export_btn.setFixedHeight(30)
             layout.addWidget(export_btn)
 
+        # Кнопка сброса
+        self.reset_btn = QPushButton("Сбросить")
+        self.reset_btn.setFixedHeight(30)
+
+        def on_reset():
+            self.clear_all()
+            if reset_callback:
+                reset_callback()
+
+        self.reset_btn.clicked.connect(on_reset)
+        layout.addWidget(self.reset_btn)
+
         layout.addStretch()
 
         if self._settings_name:
@@ -140,14 +155,26 @@ class FilterControls(QWidget):
         }
 
     def clear_all(self):
-        """Сбрасывает все фильтры: поиск, даты, чекбоксы."""
-        self._search.clear()
+        """Сбрасывает все фильтры: поиск, даты, чекбоксы, не излучая сигналов."""
+        self._search.search_input.blockSignals(True)
+        self._search.search_input.clear()
+        self._search.search_input.blockSignals(False)
+
         if self._cbx:
-            self._cbx.clear()
+            for box in self._cbx.checkboxes.values():
+                box.blockSignals(True)
+                box.setChecked(False)
+                box.blockSignals(False)
+
         if hasattr(self, "_date_from"):
+            self._date_from.blockSignals(True)
             self._date_from.clear()
+            self._date_from.blockSignals(False)
+
         if hasattr(self, "_date_to"):
+            self._date_to.blockSignals(True)
             self._date_to.clear()
+            self._date_to.blockSignals(False)
 
     # ------------------------------------------------------------------
     # Persistence helpers

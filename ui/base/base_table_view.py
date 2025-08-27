@@ -122,6 +122,7 @@ class BaseTableView(QWidget):
             export_callback=self.export_csv,
             settings_name=self.settings_id,
             date_filter_field=date_filter_field,
+            reset_callback=self._on_reset_filters,
         )
 
         self.left_layout.addWidget(self.filter_controls)
@@ -317,6 +318,14 @@ class BaseTableView(QWidget):
     def _on_column_filter_changed(self, column: int, text: str):
         self.on_filter_changed()
         self.save_table_settings()
+
+    def _on_reset_filters(self):
+        """Сбрасывает все фильтры и обновляет данные."""
+        self.filter_controls.clear_all()
+        self.column_filters.clear_all()
+        ui_settings.set_table_filters(self.settings_id, {})
+        self.save_table_settings()
+        self.on_filter_changed()
 
     def get_column_filters(self) -> dict[Field, str]:
         """Собирает фильтры по столбцам с учётом ``COLUMN_FIELD_MAP``."""

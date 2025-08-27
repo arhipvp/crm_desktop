@@ -103,3 +103,11 @@ class ColumnFilterRow(QWidget):
         """Управляет видимостью поля фильтра по его индексу."""
         if 0 <= index < len(self._editors):
             self._editors[index].setVisible(visible)
+
+    def clear_all(self) -> None:
+        """Очищает все редакторы без генерации сигналов."""
+        for editor, timer in zip(self._editors, self._timers):
+            timer.stop()
+            editor.blockSignals(True)
+            editor.clear()
+            editor.blockSignals(False)
