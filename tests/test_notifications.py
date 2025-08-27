@@ -10,7 +10,7 @@ from database.models import (
     Income,
     Task,
 )
-from services import policy_service as ps
+from services.policies import policy_service as ps
 from services import executor_service as es
 import services.telegram_service as ts
 import services.income_service as ins

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QLabel
 
 from database.models import Payment
 from services.payment_service import add_payment, update_payment
-from services.policy_service import get_policy_by_id
+from services.policies import get_policy_by_id
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import create_policy_combobox
 from ui.common.date_utils import OptionalDateEdit

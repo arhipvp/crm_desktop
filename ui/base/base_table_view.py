@@ -3,24 +3,20 @@ import logging
 logger = logging.getLogger(__name__)
 
 from peewee import Field
-from PySide6.QtCore import QDate, Qt, Signal, QTimer, QSortFilterProxyModel
-from PySide6.QtConcurrent import QtConcurrent
+from PySide6.QtCore import Qt, Signal, QSortFilterProxyModel
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
-    QApplication,
     QHBoxLayout,
     QHeaderView,
     QMenu,
-    QProgressDialog,
     QSplitter,
     QTableView,
     QVBoxLayout,
     QWidget,
     QFileDialog,
-    QMessageBox,
 )
 
-from ui.base.base_table_model import BaseTableModel
+from ui.base.table_controller import TableController
 from ui.common.filter_controls import FilterControls
 from ui.common.paginator import Paginator
 from ui.common.styled_widgets import styled_button
@@ -61,14 +57,12 @@ class BaseTableView(QWidget):
         filter_func=None,
         custom_actions=None,
         detail_view_class=None,
+        controller: TableController | None = None,
         **kwargs,
     ):
         super().__init__(parent)
 
-        self.model_class = model_class
         self.form_class = form_class
-        self.get_page_func = get_page_func
-        self.get_total_func = get_total_func
         self.can_edit = can_edit
         self.can_delete = can_delete
         self.can_add = can_add
@@ -76,9 +70,17 @@ class BaseTableView(QWidget):
         self.delete_callback = delete_callback
         self.can_restore = can_restore
         self.restore_callback = restore_callback
-        self.filter_func = filter_func
         self.custom_actions = custom_actions or []
         self.detail_view_class = detail_view_class
+
+        self.controller = controller or TableController(
+            self,
+            model_class=model_class,
+            get_page_func=get_page_func,
+            get_total_func=get_total_func,
+            filter_func=filter_func,
+        )
+        self.model_class = self.controller.model_class
 
         self.use_inline_details = True  # включить встроенные детали
         self.detail_widget = None
@@ -214,156 +216,52 @@ class BaseTableView(QWidget):
         self.left_layout.addWidget(self.paginator)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
-        prev_texts = [
-            self.column_filters.get_text(i)
-            for i in range(len(self.column_filters._editors))
-        ]
-
-        self.model = BaseTableModel(items, model_class)
-        self.proxy_model.setSourceModel(self.model)
-        self.table.setModel(self.proxy_model)
-
-        # Безопасная попытка resize
-        try:
-            self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
-            self.table.resizeColumnsToContents()
-        except NotImplementedError:
-            pass
-
-        if total_count is not None:
-            self.total_count = total_count
-            self.paginator.update(self.total_count, self.page, self.per_page)
-            self.data_loaded.emit(self.total_count)
-
-        # обновление заголовков для фильтров
-        headers = [
-            self.model.headerData(i, Qt.Horizontal)
-            for i in range(self.model.columnCount())
-        ]
-        self.column_filters.set_headers(
-            headers, prev_texts, self.COLUMN_FIELD_MAP
-        )
-        QTimer.singleShot(0, self.load_table_settings)
+        if self.controller:
+            self.controller.set_model_class_and_items(
+                model_class, items, total_count
+            )
 
     def load_data(self):
-        if not self.model_class or not self.get_page_func:
-            return
-
-        progress = QProgressDialog("Загрузка...", "Отмена", 0, 0, self)
-        progress.setWindowModality(Qt.WindowModal)
-        progress.setAutoClose(False)
-        progress.setAutoReset(False)
-        progress.show()
-        QApplication.processEvents()
-
-        filters = self.get_filters()
-        cancelled = False
-
-        def run() -> tuple[list, int]:
-            items = self.get_page_func(self.page, self.per_page, **filters)
-            total = (
-                self.get_total_func(**filters)
-                if self.get_total_func
-                else len(items)
-            )
-            return list(items), total
-
-        future = QtConcurrent.run(run)
-
-        def check_finished():
-            if not future.isFinished():
-                return
-            timer.stop()
-            progress.close()
-            if cancelled or future.isCanceled():
-                return
-            try:
-                items, total = future.result()
-            except Exception as exc:  # noqa: BLE001
-                logger.exception("Ошибка при загрузке данных")
-                QMessageBox.critical(self, "Ошибка", str(exc))
-                return
-            self.set_model_class_and_items(
-                self.model_class, items, total_count=total
-            )
-
-        timer = QTimer(self)
-        timer.setInterval(100)
-        timer.timeout.connect(check_finished)
-        timer.start()
-
-        def on_cancel():
-            nonlocal cancelled
-            cancelled = True
-            future.cancel()
-            timer.stop()
-            progress.close()
-
-        progress.canceled.connect(on_cancel)
+        if self.controller:
+            self.controller.load_data()
 
     def refresh(self):
-        self.load_data()
+        if self.controller:
+            self.controller.refresh()
 
     def on_filter_changed(self, *args, **kwargs):
-        self.page = 1
-        self.load_data()
+        if self.controller:
+            self.controller.on_filter_changed(*args, **kwargs)
 
     def next_page(self):
-        self.page += 1
-        self.load_data()
+        if self.controller:
+            self.controller.next_page()
 
     def prev_page(self):
-        if self.page > 1:
-            self.page -= 1
-            self.load_data()
+        if self.controller:
+            self.controller.prev_page()
 
     def _on_per_page_changed(self, per_page: int):
-        """Обработка изменения количества записей на странице."""
-        self.per_page = per_page
-        self.page = 1
-        self.save_table_settings()
-        self.load_data()
+        if self.controller:
+            self.controller._on_per_page_changed(per_page)
 
     def _on_column_filter_changed(self, column: int, text: str):
-        self.on_filter_changed()
-        self.save_table_settings()
+        if self.controller:
+            self.controller._on_column_filter_changed(column, text)
 
     def _on_reset_filters(self):
-        """Сбрасывает все фильтры и обновляет данные."""
-        self.filter_controls.clear_all()
-        self.column_filters.clear_all()
-        ui_settings.set_table_filters(self.settings_id, {})
-        self.save_table_settings()
-        self.on_filter_changed()
+        if self.controller:
+            self.controller._on_reset_filters()
 
     def get_column_filters(self) -> dict[Field, str]:
-        """Собирает фильтры по столбцам с учётом ``COLUMN_FIELD_MAP``."""
-        if not hasattr(self, "model") or not self.model:
-            return {}
-
-        filters: dict[Field, str] = {}
-        for i in range(self.model.columnCount()):
-            text = self.column_filters.get_text(i)
-            if not text:
-                continue
-
-            field = self.COLUMN_FIELD_MAP.get(
-                i, self.model.fields[i] if i < len(self.model.fields) else None
-            )
-            if isinstance(field, Field):
-                filters[field] = text
-        return filters
+        if self.controller:
+            return self.controller.get_column_filters()
+        return {}
 
     def get_filters(self) -> dict:
-        filters = {
-            "show_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-            "search_text": self.filter_controls.get_search_text(),
-            "column_filters": self.get_column_filters(),
-        }
-        date_range = self.filter_controls.get_date_filter()
-        if date_range:
-            filters.update(date_range)
-        return filters
+        if self.controller:
+            return self.controller.get_filters()
+        return {}
 
     def add_new(self):
         if not self.form_class:
@@ -482,7 +380,7 @@ class BaseTableView(QWidget):
     def _get_service_for_model(self, model_class):
         # Импортируй нужный сервис по классу модели
         if model_class.__name__ == "Policy":
-            from services import policy_service
+            from services.policies import policy_service
 
             return policy_service
         if model_class.__name__ == "Payment":
@@ -510,7 +408,7 @@ class BaseTableView(QWidget):
 
             return calculation_service
         if model_class.__name__ == "Client":
-            from services import client_service
+            from services.clients import client_service
 
             return client_service
 

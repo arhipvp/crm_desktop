@@ -193,7 +193,7 @@ def import_reso_payouts(
             raw_client = str(row.get("СТРАХОВАТЕЛЬ", "")).strip()
             if raw_client:
                 import re
-                from services.client_service import find_similar_clients
+                from services.clients import find_similar_clients
 
                 m = re.match(r"(.*?)\s*\[\d+\]$", raw_client)
                 name = m.group(1) if m else raw_client

@@ -16,10 +16,27 @@ from services.payment_service import (
 )
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
+from ui.base.table_controller import TableController
 from ui.common.message_boxes import confirm, show_error
 from ui.common.styled_widgets import styled_button
 from ui.forms.payment_form import PaymentForm
 from ui.views.payment_detail_view import PaymentDetailView
+
+
+class PaymentTableController(TableController):
+    def set_model_class_and_items(self, model_class, items, total_count=None):
+        total_sum = sum(p.amount for p in items)
+        overdue_sum = sum(
+            p.amount
+            for p in items
+            if not p.actual_payment_date
+            and p.payment_date
+            and p.payment_date < date.today()
+        )
+        super().set_model_class_and_items(model_class, items, total_count)
+        self.view.paginator.set_summary(
+            f"Сумма: {total_sum} ₽ (просрочено: {overdue_sum} ₽)"
+        )
 
 
 class PaymentTableView(BaseTableView):
@@ -34,25 +51,36 @@ class PaymentTableView(BaseTableView):
 
     def __init__(self, parent=None, deal_id=None, **kwargs):
         self.deal_id = deal_id
-        checkbox_map = {
-            "Показывать оплаченные": lambda state: self.load_data(),
-            "Показывать удалённые": lambda state: self.load_data(),
-        }
-        super().__init__(
-            parent=parent,
-            model_class=Payment,
-            checkbox_map=checkbox_map,
-            date_filter_field="payment_date",
-        )
-        self.model_class = Payment  # или Client, Policy и т.д.
-        self.form_class = PaymentForm
-
-        # параметры сортировки по умолчанию
         self.default_sort_column = 2
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = Qt.AscendingOrder
         self.order_by = Payment.payment_date
         self.order_dir = "asc"
+
+        checkbox_map = {
+            "Показывать оплаченные": lambda state: self.load_data(),
+            "Показывать удалённые": lambda state: self.load_data(),
+        }
+
+        controller = PaymentTableController(
+            self,
+            model_class=Payment,
+            get_page_func=lambda page, per_page, **f: get_payments_page(
+                page, per_page, order_by=self.order_by, order_dir=self.order_dir, **f
+            ),
+            get_total_func=lambda **f: build_payment_query(
+                order_by=self.order_by, order_dir=self.order_dir, **f
+            ).count(),
+            filter_func=self._apply_filters,
+        )
+
+        super().__init__(
+            parent=parent,
+            form_class=PaymentForm,
+            checkbox_map=checkbox_map,
+            date_filter_field="payment_date",
+            controller=controller,
+        )
 
         # разрешаем множественный выбор для массовых действий
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -72,8 +100,7 @@ class PaymentTableView(BaseTableView):
         self.row_double_clicked.connect(self.open_detail)
         self.load_data()
 
-    def get_filters(self) -> dict:
-        filters = super().get_filters()
+    def _apply_filters(self, filters: dict) -> dict:
         filters.update(
             {
                 "include_paid": self.filter_controls.is_checked("Показывать оплаченные"),
@@ -85,48 +112,6 @@ class PaymentTableView(BaseTableView):
         if date_range:
             filters["payment_date_range"] = date_range
         return filters
-
-    def load_data(self):
-        # 1) читаем фильтры
-        filters = self.get_filters()
-
-        # 2) получаем страницу и общее количество
-        logger.debug("📊 Фильтры платежей: %s", filters)
-        items = list(
-            get_payments_page(
-                self.page,
-                self.per_page,
-                order_by=self.order_by,
-                order_dir=self.order_dir,
-                **filters,
-            )
-        )
-
-        total_sum = sum(p.amount for p in items)
-        overdue_sum = sum(
-            p.amount
-            for p in items
-            if p.actual_payment_date is None
-            and p.payment_date
-            and p.payment_date < date.today()
-        )
-        if items:
-            self.paginator.set_summary(
-                f"Сумма: {total_sum:.2f} ₽ (Просрочено: {overdue_sum:.2f} ₽)"
-            )
-        else:
-            self.paginator.set_summary("")
-
-        total = build_payment_query(
-            order_by=self.order_by, order_dir=self.order_dir, **filters
-        ).count()
-
-        logger.debug("📦 Загружено платежей: %d", len(items))
-
-        # 3) обновляем модель и пагинатор через базовый метод
-        self.set_model_class_and_items(Payment, items, total_count=total)
-        # после загрузки данных восстанавливаем индикатор сортировки
-        self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
         field = self.COLUMN_FIELD_MAP.get(column)

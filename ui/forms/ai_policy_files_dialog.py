@@ -14,7 +14,7 @@ from PySide6.QtGui import QTextCursor
 import os
 import json as _json
 
-from services.ai_policy_service import (
+from services.policies.ai_policy_service import (
     recognize_policy_interactive,
     AiPolicyError,
     _read_text,

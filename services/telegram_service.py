@@ -1,15 +1,15 @@
 import os
-from dotenv import load_dotenv
+import logging
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, constants
 from services import task_service as ts
-import logging
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+from config import get_settings
 
-BOT_TOKEN = os.getenv("TG_BOT_TOKEN")
+settings = get_settings()
 
+BOT_TOKEN = settings.tg_bot_token
 _bot = Bot(BOT_TOKEN) if BOT_TOKEN else None
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID") or 0)
+ADMIN_CHAT_ID = settings.admin_chat_id or 0
 
 
 def format_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:

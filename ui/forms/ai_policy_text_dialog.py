@@ -11,7 +11,7 @@ from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QTextCursor
 import json
 
-from services.ai_policy_service import (
+from services.policies.ai_policy_service import (
     recognize_policy_interactive,
     AiPolicyError,
     _get_prompt,
@@ -142,7 +142,7 @@ class AiPolicyTextDialog(QDialog):
             return
 
         if self.file_path:
-            from services.ai_policy_service import _read_text
+            from services.policies.ai_policy_service import _read_text
 
             text = _read_text(self.file_path)
         else:

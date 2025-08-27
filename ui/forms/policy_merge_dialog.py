@@ -19,7 +19,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt, QDate
 import peewee
 
-from services.client_service import get_client_by_id
+from services.clients import get_client_by_id
 from services.deal_service import get_deal_by_id, get_deals_by_client_id
 from services.validators import normalize_number, normalize_policy_number
 

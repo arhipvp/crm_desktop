@@ -9,7 +9,7 @@ from peewee import JOIN, Field, fn
 from database.db import db
 from database.models import Client, Deal, Payment, Policy
 from services import executor_service as es
-from services.client_service import get_client_by_id
+from services.clients import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.folder_utils import create_policy_folder, open_folder
 from services.payment_service import (
@@ -18,6 +18,7 @@ from services.payment_service import (
 )
 from services.telegram_service import notify_executor
 from services.validators import normalize_policy_number
+from services.query_utils import apply_search_and_filters
 
 
 
@@ -583,52 +584,6 @@ def prolong_policy(original_policy: Policy) -> Policy:
     return new_policy
 
 
-def apply_policy_filters(
-    query,
-    search_text: str = "",
-    deal_id: int | None = None,
-    client_id: int | None = None,
-    include_renewed: bool = True,
-    without_deal_only: bool = False,
-    column_filters: dict | None = None,
-):
-    if deal_id is not None:
-        query = query.where(Policy.deal_id == deal_id)
-    if client_id is not None:
-        query = query.where(Policy.client == client_id)
-    if not include_renewed:
-        query = query.where(
-            (Policy.renewed_to.is_null(True))
-            | (Policy.renewed_to == "")
-            | (Policy.renewed_to == "Нет")
-        )
-    if deal_id is None and without_deal_only:
-        query = query.where(Policy.deal_id.is_null(True))
-    if search_text:
-        query = query.where(
-            (Policy.policy_number.contains(search_text))
-            | (Client.name.contains(search_text))
-        )
-
-    from services.query_utils import apply_column_filters, apply_field_filters
-
-    field_filters: dict[Field, str] = {}
-    name_filters: dict[str, str] = {}
-    if column_filters:
-        for key, val in column_filters.items():
-            if isinstance(key, Field):
-                field_filters[key] = val
-            else:
-                name_filters[str(key)] = val
-
-    if Deal.description in field_filters:
-        query = query.switch(Policy).join(Deal, JOIN.LEFT_OUTER)
-
-    query = apply_field_filters(query, field_filters)
-    query = apply_column_filters(query, name_filters, Policy)
-    return query
-
-
 def build_policy_query(
     search_text: str = "",
     show_deleted: bool = False,
@@ -642,15 +597,22 @@ def build_policy_query(
     """Сформировать запрос для выборки полисов с фильтрами."""
     base = Policy.active() if not show_deleted else Policy.select()
     query = base.select(Policy, Client).join(Client)
-    return apply_policy_filters(
-        query,
-        search_text,
-        deal_id,
-        client_id,
-        include_renewed,
-        without_deal_only,
-        column_filters,
-    )
+    if deal_id is not None:
+        query = query.where(Policy.deal_id == deal_id)
+    if client_id is not None:
+        query = query.where(Policy.client == client_id)
+    if not include_renewed:
+        query = query.where(
+            (Policy.renewed_to.is_null(True))
+            | (Policy.renewed_to == "")
+            | (Policy.renewed_to == "Нет")
+        )
+    if deal_id is None and without_deal_only:
+        query = query.where(Policy.deal_id.is_null(True))
+    if column_filters and Deal.description in column_filters:
+        query = query.switch(Policy).join(Deal, JOIN.LEFT_OUTER)
+    query = apply_search_and_filters(query, Policy, search_text, column_filters)
+    return query
 
 
 def get_policy_by_id(policy_id: int) -> Policy | None:

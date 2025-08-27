@@ -2,7 +2,7 @@ import datetime
 import pytest
 
 from database.models import Client, Policy, Payment, Income, Expense
-from services import policy_service as ps
+from services.policies import policy_service as ps
 from services.payment_service import add_payment
 
 def test_policy_merge_additional_payments(in_memory_db, monkeypatch):

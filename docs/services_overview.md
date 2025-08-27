@@ -3,8 +3,8 @@
 Сервисные модули содержат бизнес‑логику и интеграции.
 
 ## client_service
-- допустимые поля описаны в `CLIENT_ALLOWED_FIELDS`; валидация телефонов предотвращает дублирование【F:services/client_service.py†L15-L97】.
-- `add_client` нормализует имя и телефон, создаёт папку клиента и сохраняет путь и ссылку【F:services/client_service.py†L103-L141】.
+- допустимые поля описаны в `CLIENT_ALLOWED_FIELDS`; валидация телефонов предотвращает дублирование【F:services/clients/client_service.py†L15-L97】.
+- `add_client` нормализует имя и телефон, создаёт папку клиента и сохраняет путь и ссылку【F:services/clients/client_service.py†L103-L141】.
 
 ## deal_service
 - `add_deal` создаёт сделку, формирует запись в журнале и создаёт локальную папку «Сделка - …»【F:services/deal_service.py†L56-L123】.

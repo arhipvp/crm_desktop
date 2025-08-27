@@ -130,7 +130,7 @@ class CalculationTableView(BaseTableView):
         text = generate_offer_text(calcs)
         copy_text_to_clipboard(text, parent=self)
         try:
-            from services.client_service import format_phone_for_whatsapp, open_whatsapp
+            from services.clients import format_phone_for_whatsapp, open_whatsapp
             from database.models import Deal
 
             deal = Deal.get_by_id(self.deal_id)

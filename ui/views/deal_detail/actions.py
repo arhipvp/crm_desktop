@@ -21,7 +21,7 @@ from services.folder_utils import (
     open_folder,
 )
 from services.payment_service import get_payments_by_deal_id
-from services.policy_service import get_policies_by_deal_id
+from services.policies import get_policies_by_deal_id
 from services.task_service import get_incomplete_tasks_by_deal, mark_done
 from ui import settings as ui_settings
 from ui.common.message_boxes import confirm, show_error, show_info
@@ -363,7 +363,7 @@ class DealActionsMixin:
         self.btn_next.setEnabled(get_next_deal(self.instance) is not None)
 
     def _open_whatsapp(self):
-        from services.client_service import (
+        from services.clients import (
             format_phone_for_whatsapp,
             open_whatsapp,
         )

@@ -49,8 +49,8 @@ def _postgres_from_url(url: str) -> PostgresqlDatabase:
     )
 
 
-def init_from_env(env_var: str = _DEFAULT_ENV) -> None:
-    """Инициализирует :data:`db` из переменной окружения.
+def init_from_env(database_url: str | None = None, env_var: str = _DEFAULT_ENV) -> None:
+    """Инициализирует :data:`db` из переданного URL или переменной окружения.
 
     Поддерживает строки вида:
       • ``postgres://user:pass@host:port/dbname``
@@ -60,7 +60,7 @@ def init_from_env(env_var: str = _DEFAULT_ENV) -> None:
     if getattr(db, "obj", None):
         return
 
-    url = os.getenv(env_var)
+    url = database_url or os.getenv(env_var)
     if not url:
         raise RuntimeError(f"{env_var} is not set")
 
