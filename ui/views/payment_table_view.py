@@ -23,6 +23,22 @@ from ui.forms.payment_form import PaymentForm
 from ui.views.payment_detail_view import PaymentDetailView
 
 
+class PaymentTableController(TableController):
+    def set_model_class_and_items(self, model_class, items, total_count=None):
+        total_sum = sum(p.amount for p in items)
+        overdue_sum = sum(
+            p.amount
+            for p in items
+            if not p.actual_payment_date
+            and p.payment_date
+            and p.payment_date < date.today()
+        )
+        super().set_model_class_and_items(model_class, items, total_count)
+        self.view.paginator.set_summary(
+            f"Сумма: {total_sum} ₽ (просрочено: {overdue_sum} ₽)"
+        )
+
+
 class PaymentTableView(BaseTableView):
     COLUMN_FIELD_MAP = {
         0: Policy.policy_number,
@@ -46,7 +62,7 @@ class PaymentTableView(BaseTableView):
             "Показывать удалённые": lambda state: self.load_data(),
         }
 
-        controller = TableController(
+        controller = PaymentTableController(
             self,
             model_class=Payment,
             get_page_func=lambda page, per_page, **f: get_payments_page(
