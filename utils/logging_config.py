@@ -3,7 +3,8 @@
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from appdirs import user_log_dir
+
+from config import Settings, get_settings
 
 
 class PeeweeFilter(logging.Filter):
@@ -15,13 +16,13 @@ class PeeweeFilter(logging.Filter):
         return not msg.lstrip().startswith("('SELECT")
 
 
-def setup_logging() -> None:
+def setup_logging(settings: Settings | None = None) -> None:
     """Настраивает вывод логов в консоль и файл ``crm.log``."""
-    logs_dir = os.getenv("LOG_DIR") or user_log_dir("crm_desktop")
-    logs_dir = os.path.expanduser(logs_dir)
+    settings = settings or get_settings()
+    logs_dir = os.path.expanduser(settings.log_dir)
     os.makedirs(logs_dir, exist_ok=True)
 
-    level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    level_name = settings.log_level
     level = getattr(logging, level_name, logging.INFO)
 
     fmt = logging.Formatter(

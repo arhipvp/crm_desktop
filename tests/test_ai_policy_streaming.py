@@ -1,5 +1,7 @@
 import openai
+from services.policies import ai_policy_service
 from services.policies.ai_policy_service import _chat
+from config import Settings
 
 
 class DummyFunc:
@@ -54,8 +56,10 @@ class DummyClient:
 
 
 def test_chat_streaming_no_attribute_error(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "key")
     monkeypatch.setattr(openai, "OpenAI", DummyClient)
+    monkeypatch.setattr(
+        ai_policy_service, "settings", Settings(openai_api_key="key")
+    )
 
     parts = []
 

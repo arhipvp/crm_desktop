@@ -1,10 +1,13 @@
 import json
 import logging
-import os
-from typing import List, Tuple, Callable
+from typing import Callable, List, Tuple
 
 import openai
 from PyPDF2 import PdfReader
+
+from config import get_settings
+
+settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +116,7 @@ payments
 
 def _get_prompt() -> str:
     """Return system prompt for policy recognition."""
-    return os.getenv("AI_POLICY_PROMPT", DEFAULT_PROMPT)
+    return settings.ai_policy_prompt or DEFAULT_PROMPT
 
 
 def _log_conversation(path: str, messages: List[dict]) -> str:
@@ -218,11 +221,11 @@ class AiPolicyError(ValueError):
 
 
 def _chat(messages: List[dict], progress_cb: Callable[[str, str], None] | None = None) -> str:
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = settings.openai_api_key
     if not api_key:
         raise ValueError("OPENAI_API_KEY is not set")
-    base_url = os.getenv("OPENAI_BASE_URL")
-    model = os.getenv("OPENAI_MODEL", "gpt-4o")
+    base_url = settings.openai_base_url
+    model = settings.openai_model
     client = openai.OpenAI(api_key=api_key, base_url=base_url)
 
     tools = [{"type": "function", "function": POLICY_FUNCTION}]
