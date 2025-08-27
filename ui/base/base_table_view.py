@@ -5,6 +5,7 @@ logger = logging.getLogger(__name__)
 from peewee import Field
 from PySide6.QtCore import QDate, Qt, Signal, QTimer, QSortFilterProxyModel
 from PySide6.QtConcurrent import QtConcurrent
+from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -125,6 +126,7 @@ class BaseTableView(QWidget):
         )
 
         self.left_layout.addWidget(self.filter_controls)
+        QShortcut("Ctrl+F", self, activated=self.filter_controls.focus_search)
 
         # Кнопки
         self.button_row = QHBoxLayout()
