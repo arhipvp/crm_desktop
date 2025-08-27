@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 
 from services.task_service import get_task_counts_by_deal_id
 from services.payment_service import get_payment_counts_by_deal_id
-from services.policy_service import get_policy_counts_by_deal_id
+from services.policies import get_policy_counts_by_deal_id
 from services.income_service import get_income_counts_by_deal_id
 from services.expense_service import get_expense_counts_by_deal_id
 from utils.screen_utils import get_scaled_size

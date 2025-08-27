@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
 )
 
-from services.client_service import get_clients_page
+from services.clients import get_clients_page
 from ui.widgets.client_card import ClientCard
 from ui.forms.client_form import ClientForm
 from ui.common.paginator import Paginator

@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
 )
 
-from services.client_service import get_all_clients, add_client
+from services.clients import get_all_clients, add_client
 from ui.forms.policy_form import PolicyForm
 
 

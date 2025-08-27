@@ -9,7 +9,7 @@ from peewee import JOIN, Field, fn
 from database.db import db
 from database.models import Client, Deal, Payment, Policy
 from services import executor_service as es
-from services.client_service import get_client_by_id
+from services.clients import get_client_by_id
 from services.deal_service import get_deal_by_id
 from services.folder_utils import create_policy_folder, open_folder
 from services.payment_service import (

@@ -22,7 +22,7 @@ from database.models import (
     DealExecutor,
     Executor,
 )
-from services.client_service import get_client_by_id
+from services.clients import get_client_by_id
 from services.folder_utils import (
     create_deal_folder,
     find_drive_folder,

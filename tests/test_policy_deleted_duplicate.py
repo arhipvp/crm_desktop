@@ -3,7 +3,7 @@ import pytest
 
 from database.db import db
 from database.models import Client, Policy, Payment, Income, Expense
-from services import policy_service as ps
+from services.policies import policy_service as ps
 
 
 def test_create_policy_ignores_deleted_duplicates(in_memory_db, monkeypatch):

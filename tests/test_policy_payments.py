@@ -3,7 +3,7 @@ import pytest
 
 from database.models import Client, Policy, Payment
 from services import payment_service as pay_svc
-from services import policy_service as policy_svc
+from services.policies import policy_service as policy_svc
 
 
 def test_sync_policy_payments_adds_and_removes(in_memory_db, monkeypatch):

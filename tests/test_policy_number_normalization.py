@@ -2,7 +2,7 @@ import datetime
 import pytest
 
 from database.models import Client, Policy, Payment, Income, Expense
-from services import policy_service as ps
+from services.policies import policy_service as ps
 
 
 def test_duplicate_detected_with_normalized_policy_number(in_memory_db, monkeypatch):

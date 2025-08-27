@@ -2,7 +2,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 from database.models import Client
-from services.client_service import (
+from services.clients import (
     add_client,
     update_client,
     find_similar_clients,

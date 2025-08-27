@@ -17,7 +17,7 @@ from services.folder_utils import open_folder
 from ui.common.styled_widgets import styled_button
 
 from database.models import Policy
-from services.policy_service import (
+from services.policies import (
     add_policy,
     get_unique_policy_field_values,
     update_policy,
