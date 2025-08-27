@@ -1,32 +1,26 @@
+import logging
 import os
 import sys
-import logging
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-# ───── Загрузка переменных окружения ─────
-dotenv_path = Path(__file__).resolve().parent / ".env"
-load_dotenv(dotenv_path=dotenv_path)
-
+from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QFontDatabase, QFont
 
+from config import get_settings
 from database.init import init_from_env
 from services import executor_service as es
 from ui.main_window import MainWindow
 from utils.logging_config import setup_logging
 
 # ───── Инициализация базы данных и логирования ─────
-init_from_env()
-setup_logging()
+settings = get_settings()
+init_from_env(settings.database_url)
+setup_logging(settings)
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     # ───── Проверка и подготовка окружения ─────
-    es.ensure_executors_from_env()
+    es.ensure_executors_from_env(settings)
 
-    DATABASE_URL = os.getenv("DATABASE_URL")
+    DATABASE_URL = settings.database_url
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL не задан в .env")
 

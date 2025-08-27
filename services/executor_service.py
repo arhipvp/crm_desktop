@@ -1,31 +1,20 @@
 import logging
-import os
-import re
 from datetime import date
-from typing import Optional, Iterable, List
+from typing import Iterable, List, Optional
 
-from peewee import ModelSelect, JOIN
-from database.models import Executor, DealExecutor, Deal
+from peewee import JOIN, ModelSelect
+
+from config import Settings, get_settings
 from database.db import db
+from database.models import Deal, DealExecutor, Executor
 
 logger = logging.getLogger(__name__)
 
 
-def _ids_from_env() -> list[int]:
-    ids: list[int] = []
-    for part in re.split(r"[ ,]+", os.getenv("APPROVED_EXECUTOR_IDS", "").strip()):
-        if not part:
-            continue
-        try:
-            ids.append(int(part))
-        except ValueError:
-            logger.warning("Invalid executor id: %s", part)
-    return ids
-
-
-def ensure_executors_from_env() -> None:
-    """Создать записи исполнителей из переменной окружения, если их нет."""
-    for eid in _ids_from_env():
+def ensure_executors_from_env(settings: Settings | None = None) -> None:
+    """Создать записи исполнителей из настроек, если их нет."""
+    settings = settings or get_settings()
+    for eid in settings.approved_executor_ids:
         Executor.get_or_create(tg_id=eid, defaults={"full_name": str(eid)})
 
 
