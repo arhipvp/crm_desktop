@@ -11,7 +11,7 @@ from ui.common.combo_helpers import create_client_combobox, populate_combo
 from ui.common.message_boxes import confirm
 from ui.common.styled_widgets import styled_button
 from ui.forms.client_form import ClientForm
-from services.client_service import get_all_clients
+from services.clients import get_all_clients
 
 
 class DealForm(BaseEditForm):

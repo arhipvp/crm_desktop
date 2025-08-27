@@ -1,5 +1,5 @@
 import openai
-from services.ai_policy_service import _chat
+from services.policies.ai_policy_service import _chat
 
 
 class DummyFunc:

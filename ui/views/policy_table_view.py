@@ -1,5 +1,5 @@
 from database.models import Policy, Client, Deal
-from services.policy_service import (
+from services.policies import (
     build_policy_query,
     get_policies_page,
     mark_policy_deleted,
@@ -192,7 +192,7 @@ class PolicyTableView(BaseTableView):
             return
         try:
             from services.deal_service import get_all_deals
-            from services.policy_service import update_policy
+            from services.policies import update_policy
             from ui.views.deal_detail import DealDetailView
             from ui.forms.deal_form import DealForm
             from utils.name_utils import extract_surname
@@ -269,7 +269,7 @@ class PolicyTableView(BaseTableView):
             return
         try:
             from services.deal_service import get_all_deals
-            from services.policy_service import update_policy
+            from services.policies import update_policy
 
             deals = list(get_all_deals())
             if not deals:
@@ -427,7 +427,7 @@ class PolicyTableModel(BaseTableModel):
                 from PySide6.QtWidgets import QMessageBox
                 import os
                 import json as _json
-                from services.ai_policy_service import process_policy_bundle_with_ai
+                from services.policies.ai_policy_service import process_policy_bundle_with_ai
                 from ui.forms.import_policy_json_form import ImportPolicyJsonForm
                 from ui.common.message_boxes import show_error
 

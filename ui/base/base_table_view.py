@@ -380,7 +380,7 @@ class BaseTableView(QWidget):
     def _get_service_for_model(self, model_class):
         # Импортируй нужный сервис по классу модели
         if model_class.__name__ == "Policy":
-            from services import policy_service
+            from services.policies import policy_service
 
             return policy_service
         if model_class.__name__ == "Payment":
@@ -408,7 +408,7 @@ class BaseTableView(QWidget):
 
             return calculation_service
         if model_class.__name__ == "Client":
-            from services import client_service
+            from services.clients import client_service
 
             return client_service
 

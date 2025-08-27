@@ -107,7 +107,7 @@ pending_calc: dict[int, int] = {}
 # ───────────── imports из core ─────────────
 from services import task_service as ts
 from services import executor_service as es
-from services import client_service as cs
+from services.clients import client_service as cs
 from services import calculation_service as calc_s
 from services.deal_service import get_deal_by_id
 

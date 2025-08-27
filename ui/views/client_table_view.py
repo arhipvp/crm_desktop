@@ -1,7 +1,7 @@
 # ui/views/client_table_view.py
 
 from database.models import Client
-from services.client_service import (
+from services.clients import (
     build_client_query,
     get_clients_page,
     mark_client_deleted,

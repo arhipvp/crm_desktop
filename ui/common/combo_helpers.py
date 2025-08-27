@@ -6,9 +6,9 @@ from peewee import Model
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QCompleter
 
-from services.client_service import get_all_clients
+from services.clients import get_all_clients
 from services.deal_service import get_all_deals, get_deals_by_client_id
-from services.policy_service import get_all_policies
+from services.policies import get_all_policies
 
 
 def populate_combo(
@@ -145,7 +145,7 @@ def create_fk_combobox(
 
 
 def create_policy_combobox_for_deal(deal_id) -> QComboBox:
-    from services.policy_service import get_policies_by_deal_id
+    from services.policies import get_policies_by_deal_id
 
     policies = list(get_policies_by_deal_id(deal_id))
     return create_entity_combobox(

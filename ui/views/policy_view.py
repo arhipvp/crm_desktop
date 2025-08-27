@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
 )
 
-from services.policy_service import get_policies_page
+from services.policies import get_policies_page
 from ui.widgets.policy_card import PolicyCard
 from ui.forms.policy_form import PolicyForm
 from ui.common.paginator import Paginator
