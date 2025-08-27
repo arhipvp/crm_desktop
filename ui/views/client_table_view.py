@@ -9,6 +9,7 @@ from services.client_service import (
 )
 from services.folder_utils import open_folder
 from ui.base.base_table_view import BaseTableView
+from ui.base.table_controller import TableController
 from PySide6.QtWidgets import QAbstractItemView
 from ui.common.message_boxes import confirm, show_error
 from ui.common.styled_widgets import styled_button
@@ -18,10 +19,13 @@ from ui.views.client_detail_view import ClientDetailView
 
 class ClientTableView(BaseTableView):
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.model_class = Client  # или Client, Policy и т.д.
-        self.form_class = ClientForm  # соответствующая форма
-        self.form_class = ClientForm
+        controller = TableController(
+            self,
+            model_class=Client,
+            get_page_func=get_clients_page,
+            get_total_func=lambda **f: build_client_query(**f).count(),
+        )
+        super().__init__(parent, form_class=ClientForm, controller=controller)
         # разрешаем выбор нескольких строк для массовых действий
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.row_double_clicked.connect(self.open_detail)
@@ -29,27 +33,7 @@ class ClientTableView(BaseTableView):
         folder_btn.clicked.connect(self.open_selected_folder)
         # Добавляем перед растягивающим элементом
         self.button_row.insertWidget(self.button_row.count() - 1, folder_btn)
-        self.load_data()  # загрузка данных при инициализации
-
-    def get_filters(self) -> dict:
-        """
-        Собирает фильтры:
-         - текстовый поиск
-         - флаг 'Показывать удалённые'
-        """
-        filters = super().get_filters()
-        return filters
-
-    def load_data(self):
-        # 1) читаем фильтры
-        filters = self.get_filters()
-        
-        # 2) загружаем страницу и считаем общее количество
-        items = get_clients_page(self.page, self.per_page, **filters)
-        total = build_client_query(**filters).count()
-
-        # 3) обновляем таблицу и пагинатор
-        self.set_model_class_and_items(Client, list(items), total_count=total)
+        self.load_data()
 
     def get_selected(self):
         index = self.table.currentIndex()
