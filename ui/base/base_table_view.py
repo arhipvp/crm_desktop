@@ -165,6 +165,12 @@ class BaseTableView(QWidget):
         self.refresh_btn.clicked.connect(self.refresh)
         self.button_row.addWidget(self.refresh_btn)
 
+        self.select_all_btn = styled_button(
+            "Выделить все", shortcut="Ctrl+A"
+        )
+        self.select_all_btn.clicked.connect(self._select_all_rows)
+        self.button_row.addWidget(self.select_all_btn)
+
         self.button_row.addStretch()
         self.left_layout.addLayout(self.button_row)
 
@@ -405,6 +411,10 @@ class BaseTableView(QWidget):
             self.restore_callback()
         elif self.can_restore:
             self.restore_selected_default()
+
+    def _select_all_rows(self):
+        """Выделяет все строки в таблице."""
+        self.table.selectAll()
 
     def edit_selected_default(self):
         index = self.table.currentIndex()
