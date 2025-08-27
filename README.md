@@ -2,6 +2,8 @@
 
 Простое учебное CRM‑приложение на Python с использованием Peewee и PySide6. Позволяет вести базу клиентов, сделок, полисов и задач. Для работы с задачами есть отдельный Telegram‑бот. Файлы клиентов и сделок могут храниться в Google Drive.
 
+Подробное руководство по установке зависимостей и отправке изменений см. в [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Структура каталогов
 
 - `database/` – модели и инициализация БД.
@@ -59,10 +61,10 @@ sudo apt-get install -y libegl1 libgl1
 3. Установите зависимости:
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
-Файл `requirements.txt` уже содержит пакеты Google API (`google-api-python-client`, `google-auth`, `google-auth-oauthlib`) и Qt-библиотеку `PySide6`.
+Все зависимости и настройки инструментов описаны в `pyproject.toml`.
 
 4. Скопируйте `.env.example` в `.env` и укажите свои значения.
 
@@ -118,11 +120,13 @@ docker-compose up -d
 
 ## Тесты
 
-Запуск тестов выполняется командой:
+Запуск тестов выполняется командой с таймаутом:
 
 ```bash
-pytest
+PYTEST_TIMEOUT=120 pytest -vv
 ```
+
+Дополнительные рекомендации по тестированию смотрите в [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Работа с Google Drive
 
@@ -130,7 +134,7 @@ pytest
 Укажите путь к JSON‑файлу в переменной `GOOGLE_CREDENTIALS` и локальный
 каталог синхронизации в `GOOGLE_DRIVE_LOCAL_ROOT`. Для корректной работы
 необходимы библиотеки `google-api-python-client`, `google-auth` и
-`google-auth-oauthlib` (уже перечислены в `requirements.txt`).
+`google-auth-oauthlib` (уже перечислены в `pyproject.toml`).
 
 При создании клиентов и сделок папки создаются сразу в облаке, а локальный
 путь просто сохраняется и появится после синхронизации Google Drive. Если при
