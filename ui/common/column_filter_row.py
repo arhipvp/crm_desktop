@@ -75,6 +75,8 @@ class ColumnFilterRow(QWidget):
                 le.setText(texts[idx])
                 le.blockSignals(False)
         self.layout().addStretch()
+        # ensure the filter row reserves space so it doesn't overlap table rows
+        self.setFixedHeight(self.sizeHint().height())
 
     def sync_scroll(self, offset: int) -> None:
         """Сдвигает строку фильтров при прокрутке связанной таблицы."""
