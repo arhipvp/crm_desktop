@@ -1,18 +1,13 @@
-from .clients import *  # noqa: F401,F403
-from .policies import *  # noqa: F401,F403
-from .ai_consultant_service import *  # noqa: F401,F403
-from .calculation_service import *  # noqa: F401,F403
-from .dashboard_service import *  # noqa: F401,F403
-from .deal_service import *  # noqa: F401,F403
-from .executor_service import *  # noqa: F401,F403
-from .expense_service import *  # noqa: F401,F403
-from .export_service import *  # noqa: F401,F403
-from .folder_utils import *  # noqa: F401,F403
-from .income_service import *  # noqa: F401,F403
-from .payment_service import *  # noqa: F401,F403
-from .query_utils import *  # noqa: F401,F403
-from .reso_table_service import *  # noqa: F401,F403
-from .sheets_service import *  # noqa: F401,F403
-from .task_service import *  # noqa: F401,F403
-from .telegram_service import *  # noqa: F401,F403
-from .validators import *  # noqa: F401,F403
+"""Пакет прикладных сервисов.
+
+Умышленно не выполняем массовые импорты подмодулей на уровне пакета,
+чтобы избежать тяжёлых транзитивных зависимостей (OpenAI, PySide6, pandas)
+при простом ``import services`` или ``from services import X``.
+
+Импортируйте нужные подмодули напрямую, например:
+    from services import task_service as ts
+    from services import executor_service as es
+    from services.deal_service import get_deal_by_id
+"""
+
+__all__: list[str] = []

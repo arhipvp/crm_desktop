@@ -19,6 +19,7 @@ COPY database/ ./database/
 COPY services/ ./services/
 COPY telegram_bot/ ./telegram_bot/
 COPY utils/ ./utils/
+COPY config.py ./
 
 ENV PYTHONPATH=/app
 

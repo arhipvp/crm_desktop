@@ -1,6 +1,6 @@
 from peewee import Field
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QTableView
-from PySide6.QtCore import Signal, QTimer
+from PySide6.QtCore import Signal, QTimer, Qt
 
 class ColumnFilterRow(QWidget):
     """Строка фильтров по столбцам таблицы."""
@@ -14,6 +14,11 @@ class ColumnFilterRow(QWidget):
         self.setLayout(QHBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(3)
+
+        # Important: let clicks pass through empty areas of the filter row
+        # so they don't block selecting rows in the table behind.
+        # Editors themselves still receive events normally.
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
 
         if linked_view is not None:
             scroll = linked_view.horizontalScrollBar()

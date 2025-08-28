@@ -3,7 +3,6 @@ import logging
 from typing import Iterable
 from peewee import ModelSelect
 import os
-import pandas as pd
 
 from database.models import Deal, DealCalculation
 
@@ -175,6 +174,9 @@ def export_calculations_excel(deal_id: int) -> str:
         }
         for c in calcs
     ]
+    # Импортируем pandas только здесь, чтобы не требовать эту зависимость
+    # при импорте модуля (например, в телеграм-боте).
+    import pandas as pd  # type: ignore
     df = pd.DataFrame(data)
     file_name = f"calculations_{deal_id}.xlsx"
     path = os.path.join(folder, file_name)

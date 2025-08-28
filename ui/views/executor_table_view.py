@@ -21,6 +21,16 @@ class ExecutorTableView(BaseTableView):
             can_restore=False,
             checkbox_map=checkbox_map,
         )
+        # Скрыть нерелевантный чекбокс "Показывать удалённые" для исполнителей
+        try:
+            show_inactive_label = "�?�?������<�?���'�? �?�����'��?�?�<�:"
+            cbx = getattr(self.filter_controls, "_cbx", None)
+            if cbx:
+                for label, box in cbx.checkboxes.items():
+                    if label != show_inactive_label:
+                        box.setVisible(False)
+        except Exception:
+            pass
         self.row_double_clicked.connect(self.edit_selected)
         self.load_data()
 

@@ -14,6 +14,12 @@ QTableView {
     selection-color: black;
 }
 
+/* Make row selection clearly visible in all styles */
+QTableView::item:selected {
+    background-color: #d0eaff;
+    color: black;
+}
+
 /* 📌 Подсветка строки под курсором */
 QTableView::item:hover {
     background-color: #edf6ff;

@@ -105,6 +105,7 @@ class TaskTableView(BaseTableView):
         self.remind_btn.clicked.connect(self._notify_selected_tasks)
 
         # разрешаем множественный выбор и массовое удаление
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.delete_callback = self.delete_selected
 

@@ -1,8 +1,9 @@
 python-telegram-bot==22.0
 python-dotenv>=1.0
+appdirs>=1.4
 peewee>=3.17
 psycopg2-binary>=2.9
 google-api-python-client
 google-auth
 google-auth-oauthlib
-PySide6
+# PySide6, OpenAI, pandas, numpy и пр. не требуются для телеграм-бота
