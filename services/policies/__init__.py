@@ -1,8 +1,11 @@
-"""Policies package convenient exports.
+"""Удобные экспорты для сервисов полисов.
 
-This package re-exports frequently used functions from
-``services.policies.policy_service`` so existing imports like
-``from services.policies import add_policy`` keep working.
+Пакет переэкспортирует часто используемые функции из
+``services.policies.policy_service``. Это позволяет писать привычные
+конструкции вроде ``from services.policies import add_policy`` и получать
+доступ ко всем нужным утилитам, включая :func:`build_policy_query`,
+которой пользуется слой интерфейса. Без такого экспорта при запуске
+приложения возникала ``ImportError``.
 """
 
 from .policy_service import (
