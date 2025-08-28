@@ -57,6 +57,20 @@ def pytest_runtest_logfinish(nodeid, location):
 
 
 @pytest.fixture()
+def qapp():
+    """Ensure a QApplication exists for UI-related tests.
+
+    Creates a minimal offscreen QApplication if none exists and returns it.
+    """
+    try:
+        from PySide6.QtWidgets import QApplication
+    except Exception:  # pragma: no cover - optional
+        yield None
+        return
+    app = QApplication.instance() or QApplication([])
+    yield app
+
+@pytest.fixture()
 def in_memory_db(monkeypatch):
     # If db is not initialized yet, bind it to a fresh in-memory DB.
     # If it is already initialized (e.g., by an early init_from_env reading the

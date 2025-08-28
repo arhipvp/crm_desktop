@@ -9,7 +9,6 @@ description = "CRM desktop application"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "alembic==1.15.2",
     "anyio==4.9.0",
     "appdirs==1.4.4",
     "cachetools==5.5.2",
@@ -31,7 +30,6 @@ dependencies = [
     "idna==3.10",
     "iniconfig==2.1.0",
     "jsonschema==4.23.0",
-    "Mako==1.3.10",
     "MarkupSafe==3.0.2",
     "numpy==2.2.4",
     "oauthlib==3.2.2",
@@ -46,13 +44,11 @@ dependencies = [
     "pyasn1==0.6.1",
     "pyasn1_modules==0.4.2",
     "pyparsing==3.2.3",
-    "PyQt5==5.15.11",
-    "PyQt5-Qt5==5.15.2",
-    "PyQt5_sip==12.17.0",
     "PySide6==6.9.0",
     "PySide6_Addons==6.9.0",
     "PySide6_Essentials==6.9.0",
     "pytest==8.3.5",
+    "pytest-timeout==2.3.1",
     "pytest-qt==4.4.0",
     "python-dateutil==2.9.0.post0",
     "python-dotenv==1.1.0",
@@ -64,7 +60,6 @@ dependencies = [
     "shiboken6==6.9.0",
     "six==1.17.0",
     "sniffio==1.3.1",
-    "SQLAlchemy==2.0.40",
     "tqdm==4.67.1",
     "typing_extensions==4.13.1",
     "tzdata==2025.2",
@@ -95,3 +90,5 @@ markers = [
     "slow: тесты, требующие GUI или долговременных операций",
 ]
 addopts = "-m 'not slow'"
+timeout = 60
+timeout_method = "thread"

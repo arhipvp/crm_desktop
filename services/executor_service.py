@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def ensure_executors_from_env(settings: Settings | None = None) -> None:
-    """Создать записи исполнителей из настроек, если их нет."""
+    """Create Executor rows for APPROVED_EXECUTOR_IDS from settings."""
     settings = settings or get_settings()
     for eid in settings.approved_executor_ids:
         Executor.get_or_create(tg_id=eid, defaults={"full_name": str(eid)})
@@ -23,7 +23,7 @@ def get_executor(tg_id: int) -> Optional[Executor]:
 
 
 def ensure_executor(tg_id: int, full_name: str | None = None) -> Executor:
-    ex, created = Executor.get_or_create(
+    ex, _ = Executor.get_or_create(
         tg_id=tg_id,
         defaults={"full_name": full_name or str(tg_id), "is_active": False},
     )
@@ -47,7 +47,7 @@ def approve_executor(tg_id: int) -> None:
 
 
 def assign_executor(deal_id: int, tg_id: int, note: str | None = None) -> None:
-    """Привязать исполнителя к сделке."""
+    """Assign executor to a deal, replacing previous assignment."""
     executor = ensure_executor(tg_id)
     old_executor = get_executor_for_deal(deal_id)
     with db.atomic():
@@ -61,12 +61,12 @@ def assign_executor(deal_id: int, tg_id: int, note: str | None = None) -> None:
 
         deal = Deal.get_or_none(Deal.id == deal_id)
         desc = f" — {deal.description}" if deal and deal.description else ""
-        text = f"❎ Сделка #{deal_id}{desc} больше не закреплена за вами"
+        text = f"По сделке #{deal_id}{desc} исполнитель был сменен"
         notify_executor(old_executor.tg_id, text)
 
 
 def unassign_executor(deal_id: int) -> None:
-    """Отвязать исполнителя от сделки."""
+    """Remove executor assignment from a deal."""
     ex = get_executor_for_deal(deal_id)
     cnt = DealExecutor.delete().where(DealExecutor.deal_id == deal_id).execute()
     if cnt:
@@ -76,7 +76,7 @@ def unassign_executor(deal_id: int) -> None:
 
             deal = Deal.get_or_none(Deal.id == deal_id)
             desc = f" — {deal.description}" if deal and deal.description else ""
-            text = f"❎ Сделка #{deal_id}{desc} больше не закреплена за вами"
+            text = f"По сделке #{deal_id}{desc} исполнитель был отвязан"
             notify_executor(ex.tg_id, text)
 
 
@@ -94,7 +94,7 @@ def get_deals_for_executor(tg_id: int, *, only_with_tasks: bool = False) -> List
     )
 
     if only_with_tasks:
-        from database.models import Task  # локальный импорт во избежание циклов
+        from database.models import Task
         task_subq = Task.active().where(Task.dispatch_state == "queued").select(Task.deal)
         query = query.where(Deal.id.in_(task_subq))
 
@@ -110,7 +110,7 @@ def build_executor_query(
     search_text: str = "",
     show_inactive: bool = True,
 ) -> ModelSelect:
-    """Создать базовый запрос исполнителей с учётом фильтров."""
+    """Return filtered executors query."""
     query = Executor.select()
     if not show_inactive:
         query = query.where(Executor.is_active == True)
@@ -149,3 +149,4 @@ def update_executor(executor: Executor, **kwargs) -> Executor:
         setattr(executor, k, v)
     executor.save()
     return executor
+

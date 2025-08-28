@@ -10,7 +10,7 @@ from database.db import db
 from database.models import Client, Expense, Income, Payment, Policy
 
 # Выражение для активных платежей (не удалённых)
-ACTIVE = Payment.active()._where
+ACTIVE = (Payment.is_deleted == False)
 
 logger = logging.getLogger(__name__)
 
