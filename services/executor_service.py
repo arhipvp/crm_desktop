@@ -109,6 +109,7 @@ def get_available_executors() -> Iterable[Executor]:
 def build_executor_query(
     search_text: str = "",
     show_inactive: bool = True,
+    column_filters: dict | None = None,
 ) -> ModelSelect:
     """Return filtered executors query."""
     query = Executor.select()
@@ -119,6 +120,17 @@ def build_executor_query(
             (Executor.full_name.contains(search_text))
             | (Executor.tg_id.cast("TEXT").contains(search_text))
         )
+    # Apply per-column filters if provided
+    if column_filters:
+        conds = []
+        for field, text in column_filters.items():
+            try:
+                conds.append(field.cast("TEXT").contains(text))
+            except Exception:
+                # Fallback: ignore unknown fields
+                continue
+        for c in conds:
+            query = query.where(c)
     return query
 
 
@@ -127,8 +139,10 @@ def get_executors_page(
     per_page: int,
     search_text: str = "",
     show_inactive: bool = True,
+    column_filters: dict | None = None,
+    **_: dict,
 ) -> ModelSelect:
-    query = build_executor_query(search_text, show_inactive)
+    query = build_executor_query(search_text, show_inactive, column_filters)
     offset = (page - 1) * per_page
     return query.order_by(Executor.full_name.asc()).limit(per_page).offset(offset)
 
@@ -142,11 +156,11 @@ def add_executor(**kwargs) -> Executor:
 
 def update_executor(executor: Executor, **kwargs) -> Executor:
     allowed = {"full_name", "tg_id", "is_active"}
-    updates = {k: v for k, v in kwargs.items() if k in allowed}
+    # Ignore None values to avoid overwriting NOT NULL fields with NULL
+    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
     if not updates:
         return executor
     for k, v in updates.items():
         setattr(executor, k, v)
     executor.save()
     return executor
-

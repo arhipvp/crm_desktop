@@ -17,10 +17,45 @@ class ExecutorTableView(BaseTableView):
             parent=parent,
             model_class=Executor,
             form_class=ExecutorForm,
+            delete_callback=self.delete_selected,
+            can_restore=False,
             checkbox_map=checkbox_map,
         )
         self.row_double_clicked.connect(self.edit_selected)
         self.load_data()
+
+    # Ensure search/filters/pagination use local loader (not TableController)
+    def refresh(self):
+        self.load_data()
+
+    def on_filter_changed(self, *args, **kwargs):
+        self.page = 1
+        self.load_data()
+
+    def next_page(self):
+        self.page += 1
+        self.load_data()
+
+    def prev_page(self):
+        if self.page > 1:
+            self.page -= 1
+            self.load_data()
+
+    def _on_per_page_changed(self, per_page: int):
+        self.per_page = per_page
+        self.page = 1
+        try:
+            self.save_table_settings()
+        except Exception:
+            pass
+        self.load_data()
+
+    def _on_column_filter_changed(self, column: int, text: str):
+        self.on_filter_changed()
+        try:
+            self.save_table_settings()
+        except Exception:
+            pass
 
     def get_filters(self) -> dict:
         filters = super().get_filters()
@@ -29,6 +64,7 @@ class ExecutorTableView(BaseTableView):
                 "show_inactive": self.filter_controls.is_checked("Показывать неактивных"),
             }
         )
+        filters.pop("show_deleted", None)
         return filters
 
     def load_data(self):

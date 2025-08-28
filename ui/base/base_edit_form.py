@@ -230,6 +230,16 @@ class BaseEditForm(QDialog):
                 elif isinstance(field, peewee.FloatField):
                     if value is not None:
                         value = float(normalize_number(value))
+                elif isinstance(field, peewee.DecimalField):
+                    if value is not None:
+                        from decimal import Decimal, InvalidOperation
+
+                        num = normalize_number(value)
+                        try:
+                            value = Decimal(num) if num is not None else None
+                        except (InvalidOperation, TypeError):
+                            # Fallback: try float -> Decimal to be permissive
+                            value = Decimal(str(float(num))) if num is not None else None
                 elif isinstance(field, peewee.DateField):
                     value = (
                         QDate.fromString(txt, "dd.MM.yyyy").toPython() if txt else None

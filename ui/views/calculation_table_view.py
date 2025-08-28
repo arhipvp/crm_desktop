@@ -83,6 +83,7 @@ class CalculationTableView(BaseTableView):
             self.total_count = total_count
             self.paginator.update(self.total_count, self.page, self.per_page)
 
+    # Ensure refresh/filter/pagination use our local loader (not TableController)
     def get_selected(self):
         idx = self.table.currentIndex()
         if not idx.isValid():
@@ -100,7 +101,36 @@ class CalculationTableView(BaseTableView):
             sync_calculations_from_sheet()
         except Exception:
             logger.debug("Sheets sync failed", exc_info=True)
-        super().refresh()
+        self.load_data()
+
+    def on_filter_changed(self, *args, **kwargs):
+        self.page = 1
+        self.load_data()
+
+    def next_page(self):
+        self.page += 1
+        self.load_data()
+
+    def prev_page(self):
+        if self.page > 1:
+            self.page -= 1
+            self.load_data()
+
+    def _on_per_page_changed(self, per_page: int):
+        self.per_page = per_page
+        self.page = 1
+        try:
+            self.save_table_settings()
+        except Exception:
+            pass
+        self.load_data()
+
+    def _on_column_filter_changed(self, column: int, text: str):
+        self.on_filter_changed()
+        try:
+            self.save_table_settings()
+        except Exception:
+            pass
 
     def add_new(self):
         form = CalculationForm(parent=self, deal_id=self.deal_id)

@@ -10,7 +10,9 @@ RUN apt-get update \
 # Install Python dependencies from the main project and bot specific files
 COPY requirements.txt ./
 COPY telegram_bot/requirements.txt ./telegram_requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt -r telegram_requirements.txt
+# requirements.txt contains only "-e ." for local editable installs.
+# In the container we import via PYTHONPATH, so install only telegram dependencies.
+RUN pip install --no-cache-dir -r telegram_requirements.txt
 
 # Copy application source
 COPY database/ ./database/
