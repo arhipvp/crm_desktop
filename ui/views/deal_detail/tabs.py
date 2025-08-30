@@ -1,4 +1,6 @@
-from PySide6.QtCore import Qt
+from datetime import date, timedelta
+
+from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import (
     QLabel,
@@ -78,7 +80,20 @@ class DealTabsMixin:
         form.addRow("Описание:", self.desc_edit)
 
         self.reminder_date = TypableDateEdit(self.instance.reminder_date)
-        form.addRow("Напоминание:", self.reminder_date)
+        reminder_row = QWidget()
+        reminder_layout = QHBoxLayout(reminder_row)
+        reminder_layout.setContentsMargins(0, 0, 0, 0)
+        reminder_layout.addWidget(self.reminder_date)
+        for text, days in [
+            ("Завтра", 1),
+            ("+2 дня", 2),
+            ("+3 дня", 3),
+            ("+5 дней", 5),
+        ]:
+            btn = styled_button(text)
+            btn.clicked.connect(lambda _, d=days: self._postpone_reminder(d))
+            reminder_layout.addWidget(btn)
+        form.addRow("Напоминание:", reminder_row)
 
         info_panel.setContentLayout(form)
         container_layout.addWidget(info_panel)
@@ -254,6 +269,14 @@ class DealTabsMixin:
         )
 
         self.tabs.setCurrentIndex(min(current, self.tabs.count() - 1))
+
+    def _postpone_reminder(self, days: int) -> None:
+        """Shift reminder date by given days and save/close."""
+        current = self.reminder_date.date()
+        base = current.toPython() if current.isValid() else date.today()
+        new_date = base + timedelta(days=days)
+        self.reminder_date.setDate(QDate(new_date.year, new_date.month, new_date.day))
+        self._on_save_and_close()
 
     def _adjust_task_columns(self, *_):
         """Настройка колонок таблицы задач во вкладке сделки."""
