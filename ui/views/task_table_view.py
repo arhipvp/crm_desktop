@@ -33,6 +33,7 @@ class TaskTableModel(BaseTableModel):
         Task.deal,
         Task.policy,
         Task.dispatch_state,
+        Task.queued_at,
     ]
 
     def __init__(self, objects, model_class, parent=None):
@@ -50,6 +51,7 @@ class TaskTableView(BaseTableView):
         *,
         deal_id: int | None = None,
         autoload: bool = True,
+        resizable_columns: bool = False,
     ) -> None:
         super().__init__(
             parent=parent,
@@ -60,6 +62,7 @@ class TaskTableView(BaseTableView):
         self.sort_field = "due_date"
         self.sort_order = "asc"
         self.deal_id = deal_id
+        self.resizable_columns = resizable_columns
         self.table.setItemDelegate(StatusDelegate(self.table))
         self.table.verticalHeader().setVisible(False)  # убираем нумерацию строк
         self.table.horizontalHeader().sortIndicatorChanged.connect(
@@ -319,6 +322,7 @@ class TaskTableView(BaseTableView):
             idx_title = self.model.fields.index(Task.title)
             idx_deal = self.model.fields.index(Task.deal)
             idx_policy = self.model.fields.index(Task.policy)
+            idx_queued = self.model.fields.index(Task.queued_at)
             for row, task in enumerate(self.model.objects):
                 title_txt = task.title or "—"
                 deal_txt = (
@@ -331,6 +335,11 @@ class TaskTableView(BaseTableView):
                     if task.policy_id and task.policy
                     else "—"
                 )
+                queued_txt = (
+                    task.queued_at.strftime("%d.%m.%Y %H:%M")
+                    if task.queued_at
+                    else "—"
+                )
 
                 self.model.setData(
                     self.model.index(row, idx_title), title_txt, role=Qt.DisplayRole
@@ -341,6 +350,9 @@ class TaskTableView(BaseTableView):
                 self.model.setData(
                     self.model.index(row, idx_policy), policy_txt, role=Qt.DisplayRole
                 )
+                self.model.setData(
+                    self.model.index(row, idx_queued), queued_txt, role=Qt.DisplayRole
+                )
         # восстановление индикатора сортировки без вызова сигнала
         col = self.get_column_index(self.sort_field)
         order = Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder
@@ -348,9 +360,12 @@ class TaskTableView(BaseTableView):
         header.setSortIndicator(col, order)
         header.blockSignals(False)
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        for col in range(1, header.count()):
-            header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+        if self.resizable_columns:
+            header.setSectionResizeMode(QHeaderView.Interactive)
+        else:
+            header.setSectionResizeMode(0, QHeaderView.Stretch)
+            for col in range(1, header.count()):
+                header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
         self.table.resizeColumnsToContents()
 
         self._update_actions_state()

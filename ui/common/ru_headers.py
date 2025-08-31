@@ -29,4 +29,5 @@ RU_HEADERS = {
     "premium": "Страховая премия",
     "deductible": "Франшиза",
     "start_date": "Начало",
+    "queued_at": "Отправлено",
 }

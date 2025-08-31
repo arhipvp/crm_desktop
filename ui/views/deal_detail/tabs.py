@@ -253,7 +253,10 @@ class DealTabsMixin:
         vbox.addWidget(btn_add_task, alignment=Qt.AlignLeft)
 
         task_view = TaskTableView(
-            parent=self, deal_id=self.instance.id, autoload=False
+            parent=self,
+            deal_id=self.instance.id,
+            autoload=False,
+            resizable_columns=True,
         )
         task_view.data_loaded.connect(self._adjust_task_columns)
         vbox.addWidget(task_view)
@@ -312,5 +315,11 @@ class DealTabsMixin:
         try:
             idx_note = tv.model.fields.index(Task.note)
             tv.table.setColumnWidth(idx_note, 250)
+        except ValueError:
+            pass
+
+        try:
+            idx_sent = tv.model.fields.index(Task.queued_at)
+            tv.table.setColumnWidth(idx_sent, 150)
         except ValueError:
             pass
