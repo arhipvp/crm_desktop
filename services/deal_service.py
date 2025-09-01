@@ -343,6 +343,7 @@ def apply_deal_filters(
             (Deal.description.contains(search_text))
             | (Deal.status.contains(search_text))
             | (Client.name.contains(search_text))
+            | (Client.phone.contains(search_text))
             | (Deal.calculations.contains(search_text))
         )
     from services.query_utils import apply_column_filters, apply_field_filters
