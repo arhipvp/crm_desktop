@@ -7,7 +7,15 @@ logger = logging.getLogger(__name__)
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QMessageBox, QAbstractItemView, QHeaderView
 
-from database.models import Task
+from playhouse.shortcuts import prefetch
+from database.models import (
+    Client,
+    Deal,
+    DealExecutor,
+    Executor,
+    Policy,
+    Task,
+)
 from ui.base.base_table_model import BaseTableModel
 from services.task_service import (
     build_task_query,
@@ -40,10 +48,50 @@ class TaskTableModel(BaseTableModel):
         super().__init__(objects, model_class, parent)
         self.fields = self.VISIBLE_FIELDS
         self.headers = [f.name for f in self.fields]
+        self.virtual_fields = ["executor"]
+        self.headers.append("Исполнитель")
+
+    def columnCount(self, parent=None):
+        return len(self.fields) + len(self.virtual_fields)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+        col = index.column()
+        if col >= len(self.fields):
+            task = self.objects[index.row()]
+            deal = getattr(task, "deal", None)
+            ex = (
+                deal.executors[0].executor
+                if deal and getattr(deal, "executors", None)
+                else None
+            )
+            name = ex.full_name if ex else "—"
+            if role in (Qt.DisplayRole, Qt.UserRole):
+                return name
+            return None
+        return super().data(index, role)
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role != Qt.DisplayRole or orientation != Qt.Horizontal:
+            return None
+        if section < len(self.fields):
+            return super().headerData(section, orientation, role)
+        return self.headers[-1]
 
 
 class TaskTableView(BaseTableView):
     """Таблица задач + фильтры и действия отправки."""
+
+    COLUMN_FIELD_MAP = {
+        0: Task.title,
+        1: Task.due_date,
+        2: Deal.description,
+        3: Policy.policy_number,
+        4: Task.dispatch_state,
+        5: Task.queued_at,
+        6: Executor.full_name,
+    }
 
     def __init__(
         self,
@@ -85,6 +133,14 @@ class TaskTableView(BaseTableView):
             settings_name=self.settings_id,
         )
         self.left_layout.insertWidget(0, self.filter_controls)
+
+        try:
+            self.column_filters.filter_changed.disconnect()
+        except Exception:
+            pass
+        self.column_filters.filter_changed.connect(
+            self._on_column_filter_changed_db
+        )
 
         # ────────────────── Кнопка «Отправить» ──────────────────
         self.send_btn = styled_button(
@@ -203,6 +259,11 @@ class TaskTableView(BaseTableView):
             }
         )
         filters.pop("show_deleted", None)
+        cf = filters.get("column_filters")
+        if cf:
+            filters["column_filters"] = {
+                getattr(k, "name", k): v for k, v in cf.items()
+            }
         return filters
 
     def refresh(self):
@@ -214,6 +275,35 @@ class TaskTableView(BaseTableView):
             logger.debug("Sheets sync failed", exc_info=True)
 
         self.load_data()
+
+    def on_filter_changed(self, *args, **kwargs):
+        self.page = 1
+        self.load_data()
+
+    def next_page(self):
+        self.page += 1
+        self.load_data()
+
+    def prev_page(self):
+        if self.page > 1:
+            self.page -= 1
+            self.load_data()
+
+    def _on_per_page_changed(self, per_page: int):
+        self.per_page = per_page
+        self.page = 1
+        try:
+            self.save_table_settings()
+        except Exception:
+            pass
+        self.load_data()
+
+    def _on_column_filter_changed_db(self, column: int, text: str):
+        self.on_filter_changed()
+        try:
+            self.save_table_settings()
+        except Exception:
+            pass
 
     def load_data(self) -> None:
         logger.debug("📥 Используется метод загрузки: get_tasks_page")
@@ -260,7 +350,7 @@ class TaskTableView(BaseTableView):
             for i in range(len(self.column_filters._editors))
         ]
 
-        items = list(items)
+        items = list(prefetch(items, Deal, Client, Policy, DealExecutor, Executor))
         self.model = TaskTableModel(items, Task)
         self.proxy_model.setSourceModel(self.model)
         self.table.setModel(self.proxy_model)
@@ -295,7 +385,11 @@ class TaskTableView(BaseTableView):
 
         # сортировка без повторной загрузки данных
         header = self.table.horizontalHeader()
-        self.current_sort_column = self.get_column_index(self.sort_field)
+        self.current_sort_column = (
+            len(self.model.fields)
+            if self.sort_field == "executor"
+            else self.get_column_index(self.sort_field)
+        )
         self.current_sort_order = (
             Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder
         )
@@ -354,7 +448,11 @@ class TaskTableView(BaseTableView):
                     self.model.index(row, idx_queued), queued_txt, role=Qt.DisplayRole
                 )
         # восстановление индикатора сортировки без вызова сигнала
-        col = self.get_column_index(self.sort_field)
+        col = (
+            len(self.model.fields)
+            if self.sort_field == "executor"
+            else self.get_column_index(self.sort_field)
+        )
         order = Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder
         header.blockSignals(True)
         header.setSortIndicator(col, order)
@@ -398,9 +496,12 @@ class TaskTableView(BaseTableView):
                 self.refresh()
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
-        if not self.model or column >= len(self.model.fields):
+        if not self.model:
             return
-        self.sort_field = self.model.fields[column].name
+        if column >= len(self.model.fields):
+            self.sort_field = "executor"
+        else:
+            self.sort_field = self.model.fields[column].name
         self.sort_order = "desc" if order == Qt.DescendingOrder else "asc"
         self.load_data()
 
