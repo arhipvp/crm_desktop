@@ -274,10 +274,8 @@ class DealTabsMixin:
         self.tabs.setCurrentIndex(min(current, self.tabs.count() - 1))
 
     def _postpone_reminder(self, days: int) -> None:
-        """Shift reminder date by given days and save/close."""
-        current = self.reminder_date.date()
-        base = current.toPython() if current.isValid() else date.today()
-        new_date = base + timedelta(days=days)
+        """Set reminder to today + ``days`` and save/close."""
+        new_date = date.today() + timedelta(days=days)
         self.reminder_date.setDate(QDate(new_date.year, new_date.month, new_date.day))
         self._on_save_and_close()
 
