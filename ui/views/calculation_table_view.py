@@ -9,6 +9,7 @@ from database.models import DealCalculation
 from services.calculation_service import (
     get_calculations,
     mark_calculation_deleted,
+    mark_calculations_deleted,
     generate_offer_text,
 )
 from services.folder_utils import copy_text_to_clipboard
@@ -145,10 +146,20 @@ class CalculationTableView(BaseTableView):
                 self.refresh()
 
     def delete_selected(self):
-        calc = self.get_selected()
-        if calc and confirm("Удалить запись?"):
+        calcs = self.get_selected_multiple()
+        if not calcs:
+            return
+        if len(calcs) == 1:
+            message = "Удалить запись?"
+        else:
+            message = f"Удалить {len(calcs)} записей?"
+        if confirm(message):
             try:
-                mark_calculation_deleted(calc.id)
+                if len(calcs) == 1:
+                    mark_calculation_deleted(calcs[0].id)
+                else:
+                    ids = [c.id for c in calcs]
+                    mark_calculations_deleted(ids)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))

@@ -5,6 +5,7 @@ from peewee import ModelSelect
 import os
 
 from database.models import Deal, DealCalculation
+from database.db import db
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,18 @@ def mark_calculation_deleted(entry_id: int) -> None:
         entry.soft_delete()
     else:
         logger.warning("Calculation entry %s not found", entry_id)
+
+
+def mark_calculations_deleted(entry_ids: list[int]) -> int:
+    """Массово помечает расчёты удалёнными."""
+    if not entry_ids:
+        return 0
+    with db.atomic():
+        return (
+            DealCalculation.update(is_deleted=True)
+            .where(DealCalculation.id.in_(entry_ids))
+            .execute()
+        )
 
 
 # совместимый алиас на случай устаревших вызовов
