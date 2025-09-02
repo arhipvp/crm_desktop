@@ -396,9 +396,9 @@ class BaseTableView(QWidget):
 
             return deal_service
         if model_class.__name__ == "Task":
-            from services import task_service
+            from services import task_crud
 
-            return task_service
+            return task_crud
         if model_class.__name__ == "Expense":
             from services import expense_service
 

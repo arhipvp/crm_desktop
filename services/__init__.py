@@ -5,9 +5,9 @@
 при простом ``import services`` или ``from services import X``.
 
 Импортируйте нужные подмодули напрямую, например:
-    from services import task_service as ts
-    from services import executor_service as es
-    from services.deal_service import get_deal_by_id
+    from services import task_crud as tc
+    from services import task_queue as tq
+    from services.task_notifications import notify_task
 """
 
 __all__: list[str] = []

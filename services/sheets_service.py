@@ -16,7 +16,7 @@ except Exception:  # noqa: BLE001
     build = lambda *a, **k: None  # type: ignore[assignment]
 
 from database.models import Task
-from services.task_service import add_task, update_task
+from services.task_crud import add_task, update_task
 from services.validators import normalize_company_name
 
 logger = logging.getLogger(__name__)

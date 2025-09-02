@@ -105,7 +105,10 @@ pending_users: dict[int, tuple[int, str]] = {}
 pending_calc: dict[int, int] = {}
 
 # ───────────── imports из core ─────────────
-from services import task_service as ts
+from database.models import Task
+import services.task_crud as tc
+import services.task_queue as tq
+import services.task_notifications as tn
 from services import executor_service as es
 from services.clients import client_service as cs
 from services import calculation_service as calc_s
@@ -115,7 +118,7 @@ es.ensure_executors_from_env()
 
 
 # ───────────── helpers ─────────────
-def fmt_task(t: ts.Task) -> str:
+def fmt_task(t: Task) -> str:
     due = t.due_date.strftime("%d.%m.%Y") if t.due_date else "—"
     lines = [f"📌 <b>Задача #{t.id}</b> (до <b>{due}</b>)", t.title.strip()]
 
@@ -159,7 +162,7 @@ def fmt_task(t: ts.Task) -> str:
     return "\n".join(lines)
 
 
-def fmt_task_short(t: ts.Task) -> str:
+def fmt_task_short(t: Task) -> str:
     """Краткое описание задачи: заголовок и сделка."""
     d = getattr(t, "deal", None)
     if d:
@@ -202,7 +205,7 @@ async def notify_admin(
     """Отправить администратору информацию о задаче."""
     if not ADMIN_CHAT_ID:
         return
-    task = ts.Task.get_or_none(ts.Task.id == tid)
+    task = Task.get_or_none(Task.id == tid)
     if not task:
         return
     text = fmt_task(task)
@@ -286,7 +289,7 @@ async def h_show_deals(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 
     buttons = []
     for d in deals:
-        tasks_count = len(ts.get_incomplete_tasks_by_deal(d.id))
+        tasks_count = len(tc.get_incomplete_tasks_by_deal(d.id))
         text = (
             f"#{d.id} "
             f"{(d.client.name.split()[0] + ' ') if d.client and d.client.name else ''}"
@@ -313,7 +316,7 @@ async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     _p, cid = q.data.split(":")
     cid = int(cid)
 
-    deals = ts.get_deals_with_queued_tasks(cid)
+    deals = tq.get_deals_with_queued_tasks(cid)
     if not deals:
         await q.answer()
         await q.message.reply_text("Нет задач по сделкам")
@@ -349,7 +352,7 @@ async def h_choose_deal(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     _p, did = q.data.split(":")
     did = int(did)
 
-    tasks = ts.get_incomplete_tasks_by_deal(did)
+    tasks = tc.get_incomplete_tasks_by_deal(did)
     if not tasks:
         await q.answer()
         await q.message.reply_text("Нет задач")
@@ -374,16 +377,16 @@ async def h_choose_task(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     _p, tid = q.data.split(":")
     tid = int(tid)
 
-    task = ts.pop_task_by_id(q.message.chat_id, tid)
+    task = tq.pop_task_by_id(q.message.chat_id, tid)
     if not task:
-        task = ts.get_incomplete_task(tid)
+        task = tc.get_incomplete_task(tid)
         if not task:
             return await q.answer("Задача не найдена", show_alert=True)
 
     msg = await q.message.reply_html(
         fmt_task(task), reply_markup=kb_task(task.id)
     )
-    ts.link_telegram(task.id, msg.chat_id, msg.message_id)
+    tn.link_telegram(task.id, msg.chat_id, msg.message_id)
 
 
 async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
@@ -394,7 +397,7 @@ async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     tid = int(tid)
 
     if action == "done":
-        ts.mark_done(tid)
+        tn.mark_done(tid)
         await q.message.edit_text(
             "✅ Задача выполнена", parse_mode=constants.ParseMode.HTML
         )
@@ -417,9 +420,9 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     tid = int(tid)
 
     if action == "accept":
-        task = ts.Task.get_or_none(ts.Task.id == tid)
+        task = Task.get_or_none(Task.id == tid)
         if task and not task.is_done:
-            ts.mark_done(tid)
+            tn.mark_done(tid)
         await q.message.edit_text(
             "✅ Задача подтверждена", parse_mode=constants.ParseMode.HTML
         )
@@ -435,7 +438,7 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         )
         logger.info("Requesting info for task %s", tid)
     elif action == "rework":
-        ts.queue_task(tid)
+        tq.queue_task(tid)
         await q.message.edit_text(
             "↩ Задача возвращена на доработку",
             parse_mode=constants.ParseMode.HTML,
@@ -470,9 +473,9 @@ async def h_task_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     tid = int(tid)
 
     if action == "task_done":
-        task = ts.Task.get_or_none(ts.Task.id == tid)
+        task = Task.get_or_none(Task.id == tid)
         if task and not task.is_done:
-            ts.mark_done(tid)
+            tn.mark_done(tid)
         await q.message.edit_text(
             "✅ Задача выполнена", parse_mode=constants.ParseMode.HTML
         )
@@ -497,7 +500,7 @@ async def h_text(update: Update, _ctx):
     if user_id in pending_calc:
         tid = pending_calc.pop(user_id)
         lines = [l.strip() for l in update.message.text.splitlines() if l.strip()]
-        task = ts.Task.get_or_none(ts.Task.id == tid)
+        task = Task.get_or_none(Task.id == tid)
         if not task or not task.deal_id:
             await update.message.reply_text("⚠️ Сделка не найдена")
             return
@@ -541,7 +544,7 @@ async def h_text(update: Update, _ctx):
         else str(update.effective_user.id)
     )
 
-    ts.append_note(tid, f"[TG {stamp}] {user_name}: {update.message.text}")
+    tn.append_note(tid, f"[TG {stamp}] {user_name}: {update.message.text}")
     await update.message.reply_text("Комментарий сохранён 👍")
     logger.info("Note added to %s", tid)
     if update.message.chat_id != ADMIN_CHAT_ID:
@@ -558,7 +561,7 @@ async def h_file(update: Update, _ctx):
         return
 
     deal_id = int(m.group(1))
-    deal = ts.get_deal_by_id(deal_id)
+    deal = get_deal_by_id(deal_id)
     if not deal or not deal.drive_folder_path:
         return await msg.reply_text("⚠️ Папка сделки не найдена.")
 
@@ -593,7 +596,7 @@ async def h_show_tasks(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not es.is_approved(user_id):
         return await update.message.reply_text("⏳ Ожидайте одобрения администратора")
-    tasks = ts.get_incomplete_tasks_for_executor(user_id)
+    tasks = tc.get_incomplete_tasks_for_executor(user_id)
     if not tasks:
         await update.message.reply_text("Нет незавершенных задач")
         return
@@ -601,7 +604,7 @@ async def h_show_tasks(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         msg = await update.message.reply_html(
             fmt_task(t), reply_markup=kb_task(t.id)
         )
-        ts.link_telegram(t.id, msg.chat_id, msg.message_id)
+        tn.link_telegram(t.id, msg.chat_id, msg.message_id)
 
 async def h_show_tasks_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -609,7 +612,7 @@ async def h_show_tasks_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     user_id = q.from_user.id
     if not es.is_approved(user_id):
         return await q.message.reply_text("⏳ Ожидайте одобрения администратора")
-    tasks = ts.get_incomplete_tasks_for_executor(user_id)
+    tasks = tc.get_incomplete_tasks_for_executor(user_id)
     if not tasks:
         await q.message.reply_text("Нет незавершенных задач")
         return
@@ -620,14 +623,14 @@ async def h_show_tasks_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 
 async def send_pending_tasks(_ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Отправить исполнителям задачи из очереди."""
-    tasks = ts.get_all_queued_tasks()
+    tasks = tq.get_all_queued_tasks()
     for t in tasks:
         if not t.deal_id:
             continue
         ex = es.get_executor_for_deal(t.deal_id)
         if not ex or not es.is_approved(ex.tg_id):
             continue
-        popped = ts.pop_task_by_id(ex.tg_id, t.id)
+        popped = tq.pop_task_by_id(ex.tg_id, t.id)
         if not popped:
             continue
         msg = await _ctx.bot.send_message(
@@ -636,7 +639,7 @@ async def send_pending_tasks(_ctx: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup=kb_task(popped.id),
             parse_mode=constants.ParseMode.HTML,
         )
-        ts.link_telegram(popped.id, msg.chat_id, msg.message_id)
+        tn.link_telegram(popped.id, msg.chat_id, msg.message_id)
 
 
 # ───────────── main ─────────────

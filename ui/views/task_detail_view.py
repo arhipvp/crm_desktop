@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QMessageBox
 from ui.base.base_detail_view import BaseDetailView
 from ui.forms.task_form import TaskForm
 from ui.common.message_boxes import confirm
-from services.task_service import mark_task_deleted
+from services.task_crud import mark_task_deleted
 from database.models import Task
 
 
