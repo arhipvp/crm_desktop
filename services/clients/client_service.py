@@ -10,6 +10,7 @@ from database.models import Client, Deal, db
 from services.folder_utils import create_client_drive_folder, rename_client_folder
 from services.validators import normalize_phone, normalize_full_name
 from services.query_utils import apply_search_and_filters
+from .dto import ClientDTO
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,16 @@ def get_clients_page(
 
     offset = (page - 1) * per_page
     return query.order_by(Client.name.asc()).limit(per_page).offset(offset)
+
+
+def get_clients_page_dto(
+    page: int,
+    per_page: int,
+    **filters,
+) -> list[ClientDTO]:
+    """Получить страницу клиентов в виде DTO."""
+    clients = get_clients_page(page, per_page, **filters)
+    return [ClientDTO.from_model(c) for c in clients]
 
 
 def find_similar_clients(name: str) -> list[Client]:
@@ -251,6 +262,18 @@ def mark_clients_deleted(client_ids: list[int]) -> int:
             count += 1
 
     return count
+
+
+def delete_clients(clients: list[ClientDTO]) -> None:
+    """Удаляет клиентов, переданных в виде DTO."""
+    ids = [c.id for c in clients]
+    if not ids:
+        return
+    with db.atomic():
+        if len(ids) == 1:
+            mark_client_deleted(ids[0])
+        else:
+            mark_clients_deleted(ids)
 
 
 def restore_client(client_id: int):

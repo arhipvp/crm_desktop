@@ -1,16 +1,12 @@
 # ui/views/client_table_view.py
 
-from database.models import Client
-from services.clients import (
-    build_client_query,
-    get_clients_page,
-    mark_client_deleted,
-    mark_clients_deleted,
-)
+from PySide6.QtWidgets import QAbstractItemView
+
+from services.clients.client_table_controller import ClientTableController
+from services.clients.client_service import get_client_by_id
+from services.clients.dto import ClientDTO
 from services.folder_utils import open_folder
 from ui.base.base_table_view import BaseTableView
-from ui.base.table_controller import TableController
-from PySide6.QtWidgets import QAbstractItemView
 from ui.common.message_boxes import confirm, show_error
 from ui.common.styled_widgets import styled_button
 from ui.forms.client_form import ClientForm
@@ -19,12 +15,7 @@ from ui.views.client_detail_view import ClientDetailView
 
 class ClientTableView(BaseTableView):
     def __init__(self, parent=None):
-        controller = TableController(
-            self,
-            model_class=Client,
-            get_page_func=get_clients_page,
-            get_total_func=lambda **f: build_client_query(**f).count(),
-        )
+        controller = ClientTableController(self)
         super().__init__(parent, form_class=ClientForm, controller=controller)
         # разрешаем выбор нескольких строк для массовых действий
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -56,20 +47,20 @@ class ClientTableView(BaseTableView):
             message = f"Удалить {len(clients)} клиент(ов)?"
         if confirm(message):
             try:
-                if len(clients) == 1:
-                    mark_client_deleted(clients[0].id)
-                else:
-                    ids = [c.id for c in clients]
-                    mark_clients_deleted(ids)
+                self.controller.delete_clients(clients)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
 
-    def open_detail(self, client: Client):
+    def open_detail(self, client: ClientDTO):
+        full_client = get_client_by_id(client.id)
+        if not full_client:
+            show_error("Клиент не найден")
+            return
         if self.use_inline_details:
-            self.set_detail_widget(ClientDetailView(client, parent=self))
+            self.set_detail_widget(ClientDetailView(full_client, parent=self))
         else:
-            dlg = ClientDetailView(client, parent=self)
+            dlg = ClientDetailView(full_client, parent=self)
             dlg.exec()
 
     def open_selected_folder(self):
