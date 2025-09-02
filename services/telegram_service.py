@@ -1,7 +1,9 @@
 import os
 import logging
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, constants
-from services import task_service as ts
+
+from database.models import Task
+from services.task_notifications import link_telegram
 
 from config import get_settings
 
@@ -12,7 +14,7 @@ _bot = Bot(BOT_TOKEN) if BOT_TOKEN else None
 ADMIN_CHAT_ID = settings.admin_chat_id or 0
 
 
-def format_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:
+def format_exec_task(t: Task) -> tuple[str, InlineKeyboardMarkup]:
     """Сформировать текст и клавиатуру для задачи исполнителю."""
     lines = [f"<b>{t.title.upper()}</b>"]
     d = getattr(t, "deal", None)
@@ -48,7 +50,7 @@ def format_exec_task(t: ts.Task) -> tuple[str, InlineKeyboardMarkup]:
     return text, kb
 
 
-def send_exec_task(t: ts.Task, tg_id: int) -> None:
+def send_exec_task(t: Task, tg_id: int) -> None:
     """Отправить задачу исполнителю и связать её с сообщением."""
     if not _bot:
         import logging
@@ -61,7 +63,7 @@ def send_exec_task(t: ts.Task, tg_id: int) -> None:
         reply_markup=kb,
         parse_mode=constants.ParseMode.HTML,
     )
-    ts.link_telegram(t.id, msg.chat_id, msg.message_id)
+    link_telegram(t.id, msg.chat_id, msg.message_id)
 
 
 def notify_admin(text: str) -> None:

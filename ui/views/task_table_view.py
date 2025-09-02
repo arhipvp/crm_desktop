@@ -17,14 +17,14 @@ from database.models import (
     Task,
 )
 from ui.base.base_table_model import BaseTableModel
-from services.task_service import (
+from services.task_crud import (
     build_task_query,
     get_tasks_page,
-    queue_task,
-    notify_task,
     update_task,
     mark_task_deleted,
 )
+from services.task_queue import queue_task
+from services.task_notifications import notify_task
 from ui.common.message_boxes import confirm, show_error
 from ui.base.base_table_view import BaseTableView
 from ui.common.delegates import StatusDelegate

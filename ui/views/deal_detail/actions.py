@@ -22,7 +22,8 @@ from services.folder_utils import (
 )
 from services.payment_service import get_payments_by_deal_id
 from services.policies import get_policies_by_deal_id
-from services.task_service import get_incomplete_tasks_by_deal, mark_done
+from services.task_crud import get_incomplete_tasks_by_deal
+from services.task_notifications import mark_done
 from ui import settings as ui_settings
 from ui.common.message_boxes import confirm, show_error, show_info
 from ui.common.styled_widgets import styled_button
@@ -218,7 +219,7 @@ class DealActionsMixin:
             if not task:
                 return
             from services import executor_service as es
-            from services.task_service import queue_task
+            from services.task_queue import queue_task
             ex = es.get_executor_for_deal(self.instance.id)
             if not ex:
                 from ui.common.message_boxes import show_error

@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import QCheckBox, QLabel
 
 from database.models import Task
-from services.task_service import add_task, update_task
+from services.task_crud import add_task, update_task
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import (
     create_deal_combobox,

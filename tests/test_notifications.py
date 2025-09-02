@@ -14,7 +14,7 @@ from services.policies import policy_service as ps
 from services import executor_service as es
 import services.telegram_service as ts
 import services.income_service as ins
-import services.task_service as tsvc
+import services.task_notifications as tsvc
 
 pytestmark = pytest.mark.slow
 
