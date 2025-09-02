@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Callable, Iterable
 
 from peewee import Field
 from PySide6.QtCore import Qt, QTimer
@@ -18,10 +19,10 @@ class TableController:
         self,
         view,
         *,
-        model_class=None,
-        get_page_func=None,
-        get_total_func=None,
-        filter_func=None,
+        model_class: Any | None = None,
+        get_page_func: Callable[..., Iterable[Any]] | None = None,
+        get_total_func: Callable[..., int] | None = None,
+        filter_func: Callable[[dict], dict] | None = None,
     ):
         self.view = view
         self.model_class = model_class
@@ -30,7 +31,9 @@ class TableController:
         self.filter_func = filter_func
 
     # --- Работа с моделью -------------------------------------------------
-    def set_model_class_and_items(self, model_class, items, total_count=None):
+    def set_model_class_and_items(
+        self, model_class, items: list[Any], total_count: int | None = None
+    ):
         """Устанавливает модель и обновляет связанные элементы UI."""
         prev_texts = [
             self.view.column_filters.get_text(i)
