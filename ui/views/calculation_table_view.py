@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QAbstractItemView
 
 from database.models import DealCalculation
 from services.calculation_service import (
-    get_calculations,
+    build_calculation_query,
     mark_calculation_deleted,
     mark_calculations_deleted,
     generate_offer_text,
@@ -44,6 +44,16 @@ class CalculationTableModel(BaseTableModel):
 
 
 class CalculationTableView(BaseTableView):
+    COLUMN_FIELD_MAP = {
+        0: DealCalculation.insurance_company,
+        1: DealCalculation.insurance_type,
+        2: DealCalculation.insured_amount,
+        3: DealCalculation.premium,
+        4: DealCalculation.deductible,
+        5: DealCalculation.note,
+        6: DealCalculation.created_at,
+    }
+
     def __init__(self, parent=None, deal_id=None):
         self.deal_id = deal_id
         super().__init__(parent=parent, model_class=DealCalculation, form_class=CalculationForm)
@@ -61,28 +71,57 @@ class CalculationTableView(BaseTableView):
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
+
+        header = self.table.horizontalHeader()
+        header.sortIndicatorChanged.connect(self.on_sort_changed)
+
         self.load_data()
 
     def load_data(self):
-        show_deleted = self.filter_controls.is_checked("Показывать удалённые")
+        filters = self.get_filters()
+        show_deleted = filters.get("show_deleted", False)
+        search_text = filters.get("search_text", "")
+        column_filters = filters.get("column_filters", {})
+        order_field = self.COLUMN_FIELD_MAP.get(
+            self.current_sort_column, DealCalculation.created_at
+        )
+        order_dir = "desc" if self.current_sort_order == Qt.DescendingOrder else "asc"
         items = (
-            list(get_calculations(self.deal_id, show_deleted=show_deleted))
+            list(
+                build_calculation_query(
+                    self.deal_id,
+                    search_text=search_text,
+                    column_filters=column_filters,
+                    order_by=order_field,
+                    order_dir=order_dir,
+                    show_deleted=show_deleted,
+                )
+            )
             if self.deal_id
             else []
         )
         self.set_model_class_and_items(DealCalculation, items, total_count=len(items))
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
+        prev_texts = self.column_filters.get_all_texts()
         self.model = CalculationTableModel(items, model_class)
         self.proxy_model.setSourceModel(self.model)
         self.table.setModel(self.proxy_model)
         try:
+            self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
             self.table.resizeColumnsToContents()
         except NotImplementedError:
             pass
         if total_count is not None:
             self.total_count = total_count
             self.paginator.update(self.total_count, self.page, self.per_page)
+        headers = [
+            self.model.headerData(i, Qt.Horizontal)
+            for i in range(self.model.columnCount())
+        ]
+        self.column_filters.set_headers(
+            headers, prev_texts, column_field_map=self.COLUMN_FIELD_MAP
+        )
 
     # Ensure refresh/filter/pagination use our local loader (not TableController)
     def get_selected(self):
@@ -132,6 +171,12 @@ class CalculationTableView(BaseTableView):
             self.save_table_settings()
         except Exception:
             pass
+
+    def on_sort_changed(self, column: int, order: Qt.SortOrder):
+        field = self.COLUMN_FIELD_MAP.get(column)
+        if field is None:
+            return
+        self.load_data()
 
     def add_new(self):
         form = CalculationForm(parent=self, deal_id=self.deal_id)

@@ -1,11 +1,12 @@
 from datetime import datetime
 import logging
 from typing import Iterable
-from peewee import ModelSelect
+from peewee import Field, ModelSelect
 import os
 
 from database.models import Deal, DealCalculation
 from database.db import db
+from services.query_utils import apply_column_filters, apply_field_filters
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +37,47 @@ def add_calculation(deal_id: int, **kwargs) -> DealCalculation:
     return entry
 
 
-def get_calculations(deal_id: int, show_deleted: bool = False) -> ModelSelect:
+def build_calculation_query(
+    deal_id: int,
+    *,
+    search_text: str = "",
+    column_filters: dict | None = None,
+    order_by: str | Field | None = DealCalculation.created_at,
+    order_dir: str = "desc",
+    show_deleted: bool = False,
+) -> ModelSelect:
+    """Сформировать запрос расчётов с фильтрами и сортировкой."""
     base = DealCalculation.active() if not show_deleted else DealCalculation.select()
     query = base.where(DealCalculation.deal_id == deal_id)
-    return query.order_by(DealCalculation.created_at.desc())
+    if search_text:
+        query = query.where(
+            (DealCalculation.insurance_company.contains(search_text))
+            | (DealCalculation.insurance_type.contains(search_text))
+            | (DealCalculation.note.contains(search_text))
+        )
+
+    field_filters: dict[Field, str] = {}
+    name_filters: dict[str, str] = {}
+    if column_filters:
+        for key, val in column_filters.items():
+            if isinstance(key, Field):
+                field_filters[key] = val
+            else:
+                name_filters[str(key)] = val
+    query = apply_field_filters(query, field_filters)
+    query = apply_column_filters(query, name_filters, DealCalculation)
+
+    if isinstance(order_by, str):
+        order_field = getattr(DealCalculation, order_by, DealCalculation.created_at)
+    else:
+        order_field = order_by or DealCalculation.created_at
+    order_expr = order_field.desc() if order_dir == "desc" else order_field.asc()
+    return query.order_by(order_expr)
+
+
+def get_calculations(deal_id: int, show_deleted: bool = False) -> ModelSelect:
+    """Совместимая обёртка для получения расчётов без фильтров."""
+    return build_calculation_query(deal_id, show_deleted=show_deleted)
 
 
 def mark_calculation_deleted(entry_id: int) -> None:
