@@ -11,7 +11,19 @@ from ui.common.message_boxes import confirm, show_error
 
 
 class ExecutorTableView(BaseTableView):
+    COLUMN_FIELD_MAP = {
+        0: Executor.full_name,
+        1: Executor.tg_id,
+        2: Executor.is_active,
+    }
+
     def __init__(self, parent=None):
+        self.order_by = Executor.full_name
+        self.order_dir = "asc"
+        self.default_sort_column = 0
+        self.current_sort_column = self.default_sort_column
+        self.current_sort_order = Qt.AscendingOrder
+
         checkbox_map = {"Показывать неактивных": self.refresh}
         super().__init__(
             parent=parent,
@@ -32,6 +44,9 @@ class ExecutorTableView(BaseTableView):
         except Exception:
             pass
         self.row_double_clicked.connect(self.edit_selected)
+        self.table.horizontalHeader().sortIndicatorChanged.connect(
+            self.on_sort_changed
+        )
         self.load_data()
 
     # Ensure search/filters/pagination use local loader (not TableController)
@@ -79,9 +94,24 @@ class ExecutorTableView(BaseTableView):
 
     def load_data(self):
         filters = self.get_filters()
-        items = get_executors_page(self.page, self.per_page, **filters)
+        items = get_executors_page(
+            self.page,
+            self.per_page,
+            order_by=self.order_by,
+            order_dir=self.order_dir,
+            **filters,
+        )
         total = build_executor_query(**filters).count()
         self.set_model_class_and_items(Executor, list(items), total_count=total)
+
+    def on_sort_changed(self, column: int, order: Qt.SortOrder):
+        field = self.COLUMN_FIELD_MAP.get(column)
+        if field is None:
+            return
+        self.order_dir = "desc" if order == Qt.DescendingOrder else "asc"
+        self.order_by = field
+        self.page = 1
+        self.load_data()
 
     def get_selected(self):
         idx = self.table.currentIndex()

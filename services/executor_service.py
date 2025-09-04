@@ -1,8 +1,8 @@
 import logging
 from datetime import date
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Any
 
-from peewee import JOIN, ModelSelect
+from peewee import JOIN, ModelSelect, Field
 
 from config import Settings, get_settings
 from database.db import db
@@ -140,11 +140,18 @@ def get_executors_page(
     search_text: str = "",
     show_inactive: bool = True,
     column_filters: dict | None = None,
+    order_by: str | Field | Any = Executor.full_name,
+    order_dir: str = "asc",
     **_: dict,
 ) -> ModelSelect:
     query = build_executor_query(search_text, show_inactive, column_filters)
+    if isinstance(order_by, str):
+        field = getattr(Executor, order_by, Executor.full_name)
+    else:
+        field = order_by
+    order_func = field.desc if order_dir == "desc" else field.asc
     offset = (page - 1) * per_page
-    return query.order_by(Executor.full_name.asc()).limit(per_page).offset(offset)
+    return query.order_by(order_func()).limit(per_page).offset(offset)
 
 
 def add_executor(**kwargs) -> Executor:
