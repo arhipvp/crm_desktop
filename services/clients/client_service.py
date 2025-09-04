@@ -4,6 +4,7 @@ import logging
 import re
 import urllib.parse
 import webbrowser
+from typing import Any
 from peewee import ModelSelect, fn
 
 from database.models import Client, Deal, db
@@ -56,22 +57,39 @@ def get_clients_page(
     search_text: str = "",
     show_deleted: bool = False,
     column_filters: dict[str, str] | None = None,
+    order_by: str | Any = "name",
+    order_dir: str = "asc",
 ) -> ModelSelect:
     """Получить страницу клиентов с учётом фильтров."""
-    query = Client.active() if not show_deleted else Client.select()
-    query = apply_search_and_filters(query, Client, search_text, column_filters)
-
+    query = build_client_query(
+        search_text=search_text,
+        show_deleted=show_deleted,
+        column_filters=column_filters,
+    )
+    if isinstance(order_by, str):
+        field = getattr(Client, order_by, Client.name)
+    else:
+        field = order_by
+    order_func = field.desc if order_dir == "desc" else field.asc
     offset = (page - 1) * per_page
-    return query.order_by(Client.name.asc()).limit(per_page).offset(offset)
+    return query.order_by(order_func()).limit(per_page).offset(offset)
 
 
 def get_clients_page_dto(
     page: int,
     per_page: int,
+    order_by: str | Any = "name",
+    order_dir: str = "asc",
     **filters,
 ) -> list[ClientDTO]:
     """Получить страницу клиентов в виде DTO."""
-    clients = get_clients_page(page, per_page, **filters)
+    clients = get_clients_page(
+        page,
+        per_page,
+        order_by=order_by,
+        order_dir=order_dir,
+        **filters,
+    )
     return [ClientDTO.from_model(c) for c in clients]
 
 

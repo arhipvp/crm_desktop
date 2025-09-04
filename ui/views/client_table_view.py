@@ -1,6 +1,7 @@
 # ui/views/client_table_view.py
 
 from PySide6.QtWidgets import QAbstractItemView
+from PySide6.QtCore import Qt
 
 from services.clients.client_table_controller import ClientTableController
 from services.clients.client_service import get_client_by_id
@@ -20,6 +21,9 @@ class ClientTableView(BaseTableView):
         # разрешаем выбор нескольких строк для массовых действий
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.row_double_clicked.connect(self.open_detail)
+        self.table.horizontalHeader().sortIndicatorChanged.connect(
+            self.on_sort_changed
+        )
         folder_btn = styled_button("📂 Папка", tooltip="Открыть папку клиента")
         folder_btn.clicked.connect(self.open_selected_folder)
         # Добавляем перед растягивающим элементом
@@ -69,3 +73,9 @@ class ClientTableView(BaseTableView):
             return
         path = client.drive_folder_path or client.drive_folder_link
         open_folder(path, parent=self)
+
+    def on_sort_changed(self, column: int, order: Qt.SortOrder):
+        """Обновляет параметры сортировки и перезагружает таблицу."""
+        self.current_sort_column = column
+        self.current_sort_order = order
+        self.load_data()
