@@ -2,12 +2,19 @@
 
 import logging
 
-from peewee import JOIN
+from peewee import JOIN, fn
 from playhouse.shortcuts import prefetch
 
 from utils.time_utils import now_str
 from database.db import db
-from database.models import Client, Deal, Policy, Task
+from database.models import (
+    Client,
+    Deal,
+    Policy,
+    Task,
+    DealExecutor,
+    Executor,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -151,15 +158,15 @@ def mark_task_deleted(task: Task | int):
 
 
 def build_task_query(
-    include_done=True,
-    include_deleted=False,
-    search_text=None,
-    only_queued=False,
+    include_done: bool = True,
+    include_deleted: bool = False,
+    search_text: str | None = None,
+    only_queued: bool = False,
     due_before=None,
-    deal_id=None,
-    policy_id=None,
-    sort_field="due_date",
-    sort_order="asc",
+    deal_id: int | None = None,
+    policy_id: int | None = None,
+    sort_field: str = "due_date",
+    sort_order: str = "asc",
     column_filters: dict[str, str] | None = None,
 ):
     query = Task.active() if not include_deleted else Task.select()
@@ -188,9 +195,38 @@ def build_task_query(
     if policy_id:
         query = query.where(Task.policy == policy_id)
 
-    from services.query_utils import apply_column_filters
+    from services.query_utils import apply_column_filters, apply_field_filters
 
-    query = apply_column_filters(query, column_filters, Task)
+    field_filters: dict = {}
+    name_filters: dict[str, str] = {}
+    if column_filters:
+        for key, val in column_filters.items():
+            if key == "full_name":
+                field_filters[Executor.full_name] = val
+            else:
+                name_filters[key] = val
+
+    query = apply_column_filters(query, name_filters, Task)
+
+    join_executor = bool(field_filters) or sort_field == "executor"
+    if join_executor:
+        policy_alias = Policy.alias()
+        deal_alias = Deal.alias()
+        query = (
+            query.switch(Task)
+            .join(policy_alias, JOIN.LEFT_OUTER)
+            .switch(Task)
+            .join(
+                deal_alias,
+                JOIN.LEFT_OUTER,
+                on=(deal_alias.id == fn.COALESCE(Task.deal, policy_alias.deal)),
+            )
+            .join(DealExecutor, JOIN.LEFT_OUTER, on=(DealExecutor.deal == deal_alias.id))
+            .join(Executor, JOIN.LEFT_OUTER, on=(DealExecutor.executor == Executor.id))
+        )
+        if field_filters:
+            query = apply_field_filters(query, field_filters)
+
     return query
 
 
@@ -205,13 +241,22 @@ def get_tasks_page(
     """Получить страницу задач."""
     logger.debug("🔽 Применяем сортировку: field=%s, order=%s", sort_field, sort_order)
     offset = (page - 1) * per_page
-    query = build_task_query(column_filters=column_filters, **filters)
-    if sort_field and hasattr(Task, sort_field):
+    query = build_task_query(
+        column_filters=column_filters, sort_field=sort_field, **filters
+    )
+    if sort_field == "executor":
+        order = (
+            Executor.full_name.asc()
+            if sort_order == "asc"
+            else Executor.full_name.desc()
+        )
+        query = query.distinct().order_by(order, Task.id.asc())
+    elif sort_field and hasattr(Task, sort_field):
         field = getattr(Task, sort_field)
         order = field.asc() if sort_order == "asc" else field.desc()
-        query = query.order_by(order)
+        query = query.order_by(order, Task.id.asc())
     else:
-        query = query.order_by(Task.due_date.desc())
+        query = query.order_by(Task.due_date.desc(), Task.id.desc())
     return query.offset(offset).limit(per_page)
 
 
