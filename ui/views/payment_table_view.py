@@ -18,6 +18,7 @@ from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.base.table_controller import TableController
 from ui.common.message_boxes import confirm, show_error
+from ui.common.ru_headers import RU_HEADERS
 from ui.common.styled_widgets import styled_button
 from ui.forms.payment_form import PaymentForm
 from ui.views.payment_detail_view import PaymentDetailView
@@ -268,7 +269,7 @@ class PaymentTableModel(BaseTableModel):
         if role != Qt.DisplayRole or orientation != Qt.Horizontal:
             return None
 
-        if section < len(self.headers):
-            return self.headers[section]
-        else:
-            return self.virtual_fields[section - len(self.fields)].capitalize()
+        if section < len(self.fields):
+            field = self.fields[section]
+            return RU_HEADERS.get(field.name, field.name)
+        return self.headers[section]
