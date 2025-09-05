@@ -231,6 +231,8 @@ class DealTableView(BaseTableView):
         if not self.model or column >= len(self.model.fields):
             return
 
+        self.current_sort_column = column
+        self.current_sort_order = order
         self.sort_field = self.model.fields[column].name
         self.sort_order = "desc" if order == Qt.DescendingOrder else "asc"
         self.refresh()
