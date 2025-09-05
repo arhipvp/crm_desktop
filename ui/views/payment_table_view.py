@@ -114,6 +114,9 @@ class PaymentTableView(BaseTableView):
         return filters
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
+        self.current_sort_column = column
+        self.current_sort_order = order
+
         field = self.COLUMN_FIELD_MAP.get(column)
         if field is None:
             return
