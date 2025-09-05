@@ -100,10 +100,13 @@ class PaymentView(QWidget):
         )
 
     def render_payments(self):
-        for i in reversed(range(self.content_layout.count())):
-            widget = self.content_layout.itemAt(i).widget()
+        while self.content_layout.count():
+            item = self.content_layout.takeAt(0)
+            widget = item.widget()
             if widget:
                 widget.deleteLater()
+            else:
+                del item
 
         for payment in self.payments:
             card = PaymentCard(payment, parent=self)
