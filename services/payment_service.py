@@ -105,6 +105,37 @@ def mark_payment_deleted(payment_id: int):
     )
 
 
+def restore_payment(payment_id: int):
+    """Снять пометку удаления с платежа и связанных записей."""
+    payment = Payment.get_or_none(Payment.id == payment_id)
+    if not payment:
+        logger.warning(
+            "❗ Платёж с id=%s не найден для восстановления", payment_id
+        )
+        return
+
+    with db.atomic():
+        income_restored = (
+            Income.update(is_deleted=False)
+            .where(Income.payment == payment)
+            .execute()
+        )
+        expense_restored = (
+            Expense.update(is_deleted=False)
+            .where(Expense.payment == payment)
+            .execute()
+        )
+        payment.is_deleted = False
+        payment.save(only=[Payment.is_deleted])
+
+    logger.info(
+        "♻️ Восстановлен платёж #%s; доходов=%s, расходов=%s",
+        payment_id,
+        income_restored,
+        expense_restored,
+    )
+
+
 def mark_payments_paid(payment_ids: list[int], paid_date: date | None = None) -> int:
     """
     Массово отметить платежи как оплаченные.

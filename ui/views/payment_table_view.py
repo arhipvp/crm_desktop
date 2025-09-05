@@ -114,6 +114,7 @@ class PaymentTableView(BaseTableView):
             checkbox_map=checkbox_map,
             date_filter_field="payment_date",
             controller=controller,
+            **kwargs,
         )
 
         # разрешаем множественный выбор для массовых действий

@@ -191,7 +191,9 @@ class DealTabsMixin:
         btn_pay.clicked.connect(self._on_add_payment)
         self._add_shortcut("Ctrl+Shift+N", self._on_add_payment)
         pay_l.addWidget(btn_pay, alignment=Qt.AlignLeft)
-        pay_view = PaymentTableView(parent=self, deal_id=self.instance.id)
+        pay_view = PaymentTableView(
+            parent=self, deal_id=self.instance.id, can_restore=False
+        )
         pay_view.load_data()
         pay_l.addWidget(pay_view)
         self.pay_view = pay_view
