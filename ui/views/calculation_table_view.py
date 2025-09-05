@@ -176,6 +176,8 @@ class CalculationTableView(BaseTableView):
         field = self.COLUMN_FIELD_MAP.get(column)
         if field is None:
             return
+        self.current_sort_column = column
+        self.current_sort_order = order
         self.load_data()
 
     def add_new(self):
