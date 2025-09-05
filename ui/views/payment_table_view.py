@@ -3,7 +3,7 @@ from datetime import date
 
 logger = logging.getLogger(__name__)
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
 
@@ -33,7 +33,40 @@ class PaymentTableController(TableController):
             and p.payment_date
             and p.payment_date < date.today()
         )
-        super().set_model_class_and_items(model_class, items, total_count)
+
+        prev_texts = [
+            self.view.column_filters.get_text(i)
+            for i in range(len(self.view.column_filters._editors))
+        ]
+
+        self.view.model = PaymentTableModel(items, model_class)
+        self.view.proxy_model.setSourceModel(self.view.model)
+        self.view.table.setModel(self.view.proxy_model)
+
+        try:
+            self.view.table.sortByColumn(
+                self.view.current_sort_column, self.view.current_sort_order
+            )
+            self.view.table.resizeColumnsToContents()
+        except NotImplementedError:
+            pass
+
+        if total_count is not None:
+            self.view.total_count = total_count
+            self.view.paginator.update(
+                self.view.total_count, self.view.page, self.view.per_page
+            )
+            self.view.data_loaded.emit(self.view.total_count)
+
+        headers = [
+            self.view.model.headerData(i, Qt.Horizontal)
+            for i in range(self.view.model.columnCount())
+        ]
+        self.view.column_filters.set_headers(
+            headers, prev_texts, self.view.COLUMN_FIELD_MAP
+        )
+        QTimer.singleShot(0, self.view.load_table_settings)
+
         self.view.paginator.set_summary(
             f"Сумма: {total_sum} ₽ (просрочено: {overdue_sum} ₽)"
         )
