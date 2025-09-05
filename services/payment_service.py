@@ -79,10 +79,29 @@ def get_payments_page(
 def mark_payment_deleted(payment_id: int):
     """Пометить платёж удалённым."""
     payment = Payment.get_or_none(Payment.id == payment_id)
-    if payment:
-        payment.soft_delete()
-    else:
+    if not payment:
         logger.warning("❗ Платёж с id=%s не найден для удаления", payment_id)
+        return
+
+    with db.atomic():
+        income_deleted = (
+            Income.update(is_deleted=True)
+            .where(Income.payment == payment)
+            .execute()
+        )
+        expense_deleted = (
+            Expense.update(is_deleted=True)
+            .where(Expense.payment == payment)
+            .execute()
+        )
+        payment.soft_delete()
+
+    logger.info(
+        "🗑️ Помечен удалённым платёж #%s; доходов=%s, расходов=%s",
+        payment_id,
+        income_deleted,
+        expense_deleted,
+    )
 
 
 def mark_payments_paid(payment_ids: list[int], paid_date: date | None = None) -> int:
