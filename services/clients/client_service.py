@@ -327,8 +327,21 @@ def open_whatsapp(phone: str, message: str | None = None) -> None:
 
 
 def build_client_query(
-    search_text: str = "", show_deleted: bool = False, column_filters: dict[str, str] | None = None
+    search_text: str = "",
+    show_deleted: bool = False,
+    column_filters: dict[str, str] | None = None,
+    order_by: str | Any | None = None,
+    order_dir: str = "asc",
+    **kwargs,
 ):
-    """Создаёт выборку клиентов с учётом фильтров."""
+    """Создаёт выборку клиентов с учётом фильтров и сортировки."""
     query = Client.active() if not show_deleted else Client.select()
-    return apply_search_and_filters(query, Client, search_text, column_filters)
+    query = apply_search_and_filters(query, Client, search_text, column_filters)
+    if order_by:
+        if isinstance(order_by, str):
+            field = getattr(Client, order_by, Client.name)
+        else:
+            field = order_by
+        order_func = field.desc if order_dir == "desc" else field.asc
+        query = query.order_by(order_func())
+    return query
