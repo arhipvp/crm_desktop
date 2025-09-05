@@ -105,6 +105,8 @@ class ExecutorTableView(BaseTableView):
         self.set_model_class_and_items(Executor, list(items), total_count=total)
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
+        self.current_sort_column = column
+        self.current_sort_order = order
         field = self.COLUMN_FIELD_MAP.get(column)
         if field is None:
             return
