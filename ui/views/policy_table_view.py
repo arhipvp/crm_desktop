@@ -342,6 +342,8 @@ class PolicyTableView(BaseTableView):
         field = self.model.fields[logicalIndex].name
         if not hasattr(Policy, field):
             return
+        self.current_sort_column = logicalIndex
+        self.current_sort_order = order
         self.order_dir = "desc" if order == Qt.DescendingOrder else "asc"
         self.order_by = field
         self.page = 1
