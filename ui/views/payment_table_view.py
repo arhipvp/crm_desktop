@@ -1,7 +1,4 @@
-import logging
 from datetime import date
-
-logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
@@ -248,7 +245,7 @@ class PaymentTableModel(BaseTableModel):
                 and obj.payment_date
                 and obj.payment_date < date.today()
             ):
-                return QColor("red")
+                return QBrush(QColor("red"))
             return None
 
         # Виртуальные поля — после стандартных
