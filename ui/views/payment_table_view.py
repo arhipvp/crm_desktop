@@ -168,11 +168,11 @@ class PaymentTableView(BaseTableView):
         idx = self.table.currentIndex()
         if not idx.isValid():
             return None
-        return self.model.get_item(idx.row())
+        return self.model.get_item(self._source_row(idx))
 
     def get_selected_multiple(self):
         indexes = self.table.selectionModel().selectedRows()
-        return [self.model.get_item(i.row()) for i in indexes]
+        return [self.model.get_item(self._source_row(i)) for i in indexes]
 
     def add_new(self):
         form = PaymentForm()
