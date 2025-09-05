@@ -496,6 +496,8 @@ class TaskTableView(BaseTableView):
                 self.refresh()
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
+        self.current_sort_column = column
+        self.current_sort_order = order
         if not self.model:
             return
         if column >= len(self.model.fields):
