@@ -41,6 +41,11 @@ class PaymentDetailView(QDialog):
 
         self.layout = QVBoxLayout(self)
 
+        # ссылки на KPI-панель
+        self.kpi_layout: QHBoxLayout | None = None
+        self._lbl_incomes: QLabel | None = None
+        self._lbl_expenses: QLabel | None = None
+
         # ───── KPI панель ─────
         self._init_kpi_panel()
 
@@ -54,13 +59,25 @@ class PaymentDetailView(QDialog):
     # KPI
     # ------------------------------------------------------------------
     def _init_kpi_panel(self):
-        layout = QHBoxLayout()
         incomes_cnt = Income.select().where(Income.payment == self.instance).count()
         expenses_cnt = Expense.select().where(Expense.payment == self.instance).count()
-        layout.addWidget(QLabel(f"Доходов: <b>{incomes_cnt}</b>"))
-        layout.addWidget(QLabel(f"Расходов: <b>{expenses_cnt}</b>"))
+
+        if self.kpi_layout:
+            # обновляем существующие значения
+            if self._lbl_incomes:
+                self._lbl_incomes.setText(f"Доходов: <b>{incomes_cnt}</b>")
+            if self._lbl_expenses:
+                self._lbl_expenses.setText(f"Расходов: <b>{expenses_cnt}</b>")
+            return
+
+        layout = QHBoxLayout()
+        self._lbl_incomes = QLabel(f"Доходов: <b>{incomes_cnt}</b>")
+        self._lbl_expenses = QLabel(f"Расходов: <b>{expenses_cnt}</b>")
+        layout.addWidget(self._lbl_incomes)
+        layout.addWidget(self._lbl_expenses)
         layout.addStretch()
         self.layout.addLayout(layout)
+        self.kpi_layout = layout
 
     # ------------------------------------------------------------------
     # Tabs
