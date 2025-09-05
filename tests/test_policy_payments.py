@@ -146,3 +146,66 @@ def test_add_policy_rolls_back_on_payment_error(in_memory_db, monkeypatch):
 
     assert Policy.select().count() == 0
     assert Payment.select().count() == 0
+
+
+def test_sync_policy_payments_removes_extra_duplicates(in_memory_db, monkeypatch):
+    monkeypatch.setattr(
+        pay_svc,
+        "add_payment",
+        lambda **kw: Payment.create(
+            policy=kw["policy"],
+            amount=kw["amount"],
+            payment_date=kw["payment_date"],
+        ),
+    )
+    monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
+    client = Client.create(name="C")
+    d1 = datetime.date(2024, 1, 1)
+    policy = Policy.create(client=client, policy_number="P", start_date=d1, end_date=d1)
+    p1 = Payment.create(policy=policy, amount=100, payment_date=d1)
+    p2 = Payment.create(policy=policy, amount=100, payment_date=d1)
+
+    pay_svc.sync_policy_payments(
+        policy,
+        [
+            {"amount": 100, "payment_date": d1},
+        ],
+    )
+
+    payments = list(policy.payments)
+    assert [(p.payment_date, p.amount) for p in payments] == [(d1, 100)]
+    assert Payment.select().count() == 1
+    remaining_id = payments[0].id
+    assert remaining_id in {p1.id, p2.id}
+
+
+def test_sync_policy_payments_adds_missing_duplicates(in_memory_db, monkeypatch):
+    monkeypatch.setattr(
+        pay_svc,
+        "add_payment",
+        lambda **kw: Payment.create(
+            policy=kw["policy"],
+            amount=kw["amount"],
+            payment_date=kw["payment_date"],
+        ),
+    )
+    monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
+    client = Client.create(name="C")
+    d1 = datetime.date(2024, 1, 1)
+    policy = Policy.create(client=client, policy_number="P", start_date=d1, end_date=d1)
+    p1 = Payment.create(policy=policy, amount=100, payment_date=d1)
+
+    pay_svc.sync_policy_payments(
+        policy,
+        [
+            {"amount": 100, "payment_date": d1},
+            {"amount": 100, "payment_date": d1},
+        ],
+    )
+
+    payments = list(policy.payments.order_by(Payment.id))
+    assert len(payments) == 2
+    assert all((p.payment_date, p.amount) == (d1, 100) for p in payments)
+    ids = {p.id for p in payments}
+    assert p1.id in ids
+    assert len(ids) == 2

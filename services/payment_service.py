@@ -1,6 +1,7 @@
 """Сервис управления платежами."""
 
 import logging
+from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
@@ -214,11 +215,9 @@ def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
             p for p in payments if Decimal(str(p.get("amount", 0))) != Decimal("0")
         ]
 
-    existing = {
-        (p.payment_date, p.amount): p
-        for p in Payment.active().where(Payment.policy == policy)
-    }
-    incoming: set[tuple[date, Decimal]] = set()
+    existing: defaultdict[tuple[date, Decimal], list[Payment]] = defaultdict(list)
+    for p in Payment.active().where(Payment.policy == policy):
+        existing[(p.payment_date, p.amount)].append(p)
 
     for data in payments:
         payment_date = data.get("payment_date")
@@ -227,14 +226,13 @@ def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
             continue
         amount = Decimal(str(amount))
         key = (payment_date, amount)
-        incoming.add(key)
-        if key not in existing:
-            add_payment(
-                policy=policy, payment_date=payment_date, amount=amount
-            )
+        if existing[key]:
+            existing[key].pop(0)
+        else:
+            add_payment(policy=policy, payment_date=payment_date, amount=amount)
 
-    for key, payment in existing.items():
-        if key not in incoming:
+    for payments_list in existing.values():
+        for payment in payments_list:
             if hasattr(payment, "soft_delete"):
                 payment.soft_delete()
             else:
