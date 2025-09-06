@@ -3,7 +3,7 @@
 from datetime import date
 
 from PySide6.QtCore import QDate
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget, QSizePolicy
 
 from ui import settings as ui_settings
 
@@ -99,6 +99,8 @@ class FilterControls(QWidget):
 
         # Кнопка сброса
         self.reset_btn = QPushButton("Сбросить")
+        self.reset_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.reset_btn.setMinimumWidth(self.reset_btn.fontMetrics().horizontalAdvance("Сбросить") + 12)
         self.reset_btn.setFixedHeight(30)
 
         def on_reset():
