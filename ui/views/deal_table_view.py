@@ -1,5 +1,6 @@
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor, QFont, QShortcut
+from PySide6.QtWidgets import QMenu
 from PySide6.QtWidgets import QMenu, QLineEdit, QComboBox, QHBoxLayout
 
 from ui.base.base_table_model import BaseTableModel
@@ -152,6 +153,11 @@ class DealTableView(BaseTableView):
         )
         self.row_double_clicked.connect(self.open_detail)
 
+        QShortcut("Return", self.table, activated=self.open_detail)
+        QShortcut("Ctrl+E", self.table, activated=self.edit_selected)
+        QShortcut("Delete", self.table, activated=self.delete_selected)
+        QShortcut("Ctrl+D", self.table, activated=self.duplicate_selected)
+
         self.load_data()
 
     # Ensure search/filters/pagination call our loader (not TableController)
@@ -265,6 +271,22 @@ class DealTableView(BaseTableView):
 
     def add_new(self):
         form = DealForm()
+        if form.exec():
+            self.refresh()
+            if form.instance:
+                dlg = DealDetailView(form.instance, parent=self)
+                dlg.exec()
+
+    def duplicate_selected(self, _=None):
+        deal = self.get_selected()
+        if not deal:
+            return
+        form = DealForm()
+        form.fill_from_obj(deal)
+        if "is_closed" in form.fields:
+            form.fields["is_closed"].setChecked(False)
+        if "closed_reason" in form.fields:
+            form.fields["closed_reason"].setText("")
         if form.exec():
             self.refresh()
             if form.instance:
