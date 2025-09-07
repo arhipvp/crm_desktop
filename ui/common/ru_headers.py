@@ -34,4 +34,11 @@ RU_HEADERS = {
     "calculations": "Расчёты",
     "is_closed": "Закрыто",
     "closed_reason": "Причина закрытия",
+    "policy_number": "Номер полиса",
+    "contractor": "Контрагент",
+    "sales_channel": "Канал продаж",
+    "vehicle_brand": "Марка",
+    "vehicle_model": "Модель",
+    "vehicle_vin": "VIN",
+    "renewed_to": "Продлён до",
 }
