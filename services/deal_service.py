@@ -54,6 +54,12 @@ def get_deal_by_id(deal_id: int) -> Deal | None:
     return Deal.active().where(Deal.id == deal_id).get_or_none()
 
 
+def get_distinct_statuses() -> list[str]:
+    """Возвращает список уникальных статусов сделок."""
+    query = Deal.select(Deal.status.distinct()).where(Deal.status.is_null(False))
+    return [row.status for row in query]
+
+
 # ──────────────────────────── Добавление ─────────────────────────────
 
 
