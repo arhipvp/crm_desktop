@@ -30,6 +30,7 @@ RU_HEADERS = {
     "deductible": "Франшиза",
     "start_date": "Начало",
     "queued_at": "Отправлено",
+    "dispatch_state": "Статус отправки",
     "reminder_date": "Напоминание",
     "calculations": "Расчёты",
     "is_closed": "Закрыто",
