@@ -1,5 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
+from PySide6.QtWidgets import QMenu
 
 from ui.base.base_table_model import BaseTableModel
 
@@ -225,6 +226,61 @@ class DealTableView(BaseTableView):
         if deal:
             dlg = DealDetailView(deal)
             dlg.exec()
+
+    def contextMenuEvent(self, event):
+        menu = QMenu(self)
+        act_open = menu.addAction("Открыть сделку")
+        act_edit = menu.addAction("Редактировать")
+        act_folder = menu.addAction("Открыть папку сделки")
+        act_copy = menu.addAction("Копировать телефон клиента")
+        act_whatsapp = menu.addAction("Открыть WhatsApp")
+
+        action = menu.exec(event.globalPos())
+        if action == act_open:
+            self.open_detail()
+        elif action == act_edit:
+            self.edit_selected()
+        elif action == act_folder:
+            self._open_folder()
+        elif action == act_copy:
+            self._copy_client_phone()
+        elif action == act_whatsapp:
+            self._open_whatsapp()
+
+    def _open_folder(self):
+        deal = self.get_selected()
+        if not deal:
+            return
+        from services.folder_utils import open_folder
+
+        open_folder(
+            getattr(deal, "drive_folder_path", None) or deal.drive_folder_link,
+            parent=self,
+        )
+
+    def _copy_client_phone(self):
+        deal = self.get_selected()
+        if not deal or not getattr(deal, "client", None) or not deal.client.phone:
+            show_error("Не указан телефон клиента")
+            return
+        from services.folder_utils import copy_text_to_clipboard
+
+        copy_text_to_clipboard(deal.client.phone, parent=self)
+
+    def _open_whatsapp(self):
+        deal = self.get_selected()
+        if not deal or not getattr(deal, "client", None):
+            return
+        phone = deal.client.phone
+        if not phone:
+            show_error("Не указан телефон клиента")
+            return
+        from services.clients import (
+            format_phone_for_whatsapp,
+            open_whatsapp,
+        )
+
+        open_whatsapp(format_phone_for_whatsapp(phone))
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
         """Refresh data after the user changed sort order."""
