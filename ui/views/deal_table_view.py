@@ -1,10 +1,11 @@
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QShortcut
 from PySide6.QtWidgets import QMenu
+from PySide6.QtWidgets import QMenu, QLineEdit, QComboBox, QHBoxLayout
 
 from ui.base.base_table_model import BaseTableModel
 
-from database.models import Deal, Client, Executor
+from database.models import Deal, Client, Executor, DealStatus
 from services.deal_service import build_deal_query, get_deals_page, mark_deal_deleted
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
@@ -15,6 +16,9 @@ from ui.views.deal_detail import DealDetailView
 class DealTableModel(BaseTableModel):
     def __init__(self, objects, model_class, parent=None):
         super().__init__(objects, model_class, parent)
+
+        # сохраняем полный список объектов для последующей фильтрации
+        self._all_objects = list(objects)
 
         # скрываем ссылку на папку и двигаем колонки закрытия в конец
         self.fields = [f for f in self.fields if f.name != "drive_folder_link"]
@@ -31,6 +35,10 @@ class DealTableModel(BaseTableModel):
         self.headers = [f.name for f in self.fields]
         self.virtual_fields = ["executor"]
         self.headers.append("Исполнитель")
+
+        # параметры быстрого фильтра
+        self._quick_text = ""
+        self._quick_status: str | None = None
 
     def columnCount(self, parent=None):
         return len(self.fields) + len(self.virtual_fields)
@@ -60,6 +68,37 @@ class DealTableModel(BaseTableModel):
             return super().headerData(section, orientation, role)
         return self.headers[-1]
 
+    # --- Быстрый фильтр -------------------------------------------------
+    def apply_quick_filter(self, text: str = "", status: str | None = None) -> None:
+        """Фильтрует ``self.objects`` по строке и статусу.
+
+        Parameters:
+            text: Подстрока для поиска в описании и имени клиента.
+            status: Статус сделки или ``None`` для всех.
+        """
+
+        self._quick_text = text.lower()
+        self._quick_status = status
+
+        def matches(obj) -> bool:
+            if self._quick_text:
+                haystack = " ".join(
+                    [
+                        getattr(obj.client, "name", ""),
+                        getattr(obj, "description", ""),
+                        getattr(obj, "status", ""),
+                    ]
+                ).lower()
+                if self._quick_text not in haystack:
+                    return False
+            if self._quick_status:
+                if getattr(obj, "status", None) != self._quick_status:
+                    return False
+            return True
+
+        self.objects = [obj for obj in self._all_objects if matches(obj)]
+        self.layoutChanged.emit()
+
 
 class DealTableView(BaseTableView):
     COLUMN_FIELD_MAP = {
@@ -86,6 +125,24 @@ class DealTableView(BaseTableView):
             detail_view_class=DealDetailView,
             checkbox_map=checkboxes,
         )
+
+        # --- быстрый фильтр по строке и статусу -----------------------
+        self.quick_filter_edit = QLineEdit()
+        self.quick_filter_edit.setPlaceholderText("Поиск...")
+        self.status_filter = QComboBox()
+        self.status_filter.addItem("Все", None)
+        for st in DealStatus:
+            self.status_filter.addItem(st.value, st.value)
+
+        quick_layout = QHBoxLayout()
+        quick_layout.addWidget(self.quick_filter_edit)
+        quick_layout.addWidget(self.status_filter)
+
+        index = self.left_layout.indexOf(self.table)
+        self.left_layout.insertLayout(index, quick_layout)
+
+        self.quick_filter_edit.textChanged.connect(self.apply_quick_filter)
+        self.status_filter.currentIndexChanged.connect(self.apply_quick_filter)
 
         self.sort_field = "reminder_date"
         self.sort_order = "asc"  # 'asc' or 'desc'
@@ -196,11 +253,21 @@ class DealTableView(BaseTableView):
         self.table.horizontalHeader().setSortIndicator(col, order)
         # и не даём базовому классу перезаписывать порядок
 
+        # применяем быстрый фильтр к новым данным
+        self.apply_quick_filter()
+
     def get_selected(self):
         index = self.table.currentIndex()
         if not index.isValid():
             return None
         return self.model.get_item(self._source_row(index))
+
+    def apply_quick_filter(self):
+        if not getattr(self, "model", None):
+            return
+        text = self.quick_filter_edit.text().strip()
+        status = self.status_filter.currentData()
+        self.model.apply_quick_filter(text, status)
 
     def add_new(self):
         form = DealForm()
