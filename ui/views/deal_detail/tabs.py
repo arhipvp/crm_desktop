@@ -9,12 +9,15 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QScrollArea,
     QSizePolicy,
+    QLineEdit,
+    QCompleter,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
 from database.models import Task
+from services.deal_service import get_distinct_statuses
 from ui.common.date_utils import TypableDateEdit, format_date
 from ui.common.styled_widgets import styled_button
 from ..calculation_table_view import CalculationTableView
@@ -70,8 +73,9 @@ class DealTabsMixin:
         start_label = tight_label(format_date(self.instance.start_date))
         form.addRow("Старт:", start_label)
 
-        self.status_edit = QTextEdit(self.instance.status)
-        self.status_edit.setFixedHeight(40)
+        self.status_edit = QLineEdit(self.instance.status or "")
+        status_completer = QCompleter(get_distinct_statuses())
+        self.status_edit.setCompleter(status_completer)
         form.addRow("Статус:", self.status_edit)
 
         self.desc_edit = QTextEdit(self.instance.description)

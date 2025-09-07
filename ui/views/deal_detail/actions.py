@@ -140,7 +140,7 @@ class DealActionsMixin:
         ui_settings.set_window_settings(self.SETTINGS_KEY, st)
 
     def closeEvent(self, event):
-        status = self.status_edit.toPlainText().strip()
+        status = self.status_edit.text().strip()
         reminder = (
             self.reminder_date.date().toPython()
             if self.reminder_date.date().isValid()
@@ -376,7 +376,7 @@ class DealActionsMixin:
             show_error("Не указан телефон клиента")
 
     def _on_inline_save(self):
-        status = self.status_edit.toPlainText().strip()
+        status = self.status_edit.text().strip()
         reminder = (
             self.reminder_date.date().toPython()
             if self.reminder_date.date().isValid()
