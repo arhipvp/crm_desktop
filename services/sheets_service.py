@@ -199,9 +199,10 @@ def sync_calculations_from_sheet() -> int:
             continue
 
         exists = (
-            DealCalculation.active()
+            DealCalculation.select()
             .where(
                 (DealCalculation.deal_id == deal_id)
+                & (DealCalculation.is_deleted == False)
                 & (DealCalculation.insurance_company == params["insurance_company"])
                 & (DealCalculation.insurance_type == params["insurance_type"])
                 & (DealCalculation.insured_amount == params["insured_amount"])
@@ -209,12 +210,14 @@ def sync_calculations_from_sheet() -> int:
                 & (DealCalculation.deductible == params["deductible"])
                 & (DealCalculation.note == params["note"])
             )
-            .get_or_none()
+            .exists()
         )
         if exists:
             continue
         try:
-            add_calculation(deal_id, **params)
+            from database.db import db
+            with db.atomic():
+                add_calculation(deal_id, **params)
             added += 1
         except Exception:
             logger.exception("Failed to add calculation for %s", deal_id)
