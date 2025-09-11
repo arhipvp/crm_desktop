@@ -27,6 +27,7 @@ class IncomeTableModel(BaseTableModel):
         "policy_number",
         "deal_desc",
         "client_name",
+        "sales_channel",
         "policy_start",
         "payment_amount",
         "payment_date",
@@ -44,6 +45,7 @@ class IncomeTableModel(BaseTableModel):
             "Полис",
             "Сделка",
             "Клиент",
+            "Канал продаж",
             "Дата начала",
             "Сумма платежа",
             "Дата платежа",
@@ -87,30 +89,32 @@ class IncomeTableModel(BaseTableModel):
         elif col == 2:
             return policy.client.name if policy and policy.client else "—"
         elif col == 3:
+            return policy.sales_channel if policy and policy.sales_channel else "—"
+        elif col == 4:
             return (
                 policy.start_date.strftime("%d.%m.%Y")
                 if policy and policy.start_date
                 else "—"
             )
-        elif col == 4:
+        elif col == 5:
             return (
                 f"{payment.amount:,.2f} ₽" if payment and payment.amount else "0 ₽"
             )
-        elif col == 5:
+        elif col == 6:
             return (
                 payment.payment_date.strftime("%d.%m.%Y")
                 if payment and payment.payment_date
                 else "—"
             )
-        elif col == 6:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
         elif col == 7:
+            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+        elif col == 8:
             return (
                 obj.received_date.strftime("%d.%m.%Y")
                 if obj.received_date
                 else "—"
             )
-        elif col == 8:
+        elif col == 9:
             if deal and getattr(deal, "executors", None):
                 ex = deal.executors[0].executor
                 return ex.full_name if ex else "—"
@@ -129,12 +133,13 @@ class IncomeTableView(BaseTableView):
         0: Policy.policy_number,
         1: Deal.description,
         2: Client.name,
-        3: Policy.start_date,
-        4: Payment.amount,
-        5: Payment.payment_date,
-        6: Income.amount,
-        7: Income.received_date,
-        8: Executor.full_name,
+        3: Policy.sales_channel,
+        4: Policy.start_date,
+        5: Payment.amount,
+        6: Payment.payment_date,
+        7: Income.amount,
+        8: Income.received_date,
+        9: Executor.full_name,
     }
     def __init__(self, parent=None, deal_id=None):
         checkbox_map = {
@@ -157,7 +162,7 @@ class IncomeTableView(BaseTableView):
             self._on_column_filter_changed_db
         )
         self.deal_id = deal_id
-        self.default_sort_column = 7
+        self.default_sort_column = 8
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
