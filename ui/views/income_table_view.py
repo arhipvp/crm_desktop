@@ -238,9 +238,13 @@ class IncomeTableView(BaseTableView):
 
         self.set_model_class_and_items(self.model_class, items, total_count=total)
 
+    def refresh(self):
+        self.load_data()
+
     def on_filter_changed(self, *args, **kwargs):
+        self.page = 1
         self.paginator.set_summary("")
-        super().on_filter_changed(*args, **kwargs)
+        self.load_data()
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         """Устанавливает модель таблицы и применяет сохранённые настройки."""
