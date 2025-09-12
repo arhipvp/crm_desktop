@@ -98,9 +98,10 @@ def add_expense(**kwargs):
         clean_data["amount"] = Decimal(str(clean_data["amount"]))
 
     try:
-        return Expense.create(
-            payment=payment, policy_id=payment.policy_id, **clean_data
-        )
+        with db.atomic():
+            return Expense.create(
+                payment=payment, policy_id=payment.policy_id, **clean_data
+            )
     except Exception as e:
         logger.error("❌ Ошибка при создании расхода: %s", e)
         raise
