@@ -2,10 +2,11 @@ from datetime import date
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
-from PySide6.QtWidgets import QAbstractItemView
+from PySide6.QtWidgets import QAbstractItemView, QMenu
 
 from database.models import Client, Deal, Expense, Payment, Policy
 from services import expense_service
+from services.folder_utils import copy_text_to_clipboard
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
@@ -285,6 +286,39 @@ class ExpenseTableView(BaseTableView):
         if expense:
             dlg = ExpenseDetailView(expense)
             dlg.exec()
+
+    def open_selected_deal(self):
+        expense = self.get_selected()
+        if not expense:
+            return
+        policy = expense.policy or getattr(expense.payment, "policy", None)
+        deal = getattr(policy, "deal", None)
+        if deal:
+            from ui.views.deal_detail import DealDetailView
+            DealDetailView(deal, parent=self).exec()
+
+    def _on_table_menu(self, pos):
+        index = self.table.indexAt(pos)
+        if not index.isValid():
+            return
+        self.table.selectRow(index.row())
+        menu = QMenu(self)
+        act_open = menu.addAction("Открыть/редактировать")
+        act_delete = menu.addAction("Удалить")
+        act_folder = menu.addAction("Открыть папку")
+        text = str(index.data() or "")
+        act_copy = menu.addAction("Копировать значение")
+        act_deal = menu.addAction("Открыть сделку")
+        act_open.triggered.connect(self._on_edit)
+        act_delete.triggered.connect(self._on_delete)
+        act_folder.triggered.connect(self.open_selected_folder)
+        act_copy.triggered.connect(lambda: copy_text_to_clipboard(text, parent=self))
+        act_deal.triggered.connect(self.open_selected_deal)
+        expense = self.get_selected()
+        policy = expense.policy or getattr(expense.payment, "policy", None) if expense else None
+        deal = getattr(policy, "deal", None) if policy else None
+        act_deal.setEnabled(bool(deal))
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         prev_texts = [
