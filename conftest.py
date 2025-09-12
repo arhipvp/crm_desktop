@@ -111,3 +111,22 @@ def policy_folder_patches(monkeypatch):
     monkeypatch.setattr(
         "services.folder_utils.rename_policy_folder", lambda *a, **k: (None, None)
     )
+
+
+@pytest.fixture()
+def dummy_main_window(monkeypatch, qapp):
+    from PySide6.QtWidgets import QTabWidget, QWidget
+    from ui.main_window import MainWindow
+
+    def factory(tab_count: int = 0):
+        def dummy_init_tabs(self):
+            self.tab_widget = QTabWidget()
+            self.setCentralWidget(self.tab_widget)
+            for i in range(tab_count):
+                self.tab_widget.addTab(QWidget(), str(i))
+
+        monkeypatch.setattr(MainWindow, "init_tabs", dummy_init_tabs)
+        monkeypatch.setattr(MainWindow, "on_tab_changed", lambda self, index: None)
+        return MainWindow()
+
+    return factory
