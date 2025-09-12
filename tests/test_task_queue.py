@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 
 import pytest
 
-from database.models import Client, Deal, Policy, Task
+from database.models import Policy, Task
 from services.task_queue import (
     pop_all_by_deal,
     pop_next,
@@ -13,25 +13,11 @@ from services.task_states import QUEUED, SENT
 
 
 @pytest.mark.usefixtures("in_memory_db")
-def test_pop_next_returns_tasks_in_order_and_none_when_empty():
-    client = Client.create(name="C")
-    deal = Deal.create(client=client, description="D", start_date=date.today())
+def test_pop_next_returns_tasks_in_order_and_none_when_empty(make_task):
     earlier = datetime.utcnow() - timedelta(minutes=5)
     later = datetime.utcnow() - timedelta(minutes=1)
-    t1 = Task.create(
-        title="T1",
-        due_date=date.today(),
-        deal=deal,
-        dispatch_state=QUEUED,
-        queued_at=earlier,
-    )
-    t2 = Task.create(
-        title="T2",
-        due_date=date.today(),
-        deal=deal,
-        dispatch_state=QUEUED,
-        queued_at=later,
-    )
+    client, deal, t1 = make_task(title="T1", queued_at=earlier)
+    _, _, t2 = make_task(client=client, deal=deal, title="T2", queued_at=later)
 
     res1 = pop_next(chat_id=10)
     assert res1.id == t1.id
@@ -49,32 +35,20 @@ def test_pop_next_returns_tasks_in_order_and_none_when_empty():
 
 
 @pytest.mark.usefixtures("in_memory_db")
-def test_pop_next_by_client_filters_by_client_and_policy():
-    c1 = Client.create(name="C1")
-    c2 = Client.create(name="C2")
-    d1 = Deal.create(client=c1, description="D1", start_date=date.today())
-    d2 = Deal.create(client=c2, description="D2", start_date=date.today())
-    p1 = Policy.create(client=c1, policy_number="P1", start_date=date.today())
-
-    Task.create(
-        title="T_other",
-        due_date=date.today(),
-        deal=d2,
-        dispatch_state=QUEUED,
-        queued_at=datetime.utcnow(),
-    )
-    t_deal = Task.create(
+def test_pop_next_by_client_filters_by_client_and_policy(make_task):
+    c1, d1, t_deal = make_task(
+        client_name="C1",
+        deal_description="D1",
         title="T_deal",
-        due_date=date.today(),
-        deal=d1,
-        dispatch_state=QUEUED,
         queued_at=datetime.utcnow() - timedelta(minutes=2),
     )
-    t_policy = Task.create(
-        title="T_policy",
-        due_date=date.today(),
+    c2, d2, _ = make_task(client_name="C2", deal_description="D2", title="T_other")
+    p1 = Policy.create(client=c1, policy_number="P1", start_date=date.today())
+    _, _, t_policy = make_task(
+        client=c1,
         policy=p1,
-        dispatch_state=QUEUED,
+        deal=None,
+        title="T_policy",
         queued_at=datetime.utcnow() - timedelta(minutes=1),
     )
 
@@ -91,31 +65,19 @@ def test_pop_next_by_client_filters_by_client_and_policy():
 
 
 @pytest.mark.usefixtures("in_memory_db")
-def test_pop_next_by_deal_filters_tasks():
-    client = Client.create(name="C")
-    deal1 = Deal.create(client=client, description="D1", start_date=date.today())
-    deal2 = Deal.create(client=client, description="D2", start_date=date.today())
-    Task.create(
-        title="T_other",
-        due_date=date.today(),
-        deal=deal2,
-        dispatch_state=QUEUED,
-        queued_at=datetime.utcnow(),
-    )
-    t1 = Task.create(
+def test_pop_next_by_deal_filters_tasks(make_task):
+    client, deal1, t1 = make_task(
+        client_name="C",
+        deal_description="D1",
         title="T1",
-        due_date=date.today(),
-        deal=deal1,
-        dispatch_state=QUEUED,
         queued_at=datetime.utcnow() - timedelta(minutes=1),
     )
-    t2 = Task.create(
-        title="T2",
-        due_date=date.today(),
-        deal=deal1,
-        dispatch_state=QUEUED,
-        queued_at=datetime.utcnow(),
+    _, deal2, _ = make_task(
+        client=client,
+        deal_description="D2",
+        title="T_other",
     )
+    _, _, t2 = make_task(client=client, deal=deal1, title="T2", queued_at=datetime.utcnow())
 
     res1 = pop_next_by_deal(chat_id=30, deal_id=deal1.id)
     assert res1.id == t1.id
@@ -129,23 +91,11 @@ def test_pop_next_by_deal_filters_tasks():
 
 
 @pytest.mark.usefixtures("in_memory_db")
-def test_pop_all_by_deal_returns_all_and_marks_sent():
-    client = Client.create(name="C")
-    deal = Deal.create(client=client, description="D", start_date=date.today())
-    t1 = Task.create(
-        title="T1",
-        due_date=date.today(),
-        deal=deal,
-        dispatch_state=QUEUED,
-        queued_at=datetime.utcnow() - timedelta(minutes=1),
+def test_pop_all_by_deal_returns_all_and_marks_sent(make_task):
+    client, deal, t1 = make_task(
+        title="T1", queued_at=datetime.utcnow() - timedelta(minutes=1)
     )
-    t2 = Task.create(
-        title="T2",
-        due_date=date.today(),
-        deal=deal,
-        dispatch_state=QUEUED,
-        queued_at=datetime.utcnow(),
-    )
+    _, _, t2 = make_task(client=client, deal=deal, title="T2", queued_at=datetime.utcnow())
 
     tasks = pop_all_by_deal(chat_id=40, deal_id=deal.id)
     assert [t.id for t in tasks] == [t1.id, t2.id]
