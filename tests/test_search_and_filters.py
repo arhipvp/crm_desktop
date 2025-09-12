@@ -7,26 +7,21 @@ from services.query_utils import apply_search_and_filters
 from services.executor_service import get_executors_page
 
 
-@pytest.mark.parametrize(
-    "query_builder, expected_names",
-    [
-        (
-            lambda: apply_search_and_filters(
-                Client.select(), Client, "Alice", {Client.phone: "123"}
-            ),
-            ["Alice"],
-        ),
-        (
-            lambda: build_client_query(order_by="name", order_dir="asc"),
-            ["Alice", "Bob"],
-        ),
-    ],
-)
-def test_client_search_and_sorting(in_memory_db, query_builder, expected_names):
+def test_client_search_with_filters(in_memory_db):
     Client.create(name="Bob", phone="456", email="b@b", note="y")
     Client.create(name="Alice", phone="123", email="a@a", note="x")
-    query = query_builder()
-    assert [c.name for c in query] == expected_names
+    query = apply_search_and_filters(
+        Client.select(), Client, "Alice", {Client.phone: "123"}
+    )
+    assert [c.name for c in query] == ["Alice"]
+
+
+@pytest.mark.parametrize("order_by", ["name", "phone", "email"])
+def test_client_sorting(in_memory_db, order_by):
+    Client.create(name="Bob", phone="456", email="b@b", note="y")
+    Client.create(name="Alice", phone="123", email="a@a", note="x")
+    query = build_client_query(order_by=order_by, order_dir="asc")
+    assert [c.name for c in query] == ["Alice", "Bob"]
 
 
 def test_apply_search_and_filters_policies(in_memory_db):
