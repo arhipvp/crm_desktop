@@ -1,7 +1,7 @@
 import datetime as dt
-import os
-import sys
 import logging
+import sys
+from pathlib import Path
 
 from openpyxl import load_workbook
 from PySide6.QtWidgets import QApplication
@@ -29,8 +29,8 @@ def parse_date(value) -> dt.date | None:
 
 
 def run_import():
-    filepath = os.path.join(os.path.dirname(__file__), EXCEL_FILENAME)
-    wb = load_workbook(filename=filepath)
+    filepath = Path(__file__).with_name(EXCEL_FILENAME)
+    wb = load_workbook(filepath)
     ws = wb.active
 
     headers = [cell.value for cell in ws[1]]
