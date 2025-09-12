@@ -1,6 +1,7 @@
 from peewee import Field
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QTableView
-from PySide6.QtCore import Signal, QTimer, Qt
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QTableView, QApplication
+from PySide6.QtCore import Signal, QTimer, Qt, QPointF
+from PySide6.QtGui import QMouseEvent
 
 class ColumnFilterRow(QWidget):
     """Строка фильтров по столбцам таблицы."""
@@ -9,22 +10,48 @@ class ColumnFilterRow(QWidget):
 
     def __init__(self, parent=None, *, linked_view: QTableView | None = None):
         super().__init__(parent)
-        self._editors = []
-        self._timers = []
+        self._editors: list[QLineEdit] = []
+        self._timers: list[QTimer] = []
+        self._linked_view = linked_view
         self.setLayout(QHBoxLayout())
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().setSpacing(3)
 
-        # Important: let clicks pass through empty areas of the filter row
-        # so they don't block selecting rows in the table behind.
-        # Editors themselves still receive events normally.
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-
-        if linked_view is not None:
-            scroll = linked_view.horizontalScrollBar()
+        if self._linked_view is not None:
+            scroll = self._linked_view.horizontalScrollBar()
             scroll.valueChanged.connect(self.sync_scroll)
             # синхронизируем позицию при инициализации
             self.sync_scroll(scroll.value())
+
+    def _forward_mouse_event(self, event: QMouseEvent) -> None:
+        """Перенаправляет событие мыши на связанную таблицу."""
+        if self._linked_view is None:
+            return
+        global_pos = self.mapToGlobal(event.pos())
+        target_pos = self._linked_view.viewport().mapFromGlobal(global_pos)
+        forwarded = QMouseEvent(
+            event.type(),
+            QPointF(target_pos),
+            QPointF(global_pos),
+            event.button(),
+            event.buttons(),
+            event.modifiers(),
+        )
+        QApplication.sendEvent(self._linked_view.viewport(), forwarded)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if self.childAt(event.pos()) is None:
+            self._forward_mouse_event(event)
+            event.ignore()
+            return
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        if self.childAt(event.pos()) is None:
+            self._forward_mouse_event(event)
+            event.ignore()
+            return
+        super().mouseReleaseEvent(event)
 
     def set_headers(
         self,
