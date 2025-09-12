@@ -53,12 +53,9 @@ def mark_done(task_id: int, note: str | None = None) -> None:
     from .task_crud import update_task
 
     update_task(task, is_done=True, note=full_note)
-    try:
-        from services.telegram_service import notify_admin
+    from services.telegram_service import notify_admin_safe
 
-        notify_admin(f"✅ Задача #{task.id} выполнена")
-    except Exception:  # pragma: no cover - logging
-        logger.debug("Failed to notify admin", exc_info=True)
+    notify_admin_safe(f"✅ Задача #{task.id} выполнена")
 
 
 def append_note(task_id: int, text: str):
@@ -70,12 +67,9 @@ def append_note(task_id: int, text: str):
             t.note = ((t.note + "\n") if t.note else "") + text
             t.save()
         logger.info("🗒 К задаче #%s добавлена заметка", t.id)
-        try:
-            from services.telegram_service import notify_admin
+        from services.telegram_service import notify_admin_safe
 
-            notify_admin(f"📝 Обновление по задаче #{t.id}: {text}")
-        except Exception:  # pragma: no cover - logging
-            logger.debug("Failed to notify admin", exc_info=True)
+        notify_admin_safe(f"📝 Обновление по задаче #{t.id}: {text}")
 
 
 def unassign_from_telegram(task_id: int) -> None:

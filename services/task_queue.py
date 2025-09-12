@@ -24,12 +24,9 @@ def queue_task(task_id: int):
             t.queued_at = _dt.datetime.utcnow()
             t.save()
             logger.info("📤 Задача #%s поставлена в очередь", t.id)
-            try:
-                from services.telegram_service import notify_admin
+            from services.telegram_service import notify_admin_safe
 
-                notify_admin(f"📤 Задача #{t.id} поставлена в очередь")
-            except Exception:  # pragma: no cover - logging
-                logger.debug("Failed to notify admin", exc_info=True)
+            notify_admin_safe(f"📤 Задача #{t.id} поставлена в очередь")
         elif t:
             logger.info(
                 "⏭ Задача #%s не поставлена в очередь: состояние %s",
@@ -183,12 +180,9 @@ def return_to_queue(task_id: int):
             t.queued_at = _dt.datetime.utcnow()
             t.save()
             logger.info("↩ Задача #%s возвращена в очередь", t.id)
-            try:
-                from services.telegram_service import notify_admin
+            from services.telegram_service import notify_admin_safe
 
-                notify_admin(f"↩ Задача #{t.id} возвращена в очередь")
-            except Exception:  # pragma: no cover - logging
-                logger.debug("Failed to notify admin", exc_info=True)
+            notify_admin_safe(f"↩ Задача #{t.id} возвращена в очередь")
 
 
 def get_queued_tasks_by_deal(deal_id: int) -> list[Task]:
