@@ -14,6 +14,21 @@
 - `_check_duplicate_policy` предотвращает создание полиса с существующим номером【F:services/policies/policy_service.py†L108-L146】.
 - `add_policy` создаёт папку, привязывает платежи и уведомляет исполнителя【F:services/policies/policy_service.py†L286-L403】【F:services/policies/policy_service.py†L268-L280】.
 
+## payment_service
+- `get_payments_page` возвращает страницу платежей с поиском и сортировкой【F:services/payment_service.py†L47-L78】.
+- `mark_payment_deleted` помечает платёж и связанные доходы/расходы удалёнными, `restore_payment` снимает пометку【F:services/payment_service.py†L81-L137】.
+- `mark_payments_paid` массово отмечает платежи как оплаченные【F:services/payment_service.py†L140-L157】.
+
+## income_service
+- `get_incomes_page` поддерживает фильтрацию, сортировку и пагинацию доходов【F:services/income_service.py†L83-L143】.
+- `mark_incomes_deleted` позволяет массово пометить доходы удалёнными【F:services/income_service.py†L72-L80】.
+- `add_income` создаёт запись и уведомляет исполнителя при поступлении средств【F:services/income_service.py†L166-L195】.
+
+## expense_service
+- `get_expenses_page` возвращает расходы с фильтрами по дате, сделке и статусу【F:services/expense_service.py†L159-L199】.
+- `mark_expenses_deleted` массово помечает расходы удалёнными【F:services/expense_service.py†L56-L63】.
+- `add_expense` связывает расход с платежом и полисом, валидируя входные данные【F:services/expense_service.py†L70-L105】.
+
 ## executor_service
 - `ensure_executors_from_env` создаёт записи исполнителей на основе `APPROVED_EXECUTOR_IDS` из переменных окружения【F:services/executor_service.py†L17-L21】.
 - `assign_executor` очищает прежние привязки и создаёт новую запись с датой назначения【F:services/executor_service.py†L60-L66】.
