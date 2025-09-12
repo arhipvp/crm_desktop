@@ -137,6 +137,12 @@ class PolicyTableView(BaseTableView):
             self.model.get_item(self.proxy_model.mapToSource(i).row()) for i in indexes
         ]
 
+    def get_selected_deal(self):
+        policy = self.get_selected()
+        if not policy:
+            return None
+        return getattr(policy, "deal", None)
+
     def add_new(self):
         form = PolicyForm()
         if form.exec():
