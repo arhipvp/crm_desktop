@@ -269,6 +269,11 @@ class DealTableView(BaseTableView):
         status = self.status_filter.currentData()
         self.model.apply_quick_filter(text, status)
 
+    def get_column_index(self, field_name: str) -> int:
+        if self.model and field_name == "executor":
+            return len(self.model.fields)
+        return super().get_column_index(field_name)
+
     def add_new(self):
         form = DealForm()
         if form.exec():
@@ -372,11 +377,16 @@ class DealTableView(BaseTableView):
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
         """Refresh data after the user changed sort order."""
-        if not self.model or column >= len(self.model.fields):
+        if not self.model:
             return
+
+        if column >= len(self.model.fields):
+            sort_field = "executor"
+        else:
+            sort_field = self.model.fields[column].name
 
         self.current_sort_column = column
         self.current_sort_order = order
-        self.sort_field = self.model.fields[column].name
+        self.sort_field = sort_field
         self.sort_order = "desc" if order == Qt.DescendingOrder else "asc"
         self.refresh()

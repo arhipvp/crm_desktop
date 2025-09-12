@@ -397,7 +397,17 @@ def get_deals_page(
     )
 
     # 👉 Стабильная сортировка
-    if order_by and hasattr(Deal, order_by):
+    if order_by == "executor":
+        query = (
+            query.switch(Deal)
+            .join(DealExecutor, JOIN.LEFT_OUTER, on=(DealExecutor.deal == Deal.id))
+            .join(Executor, JOIN.LEFT_OUTER, on=(DealExecutor.executor == Executor.id))
+        )
+        if order_dir == "desc":
+            query = query.order_by(Executor.full_name.desc(), Deal.id.desc())
+        else:
+            query = query.order_by(Executor.full_name.asc(), Deal.id.asc())
+    elif order_by and hasattr(Deal, order_by):
         order_field = getattr(Deal, order_by)
         if order_dir == "desc":
             query = query.order_by(order_field.desc(), Deal.id.desc())
@@ -407,7 +417,6 @@ def get_deals_page(
         query = query.order_by(Deal.start_date.desc(), Deal.id.desc())
 
     from peewee import prefetch
-    from database.models import DealExecutor, Executor
 
     offset = (page - 1) * per_page
     page_query = query.limit(per_page).offset(offset)
