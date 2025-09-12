@@ -20,58 +20,19 @@ from .task_states import IDLE, QUEUED
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_SORT_FIELDS = {
+ALLOWED_SORT_FIELDS: dict[str, object] = {
     "due_date": Task.due_date,
     "title": Task.title,
     "id": Task.id,
     "queued_at": Task.queued_at,
     "is_done": Task.is_done,
     "dispatch_state": Task.dispatch_state,
+    "deal": Task.deal,
+    "policy": Task.policy,
 }
 
 
 # Поля, допустимые для создания и обновления задач
-TASK_ALLOWED_FIELDS = {
-    "title",
-    "due_date",
-    "deal_id",
-    "policy_id",
-    "is_done",
-    "note",
-    "dispatch_state",
-    "queued_at",
-    "tg_chat_id",
-    "tg_message_id",
-}
-
-
-def _clean_task_data(data: dict[str, object]) -> dict[str, object]:
-    """Отфильтровать допустимые поля и убрать пустые значения."""
-    clean: dict[str, object] = {}
-    for key, value in data.items():
-        if value in ("", None):
-            continue
-        if key in TASK_ALLOWED_FIELDS:
-            clean[key] = value
-        elif key == "deal" and hasattr(value, "id"):
-            clean["deal_id"] = value.id
-        elif key == "policy" and hasattr(value, "id"):
-            clean["policy_id"] = value.id
-    return clean
-
-
-# Допустимые поля для сортировки
-ALLOWED_SORT_FIELDS: dict[str, object] = {
-    "due_date": Task.due_date,
-    "title": Task.title,
-    "deal": Task.deal,
-    "policy": Task.policy,
-    "dispatch_state": Task.dispatch_state,
-    "queued_at": Task.queued_at,
-}
-
-
-# Поля, которые разрешено изменять через CRUD‑функции
 TASK_ALLOWED_FIELDS = {
     "title",
     "due_date",
@@ -156,8 +117,6 @@ def update_task(task: Task, **fields) -> Task:
         if isinstance(raw_note, str) and raw_note.strip()
         else "Задача выполнена."
     )
-
-    clean_fields = _clean_task_data(fields)
 
     with db.atomic():
         for key, value in clean_fields.items():
