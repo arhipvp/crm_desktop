@@ -33,7 +33,7 @@ CRM Desktop — настольное приложение на Python, объе�
 - Работа с файлами и Google Drive реализована в `folder_utils.py`: очистка имён и создание локальных папок клиентов и сделок【F:services/folder_utils.py†L58-L66】【F:services/folder_utils.py†L121-L136】【F:services/folder_utils.py†L200-L239】.
 - Telegram‑уведомления формируются и отправляются через `telegram_service.py`【F:services/telegram_service.py†L15-L64】.
 - Модуль `ai_consultant_service.py` собирает контекст из базы и задаёт вопросы модели OpenAI【F:services/ai_consultant_service.py†L10-L63】.
-- Модуль `ai_policy_service.py` распознаёт полисы из PDF или текста и возвращает данные в формате JSON через OpenAI【F:services/policies/ai_policy_service.py†L196-L209】【F:services/policies/ai_policy_service.py†L350-L359】.
+- Сервис `ai_policy_service` распознаёт полисы из PDF или текста через OpenAI и возвращает данные в формате JSON【F:services/policies/ai_policy_service.py†L196-L209】【F:services/policies/ai_policy_service.py†L350-L359】.
 - Скрипт `backup.py` выгружает данные в SQL и Excel и загружает их на Google Drive【F:backup.py†L1-L108】.
 - Конфигурация логирования сохраняет сообщения в файл и подавляет «SELECT» от Peewee【F:utils/logging_config.py†L17-L48】.
 
