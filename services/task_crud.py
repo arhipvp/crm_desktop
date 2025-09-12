@@ -20,6 +20,15 @@ from .task_states import IDLE, QUEUED
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_SORT_FIELDS = {
+    "due_date": Task.due_date,
+    "title": Task.title,
+    "id": Task.id,
+    "queued_at": Task.queued_at,
+    "is_done": Task.is_done,
+    "dispatch_state": Task.dispatch_state,
+}
+
 
 def get_all_tasks():
     """Вернуть все задачи без удалённых."""
@@ -170,6 +179,12 @@ def build_task_query(
     sort_order: str = "asc",
     column_filters: dict[str, str] | None = None,
 ):
+    sort_field = (
+        sort_field
+        if sort_field in ALLOWED_SORT_FIELDS or sort_field == "executor"
+        else "due_date"
+    )
+
     query = Task.active() if not include_deleted else Task.select()
     if not include_done:
         query = query.where(Task.is_done == False)
@@ -241,6 +256,11 @@ def get_tasks_page(
 ):
     """Получить страницу задач."""
     logger.debug("🔽 Применяем сортировку: field=%s, order=%s", sort_field, sort_order)
+    sort_field = (
+        sort_field
+        if sort_field in ALLOWED_SORT_FIELDS or sort_field == "executor"
+        else "due_date"
+    )
     offset = (page - 1) * per_page
     query = build_task_query(
         column_filters=column_filters, sort_field=sort_field, **filters
@@ -252,12 +272,10 @@ def get_tasks_page(
             else Executor.full_name.desc()
         )
         query = query.distinct().order_by(order, Task.id.asc())
-    elif sort_field and hasattr(Task, sort_field):
-        field = getattr(Task, sort_field)
+    else:
+        field = ALLOWED_SORT_FIELDS.get(sort_field, Task.due_date)
         order = field.asc() if sort_order == "asc" else field.desc()
         query = query.order_by(order, Task.id.asc())
-    else:
-        query = query.order_by(Task.due_date.desc(), Task.id.desc())
     return query.offset(offset).limit(per_page)
 
 
