@@ -1,5 +1,5 @@
-import os
 import logging
+from pathlib import Path
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, constants
 
 from database.models import Task
@@ -27,7 +27,7 @@ def format_exec_task(t: Task) -> tuple[str, InlineKeyboardMarkup]:
             from services.calculation_service import export_calculations_excel
 
             file_path = export_calculations_excel(d.id)
-            file_name = os.path.basename(file_path)
+            file_name = Path(file_path).name
             if d.drive_folder_link:
                 file_link = f"{d.drive_folder_link}/{file_name}"
                 lines.append(f'<a href="{file_link}">📊 Файл расчётов</a>')

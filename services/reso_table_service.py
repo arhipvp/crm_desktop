@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import os
+from pathlib import Path
 from datetime import date, datetime
 import logging
 import pandas as pd
@@ -158,7 +158,7 @@ def import_reso_payouts(
     """
 
     df = load_reso_table(path)
-    file_date = date.fromtimestamp(os.path.getctime(path))
+    file_date = date.fromtimestamp(Path(path).stat().st_ctime)
 
     mapping = {
         "policy_number": "НОМЕР ПОЛИСА",
