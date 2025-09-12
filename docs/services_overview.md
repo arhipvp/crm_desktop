@@ -41,6 +41,12 @@
 - `process_policy_text_with_ai` импортирует полис, отправляя текст или PDF в OpenAI и получая JSON‑структуру и протокол диалога【F:services/policies/ai_policy_service.py†L196-L209】【F:services/policies/ai_policy_service.py†L350-L359】.
 - Системный промпт задаётся переменной окружения `AI_POLICY_PROMPT`【F:config.py†L24】【F:config.py†L49】【F:services/policies/ai_policy_service.py†L117-L119】.
 
+## dashboard_service
+- `get_basic_stats` возвращает количество клиентов, сделок, полисов и задач【F:services/dashboard_service.py†L9-L18】.
+- `count_assistant_tasks`, `count_sent_tasks`, `count_working_tasks` и `count_unconfirmed_tasks` дают сводные счётчики задач【F:services/dashboard_service.py†L20-L46】.
+- `get_upcoming_deal_reminders` возвращает ближайшие напоминания по открытым сделкам【F:services/dashboard_service.py†L70-L88】.
+- `get_expiring_policies` показывает полисы с истекающим сроком действия【F:services/dashboard_service.py†L62-L69】.
+
 ## telegram_service
 - `format_exec_task` формирует HTML‑сообщение и inline‑клавиатуру для задачи исполнителю【F:services/telegram_service.py†L15-L48】.
 - `send_exec_task` передаёт сообщение через бот и сохраняет идентификаторы для обратной связи【F:services/telegram_service.py†L51-L64】.
