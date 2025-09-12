@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QTextCursor
-import os
+from pathlib import Path
 import json as _json
 
 from services.policies.ai_policy_service import (
@@ -90,7 +90,7 @@ class AiPolicyFilesDialog(QDialog):
         btns.addWidget(cancel_btn)
         layout.addLayout(btns)
 
-        self.files: list[str] = []
+        self.files: list[Path] = []
         self._messages: list[dict] = []
         self._worker: _Worker | None = None
 
@@ -122,7 +122,7 @@ class AiPolicyFilesDialog(QDialog):
         msg = QMessageBox(self)
         msg.setWindowTitle("Диалог с ИИ")
         if len(self.files) == 1:
-            name = os.path.basename(self.files[0])
+            name = self.files[0].name
             msg.setText(
                 f"Распознавание файла {name} завершено. Полный диалог см. в деталях."
             )
@@ -146,7 +146,7 @@ class AiPolicyFilesDialog(QDialog):
                 from services.folder_utils import move_file_to_folder
 
                 for src in self.files:
-                    move_file_to_folder(src, policy.drive_folder_link)
+                    move_file_to_folder(str(src), policy.drive_folder_link)
             self.accept()
         else:
             self.process_btn.setEnabled(True)
@@ -168,10 +168,10 @@ class AiPolicyFilesDialog(QDialog):
     def dropEvent(self, event):  # noqa: D401 - Qt override
         urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
         for url in urls:
-            path = url.toLocalFile()
+            path = Path(url.toLocalFile())
             if path not in self.files:
                 self.files.append(path)
-                self.list_widget.addItem(path)
+                self.list_widget.addItem(str(path))
         if urls:
             event.acceptProposedAction()
 
@@ -192,7 +192,7 @@ class AiPolicyFilesDialog(QDialog):
             QMessageBox.warning(self, "Ошибка", "Добавьте файлы.")
             return
 
-        text = "\n".join(_read_text(p) for p in self.files)
+        text = "\n".join(_read_text(str(p)) for p in self.files)
         self.conv_edit.clear()
         self._messages = [
             {"role": "system", "content": _get_prompt()},

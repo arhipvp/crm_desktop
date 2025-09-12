@@ -8,6 +8,7 @@ import os
 import subprocess
 import urllib.parse
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -29,11 +30,11 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 setup_logging()
 
 DATE = datetime.now().strftime("%Y-%m-%d_%H-%M")
-SQL_PATH = f"backups/backup_{DATE}.sql"
-XLSX_PATH = f"backups/backup_{DATE}.xlsx"
+backups_dir = Path("backups")
+backups_dir.mkdir(exist_ok=True)
+SQL_PATH = backups_dir / f"backup_{DATE}.sql"
+XLSX_PATH = backups_dir / f"backup_{DATE}.xlsx"
 DRIVE_FOLDER_NAME = "Backups"
-
-os.makedirs("backups", exist_ok=True)
 
 # ───────────── pg_dump via Docker ─────────────
 logger.info("📦 SQL-дамп через docker exec…")
@@ -98,11 +99,11 @@ folder_id = extract_folder_id(folder_url)
 if not folder_id:
     raise RuntimeError("Не удалось получить ID папки для бэкапа")
 
-if os.path.exists(SQL_PATH):
-    upload_to_drive(SQL_PATH, folder_id)
+if SQL_PATH.exists():
+    upload_to_drive(str(SQL_PATH), folder_id)
 else:
     logger.warning("⚠️ SQL-файл не найден, пропускаем загрузку.")
 
-upload_to_drive(XLSX_PATH, folder_id)
+upload_to_drive(str(XLSX_PATH), folder_id)
 
 logger.info("✅ Готово: всё, что найдено, загружено в Google Drive.")
