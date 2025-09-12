@@ -1,22 +1,7 @@
-from PySide6.QtWidgets import QDialog, QTabWidget
-
-from ui.main_window import MainWindow
+from PySide6.QtWidgets import QDialog
 
 
-def _prepare_main_window(monkeypatch):
-    """Создаёт MainWindow без загрузки реальных вкладок."""
-
-    def dummy_init_tabs(self):
-        self.tab_widget = QTabWidget()
-        self.setCentralWidget(self.tab_widget)
-
-    monkeypatch.setattr(MainWindow, "init_tabs", dummy_init_tabs)
-    monkeypatch.setattr(MainWindow, "on_tab_changed", lambda self, index: None)
-
-    return MainWindow()
-
-
-def test_open_import_policy_json_shows_message_once(monkeypatch, qapp):
+def test_open_import_policy_json_shows_message_once(monkeypatch, dummy_main_window):
 
     created = []
 
@@ -29,7 +14,7 @@ def test_open_import_policy_json_shows_message_once(monkeypatch, qapp):
 
     monkeypatch.setattr("ui.main_window.ImportPolicyJsonForm", DummyDlg)
 
-    mw = _prepare_main_window(monkeypatch)
+    mw = dummy_main_window()
     messages = []
     monkeypatch.setattr(
         mw.status_bar, "showMessage", lambda msg, timeout=0: messages.append(msg)
@@ -42,7 +27,7 @@ def test_open_import_policy_json_shows_message_once(monkeypatch, qapp):
     assert "импорт" in messages[0].lower()
 
 
-def test_open_import_policy_json_cancel_shows_no_message(monkeypatch, qapp):
+def test_open_import_policy_json_cancel_shows_no_message(monkeypatch, dummy_main_window):
 
     class DummyDlg:
         def __init__(self, parent=None):
@@ -53,7 +38,7 @@ def test_open_import_policy_json_cancel_shows_no_message(monkeypatch, qapp):
 
     monkeypatch.setattr("ui.main_window.ImportPolicyJsonForm", DummyDlg)
 
-    mw = _prepare_main_window(monkeypatch)
+    mw = dummy_main_window()
     messages = []
     monkeypatch.setattr(
         mw.status_bar, "showMessage", lambda msg, timeout=0: messages.append(msg)
