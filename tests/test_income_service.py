@@ -8,6 +8,7 @@ from database.models import Client, Policy, Payment, Income
 from services.income_service import (
     mark_incomes_deleted,
     get_incomes_page,
+    get_income_highlight_color,
 )
 
 
@@ -29,6 +30,26 @@ def _create_income(*, received_date: date, amount: int, suffix: str) -> Income:
         payment=payment,
         amount=amount,
         received_date=received_date,
+    )
+
+
+def _make_income(contractor: str | None) -> Income:
+    """Create an ``Income`` instance with an optional contractor."""
+
+    policy = Policy(
+        policy_number="123",
+        contractor=contractor,
+        start_date=date.today(),
+    )
+    payment = Payment(
+        policy=policy,
+        amount=100,
+        payment_date=date.today(),
+    )
+    return Income(
+        payment=payment,
+        amount=10,
+        received_date=date.today(),
     )
 
 
@@ -88,4 +109,16 @@ def test_get_incomes_page_pagination_and_deleted(in_memory_db):
         )
     )
     assert [i.id for i in all_incomes] == [inc4.id, inc3.id, inc2.id, inc1.id]
+
+
+@pytest.mark.parametrize(
+    "contractor, expected_color",
+    [
+        ("Some Corp", "#ffcccc"),
+        (None, None),
+    ],
+)
+def test_income_highlight(contractor, expected_color):
+    income = _make_income(contractor)
+    assert get_income_highlight_color(income) == expected_color
 
