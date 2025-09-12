@@ -25,6 +25,8 @@ from database.models import (
     Task,
 )
 
+from services.policies import policy_service as ps
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 _TEST_TIMEOUT = int(os.environ.get("PYTEST_TIMEOUT", "60"))
@@ -94,3 +96,12 @@ def in_memory_db(monkeypatch):
             test_db.close()
         except Exception:
             pass
+
+
+@pytest.fixture()
+def policy_folder_patches(monkeypatch):
+    monkeypatch.setattr(ps, "create_policy_folder", lambda *a, **k: None)
+    monkeypatch.setattr(ps, "open_folder", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "services.folder_utils.rename_policy_folder", lambda *a, **k: (None, None)
+    )

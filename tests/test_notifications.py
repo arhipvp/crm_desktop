@@ -19,10 +19,8 @@ from services.task_states import SENT
 
 pytestmark = pytest.mark.slow
 
-def test_notify_on_policy_add(in_memory_db, monkeypatch):
-    monkeypatch.setattr(ps, "create_policy_folder", lambda *a, **k: None)
-    monkeypatch.setattr(ps, "open_folder", lambda *a, **k: None)
 
+def test_notify_on_policy_add(in_memory_db, monkeypatch, policy_folder_patches):
     client = Client.create(name='C')
     deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
     executor = Executor.create(full_name='E', tg_id=1, is_active=True)
