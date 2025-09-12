@@ -299,6 +299,18 @@ class IncomeTableView(BaseTableView):
             self.model.get_item(self._source_row(i)) for i in indexes
         ]
 
+    def get_selected_deal(self):
+        income = self.get_selected()
+        if not income:
+            return None
+        payment = getattr(income, "payment", None)
+        if not payment:
+            return None
+        policy = getattr(payment, "policy", None)
+        if not policy:
+            return None
+        return getattr(policy, "deal", None)
+
     def add_new(self):
         form = self.form_class()
         if form.exec():
