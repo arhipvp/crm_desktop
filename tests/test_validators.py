@@ -1,7 +1,6 @@
 import pytest
 from services.validators import normalize_number, normalize_phone
 
-
 @pytest.mark.parametrize(
     "value, expected",
     [
