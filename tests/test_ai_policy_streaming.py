@@ -1,43 +1,31 @@
 import openai
+from types import SimpleNamespace
+
 from services.policies import ai_policy_service
 from services.policies.ai_policy_service import _chat
 from config import Settings
 
 
-class DummyFunc:
-    def __init__(self, arguments=None):
-        self.arguments = arguments
+def generate_streaming_chunks():
+    def make_chunk(tool_calls):
+        delta = SimpleNamespace(tool_calls=tool_calls)
+        choice = SimpleNamespace(delta=delta)
+        return SimpleNamespace(choices=[choice])
 
-
-class DummyCall:
-    def __init__(self, func=None):
-        self.function = func
-
-
-class DummyDelta:
-    def __init__(self, tool_calls=None):
-        self.tool_calls = tool_calls
-
-
-class DummyChoice:
-    def __init__(self, delta=None):
-        self.delta = delta
-
-
-class DummyChunk:
-    def __init__(self, delta=None):
-        self.choices = [DummyChoice(delta)]
+    return [
+        make_chunk(None),
+        make_chunk([]),
+        make_chunk(
+            [SimpleNamespace(function=SimpleNamespace(arguments='{"a'))]
+        ),
+        make_chunk(
+            [SimpleNamespace(function=SimpleNamespace(arguments='1"}'))]
+        ),
+    ]
 
 
 def fake_stream(**kwargs):
-    return iter(
-        [
-            DummyChunk(DummyDelta(None)),
-            DummyChunk(DummyDelta([])),
-            DummyChunk(DummyDelta([DummyCall(DummyFunc('{"a'))])),
-            DummyChunk(DummyDelta([DummyCall(DummyFunc('1"}'))])),
-        ]
-    )
+    return iter(generate_streaming_chunks())
 
 
 class DummyCompletions:
