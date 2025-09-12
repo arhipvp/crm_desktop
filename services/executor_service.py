@@ -4,6 +4,8 @@ from typing import Iterable, List, Optional, Any
 
 from peewee import JOIN, ModelSelect, Field
 
+from services.query_utils import apply_search_and_filters
+
 from config import Settings, get_settings
 from database.db import db
 from database.models import Deal, DealExecutor, Executor
@@ -115,22 +117,7 @@ def build_executor_query(
     query = Executor.select()
     if not show_inactive:
         query = query.where(Executor.is_active == True)
-    if search_text:
-        query = query.where(
-            (Executor.full_name.contains(search_text))
-            | (Executor.tg_id.cast("TEXT").contains(search_text))
-        )
-    # Apply per-column filters if provided
-    if column_filters:
-        conds = []
-        for field, text in column_filters.items():
-            try:
-                conds.append(field.cast("TEXT").contains(text))
-            except Exception:
-                # Fallback: ignore unknown fields
-                continue
-        for c in conds:
-            query = query.where(c)
+    query = apply_search_and_filters(query, Executor, search_text, column_filters)
     return query
 
 
