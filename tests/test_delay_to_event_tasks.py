@@ -1,9 +1,12 @@
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
+from PySide6.QtCore import QDate
 
 from database.models import Client, Deal, Task
+from ui.views.deal_detail import tabs
 from ui.views.deal_detail.actions import DealActionsMixin
+from ui.views.deal_detail.tabs import DealTabsMixin
 
 
 class DummyView(DealActionsMixin):
@@ -75,4 +78,36 @@ def test_tasks_not_closed_on_decline(monkeypatch):
 
     assert Task.select().where(Task.is_done == True).count() == 0
     assert not view.tabs_inited
+
+
+class DummyDateEdit:
+    def __init__(self):
+        self._date = None
+
+    def setDate(self, qdate: QDate):
+        self._date = qdate
+
+
+class DummyDeal(DealTabsMixin):
+    def __init__(self):
+        self.reminder_date = DummyDateEdit()
+        self.saved = False
+
+    def _on_save_and_close(self):
+        self.saved = True
+
+
+def test_postpone_reminder_uses_today(monkeypatch):
+    class FixedDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2024, 4, 8)
+
+    monkeypatch.setattr(tabs, "date", FixedDate)
+
+    deal = DummyDeal()
+    deal._postpone_reminder(2)
+
+    assert deal.reminder_date._date.toPython() == FixedDate.today() + timedelta(days=2)
+    assert deal.saved
 
