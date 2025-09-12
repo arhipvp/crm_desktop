@@ -19,3 +19,24 @@ def test_mark_calculations_deleted(in_memory_db):
         assert DealCalculation.get_by_id(calc2.id).is_deleted
     finally:
         DealCalculation.drop_table()
+
+
+def test_mark_calculations_deleted_empty_ids(in_memory_db):
+    DealCalculation.create_table()
+    try:
+        affected = mark_calculations_deleted([])
+
+        assert affected == 0
+        assert DealCalculation.select().count() == 0
+    finally:
+        DealCalculation.drop_table()
+
+
+def test_mark_calculations_deleted_missing(in_memory_db):
+    DealCalculation.create_table()
+    try:
+        affected = mark_calculations_deleted([1, 2, 3])
+
+        assert affected == 0
+    finally:
+        DealCalculation.drop_table()
