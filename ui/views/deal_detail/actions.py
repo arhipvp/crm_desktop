@@ -1,8 +1,8 @@
 import base64
 import logging
-import os
 import re
 from datetime import date, timedelta
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -232,9 +232,9 @@ class DealActionsMixin:
 
     def _open_folder(self):
         path = self.instance.drive_folder_path or self.instance.drive_folder_link
-        if self.instance.drive_folder_path and not os.path.isdir(
+        if self.instance.drive_folder_path and not Path(
             self.instance.drive_folder_path
-        ):
+        ).is_dir():
             from ui.common.message_boxes import confirm
             from services.folder_utils import create_deal_folder
 
@@ -264,7 +264,7 @@ class DealActionsMixin:
     def _ensure_local_folder(self) -> str | None:
         """Ensure local deal folder exists and return its path."""
         path = self.instance.drive_folder_path
-        if path and os.path.isdir(path):
+        if path and Path(path).is_dir():
             return path
 
         from services.folder_utils import create_deal_folder
