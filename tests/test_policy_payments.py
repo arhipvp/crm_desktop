@@ -6,13 +6,17 @@ from services import payment_service as pay_svc
 from services.policies import policy_service as policy_svc
 
 
-def test_sync_policy_payments_adds_and_removes(in_memory_db, mock_payments):
-    client = Client.create(name="C")
+def test_sync_policy_payments_adds_and_removes(
+    in_memory_db, mock_payments, make_policy_with_payment
+):
     d1 = datetime.date(2024, 1, 1)
     d2 = datetime.date(2024, 2, 1)
     d3 = datetime.date(2024, 3, 1)
-    policy = Policy.create(client=client, policy_number="P", start_date=d1, end_date=d3)
-    p1 = Payment.create(policy=policy, amount=100, payment_date=d1)
+    client, deal, policy, p1 = make_policy_with_payment(
+        client_kwargs={"name": "C"},
+        policy_kwargs={"policy_number": "P", "start_date": d1, "end_date": d3},
+        payment_kwargs={"amount": 100, "payment_date": d1},
+    )
     p2 = Payment.create(policy=policy, amount=200, payment_date=d2)
 
     pay_svc.sync_policy_payments(
@@ -33,19 +37,16 @@ def test_sync_policy_payments_adds_and_removes(in_memory_db, mock_payments):
 
 
 def test_update_policy_syncs_payments_and_marks_first_paid(
-    in_memory_db, mock_payments, policy_folder_patches
+    in_memory_db, mock_payments, policy_folder_patches, make_policy_with_payment
 ):
-    client = Client.create(name="C")
     d1 = datetime.date(2024, 1, 1)
     d2 = datetime.date(2024, 2, 1)
     d3 = datetime.date(2024, 3, 1)
-    policy = Policy.create(
-        client=client,
-        policy_number="P",
-        start_date=d1,
-        end_date=d3,
+    client, deal, policy, _ = make_policy_with_payment(
+        client_kwargs={"name": "C"},
+        policy_kwargs={"policy_number": "P", "start_date": d1, "end_date": d3},
+        payment_kwargs={"amount": 100, "payment_date": d1},
     )
-    Payment.create(policy=policy, amount=100, payment_date=d1)
     Payment.create(policy=policy, amount=200, payment_date=d2)
 
     policy_svc.update_policy(
@@ -73,12 +74,16 @@ def test_update_policy_syncs_payments_and_marks_first_paid(
     )
 
 
-def test_sync_policy_payments_removes_zero_when_real_exists(in_memory_db, mock_payments):
-    client = Client.create(name="C")
+def test_sync_policy_payments_removes_zero_when_real_exists(
+    in_memory_db, mock_payments, make_policy_with_payment
+):
     d0 = datetime.date(2024, 1, 1)
     d1 = datetime.date(2024, 2, 1)
-    policy = Policy.create(client=client, policy_number="P", start_date=d0, end_date=d1)
-    zero_payment = Payment.create(policy=policy, amount=0, payment_date=d0)
+    client, deal, policy, zero_payment = make_policy_with_payment(
+        client_kwargs={"name": "C"},
+        policy_kwargs={"policy_number": "P", "start_date": d0, "end_date": d1},
+        payment_kwargs={"amount": 0, "payment_date": d0},
+    )
 
     pay_svc.sync_policy_payments(
         policy,
@@ -156,11 +161,15 @@ def test_add_payment_rolls_back_on_related_error(
     assert Expense.select().count() == 0
 
 
-def test_sync_policy_payments_removes_extra_duplicates(in_memory_db, mock_payments):
-    client = Client.create(name="C")
+def test_sync_policy_payments_removes_extra_duplicates(
+    in_memory_db, mock_payments, make_policy_with_payment
+):
     d1 = datetime.date(2024, 1, 1)
-    policy = Policy.create(client=client, policy_number="P", start_date=d1, end_date=d1)
-    p1 = Payment.create(policy=policy, amount=100, payment_date=d1)
+    client, deal, policy, p1 = make_policy_with_payment(
+        client_kwargs={"name": "C"},
+        policy_kwargs={"policy_number": "P", "start_date": d1, "end_date": d1},
+        payment_kwargs={"amount": 100, "payment_date": d1},
+    )
     p2 = Payment.create(policy=policy, amount=100, payment_date=d1)
 
     pay_svc.sync_policy_payments(
@@ -177,11 +186,15 @@ def test_sync_policy_payments_removes_extra_duplicates(in_memory_db, mock_paymen
     assert remaining_id in {p1.id, p2.id}
 
 
-def test_sync_policy_payments_adds_missing_duplicates(in_memory_db, mock_payments):
-    client = Client.create(name="C")
+def test_sync_policy_payments_adds_missing_duplicates(
+    in_memory_db, mock_payments, make_policy_with_payment
+):
     d1 = datetime.date(2024, 1, 1)
-    policy = Policy.create(client=client, policy_number="P", start_date=d1, end_date=d1)
-    p1 = Payment.create(policy=policy, amount=100, payment_date=d1)
+    client, deal, policy, p1 = make_policy_with_payment(
+        client_kwargs={"name": "C"},
+        policy_kwargs={"policy_number": "P", "start_date": d1, "end_date": d1},
+        payment_kwargs={"amount": 100, "payment_date": d1},
+    )
 
     pay_svc.sync_policy_payments(
         policy,

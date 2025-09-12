@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 
 import pytest
 
-from database.models import Policy, Task
+from database.models import Task
 from services.task_queue import (
     pop_all_by_deal,
     pop_next,
@@ -35,7 +35,9 @@ def test_pop_next_returns_tasks_in_order_and_none_when_empty(make_task):
 
 
 @pytest.mark.usefixtures("in_memory_db")
-def test_pop_next_by_client_filters_by_client_and_policy(make_task):
+def test_pop_next_by_client_filters_by_client_and_policy(
+    make_task, make_policy_with_payment
+):
     c1, d1, t_deal = make_task(
         client_name="C1",
         deal_description="D1",
@@ -43,7 +45,9 @@ def test_pop_next_by_client_filters_by_client_and_policy(make_task):
         queued_at=datetime.utcnow() - timedelta(minutes=2),
     )
     c2, d2, _ = make_task(client_name="C2", deal_description="D2", title="T_other")
-    p1 = Policy.create(client=c1, policy_number="P1", start_date=date.today())
+    _, _, p1, _ = make_policy_with_payment(
+        client=c1, policy_kwargs={"policy_number": "P1"}
+    )
     _, _, t_policy = make_task(
         client=c1,
         policy=p1,

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import QDate
-from database.models import Client, Deal, Policy, Task, Executor, DealExecutor
+from database.models import Client, Deal, Policy, Task, Executor, DealExecutor, Payment
 from services.task_states import QUEUED
 from ui.views.deal_detail.actions import DealActionsMixin
 from ui.views.deal_detail.tabs import DealTabsMixin
@@ -78,6 +78,38 @@ def make_task():
         return client, deal, task
 
     return _make_task
+
+
+@pytest.fixture
+def make_policy_with_payment():
+    def _make_policy_with_payment(
+        *,
+        client: Client | None = None,
+        deal: Deal | None = None,
+        client_kwargs: dict | None = None,
+        deal_kwargs: dict | None = None,
+        policy_kwargs: dict | None = None,
+        payment_kwargs: dict | None = None,
+    ):
+        if client is None:
+            client_kwargs = client_kwargs or {"name": "C"}
+            client = Client.create(**client_kwargs)
+        if deal is None:
+            deal_defaults = {"description": "D", "start_date": date.today()}
+            deal_params = {**deal_defaults, **(deal_kwargs or {})}
+            deal = Deal.create(client=client, **deal_params)
+        policy_defaults = {"policy_number": "P", "start_date": date.today()}
+        policy_params = {**policy_defaults, **(policy_kwargs or {})}
+        policy_params.setdefault("client", client)
+        policy_params.setdefault("deal", deal)
+        policy = Policy.create(**policy_params)
+        payment_defaults = {"amount": 100, "payment_date": date.today()}
+        payment_params = {**payment_defaults, **(payment_kwargs or {})}
+        payment_params.setdefault("policy", policy)
+        payment = Payment.create(**payment_params)
+        return client, deal, policy, payment
+
+    return _make_policy_with_payment
 
 
 @pytest.fixture
