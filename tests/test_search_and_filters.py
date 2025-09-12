@@ -55,7 +55,7 @@ def test_get_executors_page_filters(in_memory_db):
         get_executors_page(
             page=1,
             per_page=10,
-            column_filters={Executor.full_name: "Bob"},
+            column_filters={"full_name": "Bob"},
         )
     )
     assert len(results) == 1
