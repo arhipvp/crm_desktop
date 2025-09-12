@@ -1,17 +1,9 @@
 import datetime
 
-from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 
 from database.models import Client, Policy
 from ui.views.policy_table_view import PolicyTableView
-
-
-def _create_app():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
 
 
 class DummyPolicyTableView(PolicyTableView):
@@ -21,8 +13,7 @@ class DummyPolicyTableView(PolicyTableView):
         pass
 
 
-def test_policy_table_sort_preserved_after_refresh(in_memory_db):
-    _create_app()
+def test_policy_table_sort_preserved_after_refresh(in_memory_db, qapp):
 
     client = Client.create(name="C")
     today = datetime.date.today()
@@ -35,14 +26,14 @@ def test_policy_table_sort_preserved_after_refresh(in_memory_db):
 
     column = 2  # столбец номера полиса
     view.table.sortByColumn(column, Qt.DescendingOrder)
-    QApplication.processEvents()
+    qapp.processEvents()
 
     assert view.current_sort_column == column
     assert view.current_sort_order == Qt.DescendingOrder
 
     # имитируем обновление данных после создания сделки
     view.refresh()
-    QApplication.processEvents()
+    qapp.processEvents()
 
     header = view.table.horizontalHeader()
     assert header.sortIndicatorSection() == column

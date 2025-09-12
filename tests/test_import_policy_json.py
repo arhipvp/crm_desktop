@@ -1,13 +1,6 @@
-from PySide6.QtWidgets import QApplication, QDialog, QTabWidget
+from PySide6.QtWidgets import QDialog, QTabWidget
 
 from ui.main_window import MainWindow
-
-
-def _create_app():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
 
 
 def _prepare_main_window(monkeypatch):
@@ -23,8 +16,7 @@ def _prepare_main_window(monkeypatch):
     return MainWindow()
 
 
-def test_open_import_policy_json_shows_message_once(monkeypatch):
-    _create_app()
+def test_open_import_policy_json_shows_message_once(monkeypatch, qapp):
 
     created = []
 
@@ -50,8 +42,7 @@ def test_open_import_policy_json_shows_message_once(monkeypatch):
     assert "импорт" in messages[0].lower()
 
 
-def test_open_import_policy_json_cancel_shows_no_message(monkeypatch):
-    _create_app()
+def test_open_import_policy_json_cancel_shows_no_message(monkeypatch, qapp):
 
     class DummyDlg:
         def __init__(self, parent=None):

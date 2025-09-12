@@ -70,7 +70,13 @@ def qapp():
         yield None
         return
     app = QApplication.instance() or QApplication([])
-    yield app
+    try:
+        yield app
+    finally:
+        try:
+            app.quit()
+        except Exception:
+            pass
 
 @pytest.fixture()
 def in_memory_db(monkeypatch):
