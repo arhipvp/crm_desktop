@@ -1,5 +1,5 @@
 import pytest
-from datetime import date
+import datetime
 
 from database.models import Client, Policy, Executor, Deal
 from services.clients.client_service import build_client_query
@@ -8,12 +8,15 @@ from services.executor_service import get_executors_page
 from services.deal_service import build_deal_query, get_deals_page
 
 
+TODAY = datetime.date(2024, 1, 1)
+
+
 def _create_deal(client: Client, description: str) -> Deal:
     return Deal.create(
         client=client,
         description=description,
-        reminder_date=date.today(),
-        start_date=date.today(),
+        reminder_date=TODAY,
+        start_date=TODAY,
     )
 
 
@@ -41,14 +44,14 @@ def test_apply_search_and_filters_policies(in_memory_db):
         client=c1,
         deal=None,
         policy_number="P1",
-        start_date=date.today(),
+        start_date=TODAY,
         insurance_company="IC1",
     )
     Policy.create(
         client=c2,
         deal=None,
         policy_number="P2",
-        start_date=date.today(),
+        start_date=TODAY,
         insurance_company="IC2",
     )
     query = Policy.select()

@@ -7,11 +7,14 @@ from ui.base.base_table_view import BaseTableView
 from ui.views.policy_table_view import PolicyTableView
 
 
+TODAY = datetime.date(2024, 1, 1)
+
+
 @pytest.mark.parametrize("view_class", [BaseTableView, PolicyTableView])
 @pytest.mark.parametrize("sort_order", [Qt.AscendingOrder, Qt.DescendingOrder])
 def test_table_sorting(view_class, sort_order, in_memory_db, qapp, monkeypatch):
     client = Client.create(name="C")
-    today = datetime.date.today()
+    today = TODAY
 
     if view_class is BaseTableView:
         policy1 = Policy.create(

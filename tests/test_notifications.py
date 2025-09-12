@@ -17,6 +17,9 @@ from services.task_states import SENT
 pytestmark = pytest.mark.slow
 
 
+TODAY = datetime.date(2024, 1, 1)
+
+
 @pytest.mark.parametrize("sent_notify", ["ps"], indirect=True)
 def test_notify_on_policy_add(
     in_memory_db, mock_payments, policy_folder_patches, sent_notify, make_deal_with_executor
@@ -25,11 +28,11 @@ def test_notify_on_policy_add(
 
     ps.add_policy(
         policy_number='P',
-        start_date=datetime.date.today(),
-        end_date=datetime.date.today(),
+        start_date=TODAY,
+        end_date=TODAY,
         client=client,
         deal=deal,
-        payments=[{"amount": 0, "payment_date": datetime.date.today()}],
+        payments=[{"amount": 0, "payment_date": TODAY}],
     )
 
     assert sent_notify.get('tg_id') == executor.tg_id
@@ -54,12 +57,12 @@ def test_notify_on_income_received(in_memory_db, sent_notify, make_deal_with_exe
         client=client,
         deal=deal,
         policy_number='P',
-        start_date=datetime.date.today(),
-        end_date=datetime.date.today(),
+        start_date=TODAY,
+        end_date=TODAY,
     )
-    payment = Payment.create(policy=policy, amount=0, payment_date=datetime.date.today())
+    payment = Payment.create(policy=policy, amount=0, payment_date=TODAY)
 
-    ins.add_income(payment=payment, amount=10, received_date=datetime.date.today())
+    ins.add_income(payment=payment, amount=10, received_date=TODAY)
 
     assert sent_notify.get('tg_id') == executor.tg_id
     assert 'P' in sent_notify.get('text', '')
@@ -67,10 +70,10 @@ def test_notify_on_income_received(in_memory_db, sent_notify, make_deal_with_exe
 
 def test_notify_task_resends_message(in_memory_db, monkeypatch):
     client = Client.create(name='C')
-    deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
+    deal = Deal.create(client=client, description='D', start_date=TODAY)
     task = Task.create(
         title='T',
-        due_date=datetime.date.today(),
+        due_date=TODAY,
         deal=deal,
         dispatch_state=SENT,
         tg_chat_id=99,

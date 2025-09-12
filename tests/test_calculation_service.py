@@ -1,6 +1,9 @@
-from datetime import date
+import datetime
 
 import pytest
+
+
+TODAY = datetime.date(2024, 1, 1)
 
 from database.models import Client, Deal, DealCalculation
 from services.calculation_service import (
@@ -17,7 +20,7 @@ def make_calculation():
         if client is None:
             client = Client.create(name="C")
         if deal is None:
-            deal = Deal.create(client=client, description="d", start_date=date.today())
+            deal = Deal.create(client=client, description="d", start_date=TODAY)
         calc = DealCalculation.create(deal=deal, **calc_kwargs)
         return client, deal, calc
 
@@ -26,8 +29,8 @@ def make_calculation():
 
 def test_update_calculation(in_memory_db):
     client = Client.create(name="C")
-    deal1 = Deal.create(client=client, description="d1", start_date=date.today())
-    deal2 = Deal.create(client=client, description="d2", start_date=date.today())
+    deal1 = Deal.create(client=client, description="d1", start_date=TODAY)
+    deal2 = Deal.create(client=client, description="d2", start_date=TODAY)
     calc = DealCalculation.create(deal=deal1, insurance_company="A")
 
     updated = update_calculation(
@@ -40,7 +43,7 @@ def test_update_calculation(in_memory_db):
 
 def test_get_unique_calculation_field_values(in_memory_db):
     client = Client.create(name="C")
-    deal = Deal.create(client=client, description="d", start_date=date.today())
+    deal = Deal.create(client=client, description="d", start_date=TODAY)
     DealCalculation.create(deal=deal, insurance_company="A")
     DealCalculation.create(deal=deal, insurance_company="B")
     DealCalculation.create(deal=deal, insurance_company="A")
@@ -53,7 +56,7 @@ def test_get_unique_calculation_field_values(in_memory_db):
 
 def test_format_calculation(in_memory_db):
     client = Client.create(name="C")
-    deal = Deal.create(client=client, description="d", start_date=date.today())
+    deal = Deal.create(client=client, description="d", start_date=TODAY)
     calc = DealCalculation.create(
         deal=deal,
         insurance_company="IC",

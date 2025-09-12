@@ -2,6 +2,9 @@ import datetime
 
 import pytest
 
+
+TODAY = datetime.date(2024, 1, 1)
+
 from database.models import Client, Deal, Task
 from services.task_crud import get_tasks_page, build_task_query
 
@@ -17,7 +20,7 @@ from services.task_crud import get_tasks_page, build_task_query
 @pytest.mark.parametrize("sort_order", ["asc", "desc"])
 def test_invalid_sort_field_defaults_to_due_date(func, requires_order, sort_order):
     client = Client.create(name="C")
-    deal = Deal.create(client=client, description="D", start_date=datetime.date.today())
+    deal = Deal.create(client=client, description="D", start_date=TODAY)
     t1 = Task.create(title="T1", due_date=datetime.date(2023, 1, 1), deal=deal)
     t2 = Task.create(title="T2", due_date=datetime.date(2023, 1, 2), deal=deal)
 

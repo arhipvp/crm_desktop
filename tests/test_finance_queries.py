@@ -1,5 +1,5 @@
+import datetime
 import pytest
-from datetime import date
 
 from database.models import (
     Client,
@@ -15,6 +15,9 @@ from services.income_service import get_incomes_page, get_income_highlight_color
 from services.expense_service import build_expense_query
 
 
+TODAY = datetime.date(2024, 1, 1)
+
+
 class TestIncome:
     @staticmethod
     def _create_income_for_executor(name: str, tg_id: int) -> Income:
@@ -22,25 +25,25 @@ class TestIncome:
         deal = Deal.create(
             client=client,
             description=f"Deal {name}",
-            start_date=date.today(),
+            start_date=TODAY,
         )
         policy = Policy.create(
             client=client,
             deal=deal,
             policy_number=f"P{name}",
-            start_date=date.today(),
+            start_date=TODAY,
         )
         payment = Payment.create(
             policy=policy,
             amount=100,
-            payment_date=date.today(),
+            payment_date=TODAY,
         )
         income = Income.create(payment=payment, amount=100)
         executor = Executor.create(full_name=name, tg_id=tg_id)
         DealExecutor.create(
             deal=deal,
             executor=executor,
-            assigned_date=date.today(),
+            assigned_date=TODAY,
         )
         return income
 
@@ -51,17 +54,17 @@ class TestIncome:
         policy = Policy(
             policy_number="123",
             contractor=contractor,
-            start_date=date.today(),
+            start_date=TODAY,
         )
         payment = Payment(
             policy=policy,
             amount=100,
-            payment_date=date.today(),
+            payment_date=TODAY,
         )
         return Income(
             payment=payment,
             amount=10,
-            received_date=date.today(),
+            received_date=TODAY,
         )
 
     @pytest.mark.parametrize(
@@ -100,33 +103,33 @@ class TestIncome:
     def test_income_search_related_models(self, in_memory_db, search, expected):
         client1 = Client.create(name="Alice")
         deal1 = Deal.create(
-            client=client1, description="DealA", start_date=date.today()
+            client=client1, description="DealA", start_date=TODAY
         )
         policy1 = Policy.create(
             client=client1,
             deal=deal1,
             policy_number="P1",
-            start_date=date.today(),
+            start_date=TODAY,
             note="NoteA",
         )
         payment1 = Payment.create(
-            policy=policy1, amount=100, payment_date=date.today()
+            policy=policy1, amount=100, payment_date=TODAY
         )
         Income.create(payment=payment1, amount=10)
 
         client2 = Client.create(name="Bob")
         deal2 = Deal.create(
-            client=client2, description="DealB", start_date=date.today()
+            client=client2, description="DealB", start_date=TODAY
         )
         policy2 = Policy.create(
             client=client2,
             deal=deal2,
             policy_number="P2",
-            start_date=date.today(),
+            start_date=TODAY,
             note="NoteB",
         )
         payment2 = Payment.create(
-            policy=policy2, amount=200, payment_date=date.today()
+            policy=policy2, amount=200, payment_date=TODAY
         )
         Income.create(payment=payment2, amount=20)
 
@@ -148,17 +151,17 @@ class TestExpense:
     def test_expense_search_related_models(self, in_memory_db, search, expected):
         client1 = Client.create(name="Alice")
         deal1 = Deal.create(
-            client=client1, description="DealA", start_date=date.today()
+            client=client1, description="DealA", start_date=TODAY
         )
         policy1 = Policy.create(
             client=client1,
             deal=deal1,
             policy_number="P1",
-            start_date=date.today(),
+            start_date=TODAY,
             note="NoteA",
         )
         payment1 = Payment.create(
-            policy=policy1, amount=100, payment_date=date.today()
+            policy=policy1, amount=100, payment_date=TODAY
         )
         Expense.create(
             payment=payment1, amount=10, expense_type="t", policy=policy1
@@ -166,17 +169,17 @@ class TestExpense:
 
         client2 = Client.create(name="Bob")
         deal2 = Deal.create(
-            client=client2, description="DealB", start_date=date.today()
+            client=client2, description="DealB", start_date=TODAY
         )
         policy2 = Policy.create(
             client=client2,
             deal=deal2,
             policy_number="P2",
-            start_date=date.today(),
+            start_date=TODAY,
             note="NoteB",
         )
         payment2 = Payment.create(
-            policy=policy2, amount=200, payment_date=date.today()
+            policy=policy2, amount=200, payment_date=TODAY
         )
         Expense.create(
             payment=payment2, amount=20, expense_type="t", policy=policy2
@@ -188,19 +191,19 @@ class TestExpense:
 
     def test_apply_expense_filters_field_keys(self, in_memory_db):
         client = Client.create(name="C1")
-        deal1 = Deal.create(client=client, description="D1", start_date=date.today())
-        deal2 = Deal.create(client=client, description="D2", start_date=date.today())
+        deal1 = Deal.create(client=client, description="D1", start_date=TODAY)
+        deal2 = Deal.create(client=client, description="D2", start_date=TODAY)
         policy1 = Policy.create(
-            client=client, deal=deal1, policy_number="P1", start_date=date.today()
+            client=client, deal=deal1, policy_number="P1", start_date=TODAY
         )
         policy2 = Policy.create(
-            client=client, deal=deal2, policy_number="P2", start_date=date.today()
+            client=client, deal=deal2, policy_number="P2", start_date=TODAY
         )
         payment1 = Payment.create(
-            policy=policy1, amount=100, payment_date=date.today()
+            policy=policy1, amount=100, payment_date=TODAY
         )
         payment2 = Payment.create(
-            policy=policy2, amount=200, payment_date=date.today()
+            policy=policy2, amount=200, payment_date=TODAY
         )
         Expense.create(payment=payment1, amount=10, expense_type="t1", policy=policy1)
         Expense.create(payment=payment2, amount=20, expense_type="t1", policy=policy2)

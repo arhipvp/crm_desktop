@@ -1,5 +1,4 @@
 import datetime
-from datetime import date
 from types import SimpleNamespace
 
 import pytest
@@ -8,6 +7,9 @@ from database.models import Client, Deal, Policy, Task, Executor, DealExecutor
 from services.task_states import QUEUED
 from ui.views.deal_detail.actions import DealActionsMixin
 from ui.views.deal_detail.tabs import DealTabsMixin
+
+
+TODAY = datetime.date(2024, 1, 1)
 
 
 @pytest.fixture
@@ -24,13 +26,13 @@ def make_deal_with_executor():
         deal = Deal.create(
             client=client,
             description=deal_description,
-            start_date=datetime.date.today(),
+            start_date=TODAY,
         )
         executor = Executor.create(full_name=executor_name, tg_id=tg_id, is_active=is_active)
         DealExecutor.create(
             deal=deal,
             executor=executor,
-            assigned_date=datetime.date.today(),
+            assigned_date=TODAY,
         )
         return client, deal, executor
 
@@ -58,10 +60,10 @@ def make_task():
             deal = Deal.create(
                 client=client,
                 description=deal_description,
-                start_date=datetime.date.today(),
+                start_date=TODAY,
             )
         if due_date is None:
-            due_date = datetime.date.today()
+            due_date = TODAY
         params = {
             "title": title,
             "due_date": due_date,
@@ -86,7 +88,7 @@ def dummy_delay_view(monkeypatch):
         from ui.forms import deal_next_event_dialog
 
         dummy_dialog = SimpleNamespace(
-            exec=lambda: True, get_reminder_date=lambda: date.today()
+            exec=lambda: True, get_reminder_date=lambda: TODAY
         )
         monkeypatch.setattr(
             deal_next_event_dialog, "DealNextEventDialog", lambda *a, **k: dummy_dialog
@@ -96,9 +98,9 @@ def dummy_delay_view(monkeypatch):
         )
 
         client = Client.create(name="C")
-        deal = Deal.create(client=client, description="D", start_date=date.today())
-        Task.create(title="T1", due_date=date.today(), deal=deal)
-        Task.create(title="T2", due_date=date.today(), deal=deal)
+        deal = Deal.create(client=client, description="D", start_date=TODAY)
+        Task.create(title="T1", due_date=TODAY, deal=deal)
+        Task.create(title="T2", due_date=TODAY, deal=deal)
 
         class DummyView(DealActionsMixin):
             def __init__(self, deal):
@@ -106,7 +108,7 @@ def dummy_delay_view(monkeypatch):
                 self.tabs_inited = False
 
             def _collect_upcoming_events(self):
-                return [("Event", date.today())]
+                return [("Event", TODAY)]
 
             def _init_tabs(self):
                 self.tabs_inited = True

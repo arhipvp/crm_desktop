@@ -2,6 +2,7 @@
 
 from datetime import date, timedelta
 
+import datetime
 import pytest
 
 from database.models import Client, Policy, Payment, Income
@@ -11,6 +12,9 @@ from services.income_service import (
 )
 
 
+TODAY = datetime.date(2024, 1, 1)
+
+
 def _create_income(*, received_date: date, amount: int, suffix: str) -> Income:
     """Create and return an ``Income`` with related records."""
 
@@ -18,12 +22,12 @@ def _create_income(*, received_date: date, amount: int, suffix: str) -> Income:
     policy = Policy.create(
         client=client,
         policy_number=f"P{suffix}",
-        start_date=date.today(),
+        start_date=TODAY,
     )
     payment = Payment.create(
         policy=policy,
         amount=amount * 10,
-        payment_date=date.today(),
+        payment_date=TODAY,
     )
     return Income.create(
         payment=payment,
@@ -35,9 +39,9 @@ def _create_income(*, received_date: date, amount: int, suffix: str) -> Income:
 def test_mark_incomes_deleted(in_memory_db):
     """Marked incomes should be excluded from ``Income.active``."""
 
-    inc1 = _create_income(received_date=date.today(), amount=10, suffix="1")
-    inc2 = _create_income(received_date=date.today(), amount=20, suffix="2")
-    inc3 = _create_income(received_date=date.today(), amount=30, suffix="3")
+    inc1 = _create_income(received_date=TODAY, amount=10, suffix="1")
+    inc2 = _create_income(received_date=TODAY, amount=20, suffix="2")
+    inc3 = _create_income(received_date=TODAY, amount=30, suffix="3")
 
     deleted = mark_incomes_deleted([inc1.id, inc2.id])
 
@@ -49,7 +53,7 @@ def test_mark_incomes_deleted(in_memory_db):
 def test_get_incomes_page_pagination_and_deleted(in_memory_db):
     """``get_incomes_page`` paginates and hides deleted incomes by default."""
 
-    today = date.today()
+    today = TODAY
     inc1 = _create_income(received_date=today - timedelta(days=3), amount=10, suffix="1")
     inc2 = _create_income(received_date=today - timedelta(days=2), amount=20, suffix="2")
     inc3 = _create_income(received_date=today - timedelta(days=1), amount=30, suffix="3")
