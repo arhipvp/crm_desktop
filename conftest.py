@@ -165,15 +165,16 @@ def sent_notify(monkeypatch, request):
 
 @pytest.fixture()
 def mock_payments(monkeypatch):
-    monkeypatch.setattr(
-        pay_svc,
-        "add_payment",
-        lambda **kw: Payment.create(
+    def fake_add_payment(**kw):
+        payment = Payment.create(
             policy=kw["policy"],
             amount=kw["amount"],
             payment_date=kw["payment_date"],
-        ),
-    )
+        )
+        return payment.id
+
+    monkeypatch.setattr(pay_svc, "add_payment", fake_add_payment)
+    monkeypatch.setattr(ps, "add_payment", fake_add_payment)
     monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
 
 
