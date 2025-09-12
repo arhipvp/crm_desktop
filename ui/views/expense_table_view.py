@@ -201,6 +201,9 @@ class ExpenseTableView(BaseTableView):
         # 3) обновляем модель и пагинатор
         self.set_model_class_and_items(Expense, items, total_count=total)
 
+    def refresh(self):
+        self.load_data()
+
     def next_page(self):
         self.page += 1
         self.load_data()
