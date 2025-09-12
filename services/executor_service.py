@@ -118,6 +118,7 @@ def build_executor_query(
     query = Executor.select()
     if not show_inactive:
         query = query.where(Executor.is_active == True)
+    # Используем общую утилиту для поиска и фильтрации
     query = apply_search_and_filters(query, Executor, search_text, column_filters)
     return query
 
