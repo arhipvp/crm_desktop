@@ -42,7 +42,9 @@ def test_sync_policy_payments_adds_and_removes(in_memory_db, monkeypatch):
     assert Payment.select().where(Payment.id == p2.id).count() == 0
 
 
-def test_update_policy_syncs_payments_and_marks_first_paid(in_memory_db, monkeypatch):
+def test_update_policy_syncs_payments_and_marks_first_paid(
+    in_memory_db, monkeypatch, policy_folder_patches
+):
     monkeypatch.setattr(
         pay_svc,
         "add_payment",
@@ -125,7 +127,9 @@ def test_sync_policy_payments_removes_zero_when_real_exists(in_memory_db, monkey
     )
 
 
-def test_add_policy_rolls_back_on_payment_error(in_memory_db, monkeypatch):
+def test_add_policy_rolls_back_on_payment_error(
+    in_memory_db, monkeypatch, policy_folder_patches
+):
     client = Client.create(name="C")
     d1 = datetime.date(2024, 1, 1)
     d2 = datetime.date(2024, 2, 1)

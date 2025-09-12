@@ -5,10 +5,9 @@ from database.models import Client, Policy, Payment, Income, Expense
 from services.policies import policy_service as ps
 
 
-def test_duplicate_detected_with_normalized_policy_number(in_memory_db, monkeypatch):
-    monkeypatch.setattr(ps, 'create_policy_folder', lambda *a, **k: None)
-    monkeypatch.setattr(ps, 'open_folder', lambda *a, **k: None)
-    monkeypatch.setattr('services.folder_utils.rename_policy_folder', lambda *a, **k: (None, None))
+def test_duplicate_detected_with_normalized_policy_number(
+    in_memory_db, policy_folder_patches
+):
     client = Client.create(name='C')
     start = datetime.date(2024, 1, 1)
     end = datetime.date(2025, 1, 1)

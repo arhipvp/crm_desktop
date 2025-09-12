@@ -6,11 +6,8 @@ from database.models import Client, Policy, Payment, Income, Expense
 from services.policies import policy_service as ps
 
 
-def test_create_policy_ignores_deleted_duplicates(in_memory_db, monkeypatch):
+def test_create_policy_ignores_deleted_duplicates(in_memory_db, policy_folder_patches):
     db.execute_sql('DROP INDEX IF EXISTS "policy_policy_number"')
-    monkeypatch.setattr(ps, 'create_policy_folder', lambda *a, **k: None)
-    monkeypatch.setattr(ps, 'open_folder', lambda *a, **k: None)
-    monkeypatch.setattr('services.folder_utils.rename_policy_folder', lambda *a, **k: (None, None))
     client = Client.create(name='C')
     start = datetime.date(2024, 1, 1)
     end = datetime.date(2025, 1, 1)
