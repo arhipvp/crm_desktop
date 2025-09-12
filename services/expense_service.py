@@ -8,6 +8,7 @@ from peewee import Field, JOIN, fn
 from database.db import db
 from database.models import Client, Deal, Expense, Income, Payment, Policy
 from services.payment_service import get_payment_by_id
+from services.query_utils import apply_search_and_filters
 
 logger = logging.getLogger(__name__)
 
@@ -210,20 +211,22 @@ def apply_expense_filters(
 ):
     if deal_id:
         query = query.where(Policy.deal_id == deal_id)
-    if search_text:
-        from services.query_utils import build_or_condition
+    extra_fields = [
+        Policy.policy_number,
+        Client.name,
+        Deal.description,
+        Policy.note,
+    ]
 
-        condition = build_or_condition(
-            [
-                Policy.policy_number,
-                Client.name,
-                Deal.description,
-                Policy.note,
-            ],
-            search_text,
-        )
-        if condition is not None:
-            query = query.where(condition)
+    col_filters = dict(column_filters or {})
+    income_total_filter = col_filters.pop(INCOME_TOTAL, None)
+    if income_total_filter is None and Income.amount in col_filters:
+        income_total_filter = col_filters.pop(Income.amount)
+
+    query = apply_search_and_filters(
+        query, Expense, search_text or "", col_filters, extra_fields
+    )
+
     if not include_paid:
         query = query.where(Expense.expense_date.is_null(True))
     if expense_date_range:
@@ -232,23 +235,6 @@ def apply_expense_filters(
             query = query.where(Expense.expense_date >= date_from)
         if date_to:
             query = query.where(Expense.expense_date <= date_to)
-
-    from services.query_utils import apply_column_filters, apply_field_filters
-
-    field_filters = {}
-    name_filters = {}
-    if column_filters:
-        for key, val in column_filters.items():
-            if key is Income.amount or key is INCOME_TOTAL:
-                field_filters[INCOME_TOTAL] = val
-            elif isinstance(key, Field):
-                field_filters[key] = val
-            else:
-                name_filters[str(key)] = val
-
-    income_total_filter = field_filters.pop(INCOME_TOTAL, None)
-    query = apply_field_filters(query, field_filters)
-    query = apply_column_filters(query, name_filters, Expense)
 
     if income_total_filter:
         query = query.having(

@@ -9,6 +9,7 @@ from peewee import JOIN, ModelSelect, fn, Field
 
 from database.db import db
 from database.models import Client, Expense, Income, Payment, Policy
+from services.query_utils import apply_search_and_filters
 
 # Выражение для активных платежей (не удалённых)
 ACTIVE = (Payment.is_deleted == False)
@@ -313,27 +314,12 @@ def apply_payment_filters(
     """Фильтры для выборки платежей."""
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
-    if search_text:
-        query = query.where(
-            (Policy.policy_number.contains(search_text))
-            | (Client.name.contains(search_text))
-        )
+    extra_fields = [Policy.policy_number, Client.name]
+    query = apply_search_and_filters(
+        query, Payment, search_text, column_filters, extra_fields
+    )
     if not include_paid:
         query = query.where(Payment.actual_payment_date.is_null(True))
-
-    from services.query_utils import apply_column_filters, apply_field_filters
-
-    field_filters: dict[Field, str] = {}
-    name_filters: dict[str, str] = {}
-    if column_filters:
-        for key, val in column_filters.items():
-            if isinstance(key, Field):
-                field_filters[key] = val
-            else:
-                name_filters[str(key)] = val
-
-    query = apply_field_filters(query, field_filters)
-    query = apply_column_filters(query, name_filters, Payment)
     return query
 
 
