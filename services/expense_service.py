@@ -211,12 +211,19 @@ def apply_expense_filters(
     if deal_id:
         query = query.where(Policy.deal_id == deal_id)
     if search_text:
-        query = query.where(
-            (Policy.policy_number.contains(search_text))
-            | (Client.name.contains(search_text))
-            | (Deal.description.contains(search_text))
-            | (Policy.note.contains(search_text))
+        from services.query_utils import build_or_condition
+
+        condition = build_or_condition(
+            [
+                Policy.policy_number,
+                Client.name,
+                Deal.description,
+                Policy.note,
+            ],
+            search_text,
         )
+        if condition is not None:
+            query = query.where(condition)
     if not include_paid:
         query = query.where(Expense.expense_date.is_null(True))
     if expense_date_range:

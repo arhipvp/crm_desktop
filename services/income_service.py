@@ -246,12 +246,19 @@ def apply_income_filters(
     join_executor: bool = False,
 ):
     if search_text:
-        query = query.where(
-            (Policy.policy_number.contains(search_text))
-            | (Client.name.contains(search_text))
-            | (Deal.description.contains(search_text))
-            | (Policy.note.contains(search_text))
+        from services.query_utils import build_or_condition
+
+        condition = build_or_condition(
+            [
+                Policy.policy_number,
+                Client.name,
+                Deal.description,
+                Policy.note,
+            ],
+            search_text,
         )
+        if condition is not None:
+            query = query.where(condition)
     if only_received:
         query = query.where(Income.received_date.is_null(False))
     elif not include_received:
