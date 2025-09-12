@@ -2,7 +2,7 @@ from datetime import datetime
 import logging
 from typing import Iterable
 from peewee import Field, ModelSelect
-import os
+from pathlib import Path
 
 from database.models import Deal, DealCalculation
 from database.db import db
@@ -230,7 +230,7 @@ def export_calculations_excel(deal_id: int) -> str:
     import pandas as pd  # type: ignore
     df = pd.DataFrame(data)
     file_name = f"calculations_{deal_id}.xlsx"
-    path = os.path.join(folder, file_name)
+    path = Path(folder) / file_name
     df.to_excel(path, index=False)
-    return path
+    return str(path)
 

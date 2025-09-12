@@ -13,6 +13,7 @@ import sys
 import webbrowser
 from functools import lru_cache
 import time
+from pathlib import Path
 from typing import Optional, Tuple
 
 try:
@@ -37,8 +38,8 @@ SCOPES = ["https://www.googleapis.com/auth/drive"]
 ROOT_FOLDER_ID = os.getenv(
     "GOOGLE_ROOT_FOLDER_ID", "1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm"
 )  # ID папки в Google Drive
-GOOGLE_DRIVE_LOCAL_ROOT = os.getenv(
-    "GOOGLE_DRIVE_LOCAL_ROOT", r"G:\Мой диск\Клиенты"
+GOOGLE_DRIVE_LOCAL_ROOT = Path(
+    os.getenv("GOOGLE_DRIVE_LOCAL_ROOT", r"G:\Мой диск\Клиенты")
 )
 
 
@@ -125,15 +126,15 @@ def create_client_drive_folder(client_name: str) -> Tuple[str, Optional[str]]:
     всегда будет ``None``.
     """
     safe_name = sanitize_name(client_name)
-    local_path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, safe_name)
+    local_path = GOOGLE_DRIVE_LOCAL_ROOT / safe_name
 
     try:
-        os.makedirs(local_path, exist_ok=True)
+        local_path.mkdir(parents=True, exist_ok=True)
         logger.info("📁 Создана папка клиента: %s", local_path)
     except Exception:
         logger.exception("Не удалось создать папку клиента локально")
 
-    return local_path, None
+    return str(local_path), None
 
 
 def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
@@ -146,23 +147,22 @@ def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
     if not folder_name:
         folder_name = "???"  # fallback имя
 
-    client_path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, folder_name)
+    client_path = GOOGLE_DRIVE_LOCAL_ROOT / folder_name
     logger.debug(">>> [search] checking client path: %s", client_path)
 
-    if os.path.isdir(client_path):
+    if client_path.is_dir():
         # Если есть локальная папка клиента
-        for sub in os.listdir(client_path):
-            sub_path = os.path.join(client_path, sub)
-            if os.path.isdir(sub_path) and (
-                sub == folder_name or sub.endswith(folder_name)
+        for sub_path in client_path.iterdir():
+            if sub_path.is_dir() and (
+                sub_path.name == folder_name or sub_path.name.endswith(folder_name)
             ):
                 logger.debug(">>> [match] found subfolder: %s", sub_path)
-                open_folder(sub_path, parent=parent)
+                open_folder(str(sub_path), parent=parent)
                 return
 
         # Или просто открыть саму папку клиента
         logger.info(">>> [fallback] opening client root folder: %s", client_path)
-        open_folder(client_path, parent=parent)
+        open_folder(str(client_path), parent=parent)
         return
 
     # Локальной папки нет
@@ -216,27 +216,27 @@ def create_deal_folder(
     deal_name = sanitize_name(f"Сделка - {deal_description}")
 
     # -------- локальный путь  G:\…\Клиенты\<Клиент>\Сделка - …
-    local_path = os.path.join(
-        GOOGLE_DRIVE_LOCAL_ROOT,
-        sanitize_name(client_name),
-        deal_name,
+    local_path = (
+        GOOGLE_DRIVE_LOCAL_ROOT
+        / sanitize_name(client_name)
+        / deal_name
     )
 
     logger.info("📂  Ожидаемый путь сделки: %s", local_path)
 
     # -------- создаём локальную папку (как у полиса)
-    if os.path.isdir(local_path):
+    if local_path.is_dir():
         logger.info("📂 Папка сделки уже существует: %s", local_path)
     else:
         _msg(f"Папка сделки не найдена и будет создана:\n{local_path}", None)
         try:
-            os.makedirs(local_path, exist_ok=True)
+            local_path.mkdir(parents=True, exist_ok=True)
             logger.info("📁 Создана папка сделки: %s", local_path)
         except Exception:
             logger.exception("Не удалось создать папку сделки локально")
 
     # -------- облако более не создаётся автоматически
-    return local_path, None
+    return str(local_path), None
 
 
 def create_policy_folder(
@@ -248,15 +248,15 @@ def create_policy_folder(
 
     if deal_description:
         deal_name = sanitize_name(f"Сделка - {deal_description}")
-        path = os.path.join(
-            GOOGLE_DRIVE_LOCAL_ROOT, client_name, deal_name, policy_name
+        path = (
+            GOOGLE_DRIVE_LOCAL_ROOT / client_name / deal_name / policy_name
         )
     else:
-        path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, client_name, policy_name)
+        path = GOOGLE_DRIVE_LOCAL_ROOT / client_name / policy_name
 
     try:
-        os.makedirs(path, exist_ok=True)
-        return path
+        path.mkdir(parents=True, exist_ok=True)
+        return str(path)
     except Exception as e:
         logger.error("❌ Не удалось создать папку клиента: %s", e)
 
@@ -271,8 +271,8 @@ def upload_to_drive(local_path: str, drive_folder_id: str) -> str:
 
     service = get_drive_service()  # ← вместо get_gdrive_credentials
 
-    file_metadata = {"name": os.path.basename(local_path), "parents": [drive_folder_id]}
-    media = MediaFileUpload(local_path, resumable=True)
+    file_metadata = {"name": Path(local_path).name, "parents": [drive_folder_id]}
+    media = MediaFileUpload(str(local_path), resumable=True)
 
     uploaded = (
         service.files()
@@ -301,19 +301,20 @@ def open_folder(
         return
 
     path_or_url = path_or_url.strip()
+    path = Path(path_or_url)
 
-    if os.path.isdir(path_or_url):  # локальный каталог существует
+    if path.is_dir():  # локальный каталог существует
         try:
             if sys.platform.startswith("win"):
                 try:
                     import win32com.client  # type: ignore[import-not-found]
 
                     shell = win32com.client.Dispatch("Shell.Application")
-                    target = os.path.normcase(os.path.realpath(path_or_url))
+                    target = os.path.normcase(str(path.resolve()))
                     for window in shell.Windows():
                         try:
                             current = os.path.normcase(
-                                os.path.realpath(window.Document.Folder.Self.Path)
+                                str(Path(window.Document.Folder.Self.Path).resolve())
                             )
                             if current == target:
                                 window.Visible = True
@@ -324,16 +325,16 @@ def open_folder(
                                 return
                         except Exception:
                             continue
-                    shell.Open(path_or_url)
+                    shell.Open(str(path))
                 except Exception:
-                    os.startfile(path_or_url)  # type: ignore[attr-defined]
+                    os.startfile(path)  # type: ignore[attr-defined]
             elif sys.platform.startswith("darwin"):
-                subprocess.Popen(["open", path_or_url])
+                subprocess.Popen(["open", str(path)])
             else:
-                subprocess.Popen(["xdg-open", path_or_url])
+                subprocess.Popen(["xdg-open", str(path)])
             return
         except Exception as exc:
-            logger.exception("Не удалось открыть каталог %s", path_or_url)
+            logger.exception("Не удалось открыть каталог %s", path)
             _msg(f"Не удалось открыть каталог:\n{exc}", parent)
             return
 
@@ -400,17 +401,17 @@ def rename_client_folder(old_name: str, new_name: str, drive_link: str | None):
         (новый_локальный_путь, актуальная_web-ссылка_или_None)
     """
     # 1) локальный диск -------------------------------------------------
-    old_path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, old_name)
-    new_path = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, new_name)
+    old_path = GOOGLE_DRIVE_LOCAL_ROOT / old_name
+    new_path = GOOGLE_DRIVE_LOCAL_ROOT / new_name
 
     try:
-        if os.path.isdir(old_path):
+        if old_path.is_dir():
             # если уже есть new_path, значит вручную переименовали — ничего не делаем
-            if not os.path.isdir(new_path):
+            if not new_path.is_dir():
                 os.rename(old_path, new_path)
         else:
             # старой папки нет → просто создадим новую (чтобы не упасть)
-            os.makedirs(new_path, exist_ok=True)
+            new_path.mkdir(parents=True, exist_ok=True)
     except Exception:
         logger.exception("Не удалось переименовать локальную папку клиента")
 
@@ -429,7 +430,7 @@ def rename_client_folder(old_name: str, new_name: str, drive_link: str | None):
         except Exception:
             logger.exception("Не удалось переименовать папку клиента на Drive")
 
-    return new_path, drive_link
+    return str(new_path), drive_link
 
 
 def rename_deal_folder(
@@ -442,37 +443,37 @@ def rename_deal_folder(
 ):
     """Переименовать или переместить папку сделки."""
 
-    default_old_path = os.path.join(
-        GOOGLE_DRIVE_LOCAL_ROOT,
-        sanitize_name(old_client_name),
-        sanitize_name(f"Сделка - {old_description}"),
+    default_old_path = (
+        GOOGLE_DRIVE_LOCAL_ROOT
+        / sanitize_name(old_client_name)
+        / sanitize_name(f"Сделка - {old_description}")
     )
     # если передан фактический путь и он существует — используем его
     old_path = (
-        current_path
-        if current_path and os.path.isdir(current_path)
+        Path(current_path)
+        if current_path and Path(current_path).is_dir()
         else default_old_path
     )
-    new_path = os.path.join(
-        GOOGLE_DRIVE_LOCAL_ROOT,
-        sanitize_name(new_client_name),
-        sanitize_name(f"Сделка - {new_description}"),
+    new_path = (
+        GOOGLE_DRIVE_LOCAL_ROOT
+        / sanitize_name(new_client_name)
+        / sanitize_name(f"Сделка - {new_description}")
     )
 
     try:
-        os.makedirs(os.path.dirname(new_path), exist_ok=True)
-        if os.path.isdir(old_path):
-            if not os.path.isdir(new_path):
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+        if old_path.is_dir():
+            if not new_path.is_dir():
                 os.rename(old_path, new_path)
                 logger.info("📂 Папка сделки перемещена: %s → %s", old_path, new_path)
             else:
                 logger.info("📂 Папка сделки уже в нужном месте: %s", new_path)
-        elif os.path.isdir(new_path):
+        elif new_path.is_dir():
             # папка уже в нужном месте (например, переименовали родителя)
             logger.info("📂 Папка сделки уже в нужном месте: %s", new_path)
         else:
             _msg(f"Папка сделки не найдена: {old_path}\nСоздаю новую.", None)
-            os.makedirs(new_path, exist_ok=True)
+            new_path.mkdir(parents=True, exist_ok=True)
             logger.info("📁 Создана новая папка сделки: %s", new_path)
     except Exception:
         logger.exception("Не удалось переименовать локальную папку сделки")
@@ -504,25 +505,23 @@ def rename_policy_folder(
 ):
     """Переименовать папку полиса."""
 
-    parts_old = [GOOGLE_DRIVE_LOCAL_ROOT, sanitize_name(old_client_name)]
+    old_path = GOOGLE_DRIVE_LOCAL_ROOT / sanitize_name(old_client_name)
     if old_deal_desc:
-        parts_old.append(sanitize_name(f"Сделка - {old_deal_desc}"))
-    parts_old.append(sanitize_name(f"Полис - {old_policy_number}"))
-    old_path = os.path.join(*parts_old)
+        old_path /= sanitize_name(f"Сделка - {old_deal_desc}")
+    old_path /= sanitize_name(f"Полис - {old_policy_number}")
 
-    parts_new = [GOOGLE_DRIVE_LOCAL_ROOT, sanitize_name(new_client_name)]
+    new_path = GOOGLE_DRIVE_LOCAL_ROOT / sanitize_name(new_client_name)
     if new_deal_desc:
-        parts_new.append(sanitize_name(f"Сделка - {new_deal_desc}"))
-    parts_new.append(sanitize_name(f"Полис - {new_policy_number}"))
-    new_path = os.path.join(*parts_new)
+        new_path /= sanitize_name(f"Сделка - {new_deal_desc}")
+    new_path /= sanitize_name(f"Полис - {new_policy_number}")
 
     try:
-        os.makedirs(os.path.dirname(new_path), exist_ok=True)
-        if os.path.isdir(old_path):
-            if not os.path.isdir(new_path):
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+        if old_path.is_dir():
+            if not new_path.is_dir():
                 os.rename(old_path, new_path)
         else:
-            os.makedirs(new_path, exist_ok=True)
+            new_path.mkdir(parents=True, exist_ok=True)
     except Exception:
         logger.exception("Не удалось переименовать локальную папку полиса")
 
@@ -539,7 +538,7 @@ def rename_policy_folder(
         except Exception:
             logger.exception("Не удалось переименовать папку полиса на Drive")
 
-    return new_path, drive_link
+    return str(new_path), drive_link
 
 
 def move_policy_folder_to_deal(
@@ -567,12 +566,12 @@ def move_policy_folder_to_deal(
     if not policy_path:
         return None
 
-    policy_name = os.path.basename(policy_path.rstrip("/\\"))
+    policy_name = Path(policy_path).name
     client_name = sanitize_name(client_name)
     deal_name = sanitize_name(f"Сделка - {deal_description}")
-    dest_dir = os.path.join(GOOGLE_DRIVE_LOCAL_ROOT, client_name, deal_name)
-    os.makedirs(dest_dir, exist_ok=True)
-    new_path = os.path.join(dest_dir, policy_name)
+    dest_dir = GOOGLE_DRIVE_LOCAL_ROOT / client_name / deal_name
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    new_path = dest_dir / policy_name
 
     try:
         shutil.move(policy_path, new_path)
@@ -581,7 +580,7 @@ def move_policy_folder_to_deal(
         logger.exception("Не удалось переместить папку полиса")
         return None
 
-    return new_path
+    return str(new_path)
 
 
 def move_file_to_folder(file_path: str, folder_path: str) -> str | None:
@@ -600,11 +599,12 @@ def move_file_to_folder(file_path: str, folder_path: str) -> str | None:
         Новый путь файла или ``None`` при ошибке.
     """
 
-    if not file_path or not os.path.isfile(file_path):
+    if not file_path or not Path(file_path).is_file():
         return None
 
-    os.makedirs(folder_path, exist_ok=True)
-    dest = os.path.join(folder_path, os.path.basename(file_path))
+    folder = Path(folder_path)
+    folder.mkdir(parents=True, exist_ok=True)
+    dest = folder / Path(file_path).name
 
     try:
         shutil.move(file_path, dest)
@@ -613,4 +613,4 @@ def move_file_to_folder(file_path: str, folder_path: str) -> str | None:
         logger.exception("Не удалось переместить файл полиса")
         return None
 
-    return dest
+    return str(dest)
