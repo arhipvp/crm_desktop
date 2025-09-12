@@ -114,7 +114,6 @@ def policy_folder_patches(monkeypatch):
 
 
 @pytest.fixture()
-
 def sent_notify(monkeypatch, request):
     sent = {}
     module = request.param
@@ -135,7 +134,10 @@ def mock_payments(monkeypatch):
     )
     monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
 
+
+@pytest.fixture()
 def dummy_main_window(monkeypatch, qapp):
+    """Фабрика для создания MainWindow с заглушёнными вкладками."""
     from PySide6.QtWidgets import QTabWidget, QWidget
     from ui.main_window import MainWindow
 
