@@ -11,9 +11,10 @@ class PeeweeFilter(logging.Filter):
     """Фильтрует SELECT-запросы peewee."""
 
     def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401 - short doc
-        """True, если сообщение не начинается с ``SELECT``."""
-        msg = str(record.getMessage())
-        return not msg.lstrip().startswith("('SELECT")
+        """True, если SQL-запрос не начинается с ``SELECT``."""
+        sql = getattr(record, "sql", None)
+        msg = sql if isinstance(sql, str) else str(record.getMessage())
+        return not msg.lstrip().startswith("SELECT")
 
 
 def setup_logging(settings: Settings | None = None) -> None:
