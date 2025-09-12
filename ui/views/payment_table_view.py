@@ -171,6 +171,15 @@ class PaymentTableView(BaseTableView):
         indexes = self.table.selectionModel().selectedRows()
         return [self.model.get_item(self._source_row(i)) for i in indexes]
 
+    def get_selected_deal(self):
+        payment = self.get_selected()
+        if not payment:
+            return None
+        policy = getattr(payment, "policy", None)
+        if not policy:
+            return None
+        return getattr(policy, "deal", None)
+
     def add_new(self):
         form = PaymentForm()
         if form.exec():
