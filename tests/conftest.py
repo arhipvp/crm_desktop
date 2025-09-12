@@ -1,7 +1,34 @@
 import datetime
 import pytest
-from database.models import Client, Deal, Policy, Task
+from database.models import Client, Deal, Policy, Task, Executor, DealExecutor
 from services.task_states import QUEUED
+
+
+@pytest.fixture
+def make_deal_with_executor():
+    def _make_deal_with_executor(
+        client_name: str = "C",
+        deal_description: str = "D",
+        executor_name: str = "E",
+        tg_id: int = 1,
+        *,
+        is_active: bool = True,
+    ):
+        client = Client.create(name=client_name)
+        deal = Deal.create(
+            client=client,
+            description=deal_description,
+            start_date=datetime.date.today(),
+        )
+        executor = Executor.create(full_name=executor_name, tg_id=tg_id, is_active=is_active)
+        DealExecutor.create(
+            deal=deal,
+            executor=executor,
+            assigned_date=datetime.date.today(),
+        )
+        return client, deal, executor
+
+    return _make_deal_with_executor
 
 
 @pytest.fixture
