@@ -15,7 +15,7 @@ from database.models import (
 from services.clients.client_service import build_client_query
 from services.query_utils import apply_search_and_filters
 from services.executor_service import get_executors_page
-from services.income_service import get_incomes_page
+from services.income_service import get_incomes_page, get_income_highlight_color
 from services.expense_service import build_expense_query
 from services.task_crud import build_task_query
 
@@ -46,6 +46,38 @@ def _create_income_for_executor(name: str, tg_id: int) -> Income:
         assigned_date=date.today(),
     )
     return income
+
+
+def _make_income(contractor: str | None) -> Income:
+    """Create an ``Income`` instance with an optional contractor."""
+
+    policy = Policy(
+        policy_number="123",
+        contractor=contractor,
+        start_date=date.today(),
+    )
+    payment = Payment(
+        policy=policy,
+        amount=100,
+        payment_date=date.today(),
+    )
+    return Income(
+        payment=payment,
+        amount=10,
+        received_date=date.today(),
+    )
+
+
+@pytest.mark.parametrize(
+    "contractor, expected_color",
+    [
+        ("Some Corp", "#ffcccc"),
+        (None, None),
+    ],
+)
+def test_income_highlight(contractor, expected_color):
+    income = _make_income(contractor)
+    assert get_income_highlight_color(income) == expected_color
 
 
 def test_client_search_with_filters(in_memory_db):
