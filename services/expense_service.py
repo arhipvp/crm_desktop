@@ -5,10 +5,11 @@ from decimal import Decimal
 
 from peewee import Field, JOIN, fn
 
-logger = logging.getLogger(__name__)
-
+from database.db import db
 from database.models import Client, Deal, Expense, Income, Payment, Policy
 from services.payment_service import get_payment_by_id
+
+logger = logging.getLogger(__name__)
 
 INCOME_TOTAL = fn.COALESCE(fn.SUM(Income.amount), 0).alias("income_total")
 
@@ -118,33 +119,36 @@ def update_expense(expense: Expense, **kwargs):
     Returns:
         Expense: Обновлённый расход.
     """
-    allowed_fields = {
-        "payment",
-        "payment_id",
-        "amount",
-        "expense_type",
-        "expense_date",
-        "note",
-    }
+    allowed_fields = {"amount", "expense_type", "expense_date", "note"}
 
-    updates = {}
-
+    updates: dict[str, object] = {}
     for key, value in kwargs.items():
         if key in allowed_fields and value not in ("", None):
-            if key == "payment_id" and not kwargs.get("payment"):
-                value = get_payment_by_id(value)
-                key = "payment"
-            if key == "amount" and value is not None:
+            if key == "amount":
                 value = Decimal(str(value))
             updates[key] = value
 
-    if not updates:
+    payment_obj = None
+    if kwargs.get("payment") is not None or kwargs.get("payment_id") is not None:
+        payment_id = kwargs.get("payment_id")
+        if kwargs.get("payment") is not None:
+            payment_id = getattr(kwargs.get("payment"), "id", kwargs.get("payment"))
+        payment_obj = get_payment_by_id(payment_id)
+        if not payment_obj:
+            raise ValueError("Платёж не найден")
+        if not payment_obj.policy_id:
+            raise ValueError("У платежа не указан связанный полис")
+
+    if not updates and not payment_obj:
         return expense
 
-    for key, value in updates.items():
-        setattr(expense, key, value)
-
-    expense.save()
+    with db.atomic():
+        if payment_obj:
+            expense.payment = payment_obj
+            expense.policy = payment_obj.policy
+        for key, value in updates.items():
+            setattr(expense, key, value)
+        expense.save()
     return expense
 
 
