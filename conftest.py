@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 import pytest
 from peewee import SqliteDatabase
+from ui import settings as ui_settings
 
 # Force tests to use in-memory SQLite by default to avoid touching any real DB.
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
@@ -80,6 +81,17 @@ def qapp():
             app.quit()
         except Exception:
             pass
+
+
+@pytest.fixture()
+def ui_settings_temp_path(tmp_path, monkeypatch):
+    path = tmp_path / "ui_settings.json"
+    monkeypatch.setattr(ui_settings, "SETTINGS_PATH", path)
+    try:
+        yield path
+    finally:
+        if path.exists():
+            path.unlink()
 
 
 @pytest.fixture()
