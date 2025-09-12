@@ -80,6 +80,7 @@ def qapp():
         except Exception:
             pass
 
+
 @pytest.fixture()
 def in_memory_db(monkeypatch):
     # If db is not initialized yet, bind it to a fresh in-memory DB.
@@ -115,8 +116,9 @@ def policy_folder_patches(monkeypatch):
     )
 
 
-@pytest.fixture()
+@pytest.fixture(params=["ps", "ts", "ins"])
 def sent_notify(monkeypatch, request):
+    """Parametrized notifier stub: 'ps', 'ts', or 'ins'."""
     sent = {}
     modules = {"ps": ps, "ts": ts, "ins": ins}
     module = modules[request.param]
@@ -124,6 +126,7 @@ def sent_notify(monkeypatch, request):
         module, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text)
     )
     return sent
+
 
 @pytest.fixture()
 def mock_payments(monkeypatch):
@@ -138,8 +141,10 @@ def mock_payments(monkeypatch):
     )
     monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
 
+
 @pytest.fixture()
 def dummy_main_window(monkeypatch, qapp):
+    """Фабрика для создания MainWindow с заглушёнными вкладками."""
     from PySide6.QtWidgets import QTabWidget, QWidget
     from ui.main_window import MainWindow
 

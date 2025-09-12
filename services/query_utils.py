@@ -2,7 +2,7 @@
 
 from typing import Iterable, Iterator
 
-from peewee import Field, Model, ModelSelect
+from peewee import Field, Model, ModelSelect, Node
 from playhouse.shortcuts import Cast
 
 
@@ -46,6 +46,26 @@ def apply_field_filters(
     if not field_filters:
         return query
     return _apply_contains_filters(query, field_filters.items())
+
+
+def build_or_condition(fields: Iterable[Field], value: str) -> Node | None:
+    """Сформировать OR-условие ``field.contains(value)`` для разных моделей.
+
+    Parameters:
+        fields: Iterable с полями Peewee из разных моделей.
+        value: Текст для поиска.
+
+    Returns:
+        Peewee-выражение, объединяющее условия ``OR``. ``None`` если список
+        полей пуст или значение не задано.
+    """
+    if not value:
+        return None
+    condition: Node | None = None
+    for field in fields:
+        expr = Cast(field, "TEXT").contains(value)
+        condition = expr if condition is None else (condition | expr)
+    return condition
 
 
 def apply_search_and_filters(

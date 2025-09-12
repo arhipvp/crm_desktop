@@ -23,13 +23,13 @@ def _make_income(contractor: str | None) -> Income:
         received_date=datetime.date.today(),
     )
 @pytest.mark.parametrize(
-    "contractor, expected",
+    "contractor, expected_color",
     [
         ("Some Corp", "#ffcccc"),
         (None, None),
     ],
 )
-def test_income_highlight(contractor, expected):
+def test_income_highlight(contractor, expected_color):
     income = _make_income(contractor)
-    assert get_income_highlight_color(income) == expected
+    assert get_income_highlight_color(income) == expected_color
 
