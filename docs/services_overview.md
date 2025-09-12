@@ -28,7 +28,7 @@
 ## income_service
 - CRUD и массовые пометки: `add_income`, `update_income`, `mark_income_deleted` и `mark_incomes_deleted`【F:services/income_service.py†L64-L80】【F:services/income_service.py†L166-L195】【F:services/income_service.py†L200-L235】.
 - `get_incomes_page` и `apply_income_filters` обеспечивают фильтрацию, сортировку и пагинацию доходов【F:services/income_service.py†L83-L143】【F:services/income_service.py†L238-L256】.
-- `_notify_income_received` уведомляет исполнителя о поступлении средств при создании или обновлении записи【F:services/income_service.py†L145-L162】【F:services/income_service.py†L233-L235】.
+- `_notify_income_received` уведомляет исполнителя о поступлении средств при создании или обновлении записи【F:services/income_service.py†L145-L162】​:codex-file-citation[codex-file-citation]{line_range_start=233 line_range_end=235 path=services/income_service.py git_url="https://github.com/arhipvp/crm_desktop/blob/master/services/income_service.py#L233-L235"}​.
 
 ## expense_service
 - CRUD и массовые пометки: `add_expense`, `update_expense`, `mark_expense_deleted` и `mark_expenses_deleted`【F:services/expense_service.py†L48-L64】【F:services/expense_service.py†L70-L108】【F:services/expense_service.py†L114-L153】.
