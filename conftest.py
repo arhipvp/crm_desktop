@@ -2,7 +2,6 @@ import os
 import signal
 import sys
 from pathlib import Path
-
 import pytest
 from peewee import SqliteDatabase
 
@@ -111,3 +110,11 @@ def policy_folder_patches(monkeypatch):
     monkeypatch.setattr(
         "services.folder_utils.rename_policy_folder", lambda *a, **k: (None, None)
     )
+
+
+@pytest.fixture()
+def sent_notify(monkeypatch, request):
+    sent = {}
+    module = request.param
+    monkeypatch.setattr(module, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
+    return sent
