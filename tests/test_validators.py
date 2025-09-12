@@ -3,24 +3,24 @@ from services.validators import normalize_number, normalize_phone
 
 
 @pytest.mark.parametrize(
-    "value, expected, raises",
+    "value, expected",
     [
-        ("12 345,67", "12345.67", None),
-        (None, None, None),
-        ("123руб.", "123", None),
-        ("12\u00a0345.", "12345", None),
-        (100, "100", None),
-        (10.5, "10.5", None),
-        ("5+5", "10", None),
-        ("10*10", "100", None),
-        ("10*10%", "1", None),
-        ("5//2", None, ValueError),
-        ("abc", None, ValueError),
+        ("12 345,67", "12345.67"),
+        (None, None),
+        ("123руб.", "123"),
+        ("12\u00a0345.", "12345"),
+        (100, "100"),
+        (10.5, "10.5"),
+        ("5+5", "10"),
+        ("10*10", "100"),
+        ("10*10%", "1"),
+        pytest.param("5//2", ValueError),
+        pytest.param("abc", ValueError),
     ],
 )
-def test_normalize_number(value, expected, raises):
-    if raises:
-        with pytest.raises(raises, match="Некорректное выражение"):
+def test_normalize_number(value, expected):
+    if isinstance(expected, type) and issubclass(expected, Exception):
+        with pytest.raises(expected, match="Некорректное выражение"):
             normalize_number(value)
     else:
         assert normalize_number(value) == expected
