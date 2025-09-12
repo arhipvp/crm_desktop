@@ -122,35 +122,34 @@ def update_expense(expense: Expense, **kwargs):
     """
     allowed_fields = {"amount", "expense_type", "expense_date", "note"}
 
-    updates: dict[str, object] = {}
-    for key, value in kwargs.items():
-        if key in allowed_fields and value not in ("", None):
-            if key == "amount":
-                value = Decimal(str(value))
-            updates[key] = value
-
-    payment_obj = None
-    if kwargs.get("payment") is not None or kwargs.get("payment_id") is not None:
-        payment_id = kwargs.get("payment_id")
-        if kwargs.get("payment") is not None:
-            payment_id = getattr(kwargs.get("payment"), "id", kwargs.get("payment"))
-        payment_obj = get_payment_by_id(payment_id)
-        if not payment_obj:
-            raise ValueError("Платёж не найден")
-        if not payment_obj.policy_id:
-            raise ValueError("У платежа не указан связанный полис")
-
-    if not updates and not payment_obj:
-        return expense
-
     with db.atomic():
-        if payment_obj:
+        updates: dict[str, object] = {}
+        for key, value in kwargs.items():
+            if key in allowed_fields and value not in ("", None):
+                if key == "amount":
+                    value = Decimal(str(value))
+                updates[key] = value
+
+        payment_obj = None
+        if kwargs.get("payment") is not None or kwargs.get("payment_id") is not None:
+            payment_id = kwargs.get("payment_id")
+            if kwargs.get("payment") is not None:
+                payment_id = getattr(kwargs.get("payment"), "id", kwargs.get("payment"))
+            payment_obj = get_payment_by_id(payment_id)
+            if not payment_obj:
+                raise ValueError("Платёж не найден")
+            if not payment_obj.policy_id:
+                raise ValueError("У платежа не указан связанный полис")
             expense.payment = payment_obj
             expense.policy = payment_obj.policy
+
+        if not updates and not payment_obj:
+            return expense
+
         for key, value in updates.items():
             setattr(expense, key, value)
         expense.save()
-    return expense
+        return expense
 
 
 # ──────────────────────── Постраничный вывод ───────────────────────
