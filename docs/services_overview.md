@@ -54,3 +54,9 @@
 - `sanitize_name` удаляет недопустимые символы из имен файлов и папок【F:services/folder_utils.py†L58-L66】.
 - `create_client_drive_folder` создаёт локальную папку клиента в каталоге синхронизации и возвращает путь【F:services/folder_utils.py†L121-L136】.
 - `create_deal_folder` строит путь вида `Клиенты/<Клиент>/Сделка - …` и гарантирует наличие папки【F:services/folder_utils.py†L200-L239】.
+
+## sheets_service
+- `read_sheet` и `append_rows` обеспечивают чтение и дозапись таблиц Google Sheets, идентификаторы которых задаются переменными окружения `GOOGLE_SHEETS_TASKS_ID` и `GOOGLE_SHEETS_CALCULATIONS_ID`【F:services/sheets_service.py†L24-L59】.
+
+## export_service
+- `export_objects_to_csv` выгружает ORM‑объекты в CSV, применяя русские заголовки из `RU_HEADERS` и возвращая число экспортированных строк【F:services/export_service.py†L1-L38】.
