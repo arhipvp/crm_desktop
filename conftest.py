@@ -25,6 +25,7 @@ from database.models import (
 )
 
 from services.policies import policy_service as ps
+from services import payment_service as pay_svc
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -113,8 +114,39 @@ def policy_folder_patches(monkeypatch):
 
 
 @pytest.fixture()
+
 def sent_notify(monkeypatch, request):
     sent = {}
     module = request.param
     monkeypatch.setattr(module, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
     return sent
+
+
+def mock_payments(monkeypatch):
+    monkeypatch.setattr(
+        pay_svc,
+        "add_payment",
+        lambda **kw: Payment.create(
+            policy=kw["policy"],
+            amount=kw["amount"],
+            payment_date=kw["payment_date"],
+        ),
+    )
+    monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
+
+def dummy_main_window(monkeypatch, qapp):
+    from PySide6.QtWidgets import QTabWidget, QWidget
+    from ui.main_window import MainWindow
+
+    def factory(tab_count: int = 0):
+        def dummy_init_tabs(self):
+            self.tab_widget = QTabWidget()
+            self.setCentralWidget(self.tab_widget)
+            for i in range(tab_count):
+                self.tab_widget.addTab(QWidget(), str(i))
+
+        monkeypatch.setattr(MainWindow, "init_tabs", dummy_init_tabs)
+        monkeypatch.setattr(MainWindow, "on_tab_changed", lambda self, index: None)
+        return MainWindow()
+
+    return factory

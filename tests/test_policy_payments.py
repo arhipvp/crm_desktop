@@ -6,17 +6,7 @@ from services import payment_service as pay_svc
 from services.policies import policy_service as policy_svc
 
 
-def test_sync_policy_payments_adds_and_removes(in_memory_db, monkeypatch):
-    monkeypatch.setattr(
-        pay_svc,
-        "add_payment",
-        lambda **kw: Payment.create(
-            policy=kw["policy"],
-            amount=kw["amount"],
-            payment_date=kw["payment_date"],
-        ),
-    )
-    monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
+def test_sync_policy_payments_adds_and_removes(in_memory_db, mock_payments):
     client = Client.create(name="C")
     d1 = datetime.date(2024, 1, 1)
     d2 = datetime.date(2024, 2, 1)
@@ -43,18 +33,8 @@ def test_sync_policy_payments_adds_and_removes(in_memory_db, monkeypatch):
 
 
 def test_update_policy_syncs_payments_and_marks_first_paid(
-    in_memory_db, monkeypatch, policy_folder_patches
+    in_memory_db, mock_payments, policy_folder_patches
 ):
-    monkeypatch.setattr(
-        pay_svc,
-        "add_payment",
-        lambda **kw: Payment.create(
-            policy=kw["policy"],
-            amount=kw["amount"],
-            payment_date=kw["payment_date"],
-        ),
-    )
-    monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
     client = Client.create(name="C")
     d1 = datetime.date(2024, 1, 1)
     d2 = datetime.date(2024, 2, 1)
@@ -93,16 +73,7 @@ def test_update_policy_syncs_payments_and_marks_first_paid(
     )
 
 
-def test_sync_policy_payments_removes_zero_when_real_exists(in_memory_db, monkeypatch):
-    monkeypatch.setattr(
-        pay_svc,
-        "add_payment",
-        lambda **kw: Payment.create(
-            policy=kw["policy"],
-            amount=kw["amount"],
-            payment_date=kw["payment_date"],
-        ),
-    )
+def test_sync_policy_payments_removes_zero_when_real_exists(in_memory_db, mock_payments):
     client = Client.create(name="C")
     d0 = datetime.date(2024, 1, 1)
     d1 = datetime.date(2024, 2, 1)
@@ -128,7 +99,7 @@ def test_sync_policy_payments_removes_zero_when_real_exists(in_memory_db, monkey
 
 
 def test_add_policy_rolls_back_on_payment_error(
-    in_memory_db, monkeypatch, policy_folder_patches
+    in_memory_db, monkeypatch, policy_folder_patches, mock_payments
 ):
     client = Client.create(name="C")
     d1 = datetime.date(2024, 1, 1)
@@ -152,17 +123,7 @@ def test_add_policy_rolls_back_on_payment_error(
     assert Payment.select().count() == 0
 
 
-def test_sync_policy_payments_removes_extra_duplicates(in_memory_db, monkeypatch):
-    monkeypatch.setattr(
-        pay_svc,
-        "add_payment",
-        lambda **kw: Payment.create(
-            policy=kw["policy"],
-            amount=kw["amount"],
-            payment_date=kw["payment_date"],
-        ),
-    )
-    monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
+def test_sync_policy_payments_removes_extra_duplicates(in_memory_db, mock_payments):
     client = Client.create(name="C")
     d1 = datetime.date(2024, 1, 1)
     policy = Policy.create(client=client, policy_number="P", start_date=d1, end_date=d1)
@@ -183,17 +144,7 @@ def test_sync_policy_payments_removes_extra_duplicates(in_memory_db, monkeypatch
     assert remaining_id in {p1.id, p2.id}
 
 
-def test_sync_policy_payments_adds_missing_duplicates(in_memory_db, monkeypatch):
-    monkeypatch.setattr(
-        pay_svc,
-        "add_payment",
-        lambda **kw: Payment.create(
-            policy=kw["policy"],
-            amount=kw["amount"],
-            payment_date=kw["payment_date"],
-        ),
-    )
-    monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
+def test_sync_policy_payments_adds_missing_duplicates(in_memory_db, mock_payments):
     client = Client.create(name="C")
     d1 = datetime.date(2024, 1, 1)
     policy = Policy.create(client=client, policy_number="P", start_date=d1, end_date=d1)

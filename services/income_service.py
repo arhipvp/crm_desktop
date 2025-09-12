@@ -183,7 +183,8 @@ def add_income(**kwargs):
         clean_data["amount"] = Decimal(str(clean_data["amount"]))
 
     try:
-        income = Income.create(payment=payment, **clean_data)
+        with db.atomic():
+            income = Income.create(payment=payment, **clean_data)
     except Exception as e:
         logger.error("❌ Ошибка при создании дохода: %s", e)
         raise
@@ -221,12 +222,13 @@ def update_income(income: Income, **kwargs):
         return income
 
     old_received = income.received_date
-    for key, value in updates.items():
-        setattr(income, key, value)
-    logger.debug("💬 update_income: received_date=%r", updates.get("received_date"))
-    logger.debug("💬 final obj: income.received_date = %r", income.received_date)
+    with db.atomic():
+        for key, value in updates.items():
+            setattr(income, key, value)
+        logger.debug("💬 update_income: received_date=%r", updates.get("received_date"))
+        logger.debug("💬 final obj: income.received_date = %r", income.received_date)
+        income.save()
 
-    income.save()
     if old_received is None and income.received_date:
         _notify_income_received(income)
     return income

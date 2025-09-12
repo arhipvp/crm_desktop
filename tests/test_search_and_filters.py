@@ -1,18 +1,32 @@
+import pytest
 from datetime import date
 
 from database.models import Client, Policy, Executor
+from services.clients.client_service import build_client_query
 from services.query_utils import apply_search_and_filters
 from services.executor_service import get_executors_page
 
 
-def test_apply_search_and_filters_clients(in_memory_db):
-    c1 = Client.create(name="Alice", phone="123", email="a@a", note="x")
+@pytest.mark.parametrize(
+    "query_builder, expected_names",
+    [
+        (
+            lambda: apply_search_and_filters(
+                Client.select(), Client, "Alice", {Client.phone: "123"}
+            ),
+            ["Alice"],
+        ),
+        (
+            lambda: build_client_query(order_by="name", order_dir="asc"),
+            ["Alice", "Bob"],
+        ),
+    ],
+)
+def test_client_search_and_sorting(in_memory_db, query_builder, expected_names):
     Client.create(name="Bob", phone="456", email="b@b", note="y")
-    query = Client.select()
-    query = apply_search_and_filters(query, Client, "Alice", {Client.phone: "123"})
-    results = list(query)
-    assert len(results) == 1
-    assert results[0].id == c1.id
+    Client.create(name="Alice", phone="123", email="a@a", note="x")
+    query = query_builder()
+    assert [c.name for c in query] == expected_names
 
 
 def test_apply_search_and_filters_policies(in_memory_db):
