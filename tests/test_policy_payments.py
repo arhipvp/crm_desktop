@@ -1,7 +1,7 @@
 import datetime
 import pytest
 
-from database.models import Client, Policy, Payment
+from database.models import Client, Policy, Payment, Income, Expense
 from services import payment_service as pay_svc
 from services.policies import policy_service as policy_svc
 
@@ -121,6 +121,39 @@ def test_add_policy_rolls_back_on_payment_error(
 
     assert Policy.select().count() == 0
     assert Payment.select().count() == 0
+
+
+@pytest.mark.parametrize("fail", ["income", "expense"])
+def test_add_payment_rolls_back_on_related_error(
+    in_memory_db, monkeypatch, mock_payments, fail
+):
+    import importlib
+    import services.income_service as income_service
+    import services.expense_service as expense_service
+
+    pay_module = importlib.reload(pay_svc)
+
+    client = Client.create(name="C")
+    d1 = datetime.date(2024, 1, 1)
+    policy_data = dict(client=client, policy_number="P", start_date=d1, end_date=d1)
+    if fail == "expense":
+        policy_data["contractor"] = "X"
+    policy = Policy.create(**policy_data)
+
+    def boom(**_):
+        raise RuntimeError("boom")
+
+    if fail == "income":
+        monkeypatch.setattr(income_service, "add_income", boom)
+    else:
+        monkeypatch.setattr(expense_service, "add_expense", boom)
+
+    with pytest.raises(RuntimeError):
+        pay_module.add_payment(policy=policy, amount=100, payment_date=d1)
+
+    assert Payment.select().count() == 0
+    assert Income.select().count() == 0
+    assert Expense.select().count() == 0
 
 
 def test_sync_policy_payments_removes_extra_duplicates(in_memory_db, mock_payments):
