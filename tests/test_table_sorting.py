@@ -7,16 +7,9 @@ from ui.base.base_table_view import BaseTableView
 from ui.views.policy_table_view import PolicyTableView
 
 
-class DummyPolicyTableView(PolicyTableView):
-    """Полностью отключает загрузку данных в конструкторе."""
-
-    def load_data(self):  # pragma: no cover - простая заглушка
-        pass
-
-
-@pytest.mark.parametrize("view_class", [BaseTableView, DummyPolicyTableView])
+@pytest.mark.parametrize("view_class", [BaseTableView, PolicyTableView])
 @pytest.mark.parametrize("sort_order", [Qt.AscendingOrder, Qt.DescendingOrder])
-def test_table_sorting(view_class, sort_order, in_memory_db, qapp):
+def test_table_sorting(view_class, sort_order, in_memory_db, qapp, monkeypatch):
     client = Client.create(name="C")
     today = datetime.date.today()
 
@@ -46,10 +39,12 @@ def test_table_sorting(view_class, sort_order, in_memory_db, qapp):
         p2 = Policy.create(
             client=client, deal=None, policy_number="P2", start_date=today
         )
-        view = DummyPolicyTableView()
-        view.load_data = lambda: view.set_model_class_and_items(
-            Policy, [p1, p2], total_count=2
-        )
+
+        def fake_load_data(self):
+            self.set_model_class_and_items(Policy, [p1, p2], total_count=2)
+
+        monkeypatch.setattr(PolicyTableView, "load_data", fake_load_data)
+        view = view_class()
         view.load_data()
         column = 2  # столбец номера полиса
 
