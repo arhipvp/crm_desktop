@@ -57,13 +57,21 @@ def get_clients_with_queued_tasks() -> list[Client]:
     return clients
 
 
-def _pop_tasks(
+def _dispatch_tasks(
     filter_cond,
     chat_id: int,
     log_suffix: str,
     limit: int | None = 1,
 ) -> list[Task]:
-    """Вспомогательная функция для выдачи задач из очереди."""
+    """Выбрать задачи из очереди по условию и отметить как отправленные.
+
+    Parameters:
+        filter_cond: Дополнительное условие фильтрации задач.
+        chat_id: Идентификатор чата Telegram, куда отправляются задачи.
+        log_suffix: Суффикс для сообщений журнала.
+        limit: Максимальное количество выдаваемых задач, ``None`` — без
+            ограничения.
+    """
     with db.atomic():
         query = (
             Task.active()
@@ -103,7 +111,7 @@ def _pop_tasks(
 
 def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
     """Выдать следующую задачу из очереди, фильтруя по клиенту."""
-    tasks = _pop_tasks(
+    tasks = _dispatch_tasks(
         (Deal.client_id == client_id) | (Policy.client_id == client_id),
         chat_id,
         f" для клиента {client_id}",
@@ -146,7 +154,7 @@ def get_all_deals_with_queued_tasks() -> list[Deal]:
 
 def pop_next_by_deal(chat_id: int, deal_id: int) -> Task | None:
     """Выдать следующую задачу из очереди для сделки."""
-    tasks = _pop_tasks(
+    tasks = _dispatch_tasks(
         Task.deal_id == deal_id,
         chat_id,
         f" для сделки {deal_id}",
@@ -157,7 +165,7 @@ def pop_next_by_deal(chat_id: int, deal_id: int) -> Task | None:
 
 def pop_all_by_deal(chat_id: int, deal_id: int) -> list[Task]:
     """Выдать все задачи из очереди для сделки."""
-    return _pop_tasks(
+    return _dispatch_tasks(
         Task.deal_id == deal_id,
         chat_id,
         f" для сделки {deal_id}",
@@ -166,7 +174,7 @@ def pop_all_by_deal(chat_id: int, deal_id: int) -> list[Task]:
 
 
 def pop_next(chat_id: int) -> Task | None:
-    tasks = _pop_tasks(None, chat_id, "", limit=1)
+    tasks = _dispatch_tasks(None, chat_id, "", limit=1)
     return tasks[0] if tasks else None
 
 

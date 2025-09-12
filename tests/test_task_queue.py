@@ -35,11 +35,15 @@ def test_pop_next_returns_tasks_in_order_and_none_when_empty():
 
     res1 = pop_next(chat_id=10)
     assert res1.id == t1.id
-    assert res1.dispatch_state == SENT
+    assert res1.dispatch_state == "sent"
+    assert res1.tg_chat_id == 10
 
     res2 = pop_next(chat_id=10)
     assert res2.id == t2.id
-    assert res2.dispatch_state == SENT
+    assert res2.dispatch_state == "sent"
+    assert res2.tg_chat_id == 10
+    assert res1.dispatch_state == SENT
+
 
     assert pop_next(chat_id=10) is None
 
@@ -76,8 +80,10 @@ def test_pop_next_by_client_filters_by_client_and_policy():
 
     r1 = pop_next_by_client(chat_id=20, client_id=c1.id)
     assert r1.id == t_deal.id
+    assert r1.tg_chat_id == 20
     r2 = pop_next_by_client(chat_id=20, client_id=c1.id)
     assert r2.id == t_policy.id
+    assert r2.tg_chat_id == 20
     assert pop_next_by_client(chat_id=20, client_id=c1.id) is None
 
     other = Task.get(Task.deal == d2)
@@ -113,8 +119,10 @@ def test_pop_next_by_deal_filters_tasks():
 
     res1 = pop_next_by_deal(chat_id=30, deal_id=deal1.id)
     assert res1.id == t1.id
+    assert res1.tg_chat_id == 30
     res2 = pop_next_by_deal(chat_id=30, deal_id=deal1.id)
     assert res2.id == t2.id
+    assert res2.tg_chat_id == 30
     assert pop_next_by_deal(chat_id=30, deal_id=deal1.id) is None
 
     assert Task.get(Task.deal == deal2).dispatch_state == QUEUED
