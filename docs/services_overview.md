@@ -10,6 +10,12 @@
 - `add_deal` создаёт сделку, формирует запись в журнале и создаёт локальную папку «Сделка - …»【F:services/deal_service.py†L56-L123】.
 - `add_deal_from_policy` строит описание сделки из данных полиса и связывает их между собой【F:services/deal_service.py†L137-L160】.
 
+## calculation_service
+- `add_calculation` добавляет расчёт к сделке, ограничивает набор полей и уведомляет администратора【F:services/calculation_service.py†L14-L34】.
+- `build_calculation_query` формирует запрос с поиском, фильтрами и сортировкой расчётов сделки【F:services/calculation_service.py†L37-L72】.
+- `mark_calculations_deleted` массово помечает выбранные расчёты удалёнными【F:services/calculation_service.py†L89-L98】.
+- `update_calculation` изменяет допустимые параметры расчёта и, при необходимости, привязывает его к другой сделке【F:services/calculation_service.py†L108-L132】.
+
 ## policy_service
 - `_check_duplicate_policy` предотвращает создание полиса с существующим номером【F:services/policies/policy_service.py†L108-L146】.
 - `add_policy` создаёт папку, привязывает платежи и уведомляет исполнителя【F:services/policies/policy_service.py†L286-L403】【F:services/policies/policy_service.py†L268-L280】.
