@@ -1,3 +1,5 @@
-IDLE = "idle"
-QUEUED = "queued"
-SENT = "sent"
+from database.models import DispatchState
+
+IDLE = DispatchState.IDLE.value
+QUEUED = DispatchState.QUEUED.value
+SENT = DispatchState.SENT.value

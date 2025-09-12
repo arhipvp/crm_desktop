@@ -55,6 +55,12 @@ class DealStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class DispatchState(str, Enum):
+    IDLE = "idle"
+    QUEUED = "queued"
+    SENT = "sent"
+
+
 class Deal(SoftDeleteModel):
     reminder_date = DateField(null=True)
     client = ForeignKeyField(Client, backref="deals")
@@ -113,7 +119,7 @@ class Task(SoftDeleteModel):
     is_done = BooleanField(default=False)
 
     # telegram
-    dispatch_state = CharField(default="idle")  # idle | queued | sent
+    dispatch_state = CharField(default=DispatchState.IDLE.value)
     queued_at = DateTimeField(null=True)
     tg_chat_id = BigIntegerField(null=True)
     tg_message_id = BigIntegerField(null=True)
