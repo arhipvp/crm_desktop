@@ -222,121 +222,123 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
     таблицу :class:`DealCalculation`.
     """
 
-    allowed_fields = {
-        "start_date",
-        "status",
-        "description",
-        "reminder_date",
-        "is_closed",
-        "closed_reason",
-        "client_id",
-    }
+    with db.atomic():
+        allowed_fields = {
+            "start_date",
+            "status",
+            "description",
+            "reminder_date",
+            "is_closed",
+            "closed_reason",
+            "client_id",
+        }
 
-    old_client_name = deal.client.name if deal.client_id else None
-    old_desc = deal.description
+        old_client_name = deal.client.name if deal.client_id else None
+        old_desc = deal.description
 
-    # Собираем простые обновления (кроме calculations)
-    updates: dict = {
-        key: kwargs[key]
-        for key in allowed_fields
-        if key in kwargs and kwargs[key] not in ("", None)
-    }
+        # Собираем простые обновления (кроме calculations)
+        updates: dict = {
+            key: kwargs[key]
+            for key in allowed_fields
+            if key in kwargs and kwargs[key] not in ("", None)
+        }
 
-    # Смена клиента
-    if "client_id" in updates:
-        client = get_client_by_id(updates.pop("client_id"))
-        if not client:
-            raise ValueError("Клиент не найден.")
-        deal.client = client
+        # Смена клиента
+        if "client_id" in updates:
+            client = get_client_by_id(updates.pop("client_id"))
+            if not client:
+                raise ValueError("Клиент не найден.")
+            deal.client = client
 
-    # calculations -> отдельная таблица
-    new_calc: str | None = kwargs.get("calculations")
-    new_note: str | None = journal_entry
+        # calculations -> отдельная таблица
+        new_calc: str | None = kwargs.get("calculations")
+        new_note: str | None = journal_entry
 
-    # Если закрываем сделку — пишем причину в журнал
-    if kwargs.get("is_closed") and kwargs.get("closed_reason"):
-        reason = kwargs["closed_reason"]
-        ts = now_str()
-        auto_note = f"[{ts}]: Сделка закрыта. Причина: {reason}"
-        old = deal.calculations or ""
-        deal.calculations = f"{auto_note}\n{old}"
+        # Если закрываем сделку — пишем причину в журнал
+        if kwargs.get("is_closed") and kwargs.get("closed_reason"):
+            reason = kwargs["closed_reason"]
+            ts = now_str()
+            auto_note = f"[{ts}]: Сделка закрыта. Причина: {reason}"
+            old = deal.calculations or ""
+            deal.calculations = f"{auto_note}\n{old}"
 
-    # Добавляем произвольную запись в журнал
-    if new_note:
-        ts = now_str()
-        entry = f"[{ts}]: {new_note}"
-        old = deal.calculations or ""
-        deal.calculations = f"{entry}\n{old}" if old else entry
+        # Добавляем произвольную запись в журнал
+        if new_note:
+            ts = now_str()
+            entry = f"[{ts}]: {new_note}"
+            old = deal.calculations or ""
+            deal.calculations = f"{entry}\n{old}" if old else entry
 
-    # Если нечего обновлять — возвращаем сделку как есть
-    if not updates and not new_calc and not new_note:
+        # Если нечего обновлять — возвращаем сделку как есть
+        if not updates and not new_calc and not new_note:
+            return deal
+
+        # Применяем простые обновления
+        for key, value in updates.items():
+            setattr(deal, key, value)
+
+        deal.save()
+
+        # Переименование папки при изменении описания или клиента
+        new_client_name = deal.client.name if deal.client_id else None
+        new_desc = deal.description
+        if (
+            (old_client_name and new_client_name and old_client_name != new_client_name)
+            or old_desc != new_desc
+        ):
+            try:
+                from services.folder_utils import rename_deal_folder
+
+                new_path, _ = rename_deal_folder(
+                    old_client_name or "",
+                    old_desc,
+                    new_client_name or "",
+                    new_desc,
+                    deal.drive_folder_link,
+                    deal.drive_folder_path,
+                )
+                if new_path and new_path != deal.drive_folder_path:
+                    deal.drive_folder_path = new_path
+                    deal.save(only=[Deal.drive_folder_path, Deal.drive_folder_link])
+            except Exception:
+                logger.exception("Не удалось переименовать папку сделки")
+
+        # Добавляем расчётную запись
+        if new_calc:
+            from services.calculation_service import add_calculation
+            add_calculation(deal.id, note=new_calc)
         return deal
-
-    # Применяем простые обновления
-    for key, value in updates.items():
-        setattr(deal, key, value)
-
-    deal.save()
-
-    # Переименование папки при изменении описания или клиента
-    new_client_name = deal.client.name if deal.client_id else None
-    new_desc = deal.description
-    if (
-        (old_client_name and new_client_name and old_client_name != new_client_name)
-        or old_desc != new_desc
-    ):
-        try:
-            from services.folder_utils import rename_deal_folder
-
-            new_path, _ = rename_deal_folder(
-                old_client_name or "",
-                old_desc,
-                new_client_name or "",
-                new_desc,
-                deal.drive_folder_link,
-                deal.drive_folder_path,
-            )
-            if new_path and new_path != deal.drive_folder_path:
-                deal.drive_folder_path = new_path
-                deal.save(only=[Deal.drive_folder_path, Deal.drive_folder_link])
-        except Exception:
-            logger.exception("Не удалось переименовать папку сделки")
-
-    # Добавляем расчётную запись
-    if new_calc:
-        from services.calculation_service import add_calculation
-        add_calculation(deal.id, note=new_calc)
-    return deal
 
 
 # ──────────────────────────── Удаление ─────────────────────────────
 
 
 def mark_deal_deleted(deal_id: int):
-    deal = Deal.get_or_none(Deal.id == deal_id)
-    if deal:
-        deal.soft_delete()
-        try:
-            from services.folder_utils import rename_deal_folder
+    with db.atomic():
+        deal = Deal.get_or_none(Deal.id == deal_id)
+        if deal:
+            deal.soft_delete()
+            try:
+                from services.folder_utils import rename_deal_folder
 
-            new_desc = f"{deal.description} deleted"
-            new_path, _ = rename_deal_folder(
-                deal.client.name,
-                deal.description,
-                deal.client.name,
-                new_desc,
-                deal.drive_folder_link,
-                deal.drive_folder_path,
-            )
-            deal.description = new_desc
-            deal.drive_folder_path = new_path
-            deal.save(
-                only=[Deal.description, Deal.drive_folder_path, Deal.is_deleted]
-            )
-        except Exception:
-            logger.exception("Не удалось пометить папку сделки удалённой")
-    else:
-        logger.warning("❗ Сделка с id=%s не найдена для удаления", deal_id)
+                new_desc = f"{deal.description} deleted"
+                new_path, _ = rename_deal_folder(
+                    deal.client.name,
+                    deal.description,
+                    deal.client.name,
+                    new_desc,
+                    deal.drive_folder_link,
+                    deal.drive_folder_path,
+                )
+                deal.description = new_desc
+                deal.drive_folder_path = new_path
+                deal.save(
+                    only=[Deal.description, Deal.drive_folder_path, Deal.is_deleted]
+                )
+            except Exception:
+                logger.exception("Не удалось пометить папку сделки удалённой")
+        else:
+            logger.warning("❗ Сделка с id=%s не найдена для удаления", deal_id)
 
 
 def apply_deal_filters(
