@@ -5,9 +5,6 @@ from database.models import (
     Deal,
     Policy,
     Payment,
-    Executor,
-    DealExecutor,
-    Income,
     Task,
 )
 from services.policies import policy_service as ps
@@ -21,11 +18,8 @@ pytestmark = pytest.mark.slow
 
 
 @pytest.mark.parametrize("sent_notify", ["ps"], indirect=True)
-def test_notify_on_policy_add(in_memory_db, monkeypatch, policy_folder_patches, sent_notify):
-    client = Client.create(name='C')
-    deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
-    executor = Executor.create(full_name='E', tg_id=1, is_active=True)
-    DealExecutor.create(deal=deal, executor=executor, assigned_date=datetime.date.today())
+def test_notify_on_policy_add(in_memory_db, monkeypatch, policy_folder_patches, sent_notify, make_deal_with_executor):
+    client, deal, executor = make_deal_with_executor()
 
     monkeypatch.setattr(ps, "add_payment", lambda **kw: Payment.create(policy=kw['policy'], amount=kw['amount'], payment_date=kw['payment_date']))
 
@@ -43,11 +37,8 @@ def test_notify_on_policy_add(in_memory_db, monkeypatch, policy_folder_patches, 
 
 
 @pytest.mark.parametrize("sent_notify", ["ts"], indirect=True)
-def test_notify_on_unassign(in_memory_db, sent_notify):
-    client = Client.create(name='C')
-    deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
-    executor = Executor.create(full_name='E', tg_id=1, is_active=True)
-    DealExecutor.create(deal=deal, executor=executor, assigned_date=datetime.date.today())
+def test_notify_on_unassign(in_memory_db, sent_notify, make_deal_with_executor):
+    client, deal, executor = make_deal_with_executor()
 
     es.unassign_executor(deal.id)
 
@@ -56,11 +47,8 @@ def test_notify_on_unassign(in_memory_db, sent_notify):
 
 
 @pytest.mark.parametrize("sent_notify", ["ins"], indirect=True)
-def test_notify_on_income_received(in_memory_db, sent_notify):
-    client = Client.create(name='C')
-    deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
-    executor = Executor.create(full_name='E', tg_id=1, is_active=True)
-    DealExecutor.create(deal=deal, executor=executor, assigned_date=datetime.date.today())
+def test_notify_on_income_received(in_memory_db, sent_notify, make_deal_with_executor):
+    client, deal, executor = make_deal_with_executor()
 
     policy = Policy.create(
         client=client,
