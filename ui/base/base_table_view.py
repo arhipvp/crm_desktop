@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QFileDialog,
+    QMessageBox,
 )
 
 from ui.base.table_controller import TableController
@@ -23,6 +24,7 @@ from ui.common.styled_widgets import styled_button
 from ui.common.column_filter_row import ColumnFilterRow
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
+from database.models import Deal
 
 
 class BaseTableView(QWidget):
@@ -449,6 +451,10 @@ class BaseTableView(QWidget):
             if i.isValid()
         ]
 
+    def get_selected_deal(self) -> Deal | None:
+        """Возвращает связанную сделку для выбранной строки."""
+        return None
+
     def open_selected_folder(self):
         """Открыть связанную папку для выбранной строки."""
         obj = self.get_selected_object()
@@ -459,6 +465,15 @@ class BaseTableView(QWidget):
         )
         if path:
             open_folder(path, parent=self)
+
+    def open_selected_deal(self):
+        """Открыть связанную сделку для выбранной строки."""
+        deal = self.get_selected_deal()
+        if not deal:
+            return
+        from ui.views.deal_detail import DealDetailView
+
+        DealDetailView(deal, parent=self).exec()
 
     def export_csv(self, path: str | None = None):
         objs = self.get_selected_objects()
@@ -497,12 +512,15 @@ class BaseTableView(QWidget):
         act_folder = menu.addAction("Открыть папку")
         text = str(index.data() or "")
         act_copy = menu.addAction("Копировать значение")
+        act_deal = menu.addAction("Открыть сделку")
         act_open.triggered.connect(self._on_edit)
         act_delete.triggered.connect(self._on_delete)
         act_folder.triggered.connect(self.open_selected_folder)
         act_copy.triggered.connect(
             lambda: copy_text_to_clipboard(text, parent=self)
         )
+        act_deal.triggered.connect(self.open_selected_deal)
+        act_deal.setEnabled(bool(self.get_selected_deal()))
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def _on_header_menu(self, pos):
