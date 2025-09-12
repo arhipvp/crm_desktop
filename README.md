@@ -43,6 +43,13 @@ AI_POLICY_PROMPT=
 - **OPENAI_MODEL** — название модели для запросов (например, gpt-4o).
 - **AI_POLICY_PROMPT** — системный промпт для распознавания полисов; позволяет переопределить стандартные правила.
 
+### Переменные Telegram и Google Drive
+
+- **TG_BOT_TOKEN** — токен Telegram‑бота.
+- **APPROVED_EXECUTOR_IDS** — список ID исполнителей, которым разрешено получать задачи.
+- **GOOGLE_ROOT_FOLDER_ID** — ID корневой папки в Google Drive (см. раздел [Работа с Google Drive](#работа-с-google-drive)).
+- **GOOGLE_SHEETS_TASKS_ID** и **GOOGLE_SHEETS_CALCULATIONS_ID** — идентификаторы связанных таблиц Google Sheets (см. раздел [Работа с Google Drive](#работа-с-google-drive)).
+
 Переменная `ADMIN_CHAT_ID` задаёт Telegram‑ID администратора, которому бот отправляет уведомления.
 
 Переменная `LOG_LEVEL` управляет уровнем логов. Допустимые значения совпадают с уровнями модуля `logging` (например, `DEBUG`, `INFO`). По умолчанию используется `INFO`.
