@@ -1,7 +1,7 @@
 """Простая конфигурация логирования для приложений CRM."""
 
 import logging
-import os
+from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
 from config import Settings, get_settings
@@ -22,8 +22,8 @@ class PeeweeFilter(logging.Filter):
 def setup_logging(settings: Settings | None = None) -> None:
     """Настраивает вывод логов в консоль и файл ``crm.log``."""
     settings = settings or get_settings()
-    logs_dir = os.path.expanduser(settings.log_dir)
-    os.makedirs(logs_dir, exist_ok=True)
+    logs_dir = Path(settings.log_dir).expanduser()
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
     level_name = settings.log_level
     level = getattr(logging, level_name, logging.INFO)
@@ -34,7 +34,7 @@ def setup_logging(settings: Settings | None = None) -> None:
     )
 
     file_h = RotatingFileHandler(
-        os.path.join(logs_dir, "crm.log"),
+        logs_dir / "crm.log",
         maxBytes=2_000_000,  # 2 MB
         backupCount=3,
         encoding="utf-8",

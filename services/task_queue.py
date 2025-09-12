@@ -40,21 +40,21 @@ def queue_task(task_id: int):
 
 def get_clients_with_queued_tasks() -> list[Client]:
     """Вернуть уникальных клиентов с задачами в состоянии ``queued``."""
-    base = Task.active().where(Task.dispatch_state == QUEUED)
-    tasks = prefetch(base, Deal, Policy, Client)
-
-    seen: set[int] = set()
-    clients: list[Client] = []
-    for t in tasks:
-        c = None
-        if t.deal and t.deal.client:
-            c = t.deal.client
-        elif t.policy and t.policy.client:
-            c = t.policy.client
-        if c and c.id not in seen:
-            seen.add(c.id)
-            clients.append(c)
-    return clients
+    deal_clients = (
+        Client.select()
+        .distinct()
+        .join(Deal)
+        .join(Task)
+        .where((Task.dispatch_state == QUEUED) & (Task.is_deleted == False))
+    )
+    policy_clients = (
+        Client.select()
+        .distinct()
+        .join(Policy)
+        .join(Task)
+        .where((Task.dispatch_state == QUEUED) & (Task.is_deleted == False))
+    )
+    return list(deal_clients.union(policy_clients))
 
 
 def _dispatch_tasks(
@@ -123,33 +123,27 @@ def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
 def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
     """Вернуть сделки клиента, у которых есть задачи в очереди."""
     base = (
-        Task.active()
-        .join(Deal)
-        .where((Task.dispatch_state == QUEUED) & (Deal.client_id == client_id))
+        Deal.select()
+        .distinct()
+        .join(Task)
+        .where(
+            (Task.dispatch_state == QUEUED)
+            & (Task.is_deleted == False)
+            & (Deal.client_id == client_id)
+        )
     )
-    tasks = prefetch(base, Deal)
-
-    seen: set[int] = set()
-    deals: list[Deal] = []
-    for t in tasks:
-        if t.deal and t.deal.id not in seen:
-            seen.add(t.deal.id)
-            deals.append(t.deal)
-    return deals
+    return list(prefetch(base, Client))
 
 
 def get_all_deals_with_queued_tasks() -> list[Deal]:
     """Вернуть все сделки, у которых есть задачи в очереди."""
-    base = Task.active().join(Deal).where(Task.dispatch_state == QUEUED)
-    tasks = prefetch(base, Deal, Client)
-
-    seen: set[int] = set()
-    deals: list[Deal] = []
-    for t in tasks:
-        if t.deal and t.deal.id not in seen:
-            seen.add(t.deal.id)
-            deals.append(t.deal)
-    return deals
+    base = (
+        Deal.select()
+        .distinct()
+        .join(Task)
+        .where((Task.dispatch_state == QUEUED) & (Task.is_deleted == False))
+    )
+    return list(prefetch(base, Client))
 
 
 def pop_next_by_deal(chat_id: int, deal_id: int) -> Task | None:

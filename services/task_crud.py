@@ -20,6 +20,56 @@ from .task_states import IDLE, QUEUED
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_SORT_FIELDS = {
+    "due_date": Task.due_date,
+    "title": Task.title,
+    "id": Task.id,
+    "queued_at": Task.queued_at,
+    "is_done": Task.is_done,
+    "dispatch_state": Task.dispatch_state,
+}
+
+
+# Поля, допустимые для создания и обновления задач
+TASK_ALLOWED_FIELDS = {
+    "title",
+    "due_date",
+    "deal_id",
+    "policy_id",
+    "is_done",
+    "note",
+    "dispatch_state",
+    "queued_at",
+    "tg_chat_id",
+    "tg_message_id",
+}
+
+
+def _clean_task_data(data: dict[str, object]) -> dict[str, object]:
+    """Отфильтровать допустимые поля и убрать пустые значения."""
+    clean: dict[str, object] = {}
+    for key, value in data.items():
+        if value in ("", None):
+            continue
+        if key in TASK_ALLOWED_FIELDS:
+            clean[key] = value
+        elif key == "deal" and hasattr(value, "id"):
+            clean["deal_id"] = value.id
+        elif key == "policy" and hasattr(value, "id"):
+            clean["policy_id"] = value.id
+    return clean
+
+
+# Допустимые поля для сортировки
+ALLOWED_SORT_FIELDS: dict[str, object] = {
+    "due_date": Task.due_date,
+    "title": Task.title,
+    "deal": Task.deal,
+    "policy": Task.policy,
+    "dispatch_state": Task.dispatch_state,
+    "queued_at": Task.queued_at,
+}
+
 
 # Поля, которые разрешено изменять через CRUD‑функции
 TASK_ALLOWED_FIELDS = {
@@ -71,7 +121,9 @@ def get_task_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
 
 def add_task(**kwargs):
     """Создать задачу."""
+
     clean_data = _filter_task_fields(kwargs)
+
 
     try:
         with db.atomic():
@@ -94,14 +146,18 @@ def add_task(**kwargs):
 
 def update_task(task: Task, **fields) -> Task:
     """Изменить поля задачи."""
+
     clean_fields = _filter_task_fields(fields)
     is_marking_done = clean_fields.get("is_done") is True
+
     raw_note = fields.get("note")
     user_text = (
         raw_note.strip()
         if isinstance(raw_note, str) and raw_note.strip()
         else "Задача выполнена."
     )
+
+    clean_fields = _clean_task_data(fields)
 
     with db.atomic():
         for key, value in clean_fields.items():
@@ -161,6 +217,12 @@ def build_task_query(
     sort_order: str = "asc",
     column_filters: dict[str, str] | None = None,
 ):
+    sort_field = (
+        sort_field
+        if sort_field in ALLOWED_SORT_FIELDS or sort_field == "executor"
+        else "due_date"
+    )
+
     query = Task.active() if not include_deleted else Task.select()
     if not include_done:
         query = query.where(Task.is_done == False)
@@ -200,6 +262,9 @@ def build_task_query(
 
     query = apply_column_filters(query, name_filters, Task)
 
+    if sort_field not in ALLOWED_SORT_FIELDS and sort_field != "executor":
+        sort_field = "due_date"
+
     join_executor = bool(field_filters) or sort_field == "executor"
     if join_executor:
         policy_alias = Policy.alias()
@@ -231,7 +296,15 @@ def get_tasks_page(
     **filters,
 ):
     """Получить страницу задач."""
+    if sort_field not in ALLOWED_SORT_FIELDS and sort_field != "executor":
+        sort_field = "due_date"
+
     logger.debug("🔽 Применяем сортировку: field=%s, order=%s", sort_field, sort_order)
+    sort_field = (
+        sort_field
+        if sort_field in ALLOWED_SORT_FIELDS or sort_field == "executor"
+        else "due_date"
+    )
     offset = (page - 1) * per_page
     query = build_task_query(
         column_filters=column_filters, sort_field=sort_field, **filters
@@ -243,12 +316,10 @@ def get_tasks_page(
             else Executor.full_name.desc()
         )
         query = query.distinct().order_by(order, Task.id.asc())
-    elif sort_field and hasattr(Task, sort_field):
-        field = getattr(Task, sort_field)
+    else:
+        field = ALLOWED_SORT_FIELDS.get(sort_field, Task.due_date)
         order = field.asc() if sort_order == "asc" else field.desc()
         query = query.order_by(order, Task.id.asc())
-    else:
-        query = query.order_by(Task.due_date.desc(), Task.id.desc())
     return query.offset(offset).limit(per_page)
 
 
