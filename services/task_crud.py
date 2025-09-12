@@ -21,6 +21,36 @@ from .task_states import IDLE, QUEUED
 logger = logging.getLogger(__name__)
 
 
+# Поля, которые разрешено изменять через CRUD‑функции
+TASK_ALLOWED_FIELDS = {
+    "title",
+    "due_date",
+    "deal_id",
+    "policy_id",
+    "is_done",
+    "note",
+    "dispatch_state",
+    "queued_at",
+    "tg_chat_id",
+    "tg_message_id",
+}
+
+
+def _filter_task_fields(data: dict[str, object]) -> dict[str, object]:
+    """Отфильтровать входные данные, оставив только допустимые поля."""
+    clean: dict[str, object] = {}
+    for key, value in data.items():
+        if value in ("", None):
+            continue
+        if key in TASK_ALLOWED_FIELDS:
+            clean[key] = value
+        elif key == "deal" and hasattr(value, "id"):
+            clean["deal_id"] = value.id
+        elif key == "policy" and hasattr(value, "id"):
+            clean["policy_id"] = value.id
+    return clean
+
+
 def get_all_tasks():
     """Вернуть все задачи без удалённых."""
     return Task.active()
@@ -41,27 +71,7 @@ def get_task_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
 
 def add_task(**kwargs):
     """Создать задачу."""
-    allowed_fields = {
-        "title",
-        "due_date",
-        "deal_id",
-        "policy_id",
-        "is_done",
-        "note",
-        "dispatch_state",
-        "queued_at",
-        "tg_chat_id",
-        "tg_message_id",
-    }
-
-    clean_data: dict[str, object] = {}
-    for key, value in kwargs.items():
-        if key in allowed_fields and value not in ("", None):
-            clean_data[key] = value
-        elif key == "deal" and hasattr(value, "id"):
-            clean_data["deal_id"] = value.id
-        elif key == "policy" and hasattr(value, "id"):
-            clean_data["policy_id"] = value.id
+    clean_data = _filter_task_fields(kwargs)
 
     try:
         with db.atomic():
@@ -84,20 +94,8 @@ def add_task(**kwargs):
 
 def update_task(task: Task, **fields) -> Task:
     """Изменить поля задачи."""
-    allowed_fields = {
-        "title",
-        "due_date",
-        "deal_id",
-        "policy_id",
-        "is_done",
-        "note",
-        "dispatch_state",
-        "queued_at",
-        "tg_chat_id",
-        "tg_message_id",
-    }
-
-    is_marking_done = fields.get("is_done") is True
+    clean_fields = _filter_task_fields(fields)
+    is_marking_done = clean_fields.get("is_done") is True
     raw_note = fields.get("note")
     user_text = (
         raw_note.strip()
@@ -106,15 +104,8 @@ def update_task(task: Task, **fields) -> Task:
     )
 
     with db.atomic():
-        for key, value in fields.items():
-            if value in ("", None):
-                continue
-            if key == "deal" and hasattr(value, "id"):
-                task.deal_id = value.id
-            elif key == "policy" and hasattr(value, "id"):
-                task.policy_id = value.id
-            elif key in allowed_fields:
-                setattr(task, key, value)
+        for key, value in clean_fields.items():
+            setattr(task, key, value)
 
         if is_marking_done:
             task.dispatch_state = IDLE
