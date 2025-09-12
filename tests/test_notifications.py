@@ -20,14 +20,13 @@ from services.task_states import SENT
 pytestmark = pytest.mark.slow
 
 
-def test_notify_on_policy_add(in_memory_db, monkeypatch, policy_folder_patches):
+@pytest.mark.parametrize("sent_notify", [ps], indirect=True)
+def test_notify_on_policy_add(in_memory_db, monkeypatch, policy_folder_patches, sent_notify):
     client = Client.create(name='C')
     deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
     executor = Executor.create(full_name='E', tg_id=1, is_active=True)
     DealExecutor.create(deal=deal, executor=executor, assigned_date=datetime.date.today())
 
-    sent = {}
-    monkeypatch.setattr(ps, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
     monkeypatch.setattr(ps, "add_payment", lambda **kw: Payment.create(policy=kw['policy'], amount=kw['amount'], payment_date=kw['payment_date']))
 
     ps.add_policy(
@@ -39,26 +38,25 @@ def test_notify_on_policy_add(in_memory_db, monkeypatch, policy_folder_patches):
         payments=[{"amount": 0, "payment_date": datetime.date.today()}],
     )
 
-    assert sent.get('tg_id') == executor.tg_id
-    assert 'P' in sent.get('text', '')
+    assert sent_notify.get('tg_id') == executor.tg_id
+    assert 'P' in sent_notify.get('text', '')
 
 
-def test_notify_on_unassign(in_memory_db, monkeypatch):
+@pytest.mark.parametrize("sent_notify", [ts], indirect=True)
+def test_notify_on_unassign(in_memory_db, sent_notify):
     client = Client.create(name='C')
     deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
     executor = Executor.create(full_name='E', tg_id=1, is_active=True)
     DealExecutor.create(deal=deal, executor=executor, assigned_date=datetime.date.today())
 
-    sent = {}
-    monkeypatch.setattr(ts, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
-
     es.unassign_executor(deal.id)
 
-    assert sent.get('tg_id') == executor.tg_id
-    assert str(deal.id) in sent.get('text', '')
+    assert sent_notify.get('tg_id') == executor.tg_id
+    assert str(deal.id) in sent_notify.get('text', '')
 
 
-def test_notify_on_income_received(in_memory_db, monkeypatch):
+@pytest.mark.parametrize("sent_notify", [ins], indirect=True)
+def test_notify_on_income_received(in_memory_db, sent_notify):
     client = Client.create(name='C')
     deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
     executor = Executor.create(full_name='E', tg_id=1, is_active=True)
@@ -73,13 +71,10 @@ def test_notify_on_income_received(in_memory_db, monkeypatch):
     )
     payment = Payment.create(policy=policy, amount=0, payment_date=datetime.date.today())
 
-    sent = {}
-    monkeypatch.setattr(ins, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
-
     ins.add_income(payment=payment, amount=10, received_date=datetime.date.today())
 
-    assert sent.get('tg_id') == executor.tg_id
-    assert 'P' in sent.get('text', '')
+    assert sent_notify.get('tg_id') == executor.tg_id
+    assert 'P' in sent_notify.get('text', '')
 
 
 def test_notify_task_resends_message(in_memory_db, monkeypatch):

@@ -2,7 +2,6 @@ import os
 import signal
 import sys
 from pathlib import Path
-
 import pytest
 from peewee import SqliteDatabase
 
@@ -115,6 +114,13 @@ def policy_folder_patches(monkeypatch):
 
 
 @pytest.fixture()
+
+def sent_notify(monkeypatch, request):
+    sent = {}
+    module = request.param
+    monkeypatch.setattr(module, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
+    return sent
+
 
 def mock_payments(monkeypatch):
     monkeypatch.setattr(
