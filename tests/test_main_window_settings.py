@@ -1,4 +1,5 @@
 import pytest
+import logging
 
 from PySide6.QtWidgets import QApplication, QWidget, QTabWidget
 import base64
@@ -57,3 +58,32 @@ def test_main_window_restores_geometry_and_tab(tmp_path, monkeypatch):
     assert w2.tab_widget.currentIndex() == tab_saved
     w2.close()
     app.processEvents()
+
+
+def test_main_window_logs_on_invalid_geometry(tmp_path, monkeypatch, caplog):
+    _create_app()
+    monkeypatch.setattr(ui_settings, "SETTINGS_PATH", tmp_path / "ui_settings.json")
+
+    bad_geom = base64.b64encode(b"bad").decode("ascii")
+    ui_settings.set_window_settings("MainWindow", {"geometry": bad_geom})
+
+    def dummy_init_tabs(self):
+        self.tab_widget = QTabWidget()
+        self.setCentralWidget(self.tab_widget)
+        for i in range(6):
+            self.tab_widget.addTab(QWidget(), str(i))
+
+    monkeypatch.setattr(MainWindow, "init_tabs", dummy_init_tabs)
+    monkeypatch.setattr(MainWindow, "on_tab_changed", lambda self, index: None)
+
+    def raise_error(self, ba):
+        raise ValueError("broken")
+
+    monkeypatch.setattr(MainWindow, "restoreGeometry", raise_error)
+
+    with caplog.at_level(logging.ERROR):
+        w = MainWindow()
+
+    assert "Не удалось восстановить геометрию окна" in caplog.text
+    w.close()
+    QApplication.instance().processEvents()
