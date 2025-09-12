@@ -22,6 +22,11 @@
 - `format_exec_task` формирует HTML‑сообщение и inline‑клавиатуру для задачи исполнителю【F:services/telegram_service.py†L15-L48】.
 - `send_exec_task` передаёт сообщение через бот и сохраняет идентификаторы для обратной связи【F:services/telegram_service.py†L51-L64】.
 
+## task_service
+- `add_task` создаёт задачу и уведомляет администратора【F:services/task_crud.py†L83-L102】.
+- `queue_task` ставит задачу в очередь на отправку исполнителю【F:services/task_queue.py†L18-L29】.
+- `notify_task` переотправляет задачу исполнителю или возвращает её в очередь【F:services/task_notifications.py†L13-L34】.
+
 ## folder_utils
 - `sanitize_name` удаляет недопустимые символы из имен файлов и папок【F:services/folder_utils.py†L58-L66】.
 - `create_client_drive_folder` создаёт локальную папку клиента в каталоге синхронизации и возвращает путь【F:services/folder_utils.py†L121-L136】.
