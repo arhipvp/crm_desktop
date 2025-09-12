@@ -21,6 +21,7 @@ from database.models import (
     Deal,
     Executor,
     DealExecutor,
+    DealCalculation,
     Task,
 )
 
@@ -96,11 +97,33 @@ def in_memory_db(monkeypatch):
         if not (isinstance(test_db, _Sqlite) and getattr(test_db, "database", None) == ":memory:"):
             raise RuntimeError("Refusing to run tests on a non in-memory database")
 
-    test_db.create_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor, Task])
+    test_db.create_tables([
+        Client,
+        Policy,
+        Payment,
+        Income,
+        Expense,
+        Deal,
+        Executor,
+        DealExecutor,
+        DealCalculation,
+        Task,
+    ])
     try:
         yield
     finally:
-        test_db.drop_tables([Client, Policy, Payment, Income, Expense, Deal, Executor, DealExecutor, Task])
+        test_db.drop_tables([
+            Client,
+            Policy,
+            Payment,
+            Income,
+            Expense,
+            Deal,
+            Executor,
+            DealExecutor,
+            DealCalculation,
+            Task,
+        ])
         try:
             test_db.close()
         except Exception:
