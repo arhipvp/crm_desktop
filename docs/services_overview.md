@@ -50,6 +50,9 @@
 - `queue_task` ставит задачу в очередь на отправку исполнителю【F:services/task_queue.py†L18-L29】.
 - `notify_task` переотправляет задачу исполнителю или возвращает её в очередь【F:services/task_notifications.py†L13-L34】.
 
+## reso_table_service
+- `import_reso_payouts` загружает таблицы выплат RESO и позволяет выбирать строки, из которых создаются клиенты, полисы и доходы【F:services/reso_table_service.py†L53-L66】【F:services/reso_table_service.py†L96-L116】【F:services/reso_table_service.py†L143-L157】.
+
 ## folder_utils
 - `sanitize_name` удаляет недопустимые символы из имен файлов и папок【F:services/folder_utils.py†L58-L66】.
 - `create_client_drive_folder` создаёт локальную папку клиента в каталоге синхронизации и возвращает путь【F:services/folder_utils.py†L121-L136】.

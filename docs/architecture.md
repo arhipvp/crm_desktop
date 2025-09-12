@@ -37,6 +37,7 @@ CRM Desktop — настольное приложение на Python, объе�
 - Telegram‑уведомления формируются и отправляются через `telegram_service.py`【F:services/telegram_service.py†L15-L64】.
 - Модуль `ai_consultant_service.py` собирает контекст из базы и задаёт вопросы модели OpenAI【F:services/ai_consultant_service.py†L10-L63】.
 - Сервис `ai_policy_service` распознаёт полисы из PDF или текста через OpenAI и возвращает данные в формате JSON【F:services/policies/ai_policy_service.py†L196-L209】【F:services/policies/ai_policy_service.py†L350-L359】.
+- `reso_table_service` импортирует таблицы выплат RESO и по выбранным строкам создаёт клиентов, полисы и доходы【F:services/reso_table_service.py†L53-L66】【F:services/reso_table_service.py†L96-L116】【F:services/reso_table_service.py†L143-L157】.
 - Скрипт `backup.py` выгружает данные в SQL и Excel и загружает их на Google Drive【F:backup.py†L1-L108】.
 - Конфигурация логирования сохраняет сообщения в файл и подавляет «SELECT» от Peewee【F:utils/logging_config.py†L17-L48】.
 
