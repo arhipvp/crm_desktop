@@ -1,20 +1,12 @@
 import datetime
-from PySide6.QtWidgets import QApplication
+
 from PySide6.QtCore import Qt
 
 from database.models import Client, Policy, Payment
 from ui.base.base_table_view import BaseTableView
 
 
-def _create_app():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-
-def test_date_sorting_with_filter(in_memory_db):
-    _create_app()
+def test_date_sorting_with_filter(in_memory_db, qapp):
     client = Client.create(name="C")
     policy1 = Policy.create(client=client, deal=None, policy_number="P1", start_date=datetime.date.today())
     policy2 = Policy.create(client=client, deal=None, policy_number="P2", start_date=datetime.date.today())
@@ -29,7 +21,7 @@ def test_date_sorting_with_filter(in_memory_db):
 
     column = view.get_column_index("payment_date")
     view.table.sortByColumn(column, Qt.AscendingOrder)
-    QApplication.processEvents()
+    qapp.processEvents()
 
     idx0 = view.proxy_model.index(0, column)
     idx1 = view.proxy_model.index(1, column)

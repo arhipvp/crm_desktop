@@ -1,7 +1,7 @@
 import pytest
 import logging
 
-from PySide6.QtWidgets import QApplication, QWidget, QTabWidget
+from PySide6.QtWidgets import QWidget, QTabWidget
 import base64
 
 from ui.main_window import MainWindow
@@ -10,15 +10,7 @@ from ui import settings as ui_settings
 pytestmark = pytest.mark.slow
 
 
-def _create_app():
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    return app
-
-
-def test_main_window_restores_geometry_and_tab(tmp_path, monkeypatch):
-    _create_app()
+def test_main_window_restores_geometry_and_tab(tmp_path, monkeypatch, qapp):
     monkeypatch.setattr(ui_settings, "SETTINGS_PATH", tmp_path / "ui_settings.json")
 
     def dummy_init_tabs(self):
@@ -30,16 +22,15 @@ def test_main_window_restores_geometry_and_tab(tmp_path, monkeypatch):
     monkeypatch.setattr(MainWindow, "init_tabs", dummy_init_tabs)
     monkeypatch.setattr(MainWindow, "on_tab_changed", lambda self, index: None)
 
-    app = QApplication.instance()
     w1 = MainWindow()
     w1.show()
-    app.processEvents()
+    qapp.processEvents()
     w1.resize(900, 700)
     target_index = 3
     w1.tab_widget.setCurrentIndex(target_index)
-    app.processEvents()
+    qapp.processEvents()
     w1.close()
-    app.processEvents()
+    qapp.processEvents()
 
     settings = ui_settings.get_window_settings("MainWindow")
     geom_saved = settings["geometry"]
@@ -57,11 +48,10 @@ def test_main_window_restores_geometry_and_tab(tmp_path, monkeypatch):
     assert base64.b64encode(captured["geom"]).decode("ascii") == geom_saved
     assert w2.tab_widget.currentIndex() == tab_saved
     w2.close()
-    app.processEvents()
+    qapp.processEvents()
 
 
-def test_main_window_logs_on_invalid_geometry(tmp_path, monkeypatch, caplog):
-    _create_app()
+def test_main_window_logs_on_invalid_geometry(tmp_path, monkeypatch, caplog, qapp):
     monkeypatch.setattr(ui_settings, "SETTINGS_PATH", tmp_path / "ui_settings.json")
 
     bad_geom = base64.b64encode(b"bad").decode("ascii")
@@ -86,4 +76,4 @@ def test_main_window_logs_on_invalid_geometry(tmp_path, monkeypatch, caplog):
 
     assert "Не удалось восстановить геометрию окна" in caplog.text
     w.close()
-    QApplication.instance().processEvents()
+    qapp.processEvents()
