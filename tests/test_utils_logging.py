@@ -32,4 +32,3 @@ def test_filter_keeps_other_queries():
         assert filt.filter(_record(f"   {query}"))
         assert filt.filter(_record("ignored", sql=query))
         assert filt.filter(_record("ignored", sql=f"   {query}"))
-
