@@ -2,14 +2,10 @@ import logging
 from PySide6.QtCore import QDate
 from PySide6.QtWidgets import (
     QDialog,
-    QDateEdit,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
 )
 
@@ -24,7 +20,7 @@ from services.policies import (
     DuplicatePolicyError,
 )
 
-from services.validators import normalize_number, normalize_policy_number
+from services.validators import normalize_policy_number
 
 from services.deal_service import get_all_deals, get_deals_by_client_id
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
@@ -60,7 +56,6 @@ class PolicyForm(BaseEditForm):
         first_payment_paid=False,
     ):
         self._auto_end_date = None  # будем хранить последнее автозаполненное значение
-        self._draft_payments = []  # Список черновых платежей (до сохранения)
 
         self._forced_client = forced_client
         self._forced_deal = forced_deal
@@ -166,8 +161,6 @@ class PolicyForm(BaseEditForm):
         self.start_date_edit = self.fields.get("start_date")
         self.end_date_edit = self.fields.get("end_date")
 
-        self.build_payments_section()
-
         if self.start_date_edit and self.end_date_edit:
             self.start_date_edit.dateChanged.connect(self.on_start_date_changed)
             # Если start_date уже выбран — сразу установить правильный end_date
@@ -226,8 +219,7 @@ class PolicyForm(BaseEditForm):
             return None
 
         # ВСЯ логика добавления платежей теперь делегируется в сервис
-        payments = self._draft_payments if self._draft_payments else None
-
+        payments = None  # добавление платежей производится сервисом
         if self.instance:
             policy = update_policy(
                 self.instance,
@@ -257,7 +249,7 @@ class PolicyForm(BaseEditForm):
             dlg = PolicyMergeDialog(
                 e.existing_policy,
                 data,
-                draft_payments=self._draft_payments,
+                draft_payments=None,
                 first_payment_paid=self.first_payment_checkbox.isChecked(),
                 parent=self,
             )
@@ -325,80 +317,3 @@ class PolicyForm(BaseEditForm):
         if current_deal is not None:
             set_selected_by_id(self.deal_combo, current_deal)
 
-    def build_payments_section(self):
-        # Группа платежей
-        group = QGroupBox("Платежи по полису")
-        layout = QVBoxLayout(group)
-
-        # Таблица платежей (дата, сумма)
-        self.payments_table = QTableWidget(0, 3)
-        self.payments_table.setHorizontalHeaderLabels(["Дата платежа", "Сумма", ""])
-        layout.addWidget(self.payments_table)
-
-        # Редактируемая строка для добавления платежа
-        hlayout = QHBoxLayout()
-        self.pay_date_edit = QDateEdit()
-        self.pay_date_edit.setCalendarPopup(True)
-        self.pay_date_edit.setDate(QDate.currentDate())
-        hlayout.addWidget(QLabel("Дата:"))
-        hlayout.addWidget(self.pay_date_edit)
-
-        self.pay_amount_edit = QLineEdit()
-        hlayout.addWidget(QLabel("Сумма:"))
-        hlayout.addWidget(self.pay_amount_edit)
-
-        self.btn_add_payment = QPushButton("Добавить платёж")
-        self.btn_add_payment.clicked.connect(self.on_add_payment)
-        hlayout.addWidget(self.btn_add_payment)
-        layout.addLayout(hlayout)
-
-        # Добавляем в основную форму
-        self.form_layout.addRow(group)
-        for pay in self._draft_payments:
-            self.add_payment_row(pay)
-
-    def on_add_payment(self):
-        date = self.pay_date_edit.date()
-        amount = float(normalize_number(self.pay_amount_edit.text()))
-        # Добавить в черновой список
-        self._draft_payments.append({"payment_date": date.toPython(), "amount": amount})
-        row = self.payments_table.rowCount()
-        self.payments_table.insertRow(row)
-        self.payments_table.setItem(
-            row, 0, QTableWidgetItem(date.toString("dd.MM.yyyy"))
-        )
-        self.payments_table.setItem(row, 1, QTableWidgetItem(f"{amount:.2f}"))
-
-        # Кнопка "Удалить"
-        btn = QPushButton("Удалить")
-        # Т.к. row будет "заморожен" при вставке, используем lambda с row=row:
-        btn.clicked.connect(lambda _, r=row: self.on_delete_payment(r))
-        self.payments_table.setCellWidget(row, 2, btn)
-
-        self.pay_amount_edit.clear()
-
-    def on_delete_payment(self, row):
-        # Удалить строку из таблицы
-        self.payments_table.removeRow(row)
-        # Удалить из черновика (важно! — индекс совпадает с row)
-        if 0 <= row < len(self._draft_payments):
-            del self._draft_payments[row]
-
-    def add_payment_row(self, pay: dict):
-        date = pay.get("payment_date")
-        amount = pay.get("amount")
-        if not date or amount is None:
-            return
-        row = self.payments_table.rowCount()
-        self.payments_table.insertRow(row)
-        self.payments_table.setItem(
-            row,
-            0,
-            QTableWidgetItem(
-                QDate(date.year, date.month, date.day).toString("dd.MM.yyyy")
-            ),
-        )
-        self.payments_table.setItem(row, 1, QTableWidgetItem(f"{amount:.2f}"))
-        btn = QPushButton("Удалить")
-        btn.clicked.connect(lambda _, r=row: self.on_delete_payment(r))
-        self.payments_table.setCellWidget(row, 2, btn)
