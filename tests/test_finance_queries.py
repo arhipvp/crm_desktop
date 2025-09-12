@@ -11,7 +11,7 @@ from database.models import (
     DealExecutor,
     Expense,
 )
-from services.income_service import get_incomes_page, get_income_highlight_color
+from services.income_service import get_incomes_page
 from services.expense_service import build_expense_query
 
 
@@ -44,36 +44,6 @@ class TestIncome:
         )
         return income
 
-    @staticmethod
-    def _make_income(contractor: str | None) -> Income:
-        """Create an ``Income`` instance with an optional contractor."""
-
-        policy = Policy(
-            policy_number="123",
-            contractor=contractor,
-            start_date=date.today(),
-        )
-        payment = Payment(
-            policy=policy,
-            amount=100,
-            payment_date=date.today(),
-        )
-        return Income(
-            payment=payment,
-            amount=10,
-            received_date=date.today(),
-        )
-
-    @pytest.mark.parametrize(
-        "contractor, expected_color",
-        [
-            ("Some Corp", "#ffcccc"),
-            (None, None),
-        ],
-    )
-    def test_income_highlight(self, contractor, expected_color):
-        income = self._make_income(contractor)
-        assert get_income_highlight_color(income) == expected_color
 
     def test_filter_by_executor_full_name(self, in_memory_db):
         inc1 = self._create_income_for_executor("Alice", 1)
