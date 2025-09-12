@@ -471,6 +471,18 @@ class TaskTableView(BaseTableView):
     def get_selected(self):
         return self.get_selected_object()
 
+    def get_selected_deal(self):
+        task = self.get_selected()
+        if not task:
+            return None
+        deal = getattr(task, "deal", None)
+        if deal:
+            return deal
+        policy = getattr(task, "policy", None)
+        if policy:
+            return getattr(policy, "deal", None)
+        return None
+
     def add_new(self):
         form = TaskForm(parent=self)
         if form.exec():
