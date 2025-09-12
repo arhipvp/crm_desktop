@@ -6,6 +6,7 @@ import logging
 
 # services/folder_utils.py
 import os
+from os import getenv
 import re
 import shutil
 import subprocess
@@ -33,13 +34,13 @@ except Exception:  # PySide6 может отсутствовать в теста
 
 logger = logging.getLogger(__name__)
 
-SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_CREDENTIALS", "credentials.json")
+SERVICE_ACCOUNT_FILE = getenv("GOOGLE_CREDENTIALS", "credentials.json")
 SCOPES = ["https://www.googleapis.com/auth/drive"]
-ROOT_FOLDER_ID = os.getenv(
+ROOT_FOLDER_ID = getenv(
     "GOOGLE_ROOT_FOLDER_ID", "1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm"
 )  # ID папки в Google Drive
 GOOGLE_DRIVE_LOCAL_ROOT = Path(
-    os.getenv("GOOGLE_DRIVE_LOCAL_ROOT", r"G:\Мой диск\Клиенты")
+    getenv("GOOGLE_DRIVE_LOCAL_ROOT", r"G:\Мой диск\Клиенты")
 )
 
 
@@ -310,12 +311,12 @@ def open_folder(
                     import win32com.client  # type: ignore[import-not-found]
 
                     shell = win32com.client.Dispatch("Shell.Application")
-                    target = os.path.normcase(str(path.resolve()))
+                    target = str(path.resolve()).casefold()
                     for window in shell.Windows():
                         try:
-                            current = os.path.normcase(
-                                str(Path(window.Document.Folder.Self.Path).resolve())
-                            )
+                            current = str(
+                                Path(window.Document.Folder.Self.Path).resolve()
+                            ).casefold()
                             if current == target:
                                 window.Visible = True
                                 try:
@@ -408,7 +409,7 @@ def rename_client_folder(old_name: str, new_name: str, drive_link: str | None):
         if old_path.is_dir():
             # если уже есть new_path, значит вручную переименовали — ничего не делаем
             if not new_path.is_dir():
-                os.rename(old_path, new_path)
+                old_path.rename(new_path)
         else:
             # старой папки нет → просто создадим новую (чтобы не упасть)
             new_path.mkdir(parents=True, exist_ok=True)
@@ -464,7 +465,7 @@ def rename_deal_folder(
         new_path.parent.mkdir(parents=True, exist_ok=True)
         if old_path.is_dir():
             if not new_path.is_dir():
-                os.rename(old_path, new_path)
+                old_path.rename(new_path)
                 logger.info("📂 Папка сделки перемещена: %s → %s", old_path, new_path)
             else:
                 logger.info("📂 Папка сделки уже в нужном месте: %s", new_path)
@@ -519,7 +520,7 @@ def rename_policy_folder(
         new_path.parent.mkdir(parents=True, exist_ok=True)
         if old_path.is_dir():
             if not new_path.is_dir():
-                os.rename(old_path, new_path)
+                old_path.rename(new_path)
         else:
             new_path.mkdir(parents=True, exist_ok=True)
     except Exception:
