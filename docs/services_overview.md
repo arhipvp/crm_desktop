@@ -18,7 +18,7 @@
 
 ## policy_service
 - `_check_duplicate_policy` предотвращает создание полиса с существующим номером【F:services/policies/policy_service.py†L108-L146】.
-- `add_policy` создаёт папку, привязывает платежи и уведомляет исполнителя【F:services/policies/policy_service.py†L286-L403】【F:services/policies/policy_service.py†L268-L280】.
+- `add_policy` создаёт локальную папку полиса (синхронизация с Google Drive выполняется вручную), привязывает платежи и уведомляет исполнителя【F:services/policies/policy_service.py†L286-L403】【F:services/policies/policy_service.py†L268-L280】.
 
 ## payment_service
 - Полный набор CRUD‑операций: `add_payment`, `update_payment`, `mark_payment_deleted` и `restore_payment`【F:services/payment_service.py†L81-L137】【F:services/payment_service.py†L163-L177】【F:services/payment_service.py†L277-L305】.
