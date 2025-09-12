@@ -1,4 +1,5 @@
 import base64
+import logging
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -20,6 +21,9 @@ from ui.views.policy_table_view import PolicyTableView
 from ui.views.task_table_view import TaskTableView
 from ui.views.home_tab import HomeTab
 from ui.views.executor_table_view import ExecutorTableView
+
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
@@ -76,7 +80,7 @@ class MainWindow(QMainWindow):
             try:
                 self.restoreGeometry(base64.b64decode(geom))
             except Exception:
-                pass
+                logger.exception("Не удалось восстановить геометрию окна")
         idx = st.get("last_tab")
         if idx is not None and 0 <= int(idx) < self.tab_widget.count():
             self.tab_widget.setCurrentIndex(int(idx))
