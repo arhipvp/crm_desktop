@@ -10,6 +10,7 @@ from database.models import (
     Income,
     Expense,
     Task,
+    DealExecutor,
 )
 from services.clients.client_service import build_client_query
 from services.query_utils import apply_search_and_filters
@@ -17,6 +18,34 @@ from services.executor_service import get_executors_page
 from services.income_service import get_incomes_page
 from services.expense_service import build_expense_query
 from services.task_crud import build_task_query
+
+
+def _create_income_for_executor(name: str, tg_id: int) -> Income:
+    client = Client.create(name=f"Client {name}")
+    deal = Deal.create(
+        client=client,
+        description=f"Deal {name}",
+        start_date=date.today(),
+    )
+    policy = Policy.create(
+        client=client,
+        deal=deal,
+        policy_number=f"P{name}",
+        start_date=date.today(),
+    )
+    payment = Payment.create(
+        policy=policy,
+        amount=100,
+        payment_date=date.today(),
+    )
+    income = Income.create(payment=payment, amount=100)
+    executor = Executor.create(full_name=name, tg_id=tg_id)
+    DealExecutor.create(
+        deal=deal,
+        executor=executor,
+        assigned_date=date.today(),
+    )
+    return income
 
 
 def test_client_search_with_filters(in_memory_db):
@@ -81,6 +110,20 @@ def test_get_executors_page_filters(in_memory_db):
     )
     assert len(results) == 1
     assert results[0].full_name == "Bob"
+
+
+def test_filter_by_executor_full_name(in_memory_db):
+    inc1 = _create_income_for_executor("Alice", 1)
+    _create_income_for_executor("Bob", 2)
+    result = list(
+        get_incomes_page(
+            page=1,
+            per_page=10,
+            column_filters={Executor.full_name: "Alice"},
+        )
+    )
+    assert len(result) == 1
+    assert result[0].id == inc1.id
 
 
 @pytest.mark.parametrize(
@@ -179,6 +222,27 @@ def test_expense_search_related_models(in_memory_db, search, expected):
     query = build_expense_query(search_text=search)
     results = list(query)
     assert [r.policy.policy_number for r in results] == [expected]
+
+
+def test_apply_expense_filters_field_keys(in_memory_db):
+    client = Client.create(name="C1")
+    deal1 = Deal.create(client=client, description="D1", start_date=date.today())
+    deal2 = Deal.create(client=client, description="D2", start_date=date.today())
+    policy1 = Policy.create(
+        client=client, deal=deal1, policy_number="P1", start_date=date.today()
+    )
+    policy2 = Policy.create(
+        client=client, deal=deal2, policy_number="P2", start_date=date.today()
+    )
+    payment1 = Payment.create(policy=policy1, amount=100, payment_date=date.today())
+    payment2 = Payment.create(policy=policy2, amount=200, payment_date=date.today())
+    Expense.create(payment=payment1, amount=10, expense_type="t1", policy=policy1)
+    Expense.create(payment=payment2, amount=20, expense_type="t1", policy=policy2)
+
+    query = build_expense_query(column_filters={Deal.description: "D1"})
+    results = list(query)
+    assert len(results) == 1
+    assert results[0].policy.policy_number == "P1"
 
 
 @pytest.mark.parametrize(
