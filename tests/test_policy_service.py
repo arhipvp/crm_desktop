@@ -1,7 +1,8 @@
 import datetime
 import pytest
 
-from database.models import Client, Policy, Payment, Income, Expense
+from database.db import db
+from database.models import Client, Policy
 from services.policies import policy_service as ps
 from services.payment_service import add_payment
 
@@ -66,3 +67,48 @@ def test_recreate_after_delete(in_memory_db, policy_folder_patches):
     )
     assert new_policy.policy_number == 'P'
     assert new_policy.id != pid
+
+
+def test_create_policy_ignores_deleted_duplicates(in_memory_db, policy_folder_patches):
+    db.execute_sql('DROP INDEX IF EXISTS "policy_policy_number"')
+    client = Client.create(name='C')
+    start = datetime.date(2024, 1, 1)
+    end = datetime.date(2025, 1, 1)
+    Policy.create(
+        client=client,
+        policy_number='P',
+        start_date=start,
+        end_date=end,
+        is_deleted=True,
+    )
+    policy = ps.add_policy(
+        client=client,
+        policy_number='P',
+        start_date=start,
+        end_date=end,
+    )
+    assert policy.policy_number == 'P'
+    assert policy.is_deleted is False
+    assert Policy.select().count() == 2
+
+
+def test_duplicate_detected_with_normalized_policy_number(
+    in_memory_db, policy_folder_patches
+):
+    client = Client.create(name='C')
+    start = datetime.date(2024, 1, 1)
+    end = datetime.date(2025, 1, 1)
+    ps.add_policy(
+        client=client,
+        policy_number='ab123',
+        start_date=start,
+        end_date=end,
+    )
+    with pytest.raises(ps.DuplicatePolicyError) as exc:
+        ps.add_policy(
+            client=client,
+            policy_number='AB 123',
+            start_date=start,
+            end_date=end,
+        )
+    assert exc.value.existing_policy.policy_number == 'AB123'
