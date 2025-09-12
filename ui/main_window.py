@@ -91,10 +91,11 @@ class MainWindow(QMainWindow):
             self.status_bar.clearMessage()
 
     def open_import_policy_json(self):
-        while True:
+        dlg = ImportPolicyJsonForm(self)
+        # Повторяем импорт, пока пользователь не отменит диалог
+        while dlg.exec() == QDialog.Accepted:
+            self.status_bar.showMessage("Полис успешно импортирован", 5000)
             dlg = ImportPolicyJsonForm(self)
-            if dlg.exec() != QDialog.Accepted:
-                break
 
     def open_reso_import(self):
         from ui.forms.reso_import_dialog import ResoImportDialog
