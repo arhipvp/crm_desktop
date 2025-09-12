@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -12,9 +13,7 @@ EXCLUDE_DIRS = {
     ".mypy_cache", ".pytest_cache", ".venv", "venv", "dist", "build", ".coverage"
 }
 
-all_chunks = []
-current_chunk = []
-current_line_count = 0
+logger = logging.getLogger(__name__)
 
 def should_include_file(path: Path) -> bool:
     return path.suffix in INCLUDE_EXTENSIONS
@@ -25,47 +24,57 @@ def add_file_header(rel_path: Path, lines: list[str]):
 def add_empty_folder_notice(rel_path: Path):
     return [f"# {rel_path}/ (empty directory)\n\n"]
 
-for dirpath, dirnames, filenames in os.walk(SOURCE_DIR):
-    dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
-    rel_dir = Path(dirpath).relative_to(SOURCE_DIR)
 
-    # пустая директория
-    if not filenames and not dirnames:
-        current_chunk += add_empty_folder_notice(rel_dir)
-        current_line_count += 2
+def main() -> None:
+    all_chunks: list[list[str]] = []
+    current_chunk: list[str] = []
+    current_line_count = 0
 
-    for fname in filenames:
-        path = Path(dirpath) / fname
-        rel_path = path.relative_to(SOURCE_DIR)
+    for dirpath, dirnames, filenames in os.walk(SOURCE_DIR):
+        dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
+        rel_dir = Path(dirpath).relative_to(SOURCE_DIR)
 
-        if rel_path.parts[0] in EXCLUDE_DIRS or not should_include_file(path):
-            continue
+        # пустая директория
+        if not filenames and not dirnames:
+            current_chunk += add_empty_folder_notice(rel_dir)
+            current_line_count += 2
 
-        try:
-            with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                file_lines = f.readlines()
-        except Exception:
-            file_lines = ["# (unable to read file)\n"]
+        for fname in filenames:
+            path = Path(dirpath) / fname
+            rel_path = path.relative_to(SOURCE_DIR)
 
-        file_block = add_file_header(rel_path, file_lines)
+            if rel_path.parts[0] in EXCLUDE_DIRS or not should_include_file(path):
+                continue
 
-        if current_line_count + len(file_block) > MAX_LINES_PER_FILE:
-            all_chunks.append(current_chunk)
-            current_chunk = []
-            current_line_count = 0
+            try:
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    file_lines = f.readlines()
+            except Exception:
+                file_lines = ["# (unable to read file)\n"]
 
-        current_chunk += file_block
-        current_line_count += len(file_block)
+            file_block = add_file_header(rel_path, file_lines)
 
-# Добавляем последний кусок
-if current_chunk:
-    all_chunks.append(current_chunk)
+            if current_line_count + len(file_block) > MAX_LINES_PER_FILE:
+                all_chunks.append(current_chunk)
+                current_chunk = []
+                current_line_count = 0
 
-# Создание выходной директории и сохранение
-DEST_DIR.mkdir(exist_ok=True)
-for i, chunk in enumerate(all_chunks, 1):
-    out_file = DEST_DIR / f"project_dump_part{i}.txt"
-    with open(out_file, "w", encoding="utf-8") as f:
-        f.writelines(chunk)
+            current_chunk += file_block
+            current_line_count += len(file_block)
 
-print(f"\n✅ Сохранил {len(all_chunks)} файл(ов) в папке {DEST_DIR}")
+    # Добавляем последний кусок
+    if current_chunk:
+        all_chunks.append(current_chunk)
+
+    # Создание выходной директории и сохранение
+    DEST_DIR.mkdir(exist_ok=True)
+    for i, chunk in enumerate(all_chunks, 1):
+        out_file = DEST_DIR / f"project_dump_part{i}.txt"
+        with open(out_file, "w", encoding="utf-8") as f:
+            f.writelines(chunk)
+
+    logger.info("\n✅ Сохранил %d файл(ов) в папке %s", len(all_chunks), DEST_DIR)
+
+
+if __name__ == "__main__":
+    main()
