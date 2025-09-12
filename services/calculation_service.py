@@ -28,12 +28,9 @@ def add_calculation(deal_id: int, **kwargs) -> DealCalculation:
     data.setdefault("created_at", datetime.utcnow())
     data["deal"] = deal
     entry = DealCalculation.create(**data)
-    try:
-        from services.telegram_service import notify_admin
-        msg = f"➕ Расчёт по сделке #{deal_id}: {format_calculation(entry)}"
-        notify_admin(msg)
-    except Exception:
-        logger.debug("Failed to notify admin", exc_info=True)
+    from services.telegram_service import notify_admin_safe
+    msg = f"➕ Расчёт по сделке #{deal_id}: {format_calculation(entry)}"
+    notify_admin_safe(msg)
     return entry
 
 

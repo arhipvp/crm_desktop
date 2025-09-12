@@ -96,12 +96,9 @@ def add_task(**kwargs):
     logger.info(
         "📝 Создана задача #%s: '%s' (due %s)", task.id, task.title, task.due_date
     )
-    try:
-        from services.telegram_service import notify_admin
+    from services.telegram_service import notify_admin_safe
 
-        notify_admin(f"🆕 Создана задача #{task.id}: {task.title}")
-    except Exception:  # pragma: no cover - logging
-        logger.debug("Failed to notify admin about new task", exc_info=True)
+    notify_admin_safe(f"🆕 Создана задача #{task.id}: {task.title}")
     return task
 
 
