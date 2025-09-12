@@ -72,7 +72,7 @@ def _dispatch_tasks(
     with db.atomic():
         query = (
             Task.active()
-            .select(Task.id)
+            .select()
             .join(Deal, JOIN.LEFT_OUTER)
             .switch(Task)
             .join(Policy, JOIN.LEFT_OUTER)
@@ -80,22 +80,20 @@ def _dispatch_tasks(
         where_expr = Task.dispatch_state == QUEUED
         if filter_cond is not None:
             where_expr &= filter_cond
-        query = query.where(where_expr).order_by(Task.queued_at.asc())
+        query = query.where(where_expr).order_by(Task.queued_at.asc()).distinct()
         if limit is not None:
             query = query.limit(limit)
 
-        query = query.distinct()
-        task_ids = [t.id for t in query]
-        if not task_ids:
+        task_list = list(prefetch(query, Deal, Policy, Client))
+        if not task_list:
             logger.info("📭 Нет задач в очереди%s", log_suffix)
             return []
 
-        base = Task.select().where(Task.id.in_(task_ids))
-        task_list = list(prefetch(base, Deal, Policy, Client))
+        task_ids = [t.id for t in task_list]
+        Task.update(dispatch_state=SENT, tg_chat_id=chat_id).where(Task.id.in_(task_ids)).execute()
         for task in task_list:
             task.dispatch_state = SENT
             task.tg_chat_id = chat_id
-            task.save()
             if task.deal:
                 refresh_deal_drive_link(task.deal)
             logger.info(
