@@ -21,6 +21,17 @@ from .task_states import IDLE, QUEUED
 logger = logging.getLogger(__name__)
 
 
+# Допустимые поля для сортировки
+ALLOWED_SORT_FIELDS: dict[str, object] = {
+    "due_date": Task.due_date,
+    "title": Task.title,
+    "deal": Task.deal,
+    "policy": Task.policy,
+    "dispatch_state": Task.dispatch_state,
+    "queued_at": Task.queued_at,
+}
+
+
 def get_all_tasks():
     """Вернуть все задачи без удалённых."""
     return Task.active()
@@ -209,6 +220,9 @@ def build_task_query(
 
     query = apply_column_filters(query, name_filters, Task)
 
+    if sort_field not in ALLOWED_SORT_FIELDS and sort_field != "executor":
+        sort_field = "due_date"
+
     join_executor = bool(field_filters) or sort_field == "executor"
     if join_executor:
         policy_alias = Policy.alias()
@@ -240,6 +254,9 @@ def get_tasks_page(
     **filters,
 ):
     """Получить страницу задач."""
+    if sort_field not in ALLOWED_SORT_FIELDS and sort_field != "executor":
+        sort_field = "due_date"
+
     logger.debug("🔽 Применяем сортировку: field=%s, order=%s", sort_field, sort_order)
     offset = (page - 1) * per_page
     query = build_task_query(
@@ -252,12 +269,10 @@ def get_tasks_page(
             else Executor.full_name.desc()
         )
         query = query.distinct().order_by(order, Task.id.asc())
-    elif sort_field and hasattr(Task, sort_field):
-        field = getattr(Task, sort_field)
+    else:
+        field = ALLOWED_SORT_FIELDS[sort_field]
         order = field.asc() if sort_order == "asc" else field.desc()
         query = query.order_by(order, Task.id.asc())
-    else:
-        query = query.order_by(Task.due_date.desc(), Task.id.desc())
     return query.offset(offset).limit(per_page)
 
 
