@@ -132,6 +132,9 @@ class ExpenseTableView(BaseTableView):
             checkbox_map=checkbox_map,
             date_filter_field="expense_date",
         )
+        # Перенеподключаем сигнал фильтрации колонок, чтобы работать напрямую
+        self.column_filters.filter_changed.disconnect()
+        self.column_filters.filter_changed.connect(self._on_column_filter_changed)
         self.model_class = Expense  # или Client, Policy и т.д.
         self.form_class = ExpenseForm  # соответствующая форма
         self.virtual_fields = ["policy_num", "deal_desc", "client_name", "contractor"]
@@ -198,6 +201,25 @@ class ExpenseTableView(BaseTableView):
         # 3) обновляем модель и пагинатор
         self.set_model_class_and_items(Expense, items, total_count=total)
 
+    def next_page(self):
+        self.page += 1
+        self.load_data()
+
+    def prev_page(self):
+        if self.page > 1:
+            self.page -= 1
+            self.load_data()
+
+    def _on_per_page_changed(self, per_page: int):
+        self.per_page = per_page
+        self.page = 1
+        self.save_table_settings()
+        self.load_data()
+
+    def _on_column_filter_changed(self, column: int, text: str):
+        self.on_filter_changed()
+        self.save_table_settings()
+
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
         field = self.COLUMN_FIELD_MAP.get(column)
         if field is None:
@@ -211,7 +233,8 @@ class ExpenseTableView(BaseTableView):
 
     def on_filter_changed(self, *args, **kwargs):
         self.paginator.set_summary("")
-        super().on_filter_changed(*args, **kwargs)
+        self.page = 1
+        self.load_data()
 
     def get_selected(self):
         idx = self.table.currentIndex()
