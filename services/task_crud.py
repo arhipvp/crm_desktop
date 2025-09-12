@@ -15,6 +15,7 @@ from database.models import (
     DealExecutor,
     Executor,
 )
+from .task_states import IDLE, QUEUED
 
 
 logger = logging.getLogger(__name__)
@@ -116,7 +117,7 @@ def update_task(task: Task, **fields) -> Task:
                 setattr(task, key, value)
 
         if is_marking_done:
-            task.dispatch_state = "idle"
+            task.dispatch_state = IDLE
             task.tg_chat_id = None
             task.tg_message_id = None
 
@@ -173,7 +174,7 @@ def build_task_query(
     if not include_done:
         query = query.where(Task.is_done == False)
     if only_queued:
-        query = query.where(Task.dispatch_state == "queued")
+        query = query.where(Task.dispatch_state == QUEUED)
     if search_text:
         query = (
             query.join(Deal, JOIN.LEFT_OUTER)

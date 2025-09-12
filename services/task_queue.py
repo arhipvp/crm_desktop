@@ -9,6 +9,7 @@ from playhouse.shortcuts import prefetch
 from database.db import db
 from database.models import Client, Deal, Policy, Task
 from services.deal_service import refresh_deal_drive_link
+from .task_states import IDLE, QUEUED, SENT
 
 
 logger = logging.getLogger(__name__)
@@ -18,8 +19,8 @@ def queue_task(task_id: int):
     """Поставить задачу в очередь (idle → queued)."""
     with db.atomic():
         t = Task.active().where(Task.id == task_id).get_or_none()
-        if t and t.dispatch_state == "idle":
-            t.dispatch_state = "queued"
+        if t and t.dispatch_state == IDLE:
+            t.dispatch_state = QUEUED
             t.queued_at = _dt.datetime.utcnow()
             t.save()
             logger.info("📤 Задача #%s поставлена в очередь", t.id)
@@ -39,7 +40,7 @@ def queue_task(task_id: int):
 
 def get_clients_with_queued_tasks() -> list[Client]:
     """Вернуть уникальных клиентов с задачами в состоянии ``queued``."""
-    base = Task.active().where(Task.dispatch_state == "queued")
+    base = Task.active().where(Task.dispatch_state == QUEUED)
     tasks = prefetch(base, Deal, Policy, Client)
 
     seen: set[int] = set()
@@ -79,7 +80,7 @@ def _dispatch_tasks(
             .switch(Task)
             .join(Policy, JOIN.LEFT_OUTER)
         )
-        where_expr = Task.dispatch_state == "queued"
+        where_expr = Task.dispatch_state == QUEUED
         if filter_cond is not None:
             where_expr &= filter_cond
         query = query.where(where_expr).order_by(Task.queued_at.asc())
@@ -94,7 +95,7 @@ def _dispatch_tasks(
         base = Task.select().where(Task.id.in_(task_ids))
         task_list = list(prefetch(base, Deal, Policy, Client))
         for task in task_list:
-            task.dispatch_state = "sent"
+            task.dispatch_state = SENT
             task.tg_chat_id = chat_id
             task.save()
             if task.deal:
@@ -124,7 +125,7 @@ def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
     base = (
         Task.active()
         .join(Deal)
-        .where((Task.dispatch_state == "queued") & (Deal.client_id == client_id))
+        .where((Task.dispatch_state == QUEUED) & (Deal.client_id == client_id))
     )
     tasks = prefetch(base, Deal)
 
@@ -139,7 +140,7 @@ def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
 
 def get_all_deals_with_queued_tasks() -> list[Deal]:
     """Вернуть все сделки, у которых есть задачи в очереди."""
-    base = Task.active().join(Deal).where(Task.dispatch_state == "queued")
+    base = Task.active().join(Deal).where(Task.dispatch_state == QUEUED)
     tasks = prefetch(base, Deal, Client)
 
     seen: set[int] = set()
@@ -180,8 +181,8 @@ def pop_next(chat_id: int) -> Task | None:
 def return_to_queue(task_id: int):
     with db.atomic():
         t = Task.active().where(Task.id == task_id).get_or_none()
-        if t and t.dispatch_state == "sent":
-            t.dispatch_state = "queued"
+        if t and t.dispatch_state == SENT:
+            t.dispatch_state = QUEUED
             t.tg_chat_id = None
             t.tg_message_id = None
             t.queued_at = _dt.datetime.utcnow()
@@ -205,7 +206,7 @@ def get_queued_tasks_by_deal(deal_id: int) -> list[Task]:
     base = (
         Task.active()
         .where(
-            (Task.dispatch_state == "queued")
+            (Task.dispatch_state == QUEUED)
             & ((Task.deal_id == deal_id) | (Task.policy_id.in_(policy_subq)))
         )
     )
@@ -216,7 +217,7 @@ def get_all_queued_tasks() -> list[Task]:
     """Вернуть все задачи в состоянии ``queued`` с предзагрузкой связей."""
     base = (
         Task.active()
-        .where(Task.dispatch_state == "queued")
+        .where(Task.dispatch_state == QUEUED)
         .order_by(Task.queued_at.asc())
     )
     return list(prefetch(base, Deal, Policy, Client))
@@ -227,13 +228,13 @@ def pop_task_by_id(chat_id: int, task_id: int) -> Task | None:
     with db.atomic():
         task = (
             Task.active()
-            .where((Task.id == task_id) & (Task.dispatch_state == "queued"))
+            .where((Task.id == task_id) & (Task.dispatch_state == QUEUED))
             .first()
         )
         if not task:
             return None
 
-        task.dispatch_state = "sent"
+        task.dispatch_state = SENT
         task.tg_chat_id = chat_id
         task.save()
 

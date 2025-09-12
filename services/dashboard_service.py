@@ -5,6 +5,7 @@ from peewee import fn
 from datetime import date, timedelta
 
 from database.models import Client, Deal, Policy, Task
+from .task_states import SENT
 
 
 def get_basic_stats() -> dict:
@@ -21,7 +22,7 @@ def count_assistant_tasks() -> int:
     """Количество задач, отправленных ассистенту в Telegram."""
     return (
         Task.active()
-        .where((Task.dispatch_state == "sent") & (Task.is_done == False))
+        .where((Task.dispatch_state == SENT) & (Task.is_done == False))
         .count()
     )
 
