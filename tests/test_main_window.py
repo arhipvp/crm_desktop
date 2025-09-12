@@ -10,8 +10,7 @@ from ui import settings as ui_settings
 pytestmark = pytest.mark.slow
 
 
-def test_main_window_restores_geometry_and_tab(tmp_path, monkeypatch, qapp, dummy_main_window):
-    monkeypatch.setattr(ui_settings, "SETTINGS_PATH", tmp_path / "ui_settings.json")
+def test_main_window_restores_geometry_and_tab(ui_settings_temp_path, monkeypatch, qapp, dummy_main_window):
 
     w1 = dummy_main_window(tab_count=6)
     w1.show()
@@ -42,8 +41,7 @@ def test_main_window_restores_geometry_and_tab(tmp_path, monkeypatch, qapp, dumm
     qapp.processEvents()
 
 
-def test_main_window_logs_on_invalid_geometry(tmp_path, monkeypatch, caplog, qapp, dummy_main_window):
-    monkeypatch.setattr(ui_settings, "SETTINGS_PATH", tmp_path / "ui_settings.json")
+def test_main_window_logs_on_invalid_geometry(ui_settings_temp_path, monkeypatch, caplog, qapp, dummy_main_window):
 
     bad_geom = base64.b64encode(b"bad").decode("ascii")
     ui_settings.set_window_settings("MainWindow", {"geometry": bad_geom})

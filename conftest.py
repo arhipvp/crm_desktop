@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 import pytest
 from peewee import SqliteDatabase
+from ui import settings as ui_settings
 
 # Force tests to use in-memory SQLite by default to avoid touching any real DB.
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
@@ -83,6 +84,17 @@ def qapp():
 
 
 @pytest.fixture()
+def ui_settings_temp_path(tmp_path, monkeypatch):
+    path = tmp_path / "ui_settings.json"
+    monkeypatch.setattr(ui_settings, "SETTINGS_PATH", path)
+    try:
+        yield path
+    finally:
+        if path.exists():
+            path.unlink()
+
+
+@pytest.fixture()
 def in_memory_db(monkeypatch):
     # If db is not initialized yet, bind it to a fresh in-memory DB.
     # If it is already initialized (e.g., by an early init_from_env reading the
@@ -153,15 +165,16 @@ def sent_notify(monkeypatch, request):
 
 @pytest.fixture()
 def mock_payments(monkeypatch):
-    monkeypatch.setattr(
-        pay_svc,
-        "add_payment",
-        lambda **kw: Payment.create(
+    def fake_add_payment(**kw):
+        payment = Payment.create(
             policy=kw["policy"],
             amount=kw["amount"],
             payment_date=kw["payment_date"],
-        ),
-    )
+        )
+        return payment.id
+
+    monkeypatch.setattr(pay_svc, "add_payment", fake_add_payment)
+    monkeypatch.setattr(ps, "add_payment", fake_add_payment)
     monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
 
 

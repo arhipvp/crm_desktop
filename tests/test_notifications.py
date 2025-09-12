@@ -18,10 +18,10 @@ pytestmark = pytest.mark.slow
 
 
 @pytest.mark.parametrize("sent_notify", ["ps"], indirect=True)
-def test_notify_on_policy_add(in_memory_db, monkeypatch, policy_folder_patches, sent_notify, make_deal_with_executor):
+def test_notify_on_policy_add(
+    in_memory_db, mock_payments, policy_folder_patches, sent_notify, make_deal_with_executor
+):
     client, deal, executor = make_deal_with_executor()
-
-    monkeypatch.setattr(ps, "add_payment", lambda **kw: Payment.create(policy=kw['policy'], amount=kw['amount'], payment_date=kw['payment_date']))
 
     ps.add_policy(
         policy_number='P',

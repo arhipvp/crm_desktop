@@ -10,8 +10,6 @@ from database.models import Client, Policy
 from services.policies import policy_service as ps, ai_policy_service
 from services.policies.ai_policy_service import _chat
 from services.payment_service import add_payment
-
-
 def test_policy_merge_additional_payments(in_memory_db, policy_folder_patches):
     client = Client.create(name='C')
     start = datetime.date(2024, 1, 1)
@@ -119,45 +117,37 @@ def test_duplicate_detected_with_normalized_policy_number(
     assert exc.value.existing_policy.policy_number == 'AB123'
 
 
-def generate_streaming_chunks():
-    def make_chunk(tool_calls):
-        delta = SimpleNamespace(tool_calls=tool_calls)
-        choice = SimpleNamespace(delta=delta)
-        return SimpleNamespace(choices=[choice])
+@pytest.fixture()
+def dummy_openai_client():
+    def generate_streaming_chunks():
+        def make_chunk(tool_calls):
+            delta = SimpleNamespace(tool_calls=tool_calls)
+            choice = SimpleNamespace(delta=delta)
+            return SimpleNamespace(choices=[choice])
 
-    return [
-        make_chunk(None),
-        make_chunk([]),
-        make_chunk(
-            [SimpleNamespace(function=SimpleNamespace(arguments='{"a'))]
-        ),
-        make_chunk(
-            [SimpleNamespace(function=SimpleNamespace(arguments='1"}'))]
-        ),
-    ]
+        return [
+            make_chunk(None),
+            make_chunk([]),
+            make_chunk(
+                [SimpleNamespace(function=SimpleNamespace(arguments='{"a'))]
+            ),
+            make_chunk(
+                [SimpleNamespace(function=SimpleNamespace(arguments='1"}'))]
+            ),
+        ]
 
+    def fake_stream(**kwargs):
+        return iter(generate_streaming_chunks())
 
-def fake_stream(**kwargs):
-    return iter(generate_streaming_chunks())
-
-
-class DummyCompletions:
-    def create(self, **kwargs):
-        return fake_stream()
-
-
-class DummyChat:
-    def __init__(self):
-        self.completions = DummyCompletions()
+    return SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=lambda **kwargs: fake_stream())
+        )
+    )
 
 
-class DummyClient:
-    def __init__(self, *a, **kw):
-        self.chat = DummyChat()
-
-
-def test_chat_streaming_no_attribute_error(monkeypatch):
-    monkeypatch.setattr(openai, "OpenAI", DummyClient)
+def test_chat_streaming_no_attribute_error(monkeypatch, dummy_openai_client):
+    monkeypatch.setattr(openai, "OpenAI", lambda *a, **kw: dummy_openai_client)
     monkeypatch.setattr(
         ai_policy_service, "settings", Settings(openai_api_key="key")
     )

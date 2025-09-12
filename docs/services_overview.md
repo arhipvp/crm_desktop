@@ -10,6 +10,12 @@
 - `add_deal` создаёт сделку, формирует запись в журнале и создаёт локальную папку «Сделка - …»【F:services/deal_service.py†L56-L123】.
 - `add_deal_from_policy` строит описание сделки из данных полиса и связывает их между собой【F:services/deal_service.py†L137-L160】.
 
+## calculation_service
+- `add_calculation` добавляет расчёт к сделке, ограничивает набор полей и уведомляет администратора【F:services/calculation_service.py†L14-L34】.
+- `build_calculation_query` формирует запрос с поиском, фильтрами и сортировкой расчётов сделки【F:services/calculation_service.py†L37-L72】.
+- `mark_calculations_deleted` массово помечает выбранные расчёты удалёнными【F:services/calculation_service.py†L89-L98】.
+- `update_calculation` изменяет допустимые параметры расчёта и, при необходимости, привязывает его к другой сделке【F:services/calculation_service.py†L108-L132】.
+
 ## policy_service
 - `_check_duplicate_policy` предотвращает создание полиса с существующим номером【F:services/policies/policy_service.py†L108-L146】.
 - `add_policy` создаёт папку, привязывает платежи и уведомляет исполнителя【F:services/policies/policy_service.py†L286-L403】【F:services/policies/policy_service.py†L268-L280】.
@@ -41,6 +47,12 @@
 - `process_policy_text_with_ai` импортирует полис, отправляя текст или PDF в OpenAI и получая JSON‑структуру и протокол диалога【F:services/policies/ai_policy_service.py†L196-L209】【F:services/policies/ai_policy_service.py†L350-L359】.
 - Системный промпт задаётся переменной окружения `AI_POLICY_PROMPT`【F:config.py†L24】【F:config.py†L49】【F:services/policies/ai_policy_service.py†L117-L119】.
 
+## dashboard_service
+- `get_basic_stats` возвращает количество клиентов, сделок, полисов и задач【F:services/dashboard_service.py†L9-L18】.
+- `count_assistant_tasks`, `count_sent_tasks`, `count_working_tasks` и `count_unconfirmed_tasks` дают сводные счётчики задач【F:services/dashboard_service.py†L20-L46】.
+- `get_upcoming_deal_reminders` возвращает ближайшие напоминания по открытым сделкам【F:services/dashboard_service.py†L70-L88】.
+- `get_expiring_policies` показывает полисы с истекающим сроком действия【F:services/dashboard_service.py†L62-L69】.
+
 ## telegram_service
 - `format_exec_task` формирует HTML‑сообщение и inline‑клавиатуру для задачи исполнителю【F:services/telegram_service.py†L15-L48】.
 - `send_exec_task` передаёт сообщение через бот и сохраняет идентификаторы для обратной связи【F:services/telegram_service.py†L51-L64】.
@@ -57,3 +69,9 @@
 - `sanitize_name` удаляет недопустимые символы из имен файлов и папок【F:services/folder_utils.py†L58-L66】.
 - `create_client_drive_folder` создаёт локальную папку клиента в каталоге синхронизации и возвращает путь【F:services/folder_utils.py†L121-L136】.
 - `create_deal_folder` строит путь вида `Клиенты/<Клиент>/Сделка - …` и гарантирует наличие папки【F:services/folder_utils.py†L200-L239】.
+
+## sheets_service
+- `read_sheet` и `append_rows` обеспечивают чтение и дозапись таблиц Google Sheets, идентификаторы которых задаются переменными окружения `GOOGLE_SHEETS_TASKS_ID` и `GOOGLE_SHEETS_CALCULATIONS_ID`【F:services/sheets_service.py†L24-L59】.
+
+## export_service
+- `export_objects_to_csv` выгружает ORM‑объекты в CSV, применяя русские заголовки из `RU_HEADERS` и возвращая число экспортированных строк【F:services/export_service.py†L1-L38】.
