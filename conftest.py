@@ -26,6 +26,7 @@ from database.models import (
 )
 
 from services.policies import policy_service as ps
+from services import payment_service as pay_svc
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -114,6 +115,19 @@ def policy_folder_patches(monkeypatch):
 
 
 @pytest.fixture()
+
+def mock_payments(monkeypatch):
+    monkeypatch.setattr(
+        pay_svc,
+        "add_payment",
+        lambda **kw: Payment.create(
+            policy=kw["policy"],
+            amount=kw["amount"],
+            payment_date=kw["payment_date"],
+        ),
+    )
+    monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
+
 def dummy_main_window(monkeypatch, qapp):
     from PySide6.QtWidgets import QTabWidget, QWidget
     from ui.main_window import MainWindow
