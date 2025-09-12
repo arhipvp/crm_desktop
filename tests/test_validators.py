@@ -2,29 +2,28 @@ import pytest
 from services.validators import normalize_number, normalize_phone
 
 
-def test_normalize_number_basic():
-    assert normalize_number("12 345,67") == "12345.67"
-    assert normalize_number(None) is None
-    assert normalize_number("123руб.") == "123"
-
-
-def test_normalize_number_extra_cases():
-    assert normalize_number("12\u00a0345.") == "12345"
-    assert normalize_number(100) == "100"
-    assert normalize_number(10.5) == "10.5"
-
-
-def test_normalize_number_math_expressions():
-    assert normalize_number("5+5") == "10"
-    assert normalize_number("10*10") == "100"
-    assert normalize_number("10*10%") == "1"
-
-
-def test_normalize_number_invalid_expressions():
-    with pytest.raises(ValueError, match="Некорректное выражение"):
-        normalize_number("5//2")
-    with pytest.raises(ValueError, match="Некорректное выражение"):
-        normalize_number("abc")
+@pytest.mark.parametrize(
+    "value, expected, raises",
+    [
+        ("12 345,67", "12345.67", None),
+        (None, None, None),
+        ("123руб.", "123", None),
+        ("12\u00a0345.", "12345", None),
+        (100, "100", None),
+        (10.5, "10.5", None),
+        ("5+5", "10", None),
+        ("10*10", "100", None),
+        ("10*10%", "1", None),
+        ("5//2", None, ValueError),
+        ("abc", None, ValueError),
+    ],
+)
+def test_normalize_number(value, expected, raises):
+    if raises:
+        with pytest.raises(raises, match="Некорректное выражение"):
+            normalize_number(value)
+    else:
+        assert normalize_number(value) == expected
 
 
 def test_normalize_phone():
