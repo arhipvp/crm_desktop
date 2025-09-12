@@ -36,9 +36,9 @@ AI_POLICY_PROMPT=
 
 ### Общие переменные
 
-- **DATABASE_URL** — строка подключения к SQLite или PostgreSQL.
-- **GOOGLE_DRIVE_LOCAL_ROOT** — локальный каталог синхронизации с Google Drive.
-- **GOOGLE_CREDENTIALS** — путь к JSON‑файлу сервисного аккаунта.
+- `DATABASE_URL` — строка подключения к SQLite или PostgreSQL.
+- `GOOGLE_DRIVE_LOCAL_ROOT` — локальный каталог синхронизации с Google Drive.
+- `GOOGLE_CREDENTIALS` — путь к JSON‑файлу сервисного аккаунта.
 
 ### Переменные OpenAI
 
