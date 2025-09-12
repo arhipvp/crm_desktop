@@ -1,7 +1,8 @@
 from datetime import date
 
-from database.models import Client, Policy
+from database.models import Client, Policy, Executor
 from services.query_utils import apply_search_and_filters
+from services.executor_service import get_executors_page
 
 
 def test_apply_search_and_filters_clients(in_memory_db):
@@ -38,3 +39,24 @@ def test_apply_search_and_filters_policies(in_memory_db):
     results = list(query)
     assert len(results) == 1
     assert results[0].id == p1.id
+
+
+def test_get_executors_page_filters(in_memory_db):
+    e1 = Executor.create(full_name="Alice", tg_id=1, is_active=True)
+    Executor.create(full_name="Bob", tg_id=2, is_active=True)
+
+    results = list(
+        get_executors_page(page=1, per_page=10, search_text="Alice")
+    )
+    assert len(results) == 1
+    assert results[0].id == e1.id
+
+    results = list(
+        get_executors_page(
+            page=1,
+            per_page=10,
+            column_filters={Executor.full_name: "Bob"},
+        )
+    )
+    assert len(results) == 1
+    assert results[0].full_name == "Bob"
