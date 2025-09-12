@@ -26,6 +26,8 @@ from database.models import (
 
 from services.policies import policy_service as ps
 from services import payment_service as pay_svc
+import services.telegram_service as ts
+import services.income_service as ins
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -114,14 +116,16 @@ def policy_folder_patches(monkeypatch):
 
 
 @pytest.fixture()
-
 def sent_notify(monkeypatch, request):
     sent = {}
-    module = request.param
-    monkeypatch.setattr(module, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
+    modules = {"ps": ps, "ts": ts, "ins": ins}
+    module = modules[request.param]
+    monkeypatch.setattr(
+        module, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text)
+    )
     return sent
 
-
+@pytest.fixture()
 def mock_payments(monkeypatch):
     monkeypatch.setattr(
         pay_svc,
@@ -134,6 +138,7 @@ def mock_payments(monkeypatch):
     )
     monkeypatch.setattr(Payment, "soft_delete", lambda self: self.delete_instance())
 
+@pytest.fixture()
 def dummy_main_window(monkeypatch, qapp):
     from PySide6.QtWidgets import QTabWidget, QWidget
     from ui.main_window import MainWindow
