@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QAbstractItemView
 
-from database.models import DealCalculation
+from database.models import DealCalculation, Deal
 from services.calculation_service import (
     build_calculation_query,
     mark_calculation_deleted,
@@ -134,6 +134,14 @@ class CalculationTableView(BaseTableView):
         indexes = self.table.selectionModel().selectedRows()
         return [self.model.get_item(self._source_row(i)) for i in indexes]
 
+    def get_selected_deal(self):
+        calc = self.get_selected()
+        if calc and getattr(calc, "deal", None):
+            return calc.deal
+        if self.deal_id:
+            return Deal.get_by_id(self.deal_id)
+        return None
+
     def refresh(self):
         try:
             from services.sheets_service import sync_calculations_from_sheet
@@ -219,7 +227,6 @@ class CalculationTableView(BaseTableView):
         copy_text_to_clipboard(text, parent=self)
         try:
             from services.clients import format_phone_for_whatsapp, open_whatsapp
-            from database.models import Deal
 
             deal = Deal.get_by_id(self.deal_id)
             phone = deal.client.phone if deal and deal.client else None
