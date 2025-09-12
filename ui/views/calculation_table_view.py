@@ -139,7 +139,10 @@ class CalculationTableView(BaseTableView):
         if calc and getattr(calc, "deal", None):
             return calc.deal
         if self.deal_id:
-            return Deal.get_by_id(self.deal_id)
+            try:
+                return Deal.get_by_id(self.deal_id)
+            except Deal.DoesNotExist:
+                return None
         return None
 
     def refresh(self):
