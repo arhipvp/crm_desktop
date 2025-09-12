@@ -185,19 +185,26 @@ def build_task_query(
     if only_queued:
         query = query.where(Task.dispatch_state == QUEUED)
     if search_text:
+        from services.query_utils import build_or_condition
+
         query = (
             query.join(Deal, JOIN.LEFT_OUTER)
             .join(Client, JOIN.LEFT_OUTER, on=(Deal.client == Client.id))
             .switch(Task)
             .join(Policy, JOIN.LEFT_OUTER)
-            .where(
-                (Task.title.contains(search_text))
-                | (Task.note.contains(search_text))
-                | (Deal.description.contains(search_text))
-                | (Policy.policy_number.contains(search_text))
-                | (Client.name.contains(search_text))
-            )
         )
+        condition = build_or_condition(
+            [
+                Task.title,
+                Task.note,
+                Deal.description,
+                Policy.policy_number,
+                Client.name,
+            ],
+            search_text,
+        )
+        if condition is not None:
+            query = query.where(condition)
     if due_before:
         query = query.where(Task.due_date <= due_before)
     if deal_id:
