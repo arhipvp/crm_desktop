@@ -312,5 +312,5 @@ class ExpenseTableView(BaseTableView):
 
     def get_base_query(self):
         if self.deal_id:
-            return expense_service.get_for_deal(self.deal_id)
+            return expense_service.get_expenses_by_deal(self.deal_id)
         return super().get_base_query()
