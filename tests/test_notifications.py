@@ -20,7 +20,7 @@ from services.task_states import SENT
 pytestmark = pytest.mark.slow
 
 
-@pytest.mark.parametrize("sent_notify", [ps], indirect=True)
+@pytest.mark.parametrize("sent_notify", ["ps"], indirect=True)
 def test_notify_on_policy_add(in_memory_db, monkeypatch, policy_folder_patches, sent_notify):
     client = Client.create(name='C')
     deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
@@ -42,7 +42,7 @@ def test_notify_on_policy_add(in_memory_db, monkeypatch, policy_folder_patches, 
     assert 'P' in sent_notify.get('text', '')
 
 
-@pytest.mark.parametrize("sent_notify", [ts], indirect=True)
+@pytest.mark.parametrize("sent_notify", ["ts"], indirect=True)
 def test_notify_on_unassign(in_memory_db, sent_notify):
     client = Client.create(name='C')
     deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
@@ -55,7 +55,7 @@ def test_notify_on_unassign(in_memory_db, sent_notify):
     assert str(deal.id) in sent_notify.get('text', '')
 
 
-@pytest.mark.parametrize("sent_notify", [ins], indirect=True)
+@pytest.mark.parametrize("sent_notify", ["ins"], indirect=True)
 def test_notify_on_income_received(in_memory_db, sent_notify):
     client = Client.create(name='C')
     deal = Deal.create(client=client, description='D', start_date=datetime.date.today())

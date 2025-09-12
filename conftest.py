@@ -26,6 +26,8 @@ from database.models import (
 
 from services.policies import policy_service as ps
 from services import payment_service as pay_svc
+import services.telegram_service as ts
+import services.income_service as ins
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -78,6 +80,7 @@ def qapp():
         except Exception:
             pass
 
+
 @pytest.fixture()
 def in_memory_db(monkeypatch):
     # If db is not initialized yet, bind it to a fresh in-memory DB.
@@ -113,11 +116,15 @@ def policy_folder_patches(monkeypatch):
     )
 
 
-@pytest.fixture()
+@pytest.fixture(params=["ps", "ts", "ins"])
 def sent_notify(monkeypatch, request):
+    """Parametrized notifier stub: 'ps', 'ts', or 'ins'."""
     sent = {}
-    module = request.param
-    monkeypatch.setattr(module, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text))
+    modules = {"ps": ps, "ts": ts, "ins": ins}
+    module = modules[request.param]
+    monkeypatch.setattr(
+        module, "notify_executor", lambda tg_id, text: sent.update(tg_id=tg_id, text=text)
+    )
     return sent
 
 
