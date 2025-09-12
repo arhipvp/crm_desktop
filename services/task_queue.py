@@ -87,7 +87,8 @@ def _dispatch_tasks(
         if limit is not None:
             query = query.limit(limit)
 
-        task_ids = list(dict.fromkeys(t.id for t in query))
+        query = query.distinct()
+        task_ids = [t.id for t in query]
         if not task_ids:
             logger.info("📭 Нет задач в очереди%s", log_suffix)
             return []
