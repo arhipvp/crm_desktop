@@ -56,8 +56,13 @@ def get_clients_with_queued_tasks() -> list[Client]:
     return clients
 
 
-def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
-    """Выдать следующую задачу из очереди, фильтруя по клиенту."""
+def _pop_tasks(
+    filter_cond,
+    chat_id: int,
+    log_suffix: str,
+    limit: int | None = 1,
+) -> list[Task]:
+    """Вспомогательная функция для выдачи задач из очереди."""
     with db.atomic():
         query = (
             Task.active()
@@ -65,38 +70,45 @@ def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
             .join(Deal, JOIN.LEFT_OUTER)
             .switch(Task)
             .join(Policy, JOIN.LEFT_OUTER)
-            .where(
-                (Task.dispatch_state == "queued")
-                & ((Deal.client_id == client_id) | (Policy.client_id == client_id))
-            )
-            .order_by(Task.queued_at.asc())
-            .limit(1)
         )
+        where_expr = Task.dispatch_state == "queued"
+        if filter_cond is not None:
+            where_expr &= filter_cond
+        query = query.where(where_expr).order_by(Task.queued_at.asc())
+        if limit is not None:
+            query = query.limit(limit)
 
-        task_ids = [t.id for t in query]
+        task_ids = list(dict.fromkeys(t.id for t in query))
         if not task_ids:
-            logger.info("📭 Нет задач в очереди для клиента %s", client_id)
-            return None
+            logger.info("📭 Нет задач в очереди%s", log_suffix)
+            return []
 
         base = Task.select().where(Task.id.in_(task_ids))
-        task_list = prefetch(base, Deal, Policy, Client)
-        task = task_list[0] if task_list else None
-
-        if task:
+        task_list = list(prefetch(base, Deal, Policy, Client))
+        for task in task_list:
             task.dispatch_state = "sent"
             task.tg_chat_id = chat_id
             task.save()
             if task.deal:
                 refresh_deal_drive_link(task.deal)
             logger.info(
-                "📬 Задача #%s выдана в Telegram для клиента %s: chat_id=%s",
+                "📬 Задача #%s выдана в Telegram%s: chat_id=%s",
                 task.id,
-                client_id,
+                log_suffix,
                 chat_id,
             )
-        else:
-            logger.info("📭 Нет задач в очереди для клиента %s", client_id)
-        return task
+        return task_list
+
+
+def pop_next_by_client(chat_id: int, client_id: int) -> Task | None:
+    """Выдать следующую задачу из очереди, фильтруя по клиенту."""
+    tasks = _pop_tasks(
+        (Deal.client_id == client_id) | (Policy.client_id == client_id),
+        chat_id,
+        f" для клиента {client_id}",
+        limit=1,
+    )
+    return tasks[0] if tasks else None
 
 
 def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
@@ -133,107 +145,28 @@ def get_all_deals_with_queued_tasks() -> list[Deal]:
 
 def pop_next_by_deal(chat_id: int, deal_id: int) -> Task | None:
     """Выдать следующую задачу из очереди для сделки."""
-    with db.atomic():
-        query = (
-            Task.active()
-            .select(Task.id)
-            .where(
-                (Task.dispatch_state == "queued") & (Task.deal_id == deal_id)
-            )
-            .order_by(Task.queued_at.asc())
-            .limit(1)
-        )
-
-        task_ids = [t.id for t in query]
-        if not task_ids:
-            logger.info("📭 Нет задач в очереди для сделки %s", deal_id)
-            return None
-
-        base = Task.select().where(Task.id.in_(task_ids))
-        task_list = prefetch(base, Deal, Policy, Client)
-        task = task_list[0] if task_list else None
-
-        if task:
-            task.dispatch_state = "sent"
-            task.tg_chat_id = chat_id
-            task.save()
-            if task.deal:
-                refresh_deal_drive_link(task.deal)
-            logger.info(
-                "📬 Задача #%s выдана в Telegram для сделки %s: chat_id=%s",
-                task.id,
-                deal_id,
-                chat_id,
-            )
-        else:
-            logger.info("📭 Нет задач в очереди для сделки %s", deal_id)
-        return task
+    tasks = _pop_tasks(
+        Task.deal_id == deal_id,
+        chat_id,
+        f" для сделки {deal_id}",
+        limit=1,
+    )
+    return tasks[0] if tasks else None
 
 
 def pop_all_by_deal(chat_id: int, deal_id: int) -> list[Task]:
     """Выдать все задачи из очереди для сделки."""
-    with db.atomic():
-        query = (
-            Task.active()
-            .select(Task.id)
-            .where(
-                (Task.dispatch_state == "queued") & (Task.deal_id == deal_id)
-            )
-            .order_by(Task.queued_at.asc())
-        )
-
-        task_ids = [t.id for t in query]
-        if not task_ids:
-            logger.info("📭 Нет задач в очереди для сделки %s", deal_id)
-            return []
-
-        base = Task.select().where(Task.id.in_(task_ids))
-        task_list = list(prefetch(base, Deal, Policy, Client))
-
-        for task in task_list:
-            task.dispatch_state = "sent"
-            task.tg_chat_id = chat_id
-            task.save()
-            if task.deal:
-                refresh_deal_drive_link(task.deal)
-            logger.info(
-                "📬 Задача #%s выдана в Telegram для сделки %s: chat_id=%s",
-                task.id,
-                deal_id,
-                chat_id,
-            )
-        return task_list
+    return _pop_tasks(
+        Task.deal_id == deal_id,
+        chat_id,
+        f" для сделки {deal_id}",
+        limit=None,
+    )
 
 
 def pop_next(chat_id: int) -> Task | None:
-    with db.atomic():
-        query = (
-            Task.active()
-            .select(Task.id)
-            .where(Task.dispatch_state == "queued")
-            .order_by(Task.queued_at.asc())
-            .limit(1)
-        )
-
-        task_ids = [t.id for t in query]
-        if not task_ids:
-            logger.info("📭 Нет задач в очереди")
-            return None
-
-        base = Task.select().where(Task.id.in_(task_ids))
-        task_list = prefetch(base, Deal, Policy, Client)
-        task = task_list[0] if task_list else None
-
-        if task:
-            task.dispatch_state = "sent"
-            task.tg_chat_id = chat_id
-            task.save()
-            if task.deal:
-                refresh_deal_drive_link(task.deal)
-            logger.info("📬 Задача #%s выдана в Telegram: chat_id=%s", task.id, chat_id)
-        else:
-            logger.info("📭 Нет задач в очереди")
-        return task
+    tasks = _pop_tasks(None, chat_id, "", limit=1)
+    return tasks[0] if tasks else None
 
 
 def return_to_queue(task_id: int):
