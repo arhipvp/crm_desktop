@@ -9,6 +9,7 @@ from services.query_utils import apply_search_and_filters
 from config import Settings, get_settings
 from database.db import db
 from database.models import Deal, DealExecutor, Executor
+from .task_states import QUEUED
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ def get_deals_for_executor(tg_id: int, *, only_with_tasks: bool = False) -> List
 
     if only_with_tasks:
         from database.models import Task
-        task_subq = Task.active().where(Task.dispatch_state == "queued").select(Task.deal)
+        task_subq = Task.active().where(Task.dispatch_state == QUEUED).select(Task.deal)
         query = query.where(Deal.id.in_(task_subq))
 
     return list(query)

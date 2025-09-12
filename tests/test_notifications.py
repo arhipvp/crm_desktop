@@ -15,6 +15,7 @@ from services import executor_service as es
 import services.telegram_service as ts
 import services.income_service as ins
 import services.task_notifications as tsvc
+from services.task_states import SENT
 
 pytestmark = pytest.mark.slow
 
@@ -90,7 +91,7 @@ def test_notify_task_resends_message(in_memory_db, monkeypatch):
         title='T',
         due_date=datetime.date.today(),
         deal=deal,
-        dispatch_state='sent',
+        dispatch_state=SENT,
         tg_chat_id=99,
     )
 
@@ -105,4 +106,4 @@ def test_notify_task_resends_message(in_memory_db, monkeypatch):
     tsvc.notify_task(task.id)
 
     assert sent == {'task_id': task.id, 'tg_id': 99}
-    assert Task.get_by_id(task.id).dispatch_state == 'sent'
+    assert Task.get_by_id(task.id).dispatch_state == SENT
