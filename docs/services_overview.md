@@ -11,7 +11,7 @@
 - `add_deal_from_policy` строит описание сделки из данных полиса и связывает их между собой【F:services/deal_service.py†L137-L160】.
 
 ## executor_service
-- `_ids_from_env` читает перечень одобренных исполнителей из переменной `APPROVED_EXECUTOR_IDS`【F:services/executor_service.py†L14-L29】.
+- `ensure_executors_from_env` создаёт записи исполнителей на основе `APPROVED_EXECUTOR_IDS` из переменных окружения【F:services/executor_service.py†L17-L21】.
 - `assign_executor` очищает прежние привязки и создаёт новую запись с датой назначения【F:services/executor_service.py†L60-L66】.
 
 ## ai_consultant_service
