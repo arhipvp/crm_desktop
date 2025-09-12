@@ -1,3 +1,5 @@
+"""Tests for the income service."""
+
 import datetime
 
 import pytest
