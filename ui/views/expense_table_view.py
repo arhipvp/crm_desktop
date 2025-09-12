@@ -133,6 +133,7 @@ class ExpenseTableView(BaseTableView):
             checkbox_map=checkbox_map,
             date_filter_field="expense_date",
         )
+        self.controller.get_column_filters = self.get_column_filters
         # Перенеподключаем сигнал фильтрации колонок, чтобы работать напрямую
         self.column_filters.filter_changed.disconnect()
         self.column_filters.filter_changed.connect(self._on_column_filter_changed)
@@ -158,7 +159,18 @@ class ExpenseTableView(BaseTableView):
 
         self.load_data()
 
-    def get_filters(self) -> dict:
+    def get_column_filters(self) -> dict:
+        """Собрать фильтры по столбцам в виде {Field: text}."""
+        result: dict = {}
+        for col, field in self.COLUMN_FIELD_MAP.items():
+            if field is None:
+                continue
+            text = self.column_filters.get_text(col)
+            if text:
+                result[field] = text
+        return result
+
+    def load_data(self):
         filters = super().get_filters()
         filters.update(
             {
@@ -172,15 +184,7 @@ class ExpenseTableView(BaseTableView):
         date_range = filters.pop("expense_date", None)
         if date_range:
             filters["expense_date_range"] = date_range
-        return filters
 
-    def load_data(self):
-        # 1) читаем фильтры
-        filters = self.get_filters()
-        if self.deal_id:
-            filters["deal_id"] = self.deal_id
-
-        # 2) получаем страницу и общее количество
         items = list(
             expense_service.get_expenses_page(
                 self.page,
