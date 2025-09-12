@@ -1,3 +1,5 @@
+"""Утилитарные тесты. Добавляйте новые тесты утилит сюда."""
+
 import logging
 
 from utils.logging_config import PeeweeFilter
