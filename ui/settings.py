@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 from pathlib import Path
@@ -5,22 +6,30 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 SETTINGS_PATH = Path.home() / ".crm_desktop" / "ui_settings.json"
+_CACHE: dict | None = None
 
 
 def _load_data() -> dict:
-    if SETTINGS_PATH.exists():
-        try:
-            return json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
-        except Exception as e:  # pragma: no cover - logging only
-            logger.exception("Failed to load settings: %s", e)
-    return {}
+    global _CACHE
+    if _CACHE is None:
+        if SETTINGS_PATH.exists():
+            try:
+                _CACHE = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+            except Exception as e:  # pragma: no cover - logging only
+                logger.exception("Failed to load settings: %s", e)
+                _CACHE = {}
+        else:
+            _CACHE = {}
+    return copy.deepcopy(_CACHE)
 
 
 def _save_data(data: dict) -> None:
+    global _CACHE
+    _CACHE = copy.deepcopy(data)
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
         SETTINGS_PATH.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(_CACHE, ensure_ascii=False, indent=2), encoding="utf-8"
         )
     except Exception as e:  # pragma: no cover - logging only
         logger.exception("Failed to save settings: %s", e)
