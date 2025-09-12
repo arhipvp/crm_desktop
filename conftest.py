@@ -122,6 +122,7 @@ def sent_notify(monkeypatch, request):
     return sent
 
 
+@pytest.fixture()
 def mock_payments(monkeypatch):
     monkeypatch.setattr(
         pay_svc,
