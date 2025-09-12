@@ -15,19 +15,19 @@
 - `add_policy` создаёт папку, привязывает платежи и уведомляет исполнителя【F:services/policies/policy_service.py†L286-L403】【F:services/policies/policy_service.py†L268-L280】.
 
 ## payment_service
-- `get_payments_page` возвращает страницу платежей с поиском и сортировкой【F:services/payment_service.py†L47-L78】.
-- `mark_payment_deleted` помечает платёж и связанные доходы/расходы удалёнными, `restore_payment` снимает пометку【F:services/payment_service.py†L81-L137】.
-- `mark_payments_paid` массово отмечает платежи как оплаченные【F:services/payment_service.py†L140-L157】.
+- Полный набор CRUD‑операций: `add_payment`, `update_payment`, `mark_payment_deleted` и `restore_payment`【F:services/payment_service.py†L81-L137】【F:services/payment_service.py†L163-L177】【F:services/payment_service.py†L277-L305】.
+- `get_payments_page` предоставляет постраничный вывод с фильтрами и сортировкой через `apply_payment_filters` и `build_payment_query`【F:services/payment_service.py†L47-L78】【F:services/payment_service.py†L307-L360】.
+- `mark_payments_paid` массово отмечает платежи как оплаченные и каскадно обновляет связанные записи【F:services/payment_service.py†L140-L157】.
 
 ## income_service
-- `get_incomes_page` поддерживает фильтрацию, сортировку и пагинацию доходов【F:services/income_service.py†L83-L143】.
-- `mark_incomes_deleted` позволяет массово пометить доходы удалёнными【F:services/income_service.py†L72-L80】.
-- `add_income` создаёт запись и уведомляет исполнителя при поступлении средств【F:services/income_service.py†L166-L195】.
+- CRUD и массовые пометки: `add_income`, `update_income`, `mark_income_deleted` и `mark_incomes_deleted`【F:services/income_service.py†L64-L80】【F:services/income_service.py†L166-L195】【F:services/income_service.py†L200-L235】.
+- `get_incomes_page` и `apply_income_filters` обеспечивают фильтрацию, сортировку и пагинацию доходов【F:services/income_service.py†L83-L143】【F:services/income_service.py†L238-L256】.
+- `_notify_income_received` уведомляет исполнителя о поступлении средств при создании или обновлении записи【F:services/income_service.py†L145-L162】【F:services/income_service.py†L233-L235】.
 
 ## expense_service
-- `get_expenses_page` возвращает расходы с фильтрами по дате, сделке и статусу【F:services/expense_service.py†L159-L199】.
-- `mark_expenses_deleted` массово помечает расходы удалёнными【F:services/expense_service.py†L56-L63】.
-- `add_expense` связывает расход с платежом и полисом, валидируя входные данные【F:services/expense_service.py†L70-L105】.
+- CRUD и массовые пометки: `add_expense`, `update_expense`, `mark_expense_deleted` и `mark_expenses_deleted`【F:services/expense_service.py†L48-L64】【F:services/expense_service.py†L70-L108】【F:services/expense_service.py†L114-L153】.
+- `get_expenses_page` и `apply_expense_filters` предоставляют фильтрацию по дате, сделке и статусу с пагинацией【F:services/expense_service.py†L159-L200】【F:services/expense_service.py†L203-L244】.
+- Каждая запись связывается с платежом и полисом для консистентности финансовых данных【F:services/expense_service.py†L80-L105】.
 
 ## executor_service
 - `ensure_executors_from_env` создаёт записи исполнителей на основе `APPROVED_EXECUTOR_IDS` из переменных окружения【F:services/executor_service.py†L17-L21】.
