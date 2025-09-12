@@ -38,7 +38,7 @@
 - `ask_consultant` отправляет вопрос в OpenAI, добавляя контекст БД и выбранную модель【F:services/ai_consultant_service.py†L30-L63】.
 
 ## ai_policy_service
-- `process_policy_text_with_ai` отправляет текст или файлы полиса в OpenAI, возвращая JSON‑структуру и протокол диалога【F:services/policies/ai_policy_service.py†L196-L209】【F:services/policies/ai_policy_service.py†L350-L359】.
+- `process_policy_text_with_ai` импортирует полис, отправляя текст или PDF в OpenAI и получая JSON‑структуру и протокол диалога【F:services/policies/ai_policy_service.py†L196-L209】【F:services/policies/ai_policy_service.py†L350-L359】.
 - Системный промпт задаётся переменной окружения `AI_POLICY_PROMPT`【F:config.py†L24】【F:config.py†L49】【F:services/policies/ai_policy_service.py†L117-L119】.
 
 ## telegram_service
