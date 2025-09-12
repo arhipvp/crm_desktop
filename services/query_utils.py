@@ -73,6 +73,7 @@ def apply_search_and_filters(
     model: type[Model],
     search_text: str = "",
     column_filters: dict[Field | str, str] | None = None,
+    extra_fields: Iterable[Field] = (),
 ) -> ModelSelect:
     """Apply substring search and column/field filters to a query.
 
@@ -81,13 +82,14 @@ def apply_search_and_filters(
         model: Класс модели для извлечения полей по именам.
         search_text: Текст для поиска по всем полям модели.
         column_filters: Словарь "имя поля или Field → значение".
+        extra_fields: Дополнительные поля из других моделей для включения в
+            условие ``OR`` поиска.
     """
     if search_text:
         fields = [f for f in model._meta.sorted_fields if isinstance(f, Field)]
-        condition = None
-        for field in fields:
-            expr = Cast(field, "TEXT").contains(search_text)
-            condition = expr if condition is None else (condition | expr)
+        if extra_fields:
+            fields.extend(extra_fields)
+        condition = build_or_condition(fields, search_text)
         if condition is not None:
             query = query.where(condition)
 

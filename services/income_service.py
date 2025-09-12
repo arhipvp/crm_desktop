@@ -8,6 +8,7 @@ from peewee import JOIN, Field
 from peewee import SqliteDatabase
 from database.db import db
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
+from services.query_utils import apply_search_and_filters
 from services.payment_service import get_payment_by_id
 from services import executor_service as es
 from services.telegram_service import notify_executor
@@ -245,49 +246,19 @@ def apply_income_filters(
     only_received: bool = False,
     join_executor: bool = False,
 ):
-    if search_text:
-        from services.query_utils import build_or_condition
+    logger.debug("\U0001F50D apply_income_filters: col_filters=%s", column_filters)
 
-        condition = build_or_condition(
-            [
-                Policy.policy_number,
-                Client.name,
-                Deal.description,
-                Policy.note,
-            ],
-            search_text,
-        )
-        if condition is not None:
-            query = query.where(condition)
-    if only_received:
-        query = query.where(Income.received_date.is_null(False))
-    elif not include_received:
-        query = query.where(Income.received_date.is_null(True))
-    if received_date_range:
-        date_from, date_to = received_date_range
-        if date_from:
-            query = query.where(Income.received_date >= date_from)
-        if date_to:
-            query = query.where(Income.received_date <= date_to)
-    if deal_id:
-        query = query.where(Policy.deal_id == deal_id)
+    extra_fields = [
+        Policy.policy_number,
+        Client.name,
+        Deal.description,
+        Policy.note,
+    ]
 
-    from services.query_utils import apply_column_filters, apply_field_filters
-
-    logger.debug(
-        "\U0001F50D apply_income_filters: col_filters=%s", column_filters
+    needs_join = join_executor or (
+        column_filters and Executor.full_name in column_filters
     )
-
-    field_filters = {}
-    name_filters = {}
-    if column_filters:
-        for key, val in column_filters.items():
-            if isinstance(key, Field):
-                field_filters[key] = val
-            else:
-                name_filters[str(key)] = val
-
-    if Executor.full_name in field_filters or join_executor:
+    if needs_join:
         query = (
             query.switch(Deal)
             .join(
@@ -306,8 +277,23 @@ def apply_income_filters(
         else:
             query = query.distinct(Income.id)
 
-    query = apply_field_filters(query, field_filters)
-    query = apply_column_filters(query, name_filters, Income)
+    query = apply_search_and_filters(
+        query, Income, search_text, column_filters, extra_fields
+    )
+
+    if only_received:
+        query = query.where(Income.received_date.is_null(False))
+    elif not include_received:
+        query = query.where(Income.received_date.is_null(True))
+    if received_date_range:
+        date_from, date_to = received_date_range
+        if date_from:
+            query = query.where(Income.received_date >= date_from)
+        if date_to:
+            query = query.where(Income.received_date <= date_to)
+    if deal_id:
+        query = query.where(Policy.deal_id == deal_id)
+
     return query
 
 

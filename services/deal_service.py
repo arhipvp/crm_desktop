@@ -11,7 +11,7 @@ import logging
 from datetime import date
 from utils.time_utils import now_str
 
-from peewee import JOIN, ModelSelect, Field  # если ещё не импортирован
+from peewee import JOIN, ModelSelect  # если ещё не импортирован
 
 from database.db import db
 from database.models import (
@@ -23,6 +23,7 @@ from database.models import (
     Executor,
 )
 from services.clients import get_client_by_id
+from services.query_utils import apply_search_and_filters
 from services.folder_utils import (
     create_deal_folder,
     find_drive_folder,
@@ -344,34 +345,24 @@ def apply_deal_filters(
     search_text: str = "",
     column_filters: dict | None = None,
 ):
-    if search_text:
-        query = query.where(
-            (Deal.description.contains(search_text))
-            | (Deal.status.contains(search_text))
-            | (Client.name.contains(search_text))
-            | (Client.phone.contains(search_text))
-            | (Deal.calculations.contains(search_text))
-        )
-    from services.query_utils import apply_column_filters, apply_field_filters
+    extra_fields = [
+        Deal.description,
+        Deal.status,
+        Client.name,
+        Client.phone,
+        Deal.calculations,
+    ]
 
-    field_filters: dict[Field, str] = {}
-    name_filters: dict[str, str] = {}
-    if column_filters:
-        for key, val in column_filters.items():
-            if isinstance(key, Field):
-                field_filters[key] = val
-            else:
-                name_filters[str(key)] = val
-
-    if Executor.full_name in field_filters:
+    if column_filters and Executor.full_name in column_filters:
         query = (
             query.switch(Deal)
             .join(DealExecutor, JOIN.LEFT_OUTER, on=(DealExecutor.deal == Deal.id))
             .join(Executor, JOIN.LEFT_OUTER, on=(DealExecutor.executor == Executor.id))
         )
 
-    query = apply_field_filters(query, field_filters)
-    query = apply_column_filters(query, name_filters, Deal)
+    query = apply_search_and_filters(
+        query, Deal, search_text, column_filters, extra_fields
+    )
     return query
 
 
