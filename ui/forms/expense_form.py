@@ -1,10 +1,9 @@
 from ui.common.combo_helpers import create_entity_combobox
-from database.models import Payment, Policy
 from PySide6.QtWidgets import QLabel
 
 from database.models import Expense
 from services.expense_service import add_expense, update_expense
-from services.payment_service import get_payment_by_id
+from services.payment_service import get_all_payments, get_payment_by_id
 from ui.base.base_edit_form import BaseEditForm
 
 
@@ -24,28 +23,18 @@ class ExpenseForm(BaseEditForm):
         return add_expense(**data)
 
     def build_custom_fields(self):
-        payments = self.model_class.payment.rel_model.select()
+        payments = get_all_payments()
         if self.deal_id:
-            payments = payments.join(self.model_class.policy.rel_model).where(
-                self.model_class.policy.rel_model.deal_id == self.deal_id
-            )
-
-        if self.deal_id:
-            payments = (
-                Payment.select().join(Policy).where(Policy.deal_id == self.deal_id)
-            )
-        else:
-            payments = Payment.select()
+            payments = [
+                p for p in payments if p.policy and p.policy.deal_id == self.deal_id
+            ]
 
         self.payment_combo = create_entity_combobox(
-            items=list(payments),
+            items=payments,
             label_func=lambda p: f"#{p.id}  {p.policy.policy_number}  {p.payment_date:%d.%m.%Y}",
             id_attr="id",
             placeholder="— Платёж —",
         )
-
-        self.fields["payment_id"] = self.payment_combo
-        self.form_layout.insertRow(0, "Платёж:", self.payment_combo)
 
         self.fields["payment_id"] = self.payment_combo
         self.form_layout.insertRow(0, "Платёж:", self.payment_combo)
