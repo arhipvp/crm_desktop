@@ -5,7 +5,7 @@
 Основные файлы:
 
 - `clients/client_service.py` – CRUD‑операции для клиентов.
-- `deal_service.py` – управление сделками и связанными папками на Google Drive.
+- `deal_service.py` – управление сделками и связанными локальными папками; выгрузка в облако не выполняется автоматически.
 - `policies/policy_service.py` – логика страховых полисов.
 - `task_crud.py`, `task_queue.py`, `task_notifications.py` – задачи и взаимодействие с Telegram‑ботом.
 - `sheets_service.py` и `export_service.py` – экспорт данных в Excel/CSV и синхронизация с Google Sheets.
