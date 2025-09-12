@@ -36,14 +36,24 @@ class DummyDialog:
 
 
 @pytest.mark.usefixtures("in_memory_db")
-def test_tasks_closed_on_confirm(monkeypatch):
+@pytest.mark.parametrize(
+    "confirm_result, closed_count",
+    [
+        (True, 2),
+        (False, 0),
+    ],
+)
+def test_tasks_closed_depends_on_confirm(
+    monkeypatch, confirm_result, closed_count
+):
     from ui.forms import deal_next_event_dialog
 
     monkeypatch.setattr(
         deal_next_event_dialog, "DealNextEventDialog", DummyDialog
     )
     monkeypatch.setattr(
-        "ui.views.deal_detail.actions.confirm", lambda *a, **k: True
+        "ui.views.deal_detail.actions.confirm",
+        lambda *a, **k: confirm_result,
     )
 
     client = Client.create(name="C")
@@ -54,30 +64,8 @@ def test_tasks_closed_on_confirm(monkeypatch):
     view = DummyView(deal)
     view._on_delay_to_event()
 
-    assert Task.select().where(Task.is_done == True).count() == 2
-    assert view.tabs_inited
-
-
-@pytest.mark.usefixtures("in_memory_db")
-def test_tasks_not_closed_on_decline(monkeypatch):
-    from ui.forms import deal_next_event_dialog
-
-    monkeypatch.setattr(
-        deal_next_event_dialog, "DealNextEventDialog", DummyDialog
-    )
-    monkeypatch.setattr(
-        "ui.views.deal_detail.actions.confirm", lambda *a, **k: False
-    )
-
-    client = Client.create(name="C")
-    deal = Deal.create(client=client, description="D", start_date=date.today())
-    Task.create(title="T1", due_date=date.today(), deal=deal)
-
-    view = DummyView(deal)
-    view._on_delay_to_event()
-
-    assert Task.select().where(Task.is_done == True).count() == 0
-    assert not view.tabs_inited
+    assert Task.select().where(Task.is_done == True).count() == closed_count
+    assert view.tabs_inited == confirm_result
 
 
 class DummyDateEdit:
