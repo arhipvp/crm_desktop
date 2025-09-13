@@ -1,6 +1,7 @@
 # ui/forms/import_policy_json_form.py
 
 import json
+from datetime import datetime
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -138,8 +139,6 @@ class ImportPolicyJsonForm(QDialog):
                 elif hasattr(widget, "setCurrentText"):
                     widget.setCurrentText(str(val))
                 elif hasattr(widget, "setDate") and isinstance(val, str):
-                    from datetime import datetime
-
                     try:
                         dt = datetime.strptime(val, "%Y-%m-%d").date()
                         widget.setDate(dt)
@@ -154,7 +153,6 @@ class ImportPolicyJsonForm(QDialog):
             note_widget.setText(f"{prev}{sep}{client_name}")
 
         # Заполняем черновые платежи
-        form._draft_payments = payments_data
         for pay in payments_data:
             if isinstance(pay.get("payment_date"), str):
                 try:

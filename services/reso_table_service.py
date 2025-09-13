@@ -252,7 +252,6 @@ def import_reso_payouts(
                 if prem:
                     pay_date = start_date or file_date
                     pay_data = {"payment_date": pay_date, "amount": prem}
-                    form._draft_payments = [pay_data]
                     if hasattr(form, "add_payment_row"):
                         form.add_payment_row(pay_data)
 
