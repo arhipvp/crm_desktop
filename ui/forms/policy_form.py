@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QGroupBox,
     QDateEdit,
+    QCheckBox,
 )
 
 from services.folder_utils import open_folder
@@ -157,8 +158,6 @@ class PolicyForm(BaseEditForm):
             self.fields[field] = combo
             self.form_layout.addRow(label + ":", combo)
         # После того как все поля построены!
-        from PySide6.QtWidgets import QCheckBox
-
         self.first_payment_checkbox = QCheckBox("Первый платёж уже оплачен")
         self.first_payment_checkbox.setChecked(self._first_payment_paid)
         self.form_layout.addRow("", self.first_payment_checkbox)
@@ -217,6 +216,16 @@ class PolicyForm(BaseEditForm):
     # ---------- сохранение ----------
     def save_data(self, data=None):
         data = data or self.collect_data()
+
+        for idx, pay in enumerate(self._draft_payments):
+            chk = self.payments_table.cellWidget(idx, 2)
+            if isinstance(chk, QCheckBox):
+                if chk.isChecked():
+                    pay["actual_payment_date"] = (
+                        pay.get("actual_payment_date") or pay["payment_date"]
+                    )
+                else:
+                    pay["actual_payment_date"] = None
         if not data.get("end_date"):
             from PySide6.QtWidgets import QMessageBox
 
@@ -332,10 +341,11 @@ class PolicyForm(BaseEditForm):
         group = QGroupBox("Платежи")
         vbox = QVBoxLayout(group)
 
-        self.payments_table = QTableWidget(0, 3)
+        self.payments_table = QTableWidget(0, 4)
         self.payments_table.setHorizontalHeaderLabels([
             "Дата платежа",
             "Сумма",
+            "Оплачен",
             "",
         ])
         vbox.addWidget(self.payments_table)
@@ -348,7 +358,11 @@ class PolicyForm(BaseEditForm):
             )
             for p in existing:
                 self.add_payment_row(
-                    {"payment_date": p.payment_date, "amount": float(p.amount)}
+                    {
+                        "payment_date": p.payment_date,
+                        "amount": float(p.amount),
+                        "actual_payment_date": p.actual_payment_date,
+                    }
                 )
 
         hlayout = QHBoxLayout()
@@ -381,10 +395,23 @@ class PolicyForm(BaseEditForm):
         item_date.setData(Qt.UserRole, pay)
         self.payments_table.setItem(row, 0, item_date)
         self.payments_table.setItem(row, 1, QTableWidgetItem(f"{float(amount):.2f}"))
+        chk = QCheckBox()
+        chk.setChecked(bool(pay.get("actual_payment_date")))
+        chk.stateChanged.connect(
+            lambda state, p=pay: self.on_payment_paid_toggled(p, state)
+        )
+        self.payments_table.setCellWidget(row, 2, chk)
         del_btn = QPushButton("Удалить")
         del_btn.clicked.connect(self.on_delete_payment)
-        self.payments_table.setCellWidget(row, 2, del_btn)
+        self.payments_table.setCellWidget(row, 3, del_btn)
         self._draft_payments.append(pay)
+
+    def on_payment_paid_toggled(self, pay: dict, state: int) -> None:
+        if pay is None:
+            return
+        pay["actual_payment_date"] = (
+            pay["payment_date"] if state == Qt.Checked else None
+        )
 
     def on_add_payment(self) -> None:
         qd = self.pay_date_edit.date()
@@ -392,7 +419,13 @@ class PolicyForm(BaseEditForm):
             amt = float(normalize_number(self.pay_amount_edit.text()))
         except Exception:
             amt = 0.0
-        self.add_payment_row({"payment_date": qd.toPython(), "amount": amt})
+        self.add_payment_row(
+            {
+                "payment_date": qd.toPython(),
+                "amount": amt,
+                "actual_payment_date": None,
+            }
+        )
         self.pay_amount_edit.clear()
 
     def on_delete_payment(self) -> None:
@@ -400,7 +433,7 @@ class PolicyForm(BaseEditForm):
         if not isinstance(btn, QPushButton):
             return
         for row in range(self.payments_table.rowCount()):
-            if self.payments_table.cellWidget(row, 2) is btn:
+            if self.payments_table.cellWidget(row, 3) is btn:
                 item = self.payments_table.item(row, 0)
                 pay = item.data(Qt.UserRole) if item else None
                 if pay in self._draft_payments:
