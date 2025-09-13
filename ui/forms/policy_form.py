@@ -1,5 +1,5 @@
 import logging
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -7,12 +7,16 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QVBoxLayout,
+    QTableWidget,
+    QTableWidgetItem,
+    QGroupBox,
+    QDateEdit,
 )
 
 from services.folder_utils import open_folder
 from ui.common.styled_widgets import styled_button
 
-from database.models import Policy
+from database.models import Policy, Payment
 from services.policies import (
     add_policy,
     get_unique_policy_field_values,
@@ -20,7 +24,7 @@ from services.policies import (
     DuplicatePolicyError,
 )
 
-from services.validators import normalize_policy_number
+from services.validators import normalize_policy_number, normalize_number
 
 from services.deal_service import get_all_deals, get_deals_by_client_id
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
@@ -60,6 +64,7 @@ class PolicyForm(BaseEditForm):
         self._forced_client = forced_client
         self._forced_deal = forced_deal
         self._first_payment_paid = first_payment_paid
+        self._draft_payments: list[dict] = []
         super().__init__(
             instance=policy, model_class=Policy, entity_name="полис", parent=parent
         )
@@ -171,6 +176,8 @@ class PolicyForm(BaseEditForm):
         # обновляем список сделок при смене клиента
         self.client_combo.currentIndexChanged.connect(self.on_client_changed)
 
+        self._build_payments_section()
+
     # ---------- сбор данных ----------
     def collect_data(self) -> dict:
         data = super().collect_data()
@@ -218,8 +225,8 @@ class PolicyForm(BaseEditForm):
             )
             return None
 
-        # ВСЯ логика добавления платежей теперь делегируется в сервис
-        payments = None  # добавление платежей производится сервисом
+        # Платежи передаются сервису из чернового списка
+        payments = self._draft_payments or None
         if self.instance:
             policy = update_policy(
                 self.instance,
@@ -249,7 +256,7 @@ class PolicyForm(BaseEditForm):
             dlg = PolicyMergeDialog(
                 e.existing_policy,
                 data,
-                draft_payments=None,
+                draft_payments=self._draft_payments,
                 first_payment_paid=self.first_payment_checkbox.isChecked(),
                 parent=self,
             )
@@ -316,4 +323,88 @@ class PolicyForm(BaseEditForm):
         )
         if current_deal is not None:
             set_selected_by_id(self.deal_combo, current_deal)
+
+    # ------------------------------------------------------------------
+    # Payments
+    # ------------------------------------------------------------------
+
+    def _build_payments_section(self) -> None:
+        group = QGroupBox("Платежи")
+        vbox = QVBoxLayout(group)
+
+        self.payments_table = QTableWidget(0, 3)
+        self.payments_table.setHorizontalHeaderLabels([
+            "Дата платежа",
+            "Сумма",
+            "",
+        ])
+        vbox.addWidget(self.payments_table)
+
+        if self.instance:
+            existing = (
+                Payment.active()
+                .where(Payment.policy == self.instance)
+                .order_by(Payment.payment_date)
+            )
+            for p in existing:
+                self.add_payment_row(
+                    {"payment_date": p.payment_date, "amount": float(p.amount)}
+                )
+
+        hlayout = QHBoxLayout()
+        self.pay_date_edit = QDateEdit()
+        self.pay_date_edit.setCalendarPopup(True)
+        self.pay_date_edit.setDate(QDate.currentDate())
+        hlayout.addWidget(QLabel("Дата:"))
+        hlayout.addWidget(self.pay_date_edit)
+
+        self.pay_amount_edit = QLineEdit()
+        hlayout.addWidget(QLabel("Сумма:"))
+        hlayout.addWidget(self.pay_amount_edit)
+
+        btn = QPushButton("Добавить платёж")
+        btn.clicked.connect(self.on_add_payment)
+        hlayout.addWidget(btn)
+        vbox.addLayout(hlayout)
+
+        self.layout.addWidget(group)
+
+    def add_payment_row(self, pay: dict) -> None:
+        dt = pay.get("payment_date")
+        amount = pay.get("amount")
+        if not dt or amount is None:
+            return
+        row = self.payments_table.rowCount()
+        self.payments_table.insertRow(row)
+        qd = QDate(dt.year, dt.month, dt.day)
+        item_date = QTableWidgetItem(qd.toString("dd.MM.yyyy"))
+        item_date.setData(Qt.UserRole, pay)
+        self.payments_table.setItem(row, 0, item_date)
+        self.payments_table.setItem(row, 1, QTableWidgetItem(f"{float(amount):.2f}"))
+        del_btn = QPushButton("Удалить")
+        del_btn.clicked.connect(self.on_delete_payment)
+        self.payments_table.setCellWidget(row, 2, del_btn)
+        self._draft_payments.append(pay)
+
+    def on_add_payment(self) -> None:
+        qd = self.pay_date_edit.date()
+        try:
+            amt = float(normalize_number(self.pay_amount_edit.text()))
+        except Exception:
+            amt = 0.0
+        self.add_payment_row({"payment_date": qd.toPython(), "amount": amt})
+        self.pay_amount_edit.clear()
+
+    def on_delete_payment(self) -> None:
+        btn = self.sender()
+        if not isinstance(btn, QPushButton):
+            return
+        for row in range(self.payments_table.rowCount()):
+            if self.payments_table.cellWidget(row, 2) is btn:
+                item = self.payments_table.item(row, 0)
+                pay = item.data(Qt.UserRole) if item else None
+                if pay in self._draft_payments:
+                    self._draft_payments.remove(pay)
+                self.payments_table.removeRow(row)
+                break
 
