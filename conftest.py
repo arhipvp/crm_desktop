@@ -170,6 +170,7 @@ def mock_payments(monkeypatch):
             policy=kw["policy"],
             amount=kw["amount"],
             payment_date=kw["payment_date"],
+            actual_payment_date=kw.get("actual_payment_date"),
         )
         return payment.id
 
