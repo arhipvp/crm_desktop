@@ -23,7 +23,6 @@ from services.clients import get_client_by_id
 from services.deal_service import get_deal_by_id, get_deals_by_client_id
 from services.validators import normalize_number, normalize_policy_number
 
-
 from ui.common.combo_helpers import (
     create_client_combobox,
     create_deal_combobox,
@@ -263,6 +262,7 @@ class PolicyMergeDialog(QDialog):
         ])
         vbox.addWidget(self.payments_table)
 
+        # существующие платежи из БД
         for p in (
             Payment.active()
             .where(Payment.policy == self.existing)
@@ -272,9 +272,12 @@ class PolicyMergeDialog(QDialog):
                 p.payment_date, float(p.amount), p.actual_payment_date
             )
 
+        # черновики платежей (новые)
         for p in self._draft_payments:
             self._insert_payment_row(
-                p.get("payment_date"), p.get("amount"), p.get("actual_payment_date")
+                p.get("payment_date"),
+                p.get("amount"),
+                p.get("actual_payment_date"),
             )
 
         hlayout = QHBoxLayout()
@@ -308,16 +311,37 @@ class PolicyMergeDialog(QDialog):
         layout.addWidget(group)
 
     def _insert_payment_row(self, dt, amount, actual_payment_date=None) -> None:
+        """Добавить строку платежа. В UserRole ячейки даты храним фактическую дату оплаты."""
         if dt is None or amount is None:
             return
         row = self.payments_table.rowCount()
         self.payments_table.insertRow(row)
+
+        # дата платежа (планируемая)
         qd = QDate(dt.year, dt.month, dt.day)
-        self.payments_table.setItem(row, 0, QTableWidgetItem(qd.toString("dd.MM.yyyy")))
-        self.payments_table.setItem(row, 1, QTableWidgetItem(f"{amount:.2f}"))
+        date_item = QTableWidgetItem(qd.toString("dd.MM.yyyy"))
+
+        # сохранить фактическую дату оплаты (если есть) в UserRole
+        if isinstance(actual_payment_date, date):
+            date_item.setData(Qt.UserRole, QDate(actual_payment_date.year, actual_payment_date.month, actual_payment_date.day))
+        else:
+            date_item.setData(Qt.UserRole, None)
+
+        self.payments_table.setItem(row, 0, date_item)
+
+        # сумма
+        try:
+            amt = float(amount)
+        except Exception:
+            amt = 0.0
+        self.payments_table.setItem(row, 1, QTableWidgetItem(f"{amt:.2f}"))
+
+        # чекбокс "оплачен" (истина, если есть фактическая дата)
         chk = QCheckBox()
         chk.setChecked(bool(actual_payment_date))
         self.payments_table.setCellWidget(row, 2, chk)
+
+        # кнопка удаления
         del_btn = QPushButton("Удалить")
         del_btn.clicked.connect(lambda _, r=row: self.on_delete_payment(r))
         self.payments_table.setCellWidget(row, 3, del_btn)
@@ -345,18 +369,29 @@ class PolicyMergeDialog(QDialog):
             chk = self.payments_table.cellWidget(row, 2)
             if not date_item or not amount_item:
                 continue
+
             qd = QDate.fromString(date_item.text(), "dd.MM.yyyy")
             if not qd.isValid():
                 continue
+
             try:
                 amount = float(amount_item.text())
             except Exception:
                 continue
+
+            # читаем фактическую дату оплаты из UserRole
+            actual_dt = date_item.data(Qt.UserRole)
+            if isinstance(actual_dt, QDate):
+                actual_payment_date = actual_dt.toPython()
+            else:
+                # если чекбокс отмечен, но отдельной фактической даты нет — берём дату платежа
+                actual_payment_date = qd.toPython() if (chk and chk.isChecked()) else None
+
             payments.append(
                 {
                     "payment_date": qd.toPython(),
                     "amount": amount,
-                    "actual_payment_date": qd.toPython() if chk and chk.isChecked() else None,
+                    "actual_payment_date": actual_payment_date,
                 }
             )
         return sorted(payments, key=lambda p: p["payment_date"])
