@@ -6,7 +6,7 @@ import pytest
 
 from config import Settings
 from database.db import db
-from database.models import Client, Policy
+from database.models import Client, Policy, Payment
 from services.policies import policy_service as ps, ai_policy_service
 from services.policies.ai_policy_service import _chat
 from services.payment_service import add_payment
@@ -15,8 +15,15 @@ def test_policy_merge_additional_payments(in_memory_db, policy_folder_patches):
     start = datetime.date(2024, 1, 1)
     end = datetime.date(2025, 1, 1)
     initial_payments = [
-        {'amount': 100, 'payment_date': start},
-        {'amount': 150, 'payment_date': start + datetime.timedelta(days=30)},
+        {
+            'amount': 100,
+            'payment_date': start,
+            'actual_payment_date': start,
+        },
+        {
+            'amount': 150,
+            'payment_date': start + datetime.timedelta(days=30),
+        },
     ]
     policy = ps.add_policy(
         client=client,
@@ -28,7 +35,11 @@ def test_policy_merge_additional_payments(in_memory_db, policy_folder_patches):
     assert policy.payments.count() == 2
 
     extra_payments = [
-        {'amount': 200, 'payment_date': start + datetime.timedelta(days=60)},
+        {
+            'amount': 200,
+            'payment_date': start + datetime.timedelta(days=60),
+            'actual_payment_date': start + datetime.timedelta(days=65),
+        },
     ]
     with pytest.raises(ps.DuplicatePolicyError) as exc:
         ps.add_policy(
@@ -42,9 +53,19 @@ def test_policy_merge_additional_payments(in_memory_db, policy_folder_patches):
     existing = exc.value.existing_policy
     ps.update_policy(existing, insurance_company='NewCo')
     for p in extra_payments:
-        add_payment(policy=existing, amount=p['amount'], payment_date=p['payment_date'])
-    amounts = sorted(pay.amount for pay in existing.payments)
-    assert amounts == [100, 150, 200]
+        add_payment(
+            policy=existing,
+            amount=p['amount'],
+            payment_date=p['payment_date'],
+            actual_payment_date=p['actual_payment_date'],
+        )
+    payments = list(existing.payments.order_by(Payment.payment_date))
+    assert [p.amount for p in payments] == [100, 150, 200]
+    assert [p.actual_payment_date for p in payments] == [
+        start,
+        None,
+        start + datetime.timedelta(days=65),
+    ]
     assert existing.insurance_company == 'NewCo'
 
 

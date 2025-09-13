@@ -267,10 +267,18 @@ class PolicyMergeDialog(QDialog):
             .where(Payment.policy == self.existing)
             .order_by(Payment.payment_date)
         ):
-            self._insert_payment_row(p.payment_date, p.amount)
+            self._insert_payment_row(
+                p.payment_date,
+                p.amount,
+                p.actual_payment_date,
+            )
 
         for p in self._draft_payments:
-            self._insert_payment_row(p.get("payment_date"), p.get("amount"))
+            self._insert_payment_row(
+                p.get("payment_date"),
+                p.get("amount"),
+                p.get("actual_payment_date"),
+            )
 
         hlayout = QHBoxLayout()
         self.pay_date_edit = QDateEdit()
@@ -302,13 +310,15 @@ class PolicyMergeDialog(QDialog):
 
         layout.addWidget(group)
 
-    def _insert_payment_row(self, dt, amount) -> None:
+    def _insert_payment_row(self, dt, amount, actual_dt=None) -> None:
         if dt is None or amount is None:
             return
         row = self.payments_table.rowCount()
         self.payments_table.insertRow(row)
         qd = QDate(dt.year, dt.month, dt.day)
-        self.payments_table.setItem(row, 0, QTableWidgetItem(qd.toString("dd.MM.yyyy")))
+        item = QTableWidgetItem(qd.toString("dd.MM.yyyy"))
+        item.setData(Qt.UserRole, actual_dt)
+        self.payments_table.setItem(row, 0, item)
         self.payments_table.setItem(row, 1, QTableWidgetItem(f"{amount:.2f}"))
         del_btn = QPushButton("Удалить")
         del_btn.clicked.connect(lambda _, r=row: self.on_delete_payment(r))
@@ -343,10 +353,16 @@ class PolicyMergeDialog(QDialog):
                 amount = float(amount_item.text())
             except Exception:
                 continue
-            payments.append({
-                "payment_date": qd.toPython(),
-                "amount": amount,
-            })
+            actual_dt = date_item.data(Qt.UserRole)
+            if isinstance(actual_dt, QDate):
+                actual_dt = actual_dt.toPython()
+            payments.append(
+                {
+                    "payment_date": qd.toPython(),
+                    "amount": amount,
+                    "actual_payment_date": actual_dt,
+                }
+            )
         return sorted(payments, key=lambda p: p["payment_date"])
 
     def get_merged_data(self) -> dict:
