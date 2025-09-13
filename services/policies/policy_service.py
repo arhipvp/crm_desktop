@@ -357,6 +357,7 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
                     policy=policy,
                     amount=Decimal(str(p.get("amount", 0))),
                     payment_date=p.get("payment_date", policy.start_date),
+                    actual_payment_date=p.get("actual_payment_date"),
                 )
         else:
             # Если список пуст или не передан — автонулевой платёж
@@ -515,7 +516,17 @@ def update_policy(
         logger.info("✅ Полис #%s успешно обновлён", policy.id)
 
         if payments:
-            sync_policy_payments(policy, payments)
+            sync_policy_payments(
+                policy,
+                [
+                    {
+                        "payment_date": p.get("payment_date"),
+                        "amount": p.get("amount"),
+                        "actual_payment_date": p.get("actual_payment_date"),
+                    }
+                    for p in payments
+                ],
+            )
 
         if first_payment_paid:
             first_payment = (
