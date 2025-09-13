@@ -254,10 +254,11 @@ class PolicyMergeDialog(QDialog):
     def _build_payments_section(self, layout: QVBoxLayout) -> None:
         group = QGroupBox("Платежи")
         vbox = QVBoxLayout(group)
-        self.payments_table = QTableWidget(0, 3)
+        self.payments_table = QTableWidget(0, 4)
         self.payments_table.setHorizontalHeaderLabels([
             "Дата платежа",
             "Сумма",
+            "Оплачен",
             "",
         ])
         vbox.addWidget(self.payments_table)
@@ -267,10 +268,14 @@ class PolicyMergeDialog(QDialog):
             .where(Payment.policy == self.existing)
             .order_by(Payment.payment_date)
         ):
-            self._insert_payment_row(p.payment_date, p.amount)
+            self._insert_payment_row(
+                p.payment_date, float(p.amount), p.actual_payment_date
+            )
 
         for p in self._draft_payments:
-            self._insert_payment_row(p.get("payment_date"), p.get("amount"))
+            self._insert_payment_row(
+                p.get("payment_date"), p.get("amount"), p.get("actual_payment_date")
+            )
 
         hlayout = QHBoxLayout()
         self.pay_date_edit = QDateEdit()
@@ -302,7 +307,7 @@ class PolicyMergeDialog(QDialog):
 
         layout.addWidget(group)
 
-    def _insert_payment_row(self, dt, amount) -> None:
+    def _insert_payment_row(self, dt, amount, actual_payment_date=None) -> None:
         if dt is None or amount is None:
             return
         row = self.payments_table.rowCount()
@@ -310,14 +315,17 @@ class PolicyMergeDialog(QDialog):
         qd = QDate(dt.year, dt.month, dt.day)
         self.payments_table.setItem(row, 0, QTableWidgetItem(qd.toString("dd.MM.yyyy")))
         self.payments_table.setItem(row, 1, QTableWidgetItem(f"{amount:.2f}"))
+        chk = QCheckBox()
+        chk.setChecked(bool(actual_payment_date))
+        self.payments_table.setCellWidget(row, 2, chk)
         del_btn = QPushButton("Удалить")
         del_btn.clicked.connect(lambda _, r=row: self.on_delete_payment(r))
-        self.payments_table.setCellWidget(row, 2, del_btn)
+        self.payments_table.setCellWidget(row, 3, del_btn)
 
     def on_add_payment(self) -> None:
         qd = self.pay_date_edit.date()
         amt = float(normalize_number(self.pay_amount_edit.text()))
-        self._insert_payment_row(qd.toPython(), amt)
+        self._insert_payment_row(qd.toPython(), amt, None)
         self.pay_amount_edit.clear()
 
     def on_delete_payment(self, row: int) -> None:
@@ -334,6 +342,7 @@ class PolicyMergeDialog(QDialog):
         for row in range(self.payments_table.rowCount()):
             date_item = self.payments_table.item(row, 0)
             amount_item = self.payments_table.item(row, 1)
+            chk = self.payments_table.cellWidget(row, 2)
             if not date_item or not amount_item:
                 continue
             qd = QDate.fromString(date_item.text(), "dd.MM.yyyy")
@@ -343,10 +352,13 @@ class PolicyMergeDialog(QDialog):
                 amount = float(amount_item.text())
             except Exception:
                 continue
-            payments.append({
-                "payment_date": qd.toPython(),
-                "amount": amount,
-            })
+            payments.append(
+                {
+                    "payment_date": qd.toPython(),
+                    "amount": amount,
+                    "actual_payment_date": qd.toPython() if chk and chk.isChecked() else None,
+                }
+            )
         return sorted(payments, key=lambda p: p["payment_date"])
 
     def get_merged_data(self) -> dict:
