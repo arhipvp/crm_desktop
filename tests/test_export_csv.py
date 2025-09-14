@@ -1,6 +1,7 @@
 import logging
+from types import SimpleNamespace
 
-from PySide6.QtCore import QItemSelectionModel
+from PySide6.QtCore import QItemSelectionModel, QAbstractTableModel, Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileDialog,
@@ -181,3 +182,50 @@ def test_export_csv_logs(in_memory_db, qapp, tmp_path, monkeypatch):
     assert any("Сохраняем CSV" in m for m in debug_msgs)
     assert any("Заголовки CSV" in m for m in debug_msgs)
     assert any("Количество объектов" in m for m in debug_msgs)
+
+
+def test_export_csv_with_dict_model(qapp, tmp_path, monkeypatch):
+    data = [{"name": "Alice", "age": 30, "secret": "x"}]
+
+    class DictModel(QAbstractTableModel):
+        def __init__(self, objects):
+            super().__init__()
+            self.objects = objects
+            self.fields = [
+                SimpleNamespace(name="name"),
+                SimpleNamespace(name="age"),
+                SimpleNamespace(name="secret"),
+            ]
+
+        def rowCount(self, parent=None):
+            return len(self.objects)
+
+        def columnCount(self, parent=None):
+            return 2
+
+        def data(self, index, role=Qt.DisplayRole):
+            if role != Qt.DisplayRole:
+                return None
+            field = self.fields[index.column()]
+            return self.objects[index.row()].get(field.name, "")
+
+        def get_item(self, row):
+            return self.objects[row]
+
+    view = BaseTableView(model_class=None)
+    view.controller = None
+    model = DictModel(data)
+    view.model = model
+    view.proxy_model.setSourceModel(model)
+    view.table.setModel(view.proxy_model)
+    view.table.selectRow(0)
+    qapp.processEvents()
+
+    path = tmp_path / "dict.csv"
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    view.export_csv(str(path))
+
+    text = path.read_text(encoding="utf-8")
+    assert "Alice" in text
+    assert "30" in text
+    assert "x" not in text

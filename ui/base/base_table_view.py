@@ -32,8 +32,7 @@ class BaseTableView(QWidget):
     row_double_clicked = Signal(object)  # объект строки по двойному клику
     data_loaded = Signal(int)  # сигнал о загрузке данных (количество)
 
-    # Соответствие индекса столбца полю модели. Значение ``None`` скрывает
-    # фильтр для соответствующего столбца.
+    # Соответствие индекса столбца полю модели. Значение ``None`` скрывает фильтр.
     COLUMN_FIELD_MAP: dict[int, Field | None] = {}
 
     def _on_filter_controls_changed(self, *args, **kwargs):
@@ -85,13 +84,12 @@ class BaseTableView(QWidget):
         )
         self.model_class = self.controller.model_class
 
-        self.use_inline_details = True  # включить встроенные детали
+        self.use_inline_details = True
         self.detail_widget = None
         self.settings_id = type(self).__name__
 
-        self.default_sort_column = 0  # по умолчанию — первый столбец
+        self.default_sort_column = 0
         self.default_sort_order = Qt.AscendingOrder
-        # запоминаем текущие настройки сортировки
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
 
@@ -99,7 +97,6 @@ class BaseTableView(QWidget):
         self.per_page = 30
         self.total_count = 0
 
-        # восстановим сохранённое значение per_page, если оно было
         saved_settings = ui_settings.get_table_settings(self.settings_id) or {}
         try:
             self.per_page = int(saved_settings.get("per_page", self.per_page))
@@ -117,9 +114,7 @@ class BaseTableView(QWidget):
 
         # Фильтры
         checkbox_map = kwargs.get("checkbox_map") or {}
-        checkbox_map.setdefault(
-            "Показывать удалённые", lambda state: self.on_filter_changed()
-        )
+        checkbox_map.setdefault("Показывать удалённые", lambda state: self.on_filter_changed())
 
         self.filter_controls = FilterControls(
             search_callback=self._on_filter_controls_changed,
@@ -137,44 +132,31 @@ class BaseTableView(QWidget):
         # Кнопки
         self.button_row = QHBoxLayout()
 
-        self.add_btn = styled_button(
-            "Добавить", icon="➕", role="primary", shortcut="Ctrl+N"
-        )
+        self.add_btn = styled_button("Добавить", icon="➕", role="primary", shortcut="Ctrl+N")
         self.add_btn.clicked.connect(self.add_new)
         self.button_row.addWidget(self.add_btn)
         self.add_btn.setVisible(self.can_add)
 
-        self.edit_btn = styled_button(
-            "Редактировать", icon="✏️", shortcut="F2"
-        )
+        self.edit_btn = styled_button("Редактировать", icon="✏️", shortcut="F2")
         self.edit_btn.setVisible(self.can_edit)
-
         self.edit_btn.clicked.connect(self._on_edit)
         self.button_row.addWidget(self.edit_btn)
 
-        self.delete_btn = styled_button(
-            "Удалить", icon="🗑️", role="danger", shortcut="Del"
-        )
+        self.delete_btn = styled_button("Удалить", icon="🗑️", role="danger", shortcut="Del")
         self.delete_btn.clicked.connect(self._on_delete)
         self.button_row.addWidget(self.delete_btn)
         self.delete_btn.setVisible(self.can_delete)
 
-        self.restore_btn = styled_button(
-            "Восстановить", icon="♻️", shortcut="Ctrl+R"
-        )
+        self.restore_btn = styled_button("Восстановить", icon="♻️", shortcut="Ctrl+R")
         self.restore_btn.clicked.connect(self._on_restore)
         self.button_row.addWidget(self.restore_btn)
         self.restore_btn.setVisible(self.can_restore)
 
-        self.refresh_btn = styled_button(
-            "Обновить", icon="🔄", tooltip="Обновить список", shortcut="F5"
-        )
+        self.refresh_btn = styled_button("Обновить", icon="🔄", tooltip="Обновить список", shortcut="F5")
         self.refresh_btn.clicked.connect(self.refresh)
         self.button_row.addWidget(self.refresh_btn)
 
-        self.select_all_btn = styled_button(
-            "Выделить все", shortcut="Ctrl+A"
-        )
+        self.select_all_btn = styled_button("Выделить все", shortcut="Ctrl+A")
         self.select_all_btn.clicked.connect(self._select_all_rows)
         self.button_row.addWidget(self.select_all_btn)
 
@@ -188,11 +170,10 @@ class BaseTableView(QWidget):
         self.proxy_model.setDynamicSortFilter(True)
         self.table.setEditTriggers(QTableView.NoEditTriggers)
 
-        self.table.setModel(None)  # Пока модель не установлена
+        self.table.setModel(None)
         self.table.setSortingEnabled(True)
         header = self.table.horizontalHeader()
         header.setSectionsMovable(True)
-        # запоминаем изменения сортировки пользователя
         header.sortIndicatorChanged.connect(self._on_sort_indicator_changed)
         header.sectionResized.connect(self._on_section_resized)
         header.sectionMoved.connect(self._on_section_moved)
@@ -205,24 +186,19 @@ class BaseTableView(QWidget):
         self.table.customContextMenuRequested.connect(self._on_table_menu)
         self.table.doubleClicked.connect(self._on_row_double_clicked)
         self.left_layout.addWidget(self.table)
+
         self.column_filters = ColumnFilterRow(linked_view=self.table)
         self.column_filters.filter_changed.connect(self._on_column_filter_changed)
         self.left_layout.insertWidget(self.left_layout.count() - 1, self.column_filters)
 
         # Пагинация
-        self.paginator = Paginator(
-            on_prev=self.prev_page,
-            on_next=self.next_page,
-            per_page=self.per_page,
-        )
+        self.paginator = Paginator(on_prev=self.prev_page, on_next=self.next_page, per_page=self.per_page)
         self.paginator.per_page_changed.connect(self._on_per_page_changed)
         self.left_layout.addWidget(self.paginator)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         if self.controller:
-            self.controller.set_model_class_and_items(
-                model_class, items, total_count
-            )
+            self.controller.set_model_class_and_items(model_class, items, total_count)
 
     def load_data(self):
         if self.controller:
@@ -283,7 +259,7 @@ class BaseTableView(QWidget):
     def set_detail_widget(self, widget):
         """Показывает виджет деталей справа от таблицы."""
         if self.detail_widget:
-            self.detail_widget.setParent(None)  # удаляем старый
+            self.detail_widget.setParent(None)
         self.detail_widget = widget
         self.splitter.addWidget(widget)
         self.splitter.setStretchFactor(0, 3)
@@ -325,7 +301,6 @@ class BaseTableView(QWidget):
             return
         obj = self.model.get_item(self._source_row(index))
 
-        # Вот тут изменяем:
         if self.detail_view_class:
             dlg = self.detail_view_class(obj, parent=self)
             dlg.exec()
@@ -345,11 +320,8 @@ class BaseTableView(QWidget):
 
         if confirm(f"Удалить {self.model_class.__name__} №{getattr(obj, 'id', '')}?"):
             try:
-                # Попробуй найти функцию mark_<entity>_deleted по имени модели
                 svc = self._get_service_for_model(self.model_class)
-                mark_func = getattr(
-                    svc, f"mark_{self.model_class.__name__.lower()}_deleted", None
-                )
+                mark_func = getattr(svc, f"mark_{self.model_class.__name__.lower()}_deleted", None)
                 if mark_func:
                     mark_func(obj.id)
                 self.refresh()
@@ -365,14 +337,10 @@ class BaseTableView(QWidget):
             return
         obj = self.model.get_item(self._source_row(index))
 
-        if confirm(
-            f"Восстановить {self.model_class.__name__} №{getattr(obj, 'id', '')}?"
-        ):
+        if confirm(f"Восстановить {self.model_class.__name__} №{getattr(obj, 'id', '')}?"):
             try:
                 svc = self._get_service_for_model(self.model_class)
-                restore_func = getattr(
-                    svc, f"restore_{self.model_class.__name__.lower()}", None
-                )
+                restore_func = getattr(svc, f"restore_{self.model_class.__name__.lower()}", None)
                 if restore_func:
                     restore_func(obj.id)
                 self.refresh()
@@ -381,41 +349,31 @@ class BaseTableView(QWidget):
                 show_error(str(e))
 
     def _get_service_for_model(self, model_class):
-        # Импортируй нужный сервис по классу модели
         if model_class.__name__ == "Policy":
             from services.policies import policy_service
-
             return policy_service
         if model_class.__name__ == "Payment":
             from services import payment_service
-
             return payment_service
         if model_class.__name__ == "Income":
             from services import income_service
-
             return income_service
         if model_class.__name__ == "Deal":
             from services import deal_service
-
             return deal_service
         if model_class.__name__ == "Task":
             from services import task_crud
-
             return task_crud
         if model_class.__name__ == "Expense":
             from services import expense_service
-
             return expense_service
         if model_class.__name__ == "DealCalculation":
             from services import calculation_service
-
             return calculation_service
         if model_class.__name__ == "Client":
             from services.clients import client_service
-
             return client_service
 
-        # Добавь другие сущности по необходимости
         raise ValueError("Нет сервиса для модели", model_class)
 
     def open_detail_view(self):
@@ -423,7 +381,6 @@ class BaseTableView(QWidget):
         if not index.isValid() or not self.detail_view_class:
             return
         obj = self.model.get_item(self._source_row(index))
-
         dlg = self.detail_view_class(obj, parent=self)
         dlg.exec()
         self.refresh()
@@ -443,11 +400,7 @@ class BaseTableView(QWidget):
         if not self.model:
             return []
         sel = self.table.selectionModel().selectedRows()
-        return [
-            self.model.get_item(self._source_row(i))
-            for i in sel
-            if i.isValid()
-        ]
+        return [self.model.get_item(self._source_row(i)) for i in sel if i.isValid()]
 
     def get_selected_deal(self) -> Deal | None:
         """Возвращает связанную сделку для выбранной строки."""
@@ -458,9 +411,7 @@ class BaseTableView(QWidget):
         obj = self.get_selected_object()
         if not obj:
             return
-        path = getattr(obj, "drive_folder_path", None) or getattr(
-            obj, "drive_folder_link", None
-        )
+        path = getattr(obj, "drive_folder_path", None) or getattr(obj, "drive_folder_link", None)
         if path:
             open_folder(path, parent=self)
 
@@ -470,18 +421,26 @@ class BaseTableView(QWidget):
         if not deal:
             return
         from ui.views.deal_detail import DealDetailView
-
         DealDetailView(deal, parent=self).exec()
 
     def export_csv(self, path: str | None = None, *_):
+        """Экспорт выделенных объектов в CSV.
+
+        - Логируем шаги (info/debug/warning).
+        - Поддерживаем странный вызов с bool вместо пути (приводим к None).
+        - Экспортируем только видимые колонки (по columnCount()).
+        """
         if isinstance(path, bool):
             path = None
+
         objs = self.get_selected_objects()
         logger.info("Запрошен экспорт %d строк", len(objs))
+
         if not objs:
             logger.warning("Нет выбранных строк для экспорта")
             QMessageBox.warning(self, "Экспорт", "Нет выбранных строк")
             return
+
         if path is None:
             options = QFileDialog.Options()
             path, _ = QFileDialog.getSaveFileName(
@@ -494,12 +453,22 @@ class BaseTableView(QWidget):
         if not path:
             logger.warning("Экспорт отменён пользователем")
             return
+
+        # Выбираем только видимые поля модели (по количеству колонок модели).
+        try:
+            visible_cols = self.model.columnCount()
+        except Exception:
+            visible_cols = len(getattr(self.model, "fields", []))
+
+        fields = [self.model.fields[i] for i in range(visible_cols)]
+        logger.debug("Заголовки CSV: %s", [getattr(f, "name", str(f)) for f in fields])
+        logger.debug("Количество объектов к экспорту: %d", len(objs))
         logger.debug("Сохраняем CSV в %s", path)
-        export_objects_to_csv(path, objs, self.model.fields)
+
+        export_objects_to_csv(path, objs, fields)
         logger.info("Экспортировано %d строк в %s", len(objs), path)
-        QMessageBox.information(
-            self, "Экспорт", f"Экспортировано: {len(objs)}"
-        )
+
+        QMessageBox.information(self, "Экспорт", f"Экспортировано: {len(objs)}")
 
     def _on_row_double_clicked(self, index):
         if not index.isValid():
@@ -526,9 +495,7 @@ class BaseTableView(QWidget):
         act_open.triggered.connect(self._on_edit)
         act_delete.triggered.connect(self._on_delete)
         act_folder.triggered.connect(self.open_selected_folder)
-        act_copy.triggered.connect(
-            lambda: copy_text_to_clipboard(text, parent=self)
-        )
+        act_copy.triggered.connect(lambda: copy_text_to_clipboard(text, parent=self))
         act_deal.triggered.connect(self.open_selected_deal)
         act_deal.setEnabled(bool(self.get_selected_deal()))
         act_folder.setEnabled(has_path)
@@ -599,9 +566,7 @@ class BaseTableView(QWidget):
         if order_list and len(order_list) == header.count():
             header.blockSignals(True)
             try:
-                for logical, visual in sorted(
-                    enumerate(order_list), key=lambda x: x[1]
-                ):
+                for logical, visual in sorted(enumerate(order_list), key=lambda x: x[1]):
                     current_visual = header.visualIndex(logical)
                     if current_visual != visual:
                         header.moveSection(current_visual, visual)
