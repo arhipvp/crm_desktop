@@ -39,10 +39,10 @@ def export_objects_to_csv(path: str, objects: Sequence, fields: Sequence) -> int
             row = []
             for f in fields:
                 name = getattr(f, "name", str(f))
-                if hasattr(obj, name):
-                    value = getattr(obj, name, "")
+                if isinstance(obj, dict):
+                    value = obj.get(name, "")
                 else:
-                    value = obj.get(name, "") if hasattr(obj, "get") else ""
+                    value = getattr(obj, name, "")
                 if isinstance(value, (datetime.date, datetime.datetime)):
                     value = value.strftime("%d.%m.%Y")
                 row.append(value)
