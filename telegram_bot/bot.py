@@ -82,8 +82,9 @@ try:
 except ValueError:
     ADMIN_CHAT_ID = None
 
-APPROVED_EXECUTOR_IDS: set[int] = set()
 logger = logging.getLogger(__name__)
+
+APPROVED_EXECUTOR_IDS: set[int] = set()
 for part in re.split(r"[ ,]+", os.getenv("APPROVED_EXECUTOR_IDS", "").strip()):
     if not part:
         continue
