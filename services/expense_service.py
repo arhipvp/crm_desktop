@@ -18,7 +18,9 @@ income_sum = fn.COALESCE(fn.SUM(Income.amount), 0)
 other_expense_sum = fn.COALESCE(fn.SUM(other_expense.amount), 0)
 INCOME_TOTAL = income_sum.alias("income_total")
 OTHER_EXPENSE_TOTAL = other_expense_sum.alias("other_expense_total")
-NET_INCOME = (income_sum - other_expense_sum).alias("net_income")
+NET_INCOME = (
+    income_sum - other_expense_sum - Expense.amount
+).alias("net_income")
 
 # ─────────────────────────── CRUD ────────────────────────────
 
@@ -300,7 +302,10 @@ def build_expense_query(
         .join(
             other_expense,
             JOIN.LEFT_OUTER,
-            on=(other_expense.payment == Payment.id),
+            on=(
+                (other_expense.payment == Payment.id)
+                & (other_expense.id != Expense.id)
+            ),
         )
         .group_by(Expense.id)
     )
