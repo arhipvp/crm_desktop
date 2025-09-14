@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QShortcut
-from PySide6.QtWidgets import QLineEdit, QComboBox, QHBoxLayout
+from PySide6.QtWidgets import QLineEdit, QComboBox, QHBoxLayout, QAbstractItemView
 
 from ui.base.base_table_model import BaseTableModel
 
@@ -124,6 +124,7 @@ class DealTableView(BaseTableView):
             detail_view_class=DealDetailView,
             checkbox_map=checkboxes,
         )
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
         # --- быстрый фильтр по строке и статусу -----------------------
         self.quick_filter_edit = QLineEdit()
