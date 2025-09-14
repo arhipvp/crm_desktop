@@ -8,6 +8,7 @@ from database.models import Client, Deal, Expense, Payment, Policy
 from services import expense_service
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
+from ui.common.colors import HIGHLIGHT_COLOR_INCOME
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.expense_form import ExpenseForm
 from ui.views.expense_detail_view import ExpenseDetailView
@@ -55,7 +56,7 @@ class ExpenseTableModel(BaseTableModel):
 
         if role == Qt.BackgroundRole:
             if getattr(obj, "income_total", 0) > 0:
-                return QBrush(QColor("#ccffcc"))
+                return QBrush(QColor(HIGHLIGHT_COLOR_INCOME))
             return None
 
         if role != Qt.DisplayRole:
