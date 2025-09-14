@@ -301,7 +301,7 @@ def update_payment(payment: Payment, **kwargs) -> Payment:
         "policy",
         "policy_id",
     }
-    updates: dict = {}
+    updates: dict[str, Any] = {}
 
     for key, value in kwargs.items():
         if key in allowed_fields:
@@ -316,17 +316,15 @@ def update_payment(payment: Payment, **kwargs) -> Payment:
         return payment
 
     log_updates: dict[str, Any] = {}
-    for key, value in updates.items():
-        if hasattr(value, "id"):
-            log_updates[key] = value.id
-        elif isinstance(value, Decimal):
-            log_updates[key] = str(value)
-        else:
-            log_updates[key] = value
-
     with db.atomic():
         for key, value in updates.items():
             setattr(payment, key, value)
+            if hasattr(value, "id"):
+                log_updates[key] = value.id
+            elif isinstance(value, Decimal):
+                log_updates[key] = str(value)
+            else:
+                log_updates[key] = value
 
         payment.save()
         logger.info("✏️ Платёж id=%s обновлён: %s", payment.id, log_updates)
