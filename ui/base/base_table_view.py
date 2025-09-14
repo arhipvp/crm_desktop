@@ -491,7 +491,11 @@ class BaseTableView(QWidget):
             )
         if not path:
             return
-        export_objects_to_csv(path, objs, self.model.fields)
+        fields = [
+            self.model.fields[i]
+            for i in range(self.model.columnCount())
+        ]
+        export_objects_to_csv(path, objs, fields)
         QMessageBox.information(
             self, "Экспорт", f"Экспортировано: {len(objs)}"
         )
