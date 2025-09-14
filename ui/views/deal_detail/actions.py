@@ -419,7 +419,7 @@ class DealActionsMixin:
             if added:
                 show_info(f"Добавлено расчётов: {added}")
         except Exception as e:  # noqa: BLE001
-            logger.exception("Sheets sync failed")
+            logger.exception("Ошибка синхронизации с Sheets")
             show_error(str(e))
 
         fresh = get_deal_by_id(self.instance.id)

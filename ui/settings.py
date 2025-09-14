@@ -16,7 +16,7 @@ def _load_data() -> dict:
             try:
                 _CACHE = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
             except Exception as e:  # pragma: no cover - logging only
-                logger.exception("Failed to load settings: %s", e)
+                logger.exception("Не удалось загрузить настройки: %s", e)
                 _CACHE = {}
         else:
             _CACHE = {}
@@ -32,7 +32,7 @@ def _save_data(data: dict) -> None:
             json.dumps(_CACHE, ensure_ascii=False, indent=2), encoding="utf-8"
         )
     except Exception as e:  # pragma: no cover - logging only
-        logger.exception("Failed to save settings: %s", e)
+        logger.exception("Не удалось сохранить настройки: %s", e)
 
 
 def get_table_settings(name: str) -> dict:

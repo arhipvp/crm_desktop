@@ -356,11 +356,11 @@ def copy_path_to_clipboard(
     try:
         from PySide6.QtGui import QGuiApplication
     except Exception:  # PySide6 может отсутствовать в тестах
-        logger.info("Clipboard not available")
+        logger.info("Буфер обмена недоступен")
         return
 
     if QGuiApplication.instance() is None:
-        logger.info("No GUI application for clipboard")
+        logger.info("Нет GUI-приложения для буфера обмена")
         return
 
     QGuiApplication.clipboard().setText(path_or_url)
@@ -376,11 +376,11 @@ def copy_text_to_clipboard(text: str, *, parent: Optional["QWidget"] = None) -> 
     try:
         from PySide6.QtGui import QGuiApplication
     except Exception:  # может отсутствовать в тестах
-        logger.info("Clipboard not available")
+        logger.info("Буфер обмена недоступен")
         return
 
     if QGuiApplication.instance() is None:
-        logger.info("No GUI application for clipboard")
+        logger.info("Нет GUI-приложения для буфера обмена")
         return
 
     QGuiApplication.clipboard().setText(text)
@@ -390,7 +390,7 @@ def copy_text_to_clipboard(text: str, *, parent: Optional["QWidget"] = None) -> 
 def _msg(text: str, parent: Optional["QWidget"]) -> None:
     """Показывает информационное QMessageBox, если Qt доступен."""
     if QMessageBox is None or QApplication is None or QApplication.instance() is None:
-        logger.debug("MSG: %s", text)
+        logger.debug("Сообщение: %s", text)
         return
     QMessageBox.information(parent, "Информация", text)
 

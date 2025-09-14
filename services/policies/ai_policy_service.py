@@ -122,7 +122,7 @@ def _get_prompt() -> str:
 def _log_conversation(path: str, messages: List[dict]) -> str:
     """Log conversation with OpenAI for debugging and return transcript."""
     transcript = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
-    logger.info("OpenAI conversation for %s:\n%s", path, transcript)
+    logger.info("Диалог с OpenAI для %s:\n%s", path, transcript)
     return transcript
 
 # Number of attempts to get a valid JSON response from the model
@@ -202,7 +202,7 @@ def _read_text(path: str) -> str:
             if text:
                 return text
         except Exception as e:
-            logger.warning("Failed to read PDF %s: %s", path, e)
+            logger.warning("Не удалось прочитать PDF %s: %s", path, e)
     try:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
@@ -301,7 +301,7 @@ def recognize_policy_interactive(
             messages.append({"role": "user", "content": REMINDER})
             continue
         except ValidationError as exc:
-            logger.warning("Schema validation error at %s: %s", list(exc.path), exc.message)
+            logger.warning("Ошибка валидации схемы в %s: %s", list(exc.path), exc.message)
             if attempt == MAX_ATTEMPTS - 1:
                 transcript = _log_conversation("text", messages)
                 raise AiPolicyError(

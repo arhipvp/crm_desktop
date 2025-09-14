@@ -202,7 +202,7 @@ class TaskTableView(BaseTableView):
                 sent += 1
             except Exception as exc:
                 skipped += 1
-                logger.debug("[queue_task] failed for %s: %s", t.id, exc)
+                logger.debug("[queue_task] ошибка для %s: %s", t.id, exc)
         QMessageBox.information(
             self,
             "Telegram",
@@ -218,7 +218,7 @@ class TaskTableView(BaseTableView):
             try:
                 notify_task(t.id)
             except Exception as exc:
-                logger.debug("[notify_task] failed for %s: %s", t.id, exc)
+                logger.debug("[notify_task] ошибка для %s: %s", t.id, exc)
         QMessageBox.information(self, "Напоминание", "Запрос отправлен")
         self.refresh()
 
@@ -239,7 +239,7 @@ class TaskTableView(BaseTableView):
                 mark_task_deleted(t.id)
             except Exception as exc:
                 errors += 1
-                logger.debug("[delete_task] failed for %s: %s", t.id, exc)
+                logger.debug("[delete_task] ошибка для %s: %s", t.id, exc)
         if errors:
             show_error(f"Ошибок: {errors}")
         else:
@@ -272,7 +272,7 @@ class TaskTableView(BaseTableView):
 
             sync_tasks_from_sheet()
         except Exception:
-            logger.debug("Sheets sync failed", exc_info=True)
+            logger.debug("Ошибка синхронизации с Sheets", exc_info=True)
 
         self.load_data()
 

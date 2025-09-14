@@ -23,7 +23,7 @@ def notify_task(task_id: int) -> None:
                 send_exec_task(t, t.tg_chat_id)
                 logger.info("🔔 Напоминание отправлено по задаче #%s", t.id)
             except Exception:  # pragma: no cover - logging
-                logger.debug("Failed to resend task", exc_info=True)
+                logger.debug("Не удалось повторно отправить задачу", exc_info=True)
         else:
             from .task_queue import return_to_queue
 

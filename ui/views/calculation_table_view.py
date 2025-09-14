@@ -151,7 +151,7 @@ class CalculationTableView(BaseTableView):
 
             sync_calculations_from_sheet()
         except Exception:
-            logger.debug("Sheets sync failed", exc_info=True)
+            logger.debug("Ошибка синхронизации с Sheets", exc_info=True)
         self.load_data()
 
     def on_filter_changed(self, *args, **kwargs):

@@ -46,7 +46,7 @@ def approve_executor(tg_id: int) -> None:
     if not ex.is_active:
         ex.is_active = True
         ex.save(only=[Executor.is_active])
-        logger.info("Executor %s approved", tg_id)
+        logger.info("Исполнитель %s одобрен", tg_id)
 
 
 def assign_executor(deal_id: int, tg_id: int, note: str | None = None) -> None:
@@ -58,7 +58,7 @@ def assign_executor(deal_id: int, tg_id: int, note: str | None = None) -> None:
         DealExecutor.create(
             deal=deal_id, executor=executor, assigned_date=date.today(), note=note
         )
-    logger.info("Executor %s assigned to deal %s", tg_id, deal_id)
+    logger.info("Исполнитель %s назначен на сделку %s", tg_id, deal_id)
     if old_executor and old_executor.tg_id != tg_id and is_approved(old_executor.tg_id):
         from services.telegram_service import notify_executor
 
@@ -73,7 +73,7 @@ def unassign_executor(deal_id: int) -> None:
     ex = get_executor_for_deal(deal_id)
     cnt = DealExecutor.delete().where(DealExecutor.deal_id == deal_id).execute()
     if cnt:
-        logger.info("Executor unassigned from deal %s", deal_id)
+        logger.info("Исполнитель отвязан от сделки %s", deal_id)
         if ex and is_approved(ex.tg_id):
             from services.telegram_service import notify_executor
 

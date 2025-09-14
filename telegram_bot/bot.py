@@ -213,7 +213,7 @@ async def notify_admin(
         text += f"\n\nИсполнитель: {executor}"
     if user_text:
         text += f"\n\n{user_text}"
-    logger.info("Notify admin about %s", tid)
+    logger.info("Уведомляем администратора о %s", tid)
     await bot.send_message(
         ADMIN_CHAT_ID,
         text,
@@ -237,7 +237,7 @@ async def notify_admin_user(bot, uid: int, name: str):
     if not ADMIN_CHAT_ID:
         return
     text = f"Запрос на доступ от {name} ({uid})"
-    logger.info("Notify admin about executor %s", uid)
+    logger.info("Уведомляем администратора об исполнителе %s", uid)
     await bot.send_message(ADMIN_CHAT_ID, text, reply_markup=kb_user(uid))
 
 
@@ -247,7 +247,7 @@ async def notify_admin_user(bot, uid: int, name: str):
 
 # ───────────── handlers ─────────────
 async def h_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
-    logger.info("/start from %s", update.effective_user.id)
+    logger.info("Команда /start от %s", update.effective_user.id)
     kb = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("📂 Мои сделки", callback_data="deals")],
@@ -263,8 +263,8 @@ async def h_start(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 async def h_show_deals(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    logger.info("Action '%s' from %s", q.data, q.from_user.id)
-    logger.info("%s requested deals", q.from_user.id)
+    logger.info("Действие '%s' от %s", q.data, q.from_user.id)
+    logger.info("%s запросил сделки", q.from_user.id)
 
     user_id = q.from_user.id
     user_name = q.from_user.full_name or ("@" + q.from_user.username) if q.from_user.username else str(user_id)
@@ -308,7 +308,7 @@ async def h_show_deals(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    logger.info("%s chose client", q.from_user.id)
+    logger.info("%s выбрал клиента", q.from_user.id)
 
     if not es.is_approved(q.from_user.id):
         return await q.answer("⏳ Ожидайте одобрения администратора", show_alert=True)
@@ -344,7 +344,7 @@ async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 async def h_choose_deal(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    logger.info("%s chose deal", q.from_user.id)
+    logger.info("%s выбрал сделку", q.from_user.id)
 
     if not es.is_approved(q.from_user.id):
         return await q.answer("⏳ Ожидайте одобрения администратора", show_alert=True)
@@ -401,20 +401,20 @@ async def h_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         await q.message.edit_text(
             "✅ Задача выполнена", parse_mode=constants.ParseMode.HTML
         )
-        logger.info("Task %s marked done by executor", tid)
+        logger.info("Задача %s отмечена исполнителем как выполненная", tid)
 
     elif action == "reply":
         await q.message.reply_text(
             f"Напишите комментарий к задаче #{tid}:",
             reply_markup=ForceReply(selective=True),
         )
-        logger.info("Awaiting comment for %s", tid)
+        logger.info("Ожидание комментария по задаче %s", tid)
 
 
 async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    logger.info("Admin action '%s'", q.data)
+    logger.info("Действие администратора '%s'", q.data)
 
     action, tid = q.data.split(":")
     tid = int(tid)
@@ -430,13 +430,13 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         chat_id = info[0] if isinstance(info, tuple) else info
         if chat_id:
             await _ctx.bot.send_message(chat_id, "Задача принята")
-        logger.info("Task %s accepted", tid)
+        logger.info("Задача %s принята", tid)
     elif action == "info":
         await q.message.reply_text(
             f"Введите информацию для задачи #{tid}:",
             reply_markup=ForceReply(selective=True),
         )
-        logger.info("Requesting info for task %s", tid)
+        logger.info("Запрос информации по задаче %s", tid)
     elif action == "rework":
         tq.queue_task(tid)
         await q.message.edit_text(
@@ -447,7 +447,7 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
             f"Прокомментируйте задачу #{tid}:",
             reply_markup=ForceReply(selective=True),
         )
-        logger.info("Task %s returned for rework", tid)
+        logger.info("Задача %s возвращена на доработку", tid)
     elif action == "approve_exec":
         es.approve_executor(tid)
         info = pending_users.pop(tid, None)
@@ -455,14 +455,14 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         await q.message.edit_text("Исполнитель подтверждён")
         if chat_id:
             await _ctx.bot.send_message(chat_id, "Вы одобрены. Можно брать задачи")
-        logger.info("Executor %s approved", tid)
+        logger.info("Исполнитель %s одобрен", tid)
     elif action == "deny_exec":
         info = pending_users.pop(tid, None)
         chat_id = info[0] if isinstance(info, tuple) else info
         await q.message.edit_text("Запрос отклонён")
         if chat_id:
             await _ctx.bot.send_message(chat_id, "Администратор отклонил доступ")
-        logger.info("Executor %s denied", tid)
+        logger.info("Исполнителю %s отказано", tid)
 
 
 async def h_task_button(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
@@ -517,14 +517,14 @@ async def h_text(update: Update, _ctx):
             try:
                 calc = calc_s.add_calculation(task.deal_id, **data)
             except Exception as e:  # pragma: no cover - log unexpected
-                logger.exception("Failed to add calculation for %s", tid)
+                logger.exception("Не удалось добавить расчёт для %s", tid)
                 await update.message.reply_text(f"⚠️ Ошибка сохранения: {e}")
                 continue
             saved.append(calc)
         if saved:
             lines = ["Расчёты сохранены:"] + [calc_s.format_calculation(c) for c in saved]
             await update.message.reply_text("\n".join(lines) + " 👍")
-            logger.info("Calculations added for %s count %s", tid, len(saved))
+            logger.info("Для %s добавлено расчётов: %s", tid, len(saved))
         return
 
     if not update.message.reply_to_message:
@@ -535,7 +535,7 @@ async def h_text(update: Update, _ctx):
     if not m:
         return
     tid = int(m.group(1))
-    logger.info("Text reply for %s from %s", tid, update.message.chat_id)
+    logger.info("Текстовый ответ по %s от %s", tid, update.message.chat_id)
     stamp = now_str()
     user_name = (
         update.effective_user.full_name
@@ -546,7 +546,7 @@ async def h_text(update: Update, _ctx):
 
     tn.append_note(tid, f"[TG {stamp}] {user_name}: {update.message.text}")
     await update.message.reply_text("Комментарий сохранён 👍")
-    logger.info("Note added to %s", tid)
+    logger.info("Заметка добавлена к %s", tid)
     if update.message.chat_id != ADMIN_CHAT_ID:
         await notify_admin(_ctx.bot, tid, update.message.text, executor=user_name)
 
@@ -572,7 +572,7 @@ async def h_file(update: Update, _ctx):
     if not tg_file:
         await msg.reply_text("⚠️ Не удалось определить файл.")
         return
-    logger.info("File from %s for deal %s", msg.chat_id, deal_id)
+    logger.info("Файл от %s для сделки %s", msg.chat_id, deal_id)
 
     ext = Path(tg_file.file_name or "").suffix.lower() if msg.document else ".jpg"
     if tg_file.file_size and tg_file.file_size > MAX_FILE_SIZE:
@@ -589,7 +589,7 @@ async def h_file(update: Update, _ctx):
     dest = deal_path / Path(tmp_path).name
     os.replace(tmp_path, dest)
     await msg.reply_text("📂 Файл сохранён в папке сделки ✔️")
-    logger.info("Saved file to %s", dest)
+    logger.info("Файл сохранён в %s", dest)
 
 
 async def h_show_tasks(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
