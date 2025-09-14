@@ -479,6 +479,7 @@ class BaseTableView(QWidget):
     def export_csv(self, path: str | None = None):
         objs = self.get_selected_objects()
         if not objs:
+            QMessageBox.warning(self, "Экспорт", "Нет выбранных строк")
             return
         if path is None:
             path, _ = QFileDialog.getSaveFileName(
