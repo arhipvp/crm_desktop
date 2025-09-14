@@ -343,8 +343,6 @@ def build_expense_query(
             Policy.id,
             Client.id,
             Deal.id,
-            income_subquery.c.income_total,
-            expense_subquery.c.expense_total,
         )
     )
     query = apply_expense_filters(
