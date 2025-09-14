@@ -4,6 +4,7 @@ import logging
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from peewee import JOIN, ModelSelect, fn, Field
 
@@ -314,10 +315,22 @@ def update_payment(payment: Payment, **kwargs) -> Payment:
     if not updates:
         return payment
 
+    log_updates: dict[str, Any] = {}
     for key, value in updates.items():
-        setattr(payment, key, value)
+        if hasattr(value, "id"):
+            log_updates[key] = value.id
+        elif isinstance(value, Decimal):
+            log_updates[key] = str(value)
+        else:
+            log_updates[key] = value
 
-    payment.save()
+    with db.atomic():
+        for key, value in updates.items():
+            setattr(payment, key, value)
+
+        payment.save()
+        logger.info("✏️ Платёж id=%s обновлён: %s", payment.id, log_updates)
+
     return payment
 
 
