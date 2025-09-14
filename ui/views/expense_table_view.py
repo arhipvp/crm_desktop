@@ -66,7 +66,8 @@ class ExpenseTableModel(BaseTableModel):
                 if details is None:
                     others = expense_service.get_other_expenses(payment.id, obj.id)
                     details = "\n".join(
-                        f"{self.format_money(e.amount)} — {e.expense_date.strftime('%d.%m.%Y') if e.expense_date else '—'}"
+                        f"{e.expense_type or '—'} — {self.format_money(e.amount)} — "
+                        f"{e.expense_date.strftime('%d.%m.%Y') if e.expense_date else '—'}"
                         for e in others
                     )
                     obj.other_expense_details = details

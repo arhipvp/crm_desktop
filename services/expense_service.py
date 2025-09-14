@@ -65,9 +65,16 @@ def get_expense_by_id(expense_id: int) -> Expense | None:
 
 
 def get_other_expenses(payment_id: int, exclude_id: int) -> list[Expense]:
-    """Получить другие расходы по тому же платежу."""
+    """Получить другие расходы по тому же платежу.
+
+    Возвращаются объекты с полями ``expense_type``, ``amount`` и ``expense_date``.
+    """
     return list(
-        Expense.select(Expense.amount, Expense.expense_date)
+        Expense.select(
+            Expense.expense_type,
+            Expense.amount,
+            Expense.expense_date,
+        )
         .where((Expense.payment_id == payment_id) & (Expense.id != exclude_id))
         .order_by(Expense.expense_date)
     )
