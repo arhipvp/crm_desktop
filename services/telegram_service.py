@@ -7,6 +7,8 @@ from services.task_notifications import link_telegram
 
 from config import get_settings
 
+logger = logging.getLogger(__name__)
+
 settings = get_settings()
 
 BOT_TOKEN = settings.tg_bot_token
@@ -34,9 +36,7 @@ def format_exec_task(t: Task) -> tuple[str, InlineKeyboardMarkup]:
             else:
                 lines.append(file_path)
         except Exception:
-            logging.getLogger(__name__).debug(
-                "Failed to attach calculations file", exc_info=True
-            )
+            logger.debug("Не удалось прикрепить файл с расчётами", exc_info=True)
     if t.note:
         lines.append(t.note.strip())
     text = "\n".join(lines)
@@ -53,8 +53,7 @@ def format_exec_task(t: Task) -> tuple[str, InlineKeyboardMarkup]:
 def send_exec_task(t: Task, tg_id: int) -> None:
     """Отправить задачу исполнителю и связать её с сообщением."""
     if not _bot:
-        import logging
-        logging.getLogger(__name__).warning("TG_BOT_TOKEN not configured")
+        logger.warning("TG_BOT_TOKEN не настроен")
         return
     text, kb = format_exec_task(t)
     msg = _bot.send_message(
@@ -73,7 +72,7 @@ def notify_admin(text: str) -> None:
     try:
         _bot.send_message(ADMIN_CHAT_ID, text, parse_mode=constants.ParseMode.HTML)
     except Exception as exc:
-        logging.getLogger(__name__).warning("Failed to notify admin: %s", exc)
+        logger.warning("Не удалось отправить уведомление администратору: %s", exc)
 
 
 def notify_admin_safe(text: str) -> None:
@@ -81,9 +80,7 @@ def notify_admin_safe(text: str) -> None:
     try:
         notify_admin(text)
     except Exception:
-        logging.getLogger(__name__).debug(
-            "Failed to notify admin", exc_info=True
-        )
+        logger.debug("Не удалось отправить уведомление администратору", exc_info=True)
 
 
 def notify_executor(tg_id: int, text: str) -> None:
@@ -93,7 +90,5 @@ def notify_executor(tg_id: int, text: str) -> None:
     try:
         _bot.send_message(tg_id, text, parse_mode=constants.ParseMode.HTML)
     except Exception as exc:
-        logging.getLogger(__name__).warning(
-            "Failed to notify executor %s: %s", tg_id, exc
-        )
+        logger.warning("Не удалось отправить уведомление исполнителю %s: %s", tg_id, exc)
 
