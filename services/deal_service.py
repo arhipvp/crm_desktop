@@ -277,8 +277,9 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
         # Применяем простые обновления
         for key, value in updates.items():
             setattr(deal, key, value)
-
+        changed_fields = [f.name for f in deal.dirty_fields]
         deal.save()
+        logger.info("✏️ Обновлена сделка #%s: %s", deal.id, changed_fields)
 
         # Переименование папки при изменении описания или клиента
         new_client_name = deal.client.name if deal.client_id else None
@@ -336,6 +337,7 @@ def mark_deal_deleted(deal_id: int):
                 deal.save(
                     only=[Deal.description, Deal.drive_folder_path, Deal.is_deleted]
                 )
+                logger.info("Сделка #%s помечена удалённой", deal.id)
             except Exception:
                 logger.exception("Не удалось пометить папку сделки удалённой")
         else:
