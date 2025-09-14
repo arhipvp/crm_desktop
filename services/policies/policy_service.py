@@ -222,6 +222,7 @@ def mark_policy_deleted(policy_id: int):
             policy.save(
                 only=[Policy.policy_number, Policy.drive_folder_link, Policy.is_deleted]
             )
+            logger.info("Полис %s помечен удалённым", policy_id)
         except Exception:
             logger.exception("Не удалось пометить папку полиса удалённой")
     else:
@@ -239,7 +240,7 @@ def mark_policies_deleted(policy_ids: list[int]) -> int:
         if before and not before.is_deleted:
             mark_policy_deleted(pid)
             count += 1
-
+    logger.info("Полисов помечено удалёнными: %s", count)
     return count
 
 
