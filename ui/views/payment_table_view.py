@@ -2,7 +2,7 @@ from datetime import date
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
-from PySide6.QtWidgets import QAbstractItemView
+from PySide6.QtWidgets import QAbstractItemView, QMenu
 
 from database.models import Payment, Policy
 from services.payment_service import (
@@ -11,6 +11,7 @@ from services.payment_service import (
     mark_payment_deleted,
     mark_payments_paid,
 )
+from services.folder_utils import copy_text_to_clipboard
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.base.table_controller import TableController
@@ -202,6 +203,41 @@ class PaymentTableView(BaseTableView):
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
+
+    def open_selected_policy(self):
+        payment = self.get_selected()
+        if not payment:
+            return
+        policy = getattr(payment, "policy", None)
+        if not policy:
+            return
+        from ui.views.policy_detail_view import PolicyDetailView
+
+        PolicyDetailView(policy, parent=self).exec()
+
+    def _on_table_menu(self, pos):
+        index = self.table.indexAt(pos)
+        if not index.isValid():
+            return
+        self.table.selectRow(index.row())
+        menu = QMenu(self)
+        act_open = menu.addAction("Открыть/редактировать")
+        act_policy = menu.addAction("Открыть полис")
+        act_delete = menu.addAction("Удалить")
+        act_folder = menu.addAction("Открыть папку")
+        text = str(index.data() or "")
+        act_copy = menu.addAction("Копировать значение")
+        act_deal = menu.addAction("Открыть сделку")
+        act_open.triggered.connect(self._on_edit)
+        act_policy.triggered.connect(self.open_selected_policy)
+        act_delete.triggered.connect(self._on_delete)
+        act_folder.triggered.connect(self.open_selected_folder)
+        act_copy.triggered.connect(lambda: copy_text_to_clipboard(text, parent=self))
+        act_deal.triggered.connect(self.open_selected_deal)
+        payment = self.get_selected()
+        act_policy.setEnabled(bool(getattr(payment, "policy", None)))
+        act_deal.setEnabled(bool(self.get_selected_deal()))
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def _on_mark_paid(self):
         payments = self.get_selected_multiple()
