@@ -161,6 +161,23 @@ def test_add_payment_rolls_back_on_related_error(
     assert Expense.select().count() == 0
 
 
+def test_add_payment_skips_dash_contractor(in_memory_db):
+    client = Client.create(name="C")
+    d1 = datetime.date(2024, 1, 1)
+    policy = Policy.create(
+        client=client,
+        policy_number="P",
+        start_date=d1,
+        end_date=d1,
+        contractor="—",
+    )
+    pay_svc.add_payment(policy=policy, amount=100, payment_date=d1)
+
+    assert Payment.select().count() == 1
+    assert Income.select().count() == 1
+    assert Expense.select().count() == 0
+
+
 def test_sync_policy_payments_removes_extra_duplicates(
     in_memory_db, mock_payments, make_policy_with_payment
 ):
