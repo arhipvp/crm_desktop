@@ -91,6 +91,8 @@ class PolicyTableView(BaseTableView):
             | QAbstractItemView.EditTrigger.SelectedClicked
         )
 
+        self.row_double_clicked.connect(self.open_detail)
+
         self.mark_renewed_btn = styled_button("Полис продлен (без привязки)")
         idx = self.button_row.count() - 1
         self.button_row.insertWidget(idx, self.mark_renewed_btn)
