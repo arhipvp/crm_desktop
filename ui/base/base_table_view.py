@@ -454,30 +454,38 @@ class BaseTableView(QWidget):
             logger.warning("Экспорт отменён пользователем")
             return
 
-        # Выбираем только видимые поля модели (по количеству колонок модели).
+        # Выбираем только видимые поля модели.
         try:
-            visible_cols = self.model.columnCount()
+            column_count = self.model.columnCount()
         except Exception:
-            visible_cols = len(getattr(self.model, "fields", []))
+            column_count = len(getattr(self.model, "fields", []))
+
         model_fields = getattr(self.model, "fields", [])
         column_map = getattr(self, "COLUMN_FIELD_MAP", {})
-        if len(model_fields) >= visible_cols:
-            fields = [model_fields[i] for i in range(visible_cols)]
-        else:
-            fields = [column_map.get(i) for i in range(visible_cols)]
+        visible_indices = [
+            i for i in range(column_count) if not self.table.isColumnHidden(i)
+        ]
+
+        fields = []
+        for i in visible_indices:
+            if len(model_fields) > i:
+                fields.append(model_fields[i])
+            else:
+                fields.append(column_map.get(i))
         fields = [f for f in fields if f is not None]
-        if len(fields) < visible_cols:
+        if len(fields) < len(visible_indices):
             logger.warning(
-                "Найдено полей: %d < %d колонок", len(fields), visible_cols
+                "Найдено полей: %d < %d колонок", len(fields), len(visible_indices)
             )
-        logger.debug("Заголовки CSV: %s", [getattr(f, "name", str(f)) for f in fields])
-        logger.debug("Количество объектов к экспорту: %d", len(objs))
-        logger.debug("Сохраняем CSV в %s", path)
 
         headers = [
             self.model.headerData(i, Qt.Horizontal, Qt.DisplayRole)
-            for i in range(visible_cols)
+            for i in visible_indices
         ]
+
+        logger.debug("Заголовки CSV: %s", [getattr(f, "name", str(f)) for f in fields])
+        logger.debug("Количество объектов к экспорту: %d", len(objs))
+        logger.debug("Сохраняем CSV в %s", path)
 
         export_objects_to_csv(path, objs, fields, headers=headers)
         logger.info("Экспортировано %d строк в %s", len(objs), path)
