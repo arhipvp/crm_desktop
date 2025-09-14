@@ -8,8 +8,9 @@ from services.policies import (
     mark_policies_deleted,
     attach_premium,
 )
-from PySide6.QtWidgets import QAbstractItemView
+from PySide6.QtWidgets import QAbstractItemView, QMenu
 from PySide6.QtCore import Qt, QDate, QTimer
+from services.folder_utils import copy_text_to_clipboard
 from ui.base.base_table_view import BaseTableView
 from ui.base.base_table_model import BaseTableModel
 from ui.base.table_controller import TableController
@@ -306,6 +307,30 @@ class PolicyTableView(BaseTableView):
         dlg = AiPolicyTextDialog(parent=self)
         if dlg.exec():
             self.refresh()
+
+    def _on_table_menu(self, pos):
+        index = self.table.indexAt(pos)
+        if not index.isValid():
+            return
+        self.table.selectRow(index.row())
+        menu = QMenu(self)
+        act_open = menu.addAction("Открыть/редактировать")
+        act_policy = menu.addAction("Открыть полис")
+        act_delete = menu.addAction("Удалить")
+        act_folder = menu.addAction("Открыть папку")
+        text = str(index.data() or "")
+        act_copy = menu.addAction("Копировать значение")
+        act_deal = menu.addAction("Открыть сделку")
+        act_open.triggered.connect(self._on_edit)
+        act_policy.triggered.connect(self.open_detail)
+        act_delete.triggered.connect(self._on_delete)
+        act_folder.triggered.connect(self.open_selected_folder)
+        act_copy.triggered.connect(
+            lambda: copy_text_to_clipboard(text, parent=self)
+        )
+        act_deal.triggered.connect(self.open_selected_deal)
+        act_deal.setEnabled(bool(self.get_selected_deal()))
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def open_detail(self, _=None):
         policy = self.get_selected()
