@@ -1,6 +1,7 @@
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
+from decimal import Decimal
 
 from database.models import Client, Deal, Expense, Payment, Policy
 from services import expense_service
@@ -27,6 +28,9 @@ class ExpenseTableModel(BaseTableModel):
             'Сумма платежа',
             'Дата платежа',
             'Доход по платежу',
+            'Прочие расходы',
+            'Чистый доход',
+            'Выплата контрагенту',
             'Сумма расхода',
             'Дата выплаты',
         ]
@@ -92,8 +96,18 @@ class ExpenseTableModel(BaseTableModel):
             total = getattr(obj, "income_total", 0) or 0
             return f"{total:,.2f} ₽"
         elif col == 9:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+            other_total = getattr(obj, "other_expense_total", 0) or 0
+            return f"{other_total:,.2f} ₽"
         elif col == 10:
+            net_income = getattr(obj, "net_income", 0) or 0
+            return f"{net_income:,.2f} ₽"
+        elif col == 11:
+            net_income = getattr(obj, "net_income", 0) or 0
+            contractor_payment = net_income * Decimal("0.2")
+            return f"{contractor_payment:,.2f} ₽"
+        elif col == 12:
+            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+        elif col == 13:
             return (
                 obj.expense_date.strftime("%d.%m.%Y")
                 if obj.expense_date
@@ -112,8 +126,11 @@ class ExpenseTableView(BaseTableView):
         6: Payment.amount,
         7: Payment.payment_date,
         8: expense_service.INCOME_TOTAL,
-        9: Expense.amount,
-        10: Expense.expense_date,
+        9: expense_service.OTHER_EXPENSE_TOTAL,
+        10: expense_service.NET_INCOME,
+        11: expense_service.NET_INCOME,
+        12: Expense.amount,
+        13: Expense.expense_date,
     }
 
     def __init__(self, parent=None, deal_id=None):
@@ -134,7 +151,7 @@ class ExpenseTableView(BaseTableView):
         self.form_class = ExpenseForm  # соответствующая форма
         self.virtual_fields = ["policy_num", "deal_desc", "client_name", "contractor"]
 
-        self.default_sort_column = 10
+        self.default_sort_column = 13
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
