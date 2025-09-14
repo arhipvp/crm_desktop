@@ -1,3 +1,4 @@
+import logging
 from types import SimpleNamespace
 
 from PySide6.QtCore import QItemSelectionModel, QAbstractTableModel, Qt
@@ -150,6 +151,37 @@ def test_export_button_calls_export_csv(in_memory_db, qapp, tmp_path, monkeypatc
     export_btn.click()
 
     assert called["called"]
+
+
+def test_export_csv_logs(in_memory_db, qapp, tmp_path, monkeypatch):
+    client = Client.create(name="Alice")
+    view = BaseTableView(model_class=Client)
+    view.set_model_class_and_items(Client, [client], total_count=1)
+    view.table.selectRow(0)
+    qapp.processEvents()
+
+    path = tmp_path / "out.csv"
+
+    info_msgs: list[str] = []
+    debug_msgs: list[str] = []
+
+    def fake_info(self, msg, *args, **kwargs):
+        info_msgs.append(msg % args if args else msg)
+
+    def fake_debug(self, msg, *args, **kwargs):
+        debug_msgs.append(msg % args if args else msg)
+
+    monkeypatch.setattr(logging.Logger, "info", fake_info)
+    monkeypatch.setattr(logging.Logger, "debug", fake_debug)
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+
+    view.export_csv(str(path))
+
+    assert any("Запрошен экспорт" in m for m in info_msgs)
+    assert any("Экспортировано" in m for m in info_msgs)
+    assert any("Сохраняем CSV" in m for m in debug_msgs)
+    assert any("Заголовки CSV" in m for m in debug_msgs)
+    assert any("Количество объектов" in m for m in debug_msgs)
 
 
 def test_export_csv_with_dict_model(qapp, tmp_path, monkeypatch):
