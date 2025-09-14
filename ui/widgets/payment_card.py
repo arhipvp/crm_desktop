@@ -18,8 +18,9 @@ class PaymentCard(QWidget):
         layout = QHBoxLayout(self)
 
         policy = payment.policy
+        policy_id = policy.id if policy else "—"
         policy_number = policy.policy_number if policy else "—"
-        layout.addWidget(QLabel(f"Полис: {policy_number}"))
+        layout.addWidget(QLabel(f"Полис id={policy_id} №{policy_number}"))
 
         layout.addWidget(QLabel(f"Сумма: {payment.amount:.2f} ₽"))
         layout.addWidget(QLabel(f"Плановая: {format_date(payment.payment_date)}"))

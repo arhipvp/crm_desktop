@@ -45,7 +45,10 @@ class PaymentForm(BaseEditForm):
 
         if self._forced_policy is not None:
             policy_id = getattr(self._forced_policy, "id", self._forced_policy)
-            self.setWindowTitle(f"Добавить платёж (полис #{policy_id})")
+            policy_number = getattr(self._forced_policy, "policy_number", "?")
+            self.setWindowTitle(
+                f"Добавить платёж (полис id={policy_id} №{policy_number})"
+            )
             idx = self.policy_combo.findData(policy_id)
             if idx >= 0:
                 self.policy_combo.setCurrentIndex(idx)
