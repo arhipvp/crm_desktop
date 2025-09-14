@@ -443,9 +443,6 @@ class BaseTableView(QWidget):
         if not self.model:
             return []
         sel = self.table.selectionModel().selectedRows()
-        if not sel:
-            index = self.table.currentIndex()
-            sel = [index] if index.isValid() else []
         return [
             self.model.get_item(self._source_row(i))
             for i in sel
@@ -479,6 +476,7 @@ class BaseTableView(QWidget):
     def export_csv(self, path: str | None = None):
         objs = self.get_selected_objects()
         if not objs:
+            QMessageBox.warning(self, "Экспорт", "Нет выбранных строк")
             return
         if path is None:
             path, _ = QFileDialog.getSaveFileName(

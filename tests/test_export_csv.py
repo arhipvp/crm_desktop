@@ -48,6 +48,7 @@ def test_export_button_triggers_csv(in_memory_db, qapp, tmp_path, monkeypatch):
 
     def spy(self, path: str | None = None):
         called["count"] += 1
+        # на всякий случай приводим странные значения к None
         if isinstance(path, bool):
             path = None
         return original(self, path)
@@ -71,14 +72,14 @@ def test_export_button_triggers_csv(in_memory_db, qapp, tmp_path, monkeypatch):
         exported["path"] = path
         exported["objs"] = objs
 
-    monkeypatch.setattr(
-        "ui.base.base_table_view.export_objects_to_csv", fake_export
-    )
+    # подменяем сам экспорт в CSV
+    monkeypatch.setattr("ui.base.base_table_view.export_objects_to_csv", fake_export)
 
     path = tmp_path / "out.csv"
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(path), "csv"))
     monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
 
+    # находим кнопку «Экспорт» в FilterControls
     export_btn = next(
         btn
         for btn in view.filter_controls.findChildren(QPushButton)
@@ -92,3 +93,24 @@ def test_export_button_triggers_csv(in_memory_db, qapp, tmp_path, monkeypatch):
     assert "Alice" in exported_names
     assert "Charlie" in exported_names
     assert "Bob" not in exported_names
+
+
+def test_export_csv_no_selection_warns(in_memory_db, qapp, tmp_path, monkeypatch):
+    # Наполнить таблицу, но ничего не выбирать
+    Client.create(name="Alice")
+    Client.create(name="Bob")
+
+    view = BaseTableView(model_class=Client)
+    view.set_model_class_and_items(Client, list(Client.select()), total_count=2)
+
+    path = tmp_path / "out.csv"
+    warned = {}
+
+    def fake_warning(*args, **kwargs):
+        warned["called"] = True
+
+    monkeypatch.setattr(QMessageBox, "warning", fake_warning)
+    view.export_csv(str(path))
+
+    assert warned.get("called")
+    assert not path.exists()
