@@ -116,8 +116,10 @@ class ExpenseTableModel(BaseTableModel):
                 else "0 ₽"
             )
         elif col == 11:
-            net_income = getattr(obj, "net_income", 0) or 0
-            contractor_payment = net_income * Decimal("0.2")
+            contractor_payment = getattr(obj, "contractor_payment", None)
+            if contractor_payment is None:
+                net_income = getattr(obj, "net_income", 0) or 0
+                contractor_payment = net_income * Decimal("0.2")
             return (
                 self.format_money(contractor_payment)
                 if contractor_payment
