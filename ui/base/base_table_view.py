@@ -473,14 +473,21 @@ class BaseTableView(QWidget):
 
         DealDetailView(deal, parent=self).exec()
 
-    def export_csv(self, path: str | None = None):
+    def export_csv(self, path: str | None = None, *_):
+        if isinstance(path, bool):
+            path = None
         objs = self.get_selected_objects()
         if not objs:
             QMessageBox.warning(self, "Экспорт", "Нет выбранных строк")
             return
         if path is None:
+            options = QFileDialog.Options()
             path, _ = QFileDialog.getSaveFileName(
-                self, "Сохранить как CSV", "", "CSV Files (*.csv)"
+                self,
+                "Сохранить как CSV",
+                "",
+                "CSV Files (*.csv);;All Files (*)",
+                options=options,
             )
         if not path:
             return

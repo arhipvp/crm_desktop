@@ -114,3 +114,37 @@ def test_export_csv_no_selection_warns(in_memory_db, qapp, tmp_path, monkeypatch
 
     assert warned.get("called")
     assert not path.exists()
+
+
+def test_export_button_calls_export_csv(in_memory_db, qapp, tmp_path, monkeypatch):
+    client = Client.create(name="Alice")
+
+    original = BaseTableView.export_csv
+    called = {"called": False}
+
+    def spy(self, path: str | None = None, *_):
+        called["called"] = True
+        return original(self, path)
+
+    monkeypatch.setattr(BaseTableView, "export_csv", spy)
+
+    path = tmp_path / "out.csv"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(path), "csv"))
+    monkeypatch.setattr(
+        "ui.base.base_table_view.export_objects_to_csv", lambda *a, **k: None
+    )
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+
+    view = BaseTableView(model_class=Client)
+    view.set_model_class_and_items(Client, [client], total_count=1)
+    view.table.selectRow(0)
+    qapp.processEvents()
+
+    export_btn = next(
+        btn
+        for btn in view.filter_controls.findChildren(QPushButton)
+        if "Экспорт" in btn.text()
+    )
+    export_btn.click()
+
+    assert called["called"]
