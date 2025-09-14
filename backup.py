@@ -62,7 +62,7 @@ try:
             stdout=f,
             check=True,
         )
-    logger.info(f"✅ SQL-дамп сохранён: {SQL_PATH}")
+    logger.info("✅ SQL-дамп сохранён: %s", SQL_PATH)
 except Exception:
     logger.exception("⚠️ Не удалось создать SQL-дамп")
 
@@ -89,7 +89,7 @@ with pd.ExcelWriter(XLSX_PATH, engine="openpyxl") as writer:
     for name, df in sheets.items():
         df.to_excel(writer, index=False, sheet_name=name)
 
-logger.info(f"✅ Excel-файл сохранён: {XLSX_PATH}")
+logger.info("✅ Excel-файл сохранён: %s", XLSX_PATH)
 
 # ───────────── Google Drive ─────────────
 logger.info("☁️ Загрузка в Google Drive…")
