@@ -165,15 +165,16 @@ def add_payment(**kwargs):
     from services.income_service import add_income
     from services.expense_service import add_expense
 
+    policy_id = kwargs.get("policy_id")
     policy = kwargs.get("policy") or Policy.get_or_none(
-        Policy.id == kwargs.get("policy_id")
+        Policy.id == policy_id
     )
     if not policy:
-        logger.warning(
-            "❌ Не удалось добавить платёж: не найден полис id=%s №%s",
-            kwargs.get("policy_id"),
-            kwargs.get("policy_number"),
+        num = kwargs.get("policy_number")
+        msg = "❌ Не удалось добавить платёж: не найден полис id=%s" + (
+            f" №{num}" if num else ""
         )
+        logger.warning(msg, policy_id)
         raise ValueError("Полис не найден")
 
     amount = kwargs.get("amount")
