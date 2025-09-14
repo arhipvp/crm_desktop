@@ -1,8 +1,6 @@
 import logging
-from datetime import date
 from peewee import prefetch
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QHeaderView, QAbstractItemView
 
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
@@ -11,7 +9,6 @@ from services.income_service import (
     mark_income_deleted,
     mark_incomes_deleted,
     get_incomes_page,
-    get_income_highlight_color,
 )
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
@@ -67,17 +64,6 @@ class IncomeTableModel(BaseTableModel):
         payment = getattr(obj, "payment", None)
         policy = getattr(payment, "policy", None) if payment else None
         deal = getattr(policy, "deal", None) if policy else None
-
-        if role == Qt.BackgroundRole:
-            payment_date = getattr(payment, "payment_date", None)
-            if (
-                obj.received_date is None
-                and payment_date
-                and payment_date < date.today()
-            ):
-                return QBrush(QColor("#ffcccc"))
-            color = get_income_highlight_color(obj)
-            return QBrush(QColor(color)) if color else None
 
         if role != Qt.DisplayRole:
             return None
