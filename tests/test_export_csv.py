@@ -229,3 +229,51 @@ def test_export_csv_with_dict_model(qapp, tmp_path, monkeypatch):
     assert "Alice" in text
     assert "30" in text
     assert "x" not in text
+
+
+def test_export_csv_with_column_map(qapp, tmp_path, monkeypatch):
+    data = [SimpleNamespace(name="Alice", age=30)]
+
+    class EmptyModel(QAbstractTableModel):
+        def __init__(self, objects):
+            super().__init__()
+            self.objects = objects
+            self.fields = []
+
+        def rowCount(self, parent=None):
+            return len(self.objects)
+
+        def columnCount(self, parent=None):
+            return 2
+
+        def data(self, index, role=Qt.DisplayRole):
+            if role != Qt.DisplayRole:
+                return None
+            obj = self.objects[index.row()]
+            return obj.name if index.column() == 0 else obj.age
+
+        def get_item(self, row):
+            return self.objects[row]
+
+    class MappedView(BaseTableView):
+        COLUMN_FIELD_MAP = {
+            0: SimpleNamespace(name="name"),
+            1: SimpleNamespace(name="age"),
+        }
+
+    view = MappedView(model_class=None)
+    view.controller = None
+    model = EmptyModel(data)
+    view.model = model
+    view.proxy_model.setSourceModel(model)
+    view.table.setModel(view.proxy_model)
+    view.table.selectRow(0)
+    qapp.processEvents()
+
+    path = tmp_path / "mapped.csv"
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    view.export_csv(str(path))
+
+    text = path.read_text(encoding="utf-8")
+    assert "Alice" in text
+    assert "30" in text
