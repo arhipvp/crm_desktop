@@ -16,7 +16,7 @@ class ExpenseForm(BaseEditForm):
         super().__init__(
             instance=expense, model_class=Expense, entity_name="расход", parent=parent
         )
-        if expense is None or getattr(expense, "expense_date", None) is None:
+        if getattr(self.instance, "expense_date", None) is None:
             self.fields["expense_date"].setDate(QDate.currentDate())
 
     def save_data(self):
