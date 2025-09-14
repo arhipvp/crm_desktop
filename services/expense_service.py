@@ -37,7 +37,6 @@ INCOME_TOTAL = income_total_expr.alias("income_total")
 OTHER_EXPENSE_TOTAL = (expense_total_expr - Expense.amount).alias("other_expense_total")
 net_income_expr = income_total_expr - expense_total_expr
 NET_INCOME = net_income_expr.alias("net_income")
-CONTRACTOR_PAYMENT = (net_income_expr * Decimal("0.2")).alias("contractor_payment")
 
 # ─────────────────────────── CRUD ────────────────────────────
 
@@ -256,7 +255,6 @@ def apply_expense_filters(
         income_total_filter = col_filters.pop(Income.amount)
     other_expense_total_filter = col_filters.pop(OTHER_EXPENSE_TOTAL, None)
     net_income_filter = col_filters.pop(NET_INCOME, None)
-    contractor_payment_filter = col_filters.pop(CONTRACTOR_PAYMENT, None)
 
     query = apply_search_and_filters(
         query, Expense, search_text or "", col_filters, extra_fields
@@ -279,10 +277,6 @@ def apply_expense_filters(
         )
     if net_income_filter:
         query = query.having(NET_INCOME.cast("TEXT").contains(net_income_filter))
-    if contractor_payment_filter:
-        query = query.having(
-            CONTRACTOR_PAYMENT.cast("TEXT").contains(contractor_payment_filter)
-        )
 
     return query
 
@@ -309,7 +303,6 @@ def build_expense_query(
             INCOME_TOTAL,
             OTHER_EXPENSE_TOTAL,
             NET_INCOME,
-            CONTRACTOR_PAYMENT,
         )
         .join(Payment)
         .join(Policy)

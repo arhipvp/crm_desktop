@@ -170,9 +170,3 @@ class TestExpense:
         )
         assert {r.policy.policy_number for r in rows} == {policy2.policy_number}
 
-        rows = list(
-            build_expense_query(
-                column_filters={expense_service.CONTRACTOR_PAYMENT: "22"}
-            )
-        )
-        assert {r.policy.policy_number for r in rows} == {policy2.policy_number}
