@@ -83,17 +83,16 @@ except ValueError:
     ADMIN_CHAT_ID = None
 
 APPROVED_EXECUTOR_IDS: set[int] = set()
+logger = logging.getLogger(__name__)
 for part in re.split(r"[ ,]+", os.getenv("APPROVED_EXECUTOR_IDS", "").strip()):
     if not part:
         continue
     try:
         APPROVED_EXECUTOR_IDS.add(int(part))
     except ValueError:
-        logging.getLogger(__name__).warning(
+        logger.warning(
             "Некорректный id исполнителя: %s", part
         )
-
-logger = logging.getLogger(__name__)
 
 # Допустимые параметры загружаемых файлов
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
