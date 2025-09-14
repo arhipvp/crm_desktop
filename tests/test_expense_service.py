@@ -25,7 +25,7 @@ def test_other_expense_total_excludes_current(in_memory_db, make_policy_with_pay
 
 
 def test_income_and_expense_sums(in_memory_db, make_policy_with_payment):
-    """Суммы доходов и расходов агрегируются корректно."""
+    """Суммы доходов/расходов и ``net_income`` без двойного счёта."""
 
     _, _, policy, payment = make_policy_with_payment()
     inc1 = Income.create(payment=payment, amount=100)
@@ -38,7 +38,6 @@ def test_income_and_expense_sums(in_memory_db, make_policy_with_payment):
     )
 
     total_income = inc1.amount + inc2.amount
-    total_expense = exp1.amount + exp2.amount
 
     rows = list(build_expense_query())
     row1 = next(r for r in rows if r.id == exp1.id)
@@ -48,7 +47,6 @@ def test_income_and_expense_sums(in_memory_db, make_policy_with_payment):
     assert row2.income_total == total_income
     assert row1.other_expense_total == exp2.amount
     assert row2.other_expense_total == exp1.amount
-    expected_net = total_income - total_expense
-    assert row1.net_income == expected_net
-    assert row2.net_income == expected_net
+    assert row1.net_income == total_income - exp2.amount
+    assert row2.net_income == total_income - exp1.amount
 

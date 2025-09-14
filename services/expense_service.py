@@ -13,31 +13,19 @@ from services.query_utils import apply_search_and_filters
 
 logger = logging.getLogger(__name__)
 
-income_subquery = (
-    Income.select(
-        Income.payment_id.alias("payment_id"),
-        fn.COALESCE(fn.SUM(Income.amount), 0).alias("income_total"),
-    )
-    .group_by(Income.payment_id)
-    .alias("income_subquery")
+income_subq = Income.select(fn.SUM(Income.amount)).where(Income.payment == Payment.id)
+
+other_expense = Expense.alias("other_expense")
+other_expense_subq = (
+    other_expense.select(fn.SUM(other_expense.amount))
+    .where((other_expense.payment == Payment.id) & (other_expense.id != Expense.id))
 )
 
-expense_subquery = (
-    Expense.select(
-        Expense.payment_id.alias("payment_id"),
-        fn.COALESCE(fn.SUM(Expense.amount), 0).alias("expense_total"),
-    )
-    .group_by(Expense.payment_id)
-    .alias("expense_subquery")
-)
-
-income_total_expr = fn.COALESCE(income_subquery.c.income_total, 0)
-expense_total_expr = fn.COALESCE(expense_subquery.c.expense_total, 0)
+income_total_expr = fn.COALESCE(income_subq, 0)
+other_expense_total_expr = fn.COALESCE(other_expense_subq, 0)
 INCOME_TOTAL = income_total_expr.alias("income_total")
-OTHER_EXPENSE_TOTAL = (expense_total_expr - Expense.amount).alias(
-    "other_expense_total"
-)
-NET_INCOME = (income_total_expr - expense_total_expr).alias("net_income")
+OTHER_EXPENSE_TOTAL = other_expense_total_expr.alias("other_expense_total")
+NET_INCOME = (income_total_expr - other_expense_total_expr).alias("net_income")
 
 # ─────────────────────────── CRUD ────────────────────────────
 
@@ -313,18 +301,6 @@ def build_expense_query(
         .join(Client)
         .switch(Policy)
         .join(Deal, JOIN.LEFT_OUTER)
-        .switch(Payment)
-        .join(
-            income_subquery,
-            JOIN.LEFT_OUTER,
-            on=(income_subquery.c.payment_id == Payment.id),
-        )
-        .switch(Payment)
-        .join(
-            expense_subquery,
-            JOIN.LEFT_OUTER,
-            on=(expense_subquery.c.payment_id == Payment.id),
-        )
         .group_by(Expense.id)
     )
     query = apply_expense_filters(
