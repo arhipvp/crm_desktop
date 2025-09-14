@@ -456,7 +456,7 @@ async def h_admin_action(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         await q.message.edit_text("Исполнитель подтверждён")
         if chat_id:
             await _ctx.bot.send_message(chat_id, "Вы одобрены. Можно брать задачи")
-        logger.info("Исполнитель %s одобрен", tid)
+        logger.info("Исполнитель id=%s одобрен", tid)
     elif action == "deny_exec":
         info = pending_users.pop(tid, None)
         chat_id = info[0] if isinstance(info, tuple) else info
