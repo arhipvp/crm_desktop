@@ -325,7 +325,7 @@ def build_expense_query(
             JOIN.LEFT_OUTER,
             on=(expense_subquery.c.payment_id == Payment.id),
         )
-        .group_by(Expense.id)
+        .group_by(Expense.id, Payment.id, Policy.id, Client.id, Deal.id)
     )
     query = apply_expense_filters(
         query,
