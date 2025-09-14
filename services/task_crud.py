@@ -115,11 +115,31 @@ def update_task(task: Task, **fields) -> Task:
         else "Задача выполнена."
     )
 
+    log_updates: dict[str, dict[str, object]] = {}
+
     with db.atomic():
         for key, value in clean_fields.items():
+            old_value = getattr(task, key)
+            if old_value != value:
+                log_updates[key] = {"old": old_value, "new": value}
             setattr(task, key, value)
 
         if is_marking_done:
+            if task.dispatch_state != IDLE:
+                log_updates["dispatch_state"] = {
+                    "old": task.dispatch_state,
+                    "new": IDLE,
+                }
+            if task.tg_chat_id is not None:
+                log_updates["tg_chat_id"] = {
+                    "old": task.tg_chat_id,
+                    "new": None,
+                }
+            if task.tg_message_id is not None:
+                log_updates["tg_message_id"] = {
+                    "old": task.tg_message_id,
+                    "new": None,
+                }
             task.dispatch_state = IDLE
             task.tg_chat_id = None
             task.tg_message_id = None
@@ -147,7 +167,7 @@ def update_task(task: Task, **fields) -> Task:
                     policy.note = entry + existing
                     policy.save()
 
-    logger.info("✏️ Обновлена задача id=%s", task.id)
+    logger.info("✏️ Обновлена задача id=%s: %s", task.id, log_updates)
     return task
 
 
