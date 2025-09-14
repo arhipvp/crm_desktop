@@ -17,7 +17,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     ValidationError = Exception
 
     def validate(instance, schema):  # type: ignore[unused-argument]
-        """Fallback validate if jsonschema is missing."""
+        """Резервная проверка, если jsonschema не установлен."""
         logger.warning(
             "Пакет 'jsonschema' не установлен, проверка схемы пропущена"
         )
@@ -115,20 +115,20 @@ payments
 
 
 def _get_prompt() -> str:
-    """Return system prompt for policy recognition."""
+    """Вернуть системный промпт для распознавания полисов."""
     return settings.ai_policy_prompt or DEFAULT_PROMPT
 
 
 def _log_conversation(path: str, messages: List[dict]) -> str:
-    """Log conversation with OpenAI for debugging and return transcript."""
+    """Сохранить диалог с OpenAI для отладки и вернуть транскрипт."""
     transcript = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
     logger.info("Диалог с OpenAI для %s:\n%s", path, transcript)
     return transcript
 
-# Number of attempts to get a valid JSON response from the model
+# Количество попыток получить корректный JSON от модели
 MAX_ATTEMPTS = 3
 
-# Additional instruction sent to the model when JSON parsing fails
+# Дополнительная инструкция, отправляемая модели при ошибке разбора JSON
 REMINDER = (
     "Ответ должен содержать только один валидный JSON без каких-либо пояснений."
 )
@@ -194,7 +194,7 @@ POLICY_FUNCTION = {
 
 
 def _read_text(path: str) -> str:
-    """Extract text from a PDF or text file."""
+    """Извлечь текст из PDF или текстового файла."""
     if path.lower().endswith(".pdf"):
         try:
             reader = PdfReader(path)
@@ -212,7 +212,7 @@ def _read_text(path: str) -> str:
 
 
 class AiPolicyError(ValueError):
-    """Raised when the model fails to produce valid JSON."""
+    """Вызывается, когда модель не смогла сформировать корректный JSON."""
 
     def __init__(self, message: str, messages: List[dict], transcript: str):
         super().__init__(message)
@@ -223,7 +223,7 @@ class AiPolicyError(ValueError):
 def _chat(messages: List[dict], progress_cb: Callable[[str, str], None] | None = None) -> str:
     api_key = settings.openai_api_key
     if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set")
+        raise ValueError("OPENAI_API_KEY не задан")
     base_url = settings.openai_base_url
     model = settings.openai_model
     client = openai.OpenAI(api_key=api_key, base_url=base_url)
@@ -271,9 +271,9 @@ def recognize_policy_interactive(
     messages: List[dict] | None = None,
     progress_cb: Callable[[str, str], None] | None = None,
 ) -> Tuple[dict, str, List[dict]]:
-    """Recognize policy and return JSON, transcript and messages.
+    """Распознать полис и вернуть JSON, транскрипт и сообщения.
 
-    If ``messages`` передан, диалог продолжается с них.
+    Если передан параметр ``messages``, диалог продолжается с них.
     """
     if messages is None:
         messages = [
@@ -294,7 +294,7 @@ def recognize_policy_interactive(
             if attempt == MAX_ATTEMPTS - 1:
                 transcript = _log_conversation("text", messages)
                 raise AiPolicyError(
-                    f"Failed to parse JSON: {exc}", messages, transcript
+                    f"Не удалось разобрать JSON: {exc}", messages, transcript
                 ) from exc
             if progress_cb:
                 progress_cb("user", REMINDER)
@@ -305,7 +305,7 @@ def recognize_policy_interactive(
             if attempt == MAX_ATTEMPTS - 1:
                 transcript = _log_conversation("text", messages)
                 raise AiPolicyError(
-                    f"Schema validation error: {exc.message}", messages, transcript
+                    f"Ошибка валидации схемы: {exc.message}", messages, transcript
                 ) from exc
             if progress_cb:
                 progress_cb("user", REMINDER)
@@ -316,7 +316,7 @@ def recognize_policy_interactive(
 
 
 def process_policy_files_with_ai(paths: List[str]) -> Tuple[List[dict], List[str]]:
-    """Send policy files to OpenAI and return parsed JSON data and transcripts."""
+    """Отправить файлы полисов в OpenAI и вернуть распарсенные данные JSON и транскрипты."""
     if not paths:
         return [], []
 
@@ -328,7 +328,7 @@ def process_policy_files_with_ai(paths: List[str]) -> Tuple[List[dict], List[str
             data, transcript, _ = recognize_policy_interactive(text)
         except AiPolicyError as exc:
             raise ValueError(
-                f"Failed to parse JSON for {path}: {exc}\nConversation:\n{exc.transcript}"
+                f"Не удалось разобрать JSON для {path}: {exc}\nДиалог:\n{exc.transcript}"
             ) from exc
         results.append(data)
         conversations.append(transcript)
@@ -336,9 +336,9 @@ def process_policy_files_with_ai(paths: List[str]) -> Tuple[List[dict], List[str
 
 
 def process_policy_bundle_with_ai(paths: List[str]) -> Tuple[dict, str]:
-    """Send multiple files as a single policy to OpenAI.
+    """Отправить несколько файлов как один полис в OpenAI.
 
-    The contents of all files are concatenated and processed as one policy.
+    Содержимое всех файлов объединяется и обрабатывается как один полис.
     """
     if not paths:
         return {}, ""
@@ -348,13 +348,15 @@ def process_policy_bundle_with_ai(paths: List[str]) -> Tuple[dict, str]:
 
 
 def process_policy_text_with_ai(text: str) -> Tuple[dict, str]:
-    """Send raw text of a policy to OpenAI and return parsed JSON data and transcript."""
+    """Отправить текст полиса в OpenAI и вернуть распарсенные данные JSON и транскрипт."""
     if not text:
         return {}, ""
 
     try:
         data, transcript, _ = recognize_policy_interactive(text)
     except AiPolicyError as exc:
-        raise ValueError(f"Failed to parse JSON: {exc}\nConversation:\n{exc.transcript}") from exc
+        raise ValueError(
+            f"Не удалось разобрать JSON: {exc}\nДиалог:\n{exc.transcript}"
+        ) from exc
     return data, transcript
 
