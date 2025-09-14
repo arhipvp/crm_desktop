@@ -345,3 +345,58 @@ def test_export_csv_with_column_map(qapp, tmp_path, monkeypatch):
     text = path.read_text(encoding="utf-8")
     assert "Alice" in text
     assert "30" in text
+
+
+def test_export_csv_skips_hidden_columns(qapp, tmp_path, monkeypatch):
+    data = [SimpleNamespace(name="Alice", age=30)]
+
+    class Model(QAbstractTableModel):
+        def __init__(self, objects):
+            super().__init__()
+            self.objects = objects
+            self.fields = [
+                SimpleNamespace(name="name"),
+                SimpleNamespace(name="age"),
+            ]
+
+        def rowCount(self, parent=None):
+            return len(self.objects)
+
+        def columnCount(self, parent=None):
+            return 2
+
+        def data(self, index, role=Qt.DisplayRole):
+            if role != Qt.DisplayRole:
+                return None
+            field = self.fields[index.column()]
+            return getattr(self.objects[index.row()], field.name)
+
+        def headerData(self, section, orientation, role=Qt.DisplayRole):
+            if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+                return ["Имя", "Возраст"][section]
+            return None
+
+        def get_item(self, row):
+            return self.objects[row]
+
+    view = BaseTableView(model_class=None)
+    view.controller = None
+    model = Model(data)
+    view.model = model
+    view.proxy_model.setSourceModel(model)
+    view.table.setModel(view.proxy_model)
+    view.table.selectRow(0)
+    view.table.setColumnHidden(1, True)
+    qapp.processEvents()
+
+    path = tmp_path / "hidden.csv"
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    view.export_csv(str(path))
+
+    rows = [
+        line.strip()
+        for line in path.read_text(encoding="utf-8-sig").splitlines()
+        if line.strip()
+    ]
+    assert rows[0] == "Имя"
+    assert rows[1] == "Alice"
