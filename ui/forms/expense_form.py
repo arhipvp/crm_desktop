@@ -1,4 +1,5 @@
 from ui.common.combo_helpers import create_entity_combobox
+from PySide6.QtCore import QDate
 from PySide6.QtWidgets import QLabel
 
 from database.models import Expense
@@ -15,6 +16,8 @@ class ExpenseForm(BaseEditForm):
         super().__init__(
             instance=expense, model_class=Expense, entity_name="расход", parent=parent
         )
+        if expense is None or getattr(expense, "expense_date", None) is None:
+            self.fields["expense_date"].setDate(QDate.currentDate())
 
     def save_data(self):
         data = self.collect_data()
