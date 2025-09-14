@@ -89,7 +89,9 @@ for part in re.split(r"[ ,]+", os.getenv("APPROVED_EXECUTOR_IDS", "").strip()):
     try:
         APPROVED_EXECUTOR_IDS.add(int(part))
     except ValueError:
-        logging.getLogger(__name__).warning("Invalid executor id: %s", part)
+        logging.getLogger(__name__).warning(
+            "Некорректный id исполнителя: %s", part
+        )
 
 logger = logging.getLogger(__name__)
 
