@@ -15,7 +15,7 @@ def _gather_context(limit: int = 5) -> str:
         policies = [p.policy_number for p in Policy.active().limit(limit)]
         tasks = [t.title for t in Task.active().limit(limit)]
     except Exception as exc:
-        logger.error("Failed to build DB context: %s", exc)
+        logger.error("Не удалось собрать контекст БД: %s", exc)
         return ""
 
     parts = [
@@ -57,7 +57,7 @@ def ask_consultant(question: str) -> str:
             temperature=0,
         )
     except Exception as exc:
-        logger.error("OpenAI request failed: %s", exc)
-        raise RuntimeError(f"OpenAI request failed: {exc}") from exc
+        logger.error("Ошибка запроса к OpenAI: %s", exc)
+        raise RuntimeError(f"Ошибка запроса к OpenAI: {exc}") from exc
 
     return resp.choices[0].message.content.strip()

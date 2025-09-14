@@ -83,7 +83,7 @@ def mark_calculation_deleted(entry_id: int) -> None:
     if entry:
         entry.soft_delete()
     else:
-        logger.warning("Calculation entry %s not found", entry_id)
+        logger.warning("Расчёт %s не найден", entry_id)
 
 
 def mark_calculations_deleted(entry_ids: list[int]) -> int:

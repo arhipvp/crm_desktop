@@ -38,7 +38,7 @@ class ClientForm(BaseEditForm):
 
     def save_data(self):
         data = self.collect_data()
-        logger.debug("📤 Client form save_data: %r", data)
+        logger.debug("📤 Сохранение формы клиента: %r", data)
         if self.instance:
             if all(getattr(self.instance, k) == v for k, v in data.items()):
                 return self.instance

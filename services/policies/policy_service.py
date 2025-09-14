@@ -580,9 +580,8 @@ def update_policy(
         for key, value in updates.items():
             setattr(policy, key, value)
         logger.info(
-            "✏️ Обновление полиса id=%s №%s: %s",
+            "✏️ Обновление полиса #%s: %s",
             policy.id,
-            policy.policy_number,
             log_updates,
         )
         policy.save()
