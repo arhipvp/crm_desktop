@@ -93,7 +93,8 @@ class FilterControls(QWidget):
 
         # Кнопка экспорта
         if export_callback:
-            export_btn = QPushButton("📤 Экспорт CSV", clicked=export_callback)
+            export_btn = QPushButton("📤 Экспорт CSV")
+            export_btn.clicked.connect(lambda: export_callback())
             export_btn.setFixedHeight(30)
             layout.addWidget(export_btn)
 
