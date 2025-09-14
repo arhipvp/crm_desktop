@@ -234,11 +234,7 @@ def mark_policy_deleted(policy_id: int):
                 policy.policy_number,
             )
     else:
-        logger.warning(
-            "❗ Полис id=%s №%s не найден для удаления",
-            policy_id,
-            None,
-        )
+        logger.warning("❗ Полис id=%s не найден для удаления", policy_id)
 
 
 def mark_policies_deleted(policy_ids: list[int]) -> int:
