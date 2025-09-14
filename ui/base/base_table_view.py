@@ -474,7 +474,12 @@ class BaseTableView(QWidget):
         logger.debug("Количество объектов к экспорту: %d", len(objs))
         logger.debug("Сохраняем CSV в %s", path)
 
-        export_objects_to_csv(path, objs, fields)
+        headers = [
+            self.model.headerData(i, Qt.Horizontal, Qt.DisplayRole)
+            for i in range(visible_cols)
+        ]
+
+        export_objects_to_csv(path, objs, fields, headers=headers)
         logger.info("Экспортировано %d строк в %s", len(objs), path)
 
         QMessageBox.information(self, "Экспорт", f"Экспортировано: {len(objs)}")

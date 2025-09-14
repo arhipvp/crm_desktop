@@ -73,7 +73,7 @@ def test_export_button_triggers_csv(in_memory_db, qapp, tmp_path, monkeypatch):
 
     exported: dict = {}
 
-    def fake_export(path, objs, fields):
+    def fake_export(path, objs, fields, headers=None):
         exported["path"] = path
         exported["objs"] = objs
 
@@ -231,6 +231,59 @@ def test_export_csv_with_dict_model(qapp, tmp_path, monkeypatch):
     assert "Alice" in text
     assert "30" in text
     assert "x" not in text
+
+
+def test_export_csv_custom_headers(qapp, tmp_path, monkeypatch):
+    data = [SimpleNamespace(name="Alice", age=30)]
+
+    class HeaderModel(QAbstractTableModel):
+        def __init__(self, objects):
+            super().__init__()
+            self.objects = objects
+            self.fields = [
+                SimpleNamespace(name="name"),
+                SimpleNamespace(name="age"),
+            ]
+
+        def rowCount(self, parent=None):
+            return len(self.objects)
+
+        def columnCount(self, parent=None):
+            return 2
+
+        def data(self, index, role=Qt.DisplayRole):
+            if role != Qt.DisplayRole:
+                return None
+            field = self.fields[index.column()]
+            return getattr(self.objects[index.row()], field.name)
+
+        def headerData(self, section, orientation, role=Qt.DisplayRole):
+            if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+                return ["Имя", "Возраст"][section]
+            return None
+
+        def get_item(self, row):
+            return self.objects[row]
+
+    view = BaseTableView(model_class=None)
+    view.controller = None
+    model = HeaderModel(data)
+    view.model = model
+    view.proxy_model.setSourceModel(model)
+    view.table.setModel(view.proxy_model)
+    view.table.selectRow(0)
+    qapp.processEvents()
+
+    path = tmp_path / "custom.csv"
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    view.export_csv(str(path))
+
+    rows = [
+        line.strip()
+        for line in path.read_text(encoding="utf-8-sig").splitlines()
+        if line.strip()
+    ]
+    assert rows[0] == "Имя;Возраст"
 
 
 def test_export_csv_related_fields(in_memory_db, tmp_path):
