@@ -184,7 +184,7 @@ def test_update_policy_logs_simple_values(
     )
 
     record = next(r for r in caplog.records if '✏️ Обновление полиса' in r.msg)
-    log_data = record.args[1]
+    log_data = record.args[2]
     assert log_data['client'] == 'C2'
     assert log_data['deal'] == deal2.id
     assert log_data['start_date'] == '2024-01-01'

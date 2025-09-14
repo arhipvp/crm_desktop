@@ -45,7 +45,9 @@ class PolicyDetailView(QDialog):
     def __init__(self, policy: Policy, parent=None):
         super().__init__(parent)
         self.instance = policy
-        self.setWindowTitle(f"Полис #{policy.id} — {policy.policy_number or ''}")
+        self.setWindowTitle(
+            f"Полис id={policy.id} №{policy.policy_number or ''}"
+        )
         size = get_scaled_size(1000, 700)
         self.resize(size)
         self.setMinimumSize(640, 480)

@@ -94,7 +94,10 @@ class PaymentDetailView(QDialog):
         form = QFormLayout(info)
         form.addRow("ID:", QLabel(str(self.instance.id)))
         pol = self.instance.policy
-        form.addRow("Полис:", QLabel(f"#{pol.id} {pol.policy_number}" if pol else "—"))
+        form.addRow(
+            "Полис:",
+            QLabel(f"id={pol.id} №{pol.policy_number}" if pol else "—"),
+        )
         form.addRow("Сумма:", QLabel(f"{self.instance.amount:.2f} ₽"))
         form.addRow("Плановая дата:", QLabel(format_date(self.instance.payment_date)))
         form.addRow(

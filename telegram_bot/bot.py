@@ -147,8 +147,7 @@ def fmt_task(t: Task) -> str:
 
     p = getattr(t, "policy", None)
     if p:
-        lines.append(f"\n📄 <b>Полис #{p.id}</b>")
-        lines.append(f"№ {p.policy_number}")
+        lines.append(f"\n📄 <b>Полис id={p.id} №{p.policy_number}</b>")
         lines.append(f"Тип: {p.insurance_type}")
         if p.client:
             lines.append(f"👤 Страхователь: {p.client.name}")
