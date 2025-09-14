@@ -520,10 +520,25 @@ def update_policy(
         logger.info("ℹ️ update_policy: нет изменений для полиса #%s", policy.id)
         return policy
 
+    log_updates = {}
+    for key, value in updates.items():
+        if isinstance(value, Client):
+            log_updates[key] = value.name
+        elif isinstance(value, Deal):
+            log_updates[key] = value.id
+        elif isinstance(value, date):
+            log_updates[key] = value.isoformat()
+        elif isinstance(value, Decimal):
+            log_updates[key] = str(value)
+        elif isinstance(value, (str, int, float, bool)) or value is None:
+            log_updates[key] = value
+        else:
+            log_updates[key] = str(value)
+
     with db.atomic():
         for key, value in updates.items():
             setattr(policy, key, value)
-        logger.info("✏️ Обновление полиса #%s: %s", policy.id, updates)
+        logger.info("✏️ Обновление полиса #%s: %s", policy.id, log_updates)
         policy.save()
         logger.info("✅ Полис #%s успешно обновлён", policy.id)
 
