@@ -4,8 +4,9 @@ import logging
 import re
 import urllib.parse
 import webbrowser
+from datetime import date, datetime
 from typing import Any
-from peewee import ModelSelect, fn
+from peewee import Model, ModelSelect, fn
 
 from database.models import Client, Deal, db
 from services.folder_utils import create_client_drive_folder, rename_client_folder
@@ -194,7 +195,18 @@ def update_client(client: Client, **kwargs) -> Client:
     if not updates:
         return client
 
-    logger.info("✏️ Обновление клиента id=%s: %s", client.id, updates)
+
+    log_updates: dict[str, Any] = {}
+    for key, value in updates.items():
+        if isinstance(value, Model):
+            log_updates[key] = str(value)
+        elif isinstance(value, (date, datetime)):
+            log_updates[key] = value.isoformat()
+        else:
+            log_updates[key] = value
+
+    logger.info("✏️ Обновление клиента #%s: %s", client.id, log_updates)
+
 
     old_name = client.name
     new_name = updates.get("name", old_name)
