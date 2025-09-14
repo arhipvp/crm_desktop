@@ -32,7 +32,7 @@ def export_objects_to_csv(path: str, objects: Sequence, fields: Sequence) -> int
     ]
     logger.debug("Заголовки CSV: %s", headers)
     logger.debug("Количество объектов для экспорта: %d", len(objects))
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f, delimiter=";")
         writer.writerow(headers)
         for obj in objects:
