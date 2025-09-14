@@ -78,7 +78,12 @@ def run_import():
                 policy_number = f"{original_number}-{suffix}"
                 suffix += 1
 
-            # Добавляем полис
+            contractor = data.get("Контрагент")
+            if isinstance(contractor, str):
+                contractor = contractor.strip()
+                if contractor in {"", "-", "—"}:
+                    contractor = None
+
             # Добавляем полис через словарь
             policy_data = {
                 "policy_number": policy_number,
@@ -87,7 +92,7 @@ def run_import():
                 "end_date": end_date,
                 "insurance_type": data.get("Тип страхования"),
                 "insurance_company": data.get("Компания"),
-                "contractor": data.get("Контрагент"),
+                "contractor": contractor,
                 "sales_channel": data.get("Канал продаж"),
                 "vehicle_brand": data.get("Марка авто"),
                 "vehicle_model": data.get("Модель авто"),

@@ -3,6 +3,7 @@
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import Any
 
 from peewee import JOIN, Field, fn
 
@@ -316,11 +317,18 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
         "note",
     }
 
-    clean_data = {
-        field: kwargs[field]
-        for field in allowed_fields
-        if field in kwargs and kwargs[field] not in ("", None)
-    }
+    clean_data: dict[str, Any] = {}
+    for field in allowed_fields:
+        if field not in kwargs:
+            continue
+        val = kwargs[field]
+        if isinstance(val, str):
+            val = val.strip()
+            if val in {"", "-", "—"}:
+                continue
+        elif val in ("", None):
+            continue
+        clean_data[field] = val
 
     # Обязателен номер полиса
     if not clean_data.get("policy_number"):
