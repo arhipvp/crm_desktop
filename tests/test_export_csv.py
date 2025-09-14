@@ -34,3 +34,23 @@ def test_export_csv_selected_rows(in_memory_db, qapp, tmp_path, monkeypatch):
     assert any("Alice" in row for row in rows[1:])
     assert any("Charlie" in row for row in rows[1:])
     assert all("Bob" not in row for row in rows[1:])
+
+
+def test_export_csv_no_selection(in_memory_db, qapp, tmp_path, monkeypatch):
+    Client.create(name="Alice")
+    Client.create(name="Bob")
+
+    view = BaseTableView(model_class=Client)
+    view.set_model_class_and_items(Client, list(Client.select()), total_count=2)
+
+    path = tmp_path / "out.csv"
+    called = {}
+
+    def fake_warning(*args, **kwargs):
+        called["called"] = True
+
+    monkeypatch.setattr(QMessageBox, "warning", fake_warning)
+    view.export_csv(str(path))
+
+    assert called.get("called")
+    assert not path.exists()
