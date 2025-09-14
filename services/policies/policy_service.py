@@ -264,11 +264,8 @@ def mark_policy_renewed(policy_id: int):
             policy.policy_number,
         )
     else:
-        logger.warning(
-            "❗ Полис id=%s №%s не найден для продления",
-            policy_id,
-            None,
-        )
+        msg = "❗ Полис id=%s не найден для продления"
+        logger.warning(msg, policy_id)
 
 
 def mark_policies_renewed(policy_ids: list[int]) -> int:
