@@ -84,7 +84,9 @@ class ExpenseTableModel(BaseTableModel):
             return obj.expense_type or "—"
         elif col == 6:
             return (
-                f"{payment.amount:,.2f} ₽" if payment and payment.amount else "0 ₽"
+                self.format_money(payment.amount)
+                if payment and payment.amount
+                else "0 ₽"
             )
         elif col == 7:
             return (
@@ -94,19 +96,39 @@ class ExpenseTableModel(BaseTableModel):
             )
         elif col == 8:
             total = getattr(obj, "income_total", 0) or 0
-            return f"{total:,.2f} ₽"
+            return (
+                self.format_money(total)
+                if total
+                else "0 ₽"
+            )
         elif col == 9:
             other_total = getattr(obj, "other_expense_total", 0) or 0
-            return f"{other_total:,.2f} ₽"
+            return (
+                self.format_money(other_total)
+                if other_total
+                else "0 ₽"
+            )
         elif col == 10:
             net_income = getattr(obj, "net_income", 0) or 0
-            return f"{net_income:,.2f} ₽"
+            return (
+                self.format_money(net_income)
+                if net_income
+                else "0 ₽"
+            )
         elif col == 11:
             net_income = getattr(obj, "net_income", 0) or 0
             contractor_payment = net_income * Decimal("0.2")
-            return f"{contractor_payment:,.2f} ₽"
+            return (
+                self.format_money(contractor_payment)
+                if contractor_payment
+                else "0 ₽"
+            )
         elif col == 12:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+            return (
+                self.format_money(obj.amount)
+                if obj.amount
+                else "0 ₽"
+            )
         elif col == 13:
             return (
                 obj.expense_date.strftime("%d.%m.%Y")
