@@ -53,10 +53,7 @@ class BaseTableModel(QAbstractTableModel):
             value = getattr(obj, field.name)
         except Exception as e:
             logger.warning(
-                "⚠️ Ошибка при доступе к %s у объекта %s: %s",
-                field.name,
-                obj,
-                e,
+                "⚠️ Ошибка при доступе к %s у объекта %s: %s", field.name, obj, e
             )
             value = None
 
