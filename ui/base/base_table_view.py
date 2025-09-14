@@ -479,10 +479,16 @@ class BaseTableView(QWidget):
             for i in range(visible_cols)
         ]
 
-        export_objects_to_csv(path, objs, fields, headers=headers)
-        logger.info("Экспортировано %d строк в %s", len(objs), path)
-
-        QMessageBox.information(self, "Экспорт", f"Экспортировано: {len(objs)}")
+        try:
+            export_objects_to_csv(path, objs, fields, headers=headers)
+        except Exception as e:
+            logger.exception("Ошибка экспорта CSV")
+            QMessageBox.critical(self, "Экспорт", str(e))
+        else:
+            logger.info("Экспортировано %d строк в %s", len(objs), path)
+            QMessageBox.information(
+                self, "Экспорт", f"Экспортировано: {len(objs)}"
+            )
 
     def _on_row_double_clicked(self, index):
         if not index.isValid():

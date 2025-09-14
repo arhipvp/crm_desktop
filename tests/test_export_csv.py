@@ -345,3 +345,46 @@ def test_export_csv_with_column_map(qapp, tmp_path, monkeypatch):
     text = path.read_text(encoding="utf-8")
     assert "Alice" in text
     assert "30" in text
+
+
+def test_export_csv_exception_shows_message(
+    in_memory_db, qapp, tmp_path, monkeypatch
+):
+    client = Client.create(name="Alice")
+    view = BaseTableView(model_class=Client)
+    view.set_model_class_and_items(Client, [client], total_count=1)
+    view.table.selectRow(0)
+    qapp.processEvents()
+
+    path = tmp_path / "err.csv"
+
+    def fail_export(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(
+        "ui.base.base_table_view.export_objects_to_csv", fail_export
+    )
+
+    shown: dict = {}
+
+    def fake_critical(self, title, text):
+        shown["title"] = title
+        shown["text"] = text
+
+    monkeypatch.setattr(QMessageBox, "critical", fake_critical)
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+
+    logged: dict = {}
+
+    def fake_exception(msg, *args, **kwargs):
+        logged["msg"] = msg
+
+    monkeypatch.setattr(
+        "ui.base.base_table_view.logger.exception", fake_exception
+    )
+
+    view.export_csv(str(path))
+
+    assert shown["title"] == "Экспорт"
+    assert shown["text"] == "boom"
+    assert logged["msg"] == "Ошибка экспорта CSV"
