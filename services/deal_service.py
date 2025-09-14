@@ -8,10 +8,10 @@ from __future__ import annotations
 • Типизация и мелкие правки PEP 8.
 """
 import logging
-from datetime import date
+from datetime import date, datetime
 from utils.time_utils import now_str
 
-from peewee import JOIN, ModelSelect  # если ещё не импортирован
+from peewee import JOIN, ModelSelect, Model  # если ещё не импортирован
 
 from database.db import db
 from database.models import (
@@ -277,9 +277,19 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
         # Применяем простые обновления
         for key, value in updates.items():
             setattr(deal, key, value)
-        changed_fields = [f.name for f in deal.dirty_fields]
+
+        dirty_fields = list(deal.dirty_fields)
+        log_updates = {}
+        for f in dirty_fields:
+            value = getattr(deal, f.name)
+            if isinstance(value, (date, datetime)):
+                value = value.isoformat()
+            elif isinstance(value, Model):
+                value = str(value)
+            log_updates[f.name] = value
+
         deal.save()
-        logger.info("✏️ Обновлена сделка id=%s: %s", deal.id, changed_fields)
+        logger.info("✏️ Обновлена сделка id=%s: %s", deal.id, log_updates)
 
         # Переименование папки при изменении описания или клиента
         new_client_name = deal.client.name if deal.client_id else None
