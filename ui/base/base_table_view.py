@@ -459,8 +459,17 @@ class BaseTableView(QWidget):
             visible_cols = self.model.columnCount()
         except Exception:
             visible_cols = len(getattr(self.model, "fields", []))
-
-        fields = [self.model.fields[i] for i in range(visible_cols)]
+        model_fields = getattr(self.model, "fields", [])
+        column_map = getattr(self, "COLUMN_FIELD_MAP", {})
+        if len(model_fields) >= visible_cols:
+            fields = [model_fields[i] for i in range(visible_cols)]
+        else:
+            fields = [column_map.get(i) for i in range(visible_cols)]
+        fields = [f for f in fields if f is not None]
+        if len(fields) < visible_cols:
+            logger.warning(
+                "Найдено полей: %d < %d колонок", len(fields), visible_cols
+            )
         logger.debug("Заголовки CSV: %s", [getattr(f, "name", str(f)) for f in fields])
         logger.debug("Количество объектов к экспорту: %d", len(objs))
         logger.debug("Сохраняем CSV в %s", path)
