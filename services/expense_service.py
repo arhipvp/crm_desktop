@@ -49,6 +49,7 @@ def mark_expense_deleted(expense_id: int):
     expense = Expense.get_or_none(Expense.id == expense_id)
     if expense:
         expense.soft_delete()
+        logger.info("🗑️ Расход #%s помечен удалённым", expense.id)
     else:
         logger.warning("❗ Расход с id=%s не найден для удаления", expense_id)
 
@@ -100,9 +101,11 @@ def add_expense(**kwargs):
 
     try:
         with db.atomic():
-            return Expense.create(
+            expense = Expense.create(
                 payment=payment, policy_id=payment.policy_id, **clean_data
             )
+        logger.info("✅ Расход #%s создан", expense.id)
+        return expense
     except Exception as e:
         logger.error("❌ Ошибка при создании расхода: %s", e)
         raise
