@@ -94,7 +94,7 @@ def add_task(**kwargs):
         raise
 
     logger.info(
-        "📝 Создана задача #%s: '%s' (due %s)", task.id, task.title, task.due_date
+        "📝 Создана задача id=%s: '%s' (due %s)", task.id, task.title, task.due_date
     )
     from services.telegram_service import notify_admin_safe
 
@@ -147,7 +147,7 @@ def update_task(task: Task, **fields) -> Task:
                     policy.note = entry + existing
                     policy.save()
 
-    logger.info("✏️ Обновлена задача #%s", task.id)
+    logger.info("✏️ Обновлена задача id=%s", task.id)
     return task
 
 
@@ -156,7 +156,7 @@ def mark_task_deleted(task: Task | int):
     if task_obj:
         with db.atomic():
             task_obj.soft_delete()
-        logger.info("🗑 Задача #%s помечена как удалённая", task_obj.id)
+        logger.info("🗑 Задача id=%s помечена как удалённая", task_obj.id)
     else:
         logger.warning("❗ Задача %s не найдена для удаления", task)
 

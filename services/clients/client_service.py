@@ -205,7 +205,7 @@ def update_client(client: Client, **kwargs) -> Client:
         else:
             log_updates[key] = value
 
-    logger.info("✏️ Обновление клиента #%s: %s", client.id, log_updates)
+    logger.info("✏️ Обновление клиента id=%s: %s", client.id, log_updates)
 
 
     old_name = client.name

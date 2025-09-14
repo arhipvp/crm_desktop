@@ -23,13 +23,13 @@ def queue_task(task_id: int):
             t.dispatch_state = QUEUED
             t.queued_at = _dt.datetime.utcnow()
             t.save()
-            logger.info("📤 Задача #%s поставлена в очередь", t.id)
+            logger.info("📤 Задача id=%s поставлена в очередь", t.id)
             from services.telegram_service import notify_admin_safe
 
             notify_admin_safe(f"📤 Задача #{t.id} поставлена в очередь")
         elif t:
             logger.info(
-                "⏭ Задача #%s не поставлена в очередь: состояние %s",
+                "⏭ Задача id=%s не поставлена в очередь: состояние %s",
                 t.id,
                 t.dispatch_state,
             )
@@ -97,7 +97,7 @@ def _dispatch_tasks(
             if task.deal:
                 refresh_deal_drive_link(task.deal)
             logger.info(
-                "📬 Задача #%s выдана в Telegram%s: chat_id=%s",
+                "📬 Задача id=%s выдана в Telegram%s: chat_id=%s",
                 task.id,
                 log_suffix,
                 chat_id,
@@ -177,7 +177,7 @@ def return_to_queue(task_id: int):
             t.tg_message_id = None
             t.queued_at = _dt.datetime.utcnow()
             t.save()
-            logger.info("↩ Задача #%s возвращена в очередь", t.id)
+            logger.info("↩ Задача id=%s возвращена в очередь", t.id)
             from services.telegram_service import notify_admin_safe
 
             notify_admin_safe(f"↩ Задача #{t.id} возвращена в очередь")
