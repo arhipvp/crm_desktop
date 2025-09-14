@@ -2,6 +2,7 @@
 
 import logging
 from decimal import Decimal
+from typing import Any
 
 from peewee import Field, JOIN, fn
 
@@ -150,9 +151,22 @@ def update_expense(expense: Expense, **kwargs):
         if not updates and not payment_obj:
             return expense
 
+        log_updates: dict[str, Any] = {}
+        for key, value in updates.items():
+            if hasattr(value, "id"):
+                log_updates[key] = value.id
+            elif isinstance(value, Decimal):
+                log_updates[key] = str(value)
+            else:
+                log_updates[key] = value
+        if payment_obj:
+            log_updates["payment"] = payment_obj.id
+            log_updates["policy"] = payment_obj.policy_id
+
         for key, value in updates.items():
             setattr(expense, key, value)
         expense.save()
+        logger.info("✏️ Расход id=%s обновлён: %s", expense.id, log_updates)
         return expense
 
 
