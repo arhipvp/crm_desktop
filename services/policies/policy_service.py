@@ -223,9 +223,17 @@ def mark_policy_deleted(policy_id: int):
                 only=[Policy.policy_number, Policy.drive_folder_link, Policy.is_deleted]
             )
         except Exception:
-            logger.exception("Не удалось пометить папку полиса удалённой")
+            logger.exception(
+                "Не удалось пометить папку полиса id=%s №%s удалённой",
+                policy.id,
+                policy.policy_number,
+            )
     else:
-        logger.warning("❗ Полис с id=%s не найден для удаления", policy_id)
+        logger.warning(
+            "❗ Полис id=%s №%s не найден для удаления",
+            policy_id,
+            None,
+        )
 
 
 def mark_policies_deleted(policy_ids: list[int]) -> int:
@@ -249,9 +257,17 @@ def mark_policy_renewed(policy_id: int):
     if policy:
         policy.renewed_to = True
         policy.save()
-        logger.info("🔁 Полис %s помечен продлённым", policy_id)
+        logger.info(
+            "🔁 Полис id=%s №%s помечен продлённым",
+            policy.id,
+            policy.policy_number,
+        )
     else:
-        logger.warning("❗ Полис с id=%s не найден для продления", policy_id)
+        logger.warning(
+            "❗ Полис id=%s №%s не найден для продления",
+            policy_id,
+            None,
+        )
 
 
 def mark_policies_renewed(policy_ids: list[int]) -> int:
@@ -277,7 +293,9 @@ def _notify_policy_added(policy: Policy) -> None:
     if not deal:
         return
     desc = f" — {deal.description}" if deal.description else ""
-    text = f"📄 В вашу сделку #{deal.id}{desc} добавлен полис {policy.policy_number}"
+    text = (
+        f"📄 В вашу сделку #{deal.id}{desc} добавлен полис id={policy.id} №{policy.policy_number}"
+    )
     notify_executor(ex.tg_id, text)
 
 
@@ -355,7 +373,10 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
         # ────────── Создание полиса ──────────
         policy = Policy.create(client=client, deal=deal, **clean_data)
         logger.info(
-            "✅ Полис #%s создан для клиента '%s'", policy.policy_number, client.name
+            "✅ Полис id=%s №%s создан для клиента '%s'",
+            policy.id,
+            policy.policy_number,
+            client.name,
         )
 
         # ----------- Платежи ----------
@@ -375,7 +396,8 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
                 payment_date=policy.start_date,
             )
             logger.info(
-                "💳 Авто-добавлен платёж с нулевой суммой для полиса #%s",
+                "💳 Авто-добавлен платёж с нулевой суммой для полиса id=%s №%s",
+                policy.id,
                 policy.policy_number,
             )
 
@@ -400,10 +422,20 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
         if folder_path:
             policy.drive_folder_link = folder_path
             policy.save()
-            logger.info("📁 Папка полиса создана: %s", folder_path)
+            logger.info(
+                "📁 Папка полиса id=%s №%s создана: %s",
+                policy.id,
+                policy.policy_number,
+                folder_path,
+            )
             open_folder(folder_path)
     except Exception as e:
-        logger.error("❌ Ошибка при создании или открытии папки полиса: %s", e)
+        logger.error(
+            "❌ Ошибка при создании или открытии папки полиса id=%s №%s: %s",
+            policy.id,
+            policy.policy_number,
+            e,
+        )
 
     # ────────── Автоматические действия ──────────
     # Задача продления полиса больше не создаётся автоматически
@@ -517,15 +549,28 @@ def update_policy(
     )
 
     if not updates and not first_payment_paid and not payments:
-        logger.info("ℹ️ update_policy: нет изменений для полиса #%s", policy.id)
+        logger.info(
+            "ℹ️ update_policy: нет изменений для полиса id=%s №%s",
+            policy.id,
+            policy.policy_number,
+        )
         return policy
 
     with db.atomic():
         for key, value in updates.items():
             setattr(policy, key, value)
-        logger.info("✏️ Обновление полиса #%s: %s", policy.id, updates)
+        logger.info(
+            "✏️ Обновление полиса id=%s №%s: %s",
+            policy.id,
+            policy.policy_number,
+            updates,
+        )
         policy.save()
-        logger.info("✅ Полис #%s успешно обновлён", policy.id)
+        logger.info(
+            "✅ Полис id=%s №%s успешно обновлён",
+            policy.id,
+            policy.policy_number,
+        )
 
         if payments:
             sync_policy_payments(
@@ -575,7 +620,11 @@ def update_policy(
                 policy.drive_folder_link = new_path
                 policy.save(only=[Policy.drive_folder_link])
         except Exception:
-            logger.exception("Не удалось переименовать папку полиса")
+            logger.exception(
+                "Не удалось переименовать папку полиса id=%s №%s",
+                policy.id,
+                policy.policy_number,
+            )
 
     if policy.deal_id and policy.deal_id != old_deal_id:
         _notify_policy_added(policy)
