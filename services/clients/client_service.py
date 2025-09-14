@@ -173,7 +173,7 @@ def add_client(**kwargs) -> Client:
             )
             raise
 
-        logger.info("✅ Клиент #%s: %s создан", client.id, client.name)
+        logger.info("✅ Клиент id=%s: %s создан", client.id, client.name)
 
         return client
 
@@ -194,7 +194,7 @@ def update_client(client: Client, **kwargs) -> Client:
     if not updates:
         return client
 
-    logger.info("✏️ Обновление клиента #%s: %s", client.id, updates)
+    logger.info("✏️ Обновление клиента id=%s: %s", client.id, updates)
 
     old_name = client.name
     new_name = updates.get("name", old_name)
@@ -265,7 +265,7 @@ def mark_client_deleted(client_id: int):
             )
         except Exception:
             logger.exception("Не удалось пометить папку клиента удалённой")
-        logger.info("🗑️ Клиент #%s: %s помечен удалённым", client.id, client.name)
+        logger.info("🗑️ Клиент id=%s: %s помечен удалённым", client.id, client.name)
     else:
         logger.warning("❗ Клиент с id=%s не найден для удаления", client_id)
 
@@ -303,7 +303,7 @@ def restore_client(client_id: int):
     if client:
         client.is_deleted = False
         client.save()
-        logger.info("✅ Клиент %s восстановлен", client_id)
+        logger.info("✅ Клиент id=%s восстановлен", client_id)
     else:
         logger.warning("❗ Клиент с id=%s не найден для восстановления", client_id)
 
