@@ -99,7 +99,7 @@ def mark_payment_deleted(payment_id: int):
         payment.soft_delete()
 
     logger.info(
-        "🗑️ Помечен удалённым платёж #%s; доходов=%s, расходов=%s",
+        "🗑️ Помечен удалённым платёж id=%s; доходов=%s, расходов=%s",
         payment_id,
         income_deleted,
         expense_deleted,
@@ -130,7 +130,7 @@ def restore_payment(payment_id: int):
         payment.save(only=[Payment.is_deleted])
 
     logger.info(
-        "♻️ Восстановлен платёж #%s; доходов=%s, расходов=%s",
+        "♻️ Восстановлен платёж id=%s; доходов=%s, расходов=%s",
         payment_id,
         income_restored,
         expense_restored,
@@ -195,7 +195,7 @@ def add_payment(**kwargs):
         with db.atomic():
             payment = Payment.create(policy=policy, is_deleted=False, **clean_data)
             logger.info(
-                "✅ Добавлен платёж #%s к полису id=%s №%s на сумму %.2f",
+                "✅ Добавлен платёж id=%s к полису id=%s №%s на сумму %.2f",
                 payment.id,
                 policy.id,
                 policy.policy_number,
@@ -214,7 +214,7 @@ def add_payment(**kwargs):
                     note=f"выплата контрагенту {contractor}",
                 )
                 logger.info(
-                    "💸 Авто-расход контрагенту: платёж #%s ↔ полис id=%s №%s (%s)",
+                    "💸 Авто-расход контрагенту: платёж id=%s ↔ полис id=%s №%s (%s)",
                     payment.id,
                     policy.id,
                     policy.policy_number,

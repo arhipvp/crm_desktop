@@ -21,7 +21,7 @@ def notify_task(task_id: int) -> None:
                 from services.telegram_service import send_exec_task
 
                 send_exec_task(t, t.tg_chat_id)
-                logger.info("🔔 Напоминание отправлено по задаче #%s", t.id)
+                logger.info("🔔 Напоминание отправлено по задаче id=%s", t.id)
             except Exception:  # pragma: no cover - logging
                 logger.debug("Не удалось повторно отправить задачу", exc_info=True)
         else:
@@ -39,7 +39,7 @@ def link_telegram(task_id: int, chat_id: int, msg_id: int):
         Task.update(tg_chat_id=chat_id, tg_message_id=msg_id).where(
             Task.id == task_id
         ).execute()
-    logger.info("🔗 Telegram-связь установлена для задачи #%s", task_id)
+    logger.info("🔗 Telegram-связь установлена для задачи id=%s", task_id)
 
 
 def mark_done(task_id: int, note: str | None = None) -> None:
@@ -66,7 +66,7 @@ def append_note(task_id: int, text: str):
         with db.atomic():
             t.note = ((t.note + "\n") if t.note else "") + text
             t.save()
-        logger.info("🗒 К задаче #%s добавлена заметка", t.id)
+        logger.info("🗒 К задаче id=%s добавлена заметка", t.id)
         from services.telegram_service import notify_admin_safe
 
         notify_admin_safe(f"📝 Обновление по задаче #{t.id}: {text}")
@@ -79,7 +79,7 @@ def unassign_from_telegram(task_id: int) -> None:
         task.tg_chat_id = None
         task.tg_message_id = None
         task.save()
-    logger.info("❎ Задача #%s снята с Telegram", task.id)
+    logger.info("❎ Задача id=%s снята с Telegram", task.id)
 
 
 __all__ = [

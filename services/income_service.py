@@ -50,7 +50,7 @@ def mark_income_deleted(income_id: int):
     income = Income.get_or_none(Income.id == income_id)
     if income:
         income.soft_delete()
-        logger.info("🗑️ Доход #%s помечен удалённым", income.id)
+        logger.info("🗑️ Доход id=%s помечен удалённым", income.id)
     else:
         logger.warning("❗ Доход с id=%s не найден для удаления", income_id)
 
@@ -176,7 +176,7 @@ def add_income(**kwargs):
         logger.error("❌ Ошибка при создании дохода: %s", e)
         raise
 
-    logger.info("✅ Доход #%s создан", income.id)
+    logger.info("✅ Доход id=%s создан", income.id)
     if income.received_date:
         _notify_income_received(income)
     return income
