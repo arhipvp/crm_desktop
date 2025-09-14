@@ -443,9 +443,6 @@ class BaseTableView(QWidget):
         if not self.model:
             return []
         sel = self.table.selectionModel().selectedRows()
-        if not sel:
-            index = self.table.currentIndex()
-            sel = [index] if index.isValid() else []
         return [
             self.model.get_item(self._source_row(i))
             for i in sel

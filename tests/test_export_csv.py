@@ -37,10 +37,12 @@ def test_export_csv_selected_rows(in_memory_db, qapp, tmp_path, monkeypatch):
 
 
 def test_export_csv_no_selection_warns(in_memory_db, qapp, tmp_path, monkeypatch):
-    c1 = Client.create(name="Alice")
+    # Наполнить таблицу, но ничего не выбирать
+    Client.create(name="Alice")
+    Client.create(name="Bob")
 
     view = BaseTableView(model_class=Client)
-    view.set_model_class_and_items(Client, [c1], total_count=1)
+    view.set_model_class_and_items(Client, list(Client.select()), total_count=2)
 
     path = tmp_path / "out.csv"
     warned = {}
