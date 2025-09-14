@@ -14,11 +14,11 @@ from services.query_utils import apply_search_and_filters
 logger = logging.getLogger(__name__)
 
 other_expense = Expense.alias()
-INCOME_TOTAL = fn.COALESCE(fn.SUM(Income.amount), 0).alias("income_total")
-OTHER_EXPENSE_TOTAL = fn.COALESCE(fn.SUM(other_expense.amount), 0).alias(
-    "other_expense_total"
-)
-NET_INCOME = (INCOME_TOTAL - OTHER_EXPENSE_TOTAL).alias("net_income")
+income_sum = fn.COALESCE(fn.SUM(Income.amount), 0)
+other_expense_sum = fn.COALESCE(fn.SUM(other_expense.amount), 0)
+INCOME_TOTAL = income_sum.alias("income_total")
+OTHER_EXPENSE_TOTAL = other_expense_sum.alias("other_expense_total")
+NET_INCOME = (income_sum - other_expense_sum).alias("net_income")
 
 # ─────────────────────────── CRUD ────────────────────────────
 
