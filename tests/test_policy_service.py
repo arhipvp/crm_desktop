@@ -6,10 +6,11 @@ import pytest
 
 from config import Settings
 from database.db import db
-from database.models import Client, Policy, Payment
+from database.models import Client, Policy, Payment, Income
 from services.policies import policy_service as ps, ai_policy_service
 from services.policies.ai_policy_service import _chat
 from services.payment_service import add_payment
+from services.income_service import get_income_highlight_color
 def test_policy_merge_additional_payments(in_memory_db, policy_folder_patches):
     client = Client.create(name='C')
     start = datetime.date(2024, 1, 1)
@@ -136,6 +137,32 @@ def test_duplicate_detected_with_normalized_policy_number(
             end_date=end,
         )
     assert exc.value.existing_policy.policy_number == 'AB123'
+
+
+def test_contractor_dash_clears_and_no_income_highlight(
+    in_memory_db, policy_folder_patches
+):
+    client = Client.create(name='C')
+    start = datetime.date(2024, 1, 1)
+    end = datetime.date(2025, 1, 1)
+    policy = ps.add_policy(
+        client=client,
+        policy_number='P',
+        contractor='Some Co',
+        start_date=start,
+        end_date=end,
+        payments=[{'amount': 100, 'payment_date': start}],
+    )
+    ps.update_policy(policy, contractor='—')
+    policy_db = Policy.get_by_id(policy.id)
+    assert policy_db.contractor is None
+    payment = policy_db.payments.get()
+    income = Income.create(
+        payment=payment,
+        amount=10,
+        received_date=start,
+    )
+    assert get_income_highlight_color(income) is None
 
 
 @pytest.fixture()

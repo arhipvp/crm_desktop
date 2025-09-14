@@ -470,17 +470,21 @@ def update_policy(
     for key, value in kwargs.items():
         if key not in allowed_fields:
             continue
+        val = value.strip() if isinstance(value, str) else value
         if key == "deal_id" and "deal" not in kwargs:
-            value = get_deal_by_id(value) if value not in ("", None) else None
+            val = get_deal_by_id(val) if val not in ("", None) else None
             key = "deal"
         if key == "client_id" and "client" not in kwargs:
-            value = get_client_by_id(value) if value not in ("", None) else None
+            val = get_client_by_id(val) if val not in ("", None) else None
             key = "client"
-        if key == "policy_number" and value not in ("", None):
-            value = normalize_policy_number(value)
-        if value not in ("", None):
-            updates[key] = value
-        elif key in {"contractor", "deal", "client"}:
+        if key == "policy_number" and val not in ("", None):
+            val = normalize_policy_number(val)
+        if key == "contractor" and val in {"", "-", "—", None}:
+            updates[key] = None
+            continue
+        if val not in ("", None):
+            updates[key] = val
+        elif key in {"deal", "client"}:
             updates[key] = None
 
     # ────────── Проверка дубликата ──────────
