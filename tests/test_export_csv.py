@@ -1,3 +1,4 @@
+import datetime
 import logging
 from types import SimpleNamespace
 
@@ -9,7 +10,8 @@ from PySide6.QtWidgets import (
     QPushButton,
 )
 
-from database.models import Client
+from database.models import Client, Policy
+from services.export_service import export_objects_to_csv
 from ui.base.base_table_view import BaseTableView
 
 
@@ -229,6 +231,19 @@ def test_export_csv_with_dict_model(qapp, tmp_path, monkeypatch):
     assert "Alice" in text
     assert "30" in text
     assert "x" not in text
+
+
+def test_export_csv_related_fields(in_memory_db, tmp_path):
+    client = Client.create(name="Alice")
+    policy = Policy.create(
+        client=client, policy_number="PN123", start_date=datetime.date.today()
+    )
+    path = tmp_path / "related.csv"
+    fields = [Policy.policy_number, Client.name]
+    export_objects_to_csv(str(path), [policy], fields)
+    text = path.read_text(encoding="utf-8-sig")
+    assert "PN123" in text
+    assert "Alice" in text
 
 
 def test_export_csv_with_column_map(qapp, tmp_path, monkeypatch):
