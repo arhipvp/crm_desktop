@@ -1,5 +1,3 @@
-from datetime import date
-
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
