@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QAbstractItemView
 from ui.base.base_table_view import BaseTableView
 from database.models import Executor
 from ui.forms.executor_form import ExecutorForm
@@ -33,6 +34,7 @@ class ExecutorTableView(BaseTableView):
             can_restore=False,
             checkbox_map=checkbox_map,
         )
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         # Скрыть нерелевантный чекбокс "Показывать удалённые" для исполнителей
         try:
             show_inactive_label = "�?�?������<�?���'�? �?�����'��?�?�<�:"

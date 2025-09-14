@@ -24,6 +24,7 @@ from ui.common.styled_widgets import styled_button
 from ui.common.column_filter_row import ColumnFilterRow
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
+from services.export_service import export_objects_to_csv
 from database.models import Deal
 
 
@@ -485,15 +486,10 @@ class BaseTableView(QWidget):
             )
         if not path:
             return
-        try:
-            from services.export_service import export_objects_to_csv
-
-            export_objects_to_csv(path, objs, self.model.fields)
-            QMessageBox.information(
-                self, "Экспорт", f"Экспортировано: {len(objs)}"
-            )
-        except Exception as exc:
-            QMessageBox.critical(self, "Ошибка", str(exc))
+        export_objects_to_csv(path, objs, self.model.fields)
+        QMessageBox.information(
+            self, "Экспорт", f"Экспортировано: {len(objs)}"
+        )
 
     def _on_row_double_clicked(self, index):
         if not index.isValid():
