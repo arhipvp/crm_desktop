@@ -15,6 +15,7 @@ class Settings:
     database_url: str = ""
     log_dir: str = field(default_factory=lambda: user_log_dir("crm_desktop"))
     log_level: str = "INFO"
+    detailed_logging: bool = False
     approved_executor_ids: list[int] = field(default_factory=list)
     tg_bot_token: str | None = None
     admin_chat_id: int | None = None
@@ -40,6 +41,7 @@ def get_settings() -> Settings:
         database_url=os.getenv("DATABASE_URL", ""),
         log_dir=os.getenv("LOG_DIR") or user_log_dir("crm_desktop"),
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
+        detailed_logging=os.getenv("DETAILED_LOGGING", "0").lower() in {"1", "true", "yes", "on"},
         approved_executor_ids=approved_ids,
         tg_bot_token=os.getenv("TG_BOT_TOKEN"),
         admin_chat_id=int(admin_chat) if admin_chat else None,

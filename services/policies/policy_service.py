@@ -222,6 +222,7 @@ def mark_policy_deleted(policy_id: int):
             policy.save(
                 only=[Policy.policy_number, Policy.drive_folder_link, Policy.is_deleted]
             )
+            logger.info("Полис %s помечен удалённым", policy_id)
         except Exception:
             logger.exception(
                 "Не удалось пометить папку полиса id=%s №%s удалённой",
@@ -247,7 +248,7 @@ def mark_policies_deleted(policy_ids: list[int]) -> int:
         if before and not before.is_deleted:
             mark_policy_deleted(pid)
             count += 1
-
+    logger.info("Полисов помечено удалёнными: %s", count)
     return count
 
 
@@ -555,6 +556,21 @@ def update_policy(
             policy.policy_number,
         )
         return policy
+
+    log_updates = {}
+    for key, value in updates.items():
+        if isinstance(value, Client):
+            log_updates[key] = value.name
+        elif isinstance(value, Deal):
+            log_updates[key] = value.id
+        elif isinstance(value, date):
+            log_updates[key] = value.isoformat()
+        elif isinstance(value, Decimal):
+            log_updates[key] = str(value)
+        elif isinstance(value, (str, int, float, bool)) or value is None:
+            log_updates[key] = value
+        else:
+            log_updates[key] = str(value)
 
     with db.atomic():
         for key, value in updates.items():
