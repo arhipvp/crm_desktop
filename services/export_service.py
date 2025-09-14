@@ -3,6 +3,7 @@ import datetime
 import logging
 from typing import Sequence
 
+from peewee import Field
 from ui.common.ru_headers import RU_HEADERS
 
 
@@ -39,7 +40,10 @@ def export_objects_to_csv(path: str, objects: Sequence, fields: Sequence) -> int
             row = []
             for f in fields:
                 name = getattr(f, "name", str(f))
-                if isinstance(obj, dict):
+                if isinstance(f, Field) and f.model is not type(obj):
+                    related = getattr(obj, f.model._meta.name, None)
+                    value = getattr(related, f.name, "") if related else ""
+                elif isinstance(obj, dict):
                     value = obj.get(name, "")
                 else:
                     value = getattr(obj, name, "")
