@@ -173,6 +173,8 @@ def add_client(**kwargs) -> Client:
             )
             raise
 
+        logger.info("✅ Клиент #%s: %s создан", client.id, client.name)
+
         return client
 
 
@@ -263,6 +265,7 @@ def mark_client_deleted(client_id: int):
             )
         except Exception:
             logger.exception("Не удалось пометить папку клиента удалённой")
+        logger.info("🗑️ Клиент #%s: %s помечен удалённым", client.id, client.name)
     else:
         logger.warning("❗ Клиент с id=%s не найден для удаления", client_id)
 
@@ -278,7 +281,7 @@ def mark_clients_deleted(client_ids: list[int]) -> int:
         if before and not before.is_deleted:
             mark_client_deleted(cid)
             count += 1
-
+    logger.info("🗑️ Помечено удалёнными клиентов: %s", count)
     return count
 
 
