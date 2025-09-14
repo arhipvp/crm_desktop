@@ -1,7 +1,6 @@
 import csv
 import datetime
 import logging
-from typing import Sequence
 
 from peewee import Field
 from ui.common.ru_headers import RU_HEADERS
@@ -10,27 +9,13 @@ from ui.common.ru_headers import RU_HEADERS
 logger = logging.getLogger(__name__)
 
 
-def export_objects_to_csv(path: str, objects: Sequence, fields: Sequence) -> int:
-    """Export given ORM objects to CSV file.
-
-    Parameters
-    ----------
-    path : str
-        Destination file path.
-    objects : Sequence
-        Objects to export.
-    fields : Sequence
-        List of model fields (peewee Field objects).
-
-    Returns
-    -------
-    int
-        Number of exported rows.
-    """
-    headers = [
-        RU_HEADERS.get(getattr(f, "name", str(f)), getattr(f, "name", str(f)))
-        for f in fields
-    ]
+def export_objects_to_csv(path, objects, fields, headers=None):
+    """Export given ORM objects to CSV file."""
+    if headers is None:
+        headers = [
+            RU_HEADERS.get(getattr(f, "name", str(f)), getattr(f, "name", str(f)))
+            for f in fields
+        ]
     logger.debug("Заголовки CSV: %s", headers)
     logger.debug("Количество объектов для экспорта: %d", len(objects))
     with open(path, "w", newline="", encoding="utf-8-sig") as f:
