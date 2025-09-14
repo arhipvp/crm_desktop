@@ -14,11 +14,11 @@ from services.query_utils import apply_search_and_filters
 logger = logging.getLogger(__name__)
 
 other_expense = Expense.alias()
-INCOME_TOTAL_EXPR = fn.COALESCE(fn.SUM(Income.amount), 0)
-OTHER_EXPENSE_TOTAL_EXPR = fn.COALESCE(fn.SUM(other_expense.amount), 0)
-INCOME_TOTAL = INCOME_TOTAL_EXPR.alias("income_total")
-OTHER_EXPENSE_TOTAL = OTHER_EXPENSE_TOTAL_EXPR.alias("other_expense_total")
-NET_INCOME = (INCOME_TOTAL_EXPR - OTHER_EXPENSE_TOTAL_EXPR).alias("net_income")
+INCOME_TOTAL = fn.COALESCE(fn.SUM(Income.amount), 0).alias("income_total")
+OTHER_EXPENSE_TOTAL = fn.COALESCE(fn.SUM(other_expense.amount), 0).alias(
+    "other_expense_total"
+)
+NET_INCOME = (INCOME_TOTAL - OTHER_EXPENSE_TOTAL).alias("net_income")
 
 # ─────────────────────────── CRUD ────────────────────────────
 
@@ -302,13 +302,7 @@ def build_expense_query(
             JOIN.LEFT_OUTER,
             on=(other_expense.payment == Payment.id),
         )
-        .group_by(
-            Expense.id,
-            Payment.id,
-            Policy.id,
-            Client.id,
-            Deal.id,
-        )
+        .group_by(Expense.id)
     )
     query = apply_expense_filters(
         query,
