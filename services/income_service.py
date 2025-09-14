@@ -27,7 +27,7 @@ def get_income_highlight_color(income: Income) -> str | None:
     payment = getattr(income, "payment", None)
     policy = getattr(payment, "policy", None) if payment else None
     contractor = getattr(policy, "contractor", "") if policy else ""
-    if contractor and contractor.strip():
+    if contractor and contractor.strip() and contractor.strip() not in {"-", "—"}:
         return "#ffcccc"
     return None
 

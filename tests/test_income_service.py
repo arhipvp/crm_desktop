@@ -116,6 +116,7 @@ def test_get_incomes_page_pagination_and_deleted(in_memory_db):
     [
         ("Some Corp", "#ffcccc"),
         (None, None),
+        ("—", None),
     ],
 )
 def test_income_highlight(contractor, expected_color):
