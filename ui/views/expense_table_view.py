@@ -19,20 +19,20 @@ class ExpenseTableModel(BaseTableModel):
 
         self.fields = []  # отключаем автоколонки
         self.headers = [
-            'Полис',
-            'Сделка',
-            'Клиент',
-            'Контрагент',
-            'Дата начала',
-            'Тип расхода',
-            'Сумма платежа',
-            'Дата платежа',
-            'Доход по платежу',
-            'Прочие расходы',
-            'Чистый доход',
-            'Выплата контрагенту',
-            'Сумма расхода',
-            'Дата выплаты',
+            "Полис",
+            "Сделка",
+            "Клиент",
+            "Контрагент",
+            "Дата начала",
+            "Тип расхода",
+            "Сумма платежа",
+            "Дата платежа",
+            "Доход по платежу",
+            "Прочие расходы",
+            "Чистый доход",
+            "Выплата контрагенту",
+            "Сумма расхода",
+            "Дата выплаты",
         ]
 
     def columnCount(self, parent=None):
@@ -96,45 +96,25 @@ class ExpenseTableModel(BaseTableModel):
             )
         elif col == 8:
             total = getattr(obj, "income_total", 0) or 0
-            return (
-                self.format_money(total)
-                if total
-                else "0 ₽"
-            )
+            return self.format_money(total) if total else "0 ₽"
         elif col == 9:
             other_total = getattr(obj, "other_expense_total", 0) or 0
-            return (
-                self.format_money(other_total)
-                if other_total
-                else "0 ₽"
-            )
+            return self.format_money(other_total) if other_total else "0 ₽"
         elif col == 10:
             net_income = getattr(obj, "net_income", 0) or 0
-            return (
-                self.format_money(net_income)
-                if net_income
-                else "0 ₽"
-            )
+            return self.format_money(net_income) if net_income else "0 ₽"
         elif col == 11:
-            net_income = getattr(obj, "net_income", 0) or 0
-            contractor_payment = net_income * Decimal("0.2")
+            contractor_payment = getattr(obj, "contractor_payment", None)
+            if contractor_payment is None:
+                net_income = getattr(obj, "net_income", 0) or 0
+                contractor_payment = net_income * Decimal("0.2")
             return (
-                self.format_money(contractor_payment)
-                if contractor_payment
-                else "0 ₽"
+                self.format_money(contractor_payment) if contractor_payment else "0 ₽"
             )
         elif col == 12:
-            return (
-                self.format_money(obj.amount)
-                if obj.amount
-                else "0 ₽"
-            )
+            return self.format_money(obj.amount) if obj.amount else "0 ₽"
         elif col == 13:
-            return (
-                obj.expense_date.strftime("%d.%m.%Y")
-                if obj.expense_date
-                else "—"
-            )
+            return obj.expense_date.strftime("%d.%m.%Y") if obj.expense_date else "—"
 
 
 class ExpenseTableView(BaseTableView):
@@ -150,7 +130,7 @@ class ExpenseTableView(BaseTableView):
         8: expense_service.INCOME_TOTAL,
         9: expense_service.OTHER_EXPENSE_TOTAL,
         10: expense_service.NET_INCOME,
-        11: expense_service.NET_INCOME,
+        11: expense_service.CONTRACTOR_PAYMENT,
         12: Expense.amount,
         13: Expense.expense_date,
     }
@@ -180,9 +160,7 @@ class ExpenseTableView(BaseTableView):
         self.order_by = Expense.expense_date
         self.order_dir = "desc"
 
-        self.table.horizontalHeader().sortIndicatorChanged.connect(
-            self.on_sort_changed
-        )
+        self.table.horizontalHeader().sortIndicatorChanged.connect(self.on_sort_changed)
         self.row_double_clicked.connect(self.open_detail)
 
         # разрешаем множественный выбор для массовых действий
@@ -205,11 +183,7 @@ class ExpenseTableView(BaseTableView):
     def load_data(self):
         filters = super().get_filters()
         filters.update(
-            {
-                "include_paid": self.filter_controls.is_checked(
-                    "Показывать выплаченные"
-                )
-            }
+            {"include_paid": self.filter_controls.is_checked("Показывать выплаченные")}
         )
         if self.deal_id:
             filters["deal_id"] = self.deal_id
@@ -358,9 +332,7 @@ class ExpenseTableView(BaseTableView):
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(
-            headers, prev_texts, self.COLUMN_FIELD_MAP
-        )
+        self.column_filters.set_headers(headers, prev_texts, self.COLUMN_FIELD_MAP)
         QTimer.singleShot(0, self.load_table_settings)
 
     def get_base_query(self):

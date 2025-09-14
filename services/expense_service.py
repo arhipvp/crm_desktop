@@ -34,10 +34,10 @@ expense_subquery = (
 income_total_expr = fn.COALESCE(income_subquery.c.income_total, 0)
 expense_total_expr = fn.COALESCE(expense_subquery.c.expense_total, 0)
 INCOME_TOTAL = income_total_expr.alias("income_total")
-OTHER_EXPENSE_TOTAL = (expense_total_expr - Expense.amount).alias(
-    "other_expense_total"
-)
-NET_INCOME = (income_total_expr - expense_total_expr).alias("net_income")
+OTHER_EXPENSE_TOTAL = (expense_total_expr - Expense.amount).alias("other_expense_total")
+net_income_expr = income_total_expr - expense_total_expr
+NET_INCOME = net_income_expr.alias("net_income")
+CONTRACTOR_PAYMENT = (net_income_expr * Decimal("0.2")).alias("contractor_payment")
 
 # ─────────────────────────── CRUD ────────────────────────────
 
@@ -54,12 +54,7 @@ def get_pending_expenses():
 
 def get_expense_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых расходов по сделке."""
-    base = (
-        Expense.active()
-        .join(Payment)
-        .join(Policy)
-        .where(Policy.deal_id == deal_id)
-    )
+    base = Expense.active().join(Payment).join(Policy).where(Policy.deal_id == deal_id)
     open_count = base.where(Expense.expense_date.is_null(True)).count()
     closed_count = base.where(Expense.expense_date.is_null(False)).count()
     return open_count, closed_count
@@ -83,11 +78,7 @@ def mark_expenses_deleted(expense_ids: list[int]) -> int:
     """Массово пометить расходы удалёнными."""
     if not expense_ids:
         return 0
-    return (
-        Expense.update(is_deleted=True)
-        .where(Expense.id.in_(expense_ids))
-        .execute()
-    )
+    return Expense.update(is_deleted=True).where(Expense.id.in_(expense_ids)).execute()
 
 
 # ─────────────────────────── Добавление ───────────────────────────
@@ -263,6 +254,9 @@ def apply_expense_filters(
     income_total_filter = col_filters.pop(INCOME_TOTAL, None)
     if income_total_filter is None and Income.amount in col_filters:
         income_total_filter = col_filters.pop(Income.amount)
+    other_expense_total_filter = col_filters.pop(OTHER_EXPENSE_TOTAL, None)
+    net_income_filter = col_filters.pop(NET_INCOME, None)
+    contractor_payment_filter = col_filters.pop(CONTRACTOR_PAYMENT, None)
 
     query = apply_search_and_filters(
         query, Expense, search_text or "", col_filters, extra_fields
@@ -278,8 +272,16 @@ def apply_expense_filters(
             query = query.where(Expense.expense_date <= date_to)
 
     if income_total_filter:
+        query = query.having(INCOME_TOTAL.cast("TEXT").contains(income_total_filter))
+    if other_expense_total_filter:
         query = query.having(
-            INCOME_TOTAL.cast("TEXT").contains(income_total_filter)
+            OTHER_EXPENSE_TOTAL.cast("TEXT").contains(other_expense_total_filter)
+        )
+    if net_income_filter:
+        query = query.having(NET_INCOME.cast("TEXT").contains(net_income_filter))
+    if contractor_payment_filter:
+        query = query.having(
+            CONTRACTOR_PAYMENT.cast("TEXT").contains(contractor_payment_filter)
         )
 
     return query
@@ -307,6 +309,7 @@ def build_expense_query(
             INCOME_TOTAL,
             OTHER_EXPENSE_TOTAL,
             NET_INCOME,
+            CONTRACTOR_PAYMENT,
         )
         .join(Payment)
         .join(Policy)

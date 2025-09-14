@@ -13,6 +13,7 @@ from database.models import (
 )
 from services.income_service import get_incomes_page
 from services.expense_service import build_expense_query
+from services import expense_service
 
 
 class TestIncome:
@@ -34,7 +35,6 @@ class TestIncome:
             assigned_date=date.today(),
         )
         return income
-
 
     def test_filter_by_executor_full_name(self, in_memory_db, make_policy_with_payment):
         inc1 = self._create_income_for_executor(make_policy_with_payment, "Alice", 1)
@@ -138,3 +138,41 @@ class TestExpense:
         results = list(query)
         assert len(results) == 1
         assert results[0].policy.policy_number == "P1"
+
+    def test_filter_by_aggregated_fields(self, in_memory_db, make_policy_with_payment):
+        _, _, policy1, pay1 = make_policy_with_payment(
+            payment_kwargs={"amount": 100},
+            policy_kwargs={"policy_number": "P1"},
+        )
+        Income.create(payment=pay1, amount=100)
+        exp1 = Expense.create(
+            payment=pay1, amount=30, expense_type="e1", policy=policy1
+        )
+        Expense.create(payment=pay1, amount=20, expense_type="e2", policy=policy1)
+
+        _, _, policy2, pay2 = make_policy_with_payment(
+            payment_kwargs={"amount": 200},
+            policy_kwargs={"policy_number": "P2"},
+        )
+        Income.create(payment=pay2, amount=200)
+        Expense.create(payment=pay2, amount=40, expense_type="e1", policy=policy2)
+        Expense.create(payment=pay2, amount=50, expense_type="e2", policy=policy2)
+
+        rows = list(
+            build_expense_query(
+                column_filters={expense_service.OTHER_EXPENSE_TOTAL: "20"}
+            )
+        )
+        assert [r.id for r in rows] == [exp1.id]
+
+        rows = list(
+            build_expense_query(column_filters={expense_service.NET_INCOME: "110"})
+        )
+        assert {r.policy.policy_number for r in rows} == {policy2.policy_number}
+
+        rows = list(
+            build_expense_query(
+                column_filters={expense_service.CONTRACTOR_PAYMENT: "22"}
+            )
+        )
+        assert {r.policy.policy_number for r in rows} == {policy2.policy_number}
