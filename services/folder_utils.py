@@ -129,11 +129,14 @@ def create_client_drive_folder(client_name: str) -> Tuple[str, Optional[str]]:
     safe_name = sanitize_name(client_name)
     local_path = GOOGLE_DRIVE_LOCAL_ROOT / safe_name
 
-    try:
-        local_path.mkdir(parents=True, exist_ok=True)
-        logger.info("📁 Создана папка клиента: %s", local_path)
-    except Exception:
-        logger.exception("Не удалось создать папку клиента локально")
+    if local_path.exists():
+        logger.info("Папка клиента уже существует")
+    else:
+        try:
+            local_path.mkdir(parents=True, exist_ok=False)
+            logger.info("Папка клиента создана: %s", local_path)
+        except Exception:
+            logger.exception("Не удалось создать папку клиента локально")
 
     return str(local_path), None
 
