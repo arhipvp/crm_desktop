@@ -186,6 +186,8 @@ def add_payment(**kwargs):
         clean_data["amount"] = Decimal(str(clean_data["amount"]))
 
     contractor = (policy.contractor or "").strip()
+    if contractor in {"", "-", "—"}:
+        contractor = ""
 
     try:
         with db.atomic():
