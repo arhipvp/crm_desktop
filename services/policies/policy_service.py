@@ -583,7 +583,7 @@ def update_policy(
             "✏️ Обновление полиса id=%s №%s: %s",
             policy.id,
             policy.policy_number,
-            updates,
+            log_updates,
         )
         policy.save()
         logger.info(
