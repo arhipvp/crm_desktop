@@ -222,7 +222,11 @@ def mark_policy_deleted(policy_id: int):
             policy.save(
                 only=[Policy.policy_number, Policy.drive_folder_link, Policy.is_deleted]
             )
-            logger.info("Полис %s помечен удалённым", policy_id)
+            logger.info(
+                "Полис id=%s №%s помечен удалённым",
+                policy.id,
+                policy.policy_number,
+            )
         except Exception:
             logger.exception(
                 "Не удалось пометить папку полиса id=%s №%s удалённой",
