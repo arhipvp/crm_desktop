@@ -510,6 +510,10 @@ class BaseTableView(QWidget):
         act_open = menu.addAction("Открыть/редактировать")
         act_delete = menu.addAction("Удалить")
         act_folder = menu.addAction("Открыть папку")
+        has_path = bool(
+            getattr(self.get_selected_object(), "drive_folder_path", None)
+            or getattr(self.get_selected_object(), "drive_folder_link", None)
+        )
         text = str(index.data() or "")
         act_copy = menu.addAction("Копировать значение")
         act_deal = menu.addAction("Открыть сделку")
@@ -521,6 +525,7 @@ class BaseTableView(QWidget):
         )
         act_deal.triggered.connect(self.open_selected_deal)
         act_deal.setEnabled(bool(self.get_selected_deal()))
+        act_folder.setEnabled(has_path)
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def _on_header_menu(self, pos):
