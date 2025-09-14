@@ -54,13 +54,8 @@ class ExpenseTableModel(BaseTableModel):
         deal = getattr(policy, "deal", None) if policy else None
 
         if role == Qt.BackgroundRole:
-            payment_date = getattr(payment, "payment_date", None)
-            if (
-                obj.expense_date is None
-                and payment_date
-                and payment_date < date.today()
-            ):
-                return QBrush(QColor("#ffcccc"))
+            if getattr(obj, "income_total", 0) > 0:
+                return QBrush(QColor("#ccffcc"))
             return None
 
         if role != Qt.DisplayRole:
