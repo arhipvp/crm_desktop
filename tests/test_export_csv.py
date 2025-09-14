@@ -36,7 +36,8 @@ def test_export_csv_selected_rows(in_memory_db, qapp, tmp_path, monkeypatch):
     assert all("Bob" not in row for row in rows[1:])
 
 
-def test_export_csv_no_selection(in_memory_db, qapp, tmp_path, monkeypatch):
+def test_export_csv_no_selection_warns(in_memory_db, qapp, tmp_path, monkeypatch):
+    # Наполнить таблицу, но ничего не выбирать
     Client.create(name="Alice")
     Client.create(name="Bob")
 
@@ -44,13 +45,13 @@ def test_export_csv_no_selection(in_memory_db, qapp, tmp_path, monkeypatch):
     view.set_model_class_and_items(Client, list(Client.select()), total_count=2)
 
     path = tmp_path / "out.csv"
-    called = {}
+    warned = {}
 
     def fake_warning(*args, **kwargs):
-        called["called"] = True
+        warned["called"] = True
 
     monkeypatch.setattr(QMessageBox, "warning", fake_warning)
     view.export_csv(str(path))
 
-    assert called.get("called")
+    assert warned.get("called")
     assert not path.exists()
