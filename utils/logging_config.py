@@ -27,6 +27,8 @@ def setup_logging(settings: Settings | None = None) -> None:
 
     level_name = settings.log_level
     level = getattr(logging, level_name, logging.INFO)
+    if settings.detailed_logging:
+        level = logging.DEBUG
 
     fmt = logging.Formatter(
         "%(asctime)s | %(levelname)-8s | %(name)s │ %(message)s",

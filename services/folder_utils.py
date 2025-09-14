@@ -139,7 +139,7 @@ def create_client_drive_folder(client_name: str) -> Tuple[str, Optional[str]]:
 
 
 def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
-    logger.debug(">>> [open_local_or_web] folder_link:", folder_link)
+    logger.debug(">>> [open_local_or_web] folder_link: %s", folder_link)
 
     if not folder_link and not folder_name:
         QMessageBox.warning(parent, "Ошибка", "Нет ссылки и нет имени папки.")
@@ -162,7 +162,7 @@ def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
                 return
 
         # Или просто открыть саму папку клиента
-        logger.info(">>> [fallback] opening client root folder: %s", client_path)
+        logger.debug(">>> [fallback] opening client root folder: %s", client_path)
         open_folder(str(client_path), parent=parent)
         return
 
@@ -187,7 +187,7 @@ def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
 
     # Нет GUI или пользователь отменил → открываем ссылку, если есть
     if folder_link:
-        logger.info(">>> [fallback] opening web link: %s", folder_link)
+        logger.debug(">>> [fallback] opening web link: %s", folder_link)
         webbrowser.open(folder_link)
     else:
         if QMessageBox is not None:
@@ -390,7 +390,7 @@ def copy_text_to_clipboard(text: str, *, parent: Optional["QWidget"] = None) -> 
 def _msg(text: str, parent: Optional["QWidget"]) -> None:
     """Показывает информационное QMessageBox, если Qt доступен."""
     if QMessageBox is None or QApplication is None or QApplication.instance() is None:
-        logger.info("MSG: %s", text)
+        logger.debug("MSG: %s", text)
         return
     QMessageBox.information(parent, "Информация", text)
 
