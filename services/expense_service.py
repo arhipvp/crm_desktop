@@ -13,14 +13,31 @@ from services.query_utils import apply_search_and_filters
 
 logger = logging.getLogger(__name__)
 
-other_expense = Expense.alias()
-income_sum = fn.COALESCE(fn.SUM(Income.amount), 0)
-other_expense_sum = fn.COALESCE(fn.SUM(other_expense.amount), 0)
-INCOME_TOTAL = income_sum.alias("income_total")
-OTHER_EXPENSE_TOTAL = other_expense_sum.alias("other_expense_total")
-NET_INCOME = (
-    income_sum - other_expense_sum - Expense.amount
-).alias("net_income")
+income_subquery = (
+    Income.select(
+        Income.payment_id.alias("payment_id"),
+        fn.COALESCE(fn.SUM(Income.amount), 0).alias("income_total"),
+    )
+    .group_by(Income.payment_id)
+    .alias("income_subquery")
+)
+
+expense_subquery = (
+    Expense.select(
+        Expense.payment_id.alias("payment_id"),
+        fn.COALESCE(fn.SUM(Expense.amount), 0).alias("expense_total"),
+    )
+    .group_by(Expense.payment_id)
+    .alias("expense_subquery")
+)
+
+income_total_expr = fn.COALESCE(income_subquery.c.income_total, 0)
+expense_total_expr = fn.COALESCE(expense_subquery.c.expense_total, 0)
+INCOME_TOTAL = income_total_expr.alias("income_total")
+OTHER_EXPENSE_TOTAL = (expense_total_expr - Expense.amount).alias(
+    "other_expense_total"
+)
+NET_INCOME = (income_total_expr - expense_total_expr).alias("net_income")
 
 # ─────────────────────────── CRUD ────────────────────────────
 
@@ -297,15 +314,16 @@ def build_expense_query(
         .switch(Policy)
         .join(Deal, JOIN.LEFT_OUTER)
         .switch(Payment)
-        .join(Income, JOIN.LEFT_OUTER)
+        .join(
+            income_subquery,
+            JOIN.LEFT_OUTER,
+            on=(income_subquery.c.payment_id == Payment.id),
+        )
         .switch(Payment)
         .join(
-            other_expense,
+            expense_subquery,
             JOIN.LEFT_OUTER,
-            on=(
-                (other_expense.payment == Payment.id)
-                & (other_expense.id != Expense.id)
-            ),
+            on=(expense_subquery.c.payment_id == Payment.id),
         )
         .group_by(Expense.id)
     )
