@@ -1,8 +1,12 @@
 import csv
 import datetime
+import logging
 from typing import Sequence
 
 from ui.common.ru_headers import RU_HEADERS
+
+
+logger = logging.getLogger(__name__)
 
 
 def export_objects_to_csv(path: str, objects: Sequence, fields: Sequence) -> int:
@@ -22,7 +26,12 @@ def export_objects_to_csv(path: str, objects: Sequence, fields: Sequence) -> int
     int
         Number of exported rows.
     """
-    headers = [RU_HEADERS.get(getattr(f, "name", str(f)), getattr(f, "name", str(f))) for f in fields]
+    headers = [
+        RU_HEADERS.get(getattr(f, "name", str(f)), getattr(f, "name", str(f)))
+        for f in fields
+    ]
+    logger.debug("Заголовки CSV: %s", headers)
+    logger.debug("Количество объектов для экспорта: %d", len(objects))
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter=";")
         writer.writerow(headers)

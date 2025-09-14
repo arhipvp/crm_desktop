@@ -477,7 +477,9 @@ class BaseTableView(QWidget):
         if isinstance(path, bool):
             path = None
         objs = self.get_selected_objects()
+        logger.info("Запрошен экспорт %d строк", len(objs))
         if not objs:
+            logger.warning("Нет выбранных строк для экспорта")
             QMessageBox.warning(self, "Экспорт", "Нет выбранных строк")
             return
         if path is None:
@@ -490,8 +492,11 @@ class BaseTableView(QWidget):
                 options=options,
             )
         if not path:
+            logger.warning("Экспорт отменён пользователем")
             return
+        logger.debug("Сохраняем CSV в %s", path)
         export_objects_to_csv(path, objs, self.model.fields)
+        logger.info("Экспортировано %d строк в %s", len(objs), path)
         QMessageBox.information(
             self, "Экспорт", f"Экспортировано: {len(objs)}"
         )
