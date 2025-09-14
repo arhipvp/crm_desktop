@@ -209,6 +209,15 @@ def update_income(income: Income, **kwargs):
     if not updates:
         return income
 
+    log_updates: dict[str, Any] = {}
+    for key, value in updates.items():
+        if hasattr(value, "id"):
+            log_updates[key] = value.id
+        elif isinstance(value, Decimal):
+            log_updates[key] = str(value)
+        else:
+            log_updates[key] = value
+
     old_received = income.received_date
     with db.atomic():
         for key, value in updates.items():
@@ -216,6 +225,7 @@ def update_income(income: Income, **kwargs):
         logger.debug("💬 update_income: received_date=%r", updates.get("received_date"))
         logger.debug("💬 final obj: income.received_date = %r", income.received_date)
         income.save()
+        logger.info("✏️ Доход id=%s обновлён: %s", income.id, log_updates)
 
     if old_received is None and income.received_date:
         _notify_income_received(income)
