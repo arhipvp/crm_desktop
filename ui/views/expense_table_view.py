@@ -60,6 +60,19 @@ class ExpenseTableModel(BaseTableModel):
                 return QBrush(QColor(HIGHLIGHT_COLOR_INCOME))
             return None
 
+        if role == Qt.ToolTipRole and index.column() == 9:
+            if payment:
+                details = getattr(obj, "other_expense_details", None)
+                if details is None:
+                    others = expense_service.get_other_expenses(payment.id, obj.id)
+                    details = "\n".join(
+                        f"{self.format_money(e.amount)} — {e.expense_date.strftime('%d.%m.%Y') if e.expense_date else '—'}"
+                        for e in others
+                    )
+                    obj.other_expense_details = details
+                return details or None
+            return None
+
         if role != Qt.DisplayRole:
             return None
 
