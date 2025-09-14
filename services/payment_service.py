@@ -170,8 +170,9 @@ def add_payment(**kwargs):
     )
     if not policy:
         logger.warning(
-            "❌ Не удалось добавить платёж: не найден полис #%s",
+            "❌ Не удалось добавить платёж: не найден полис id=%s №%s",
             kwargs.get("policy_id"),
+            kwargs.get("policy_number"),
         )
         raise ValueError("Полис не найден")
 
@@ -193,8 +194,9 @@ def add_payment(**kwargs):
         with db.atomic():
             payment = Payment.create(policy=policy, is_deleted=False, **clean_data)
             logger.info(
-                "✅ Добавлен платёж #%s к полису #%s на сумму %.2f",
+                "✅ Добавлен платёж #%s к полису id=%s №%s на сумму %.2f",
                 payment.id,
+                policy.id,
                 policy.policy_number,
                 payment.amount,
             )
@@ -211,9 +213,10 @@ def add_payment(**kwargs):
                     note=f"выплата контрагенту {contractor}",
                 )
                 logger.info(
-                    "💸 Авто-расход контрагенту: платёж #%s ↔ полис #%s (%s)",
+                    "💸 Авто-расход контрагенту: платёж #%s ↔ полис id=%s №%s (%s)",
                     payment.id,
                     policy.id,
+                    policy.policy_number,
                     contractor,
                 )
 
