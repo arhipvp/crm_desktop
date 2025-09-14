@@ -1,12 +1,13 @@
 import datetime
 from types import SimpleNamespace
 
+import logging
 import openai
 import pytest
 
 from config import Settings
 from database.db import db
-from database.models import Client, Policy, Payment
+from database.models import Client, Policy, Payment, Deal
 from services.policies import policy_service as ps, ai_policy_service
 from services.policies.ai_policy_service import _chat
 from services.payment_service import add_payment
@@ -155,6 +156,43 @@ def test_contractor_dash_clears(
     ps.update_policy(policy, contractor='—')
     policy_db = Policy.get_by_id(policy.id)
     assert policy_db.contractor is None
+
+
+def test_update_policy_logs_simple_values(
+    in_memory_db, policy_folder_patches, caplog
+):
+    client1 = Client.create(name='C1')
+    client2 = Client.create(name='C2')
+    deal1 = Deal.create(client=client1, description='D1', start_date=datetime.date(2024, 1, 1))
+    policy = ps.add_policy(
+        client=client1,
+        deal=deal1,
+        policy_number='P1',
+        start_date=datetime.date(2024, 1, 1),
+        end_date=datetime.date(2025, 1, 1),
+    )
+    deal2 = Deal.create(client=client2, description='D2', start_date=datetime.date(2024, 1, 1))
+
+    caplog.set_level(logging.INFO)
+    ps.update_policy(
+        policy,
+        client_id=client2.id,
+        deal_id=deal2.id,
+        start_date=datetime.date(2024, 1, 1),
+        end_date=datetime.date(2025, 1, 1),
+        note='N',
+    )
+
+    record = next(r for r in caplog.records if '✏️ Обновление полиса' in r.msg)
+    log_data = record.args[1]
+    assert log_data['client'] == 'C2'
+    assert log_data['deal'] == deal2.id
+    assert log_data['start_date'] == '2024-01-01'
+    assert log_data['end_date'] == '2025-01-01'
+    assert log_data['note'] == 'N'
+    assert all(
+        isinstance(v, (str, int, float, bool, type(None))) for v in log_data.values()
+    )
 
 
 @pytest.fixture()
