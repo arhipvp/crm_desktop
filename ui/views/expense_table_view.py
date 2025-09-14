@@ -30,7 +30,6 @@ class ExpenseTableModel(BaseTableModel):
             "Доход по платежу",
             "Прочие расходы",
             "Чистый доход",
-            "Выплата контрагенту",
             "Сумма расхода",
             "Дата выплаты",
         ]
@@ -104,16 +103,8 @@ class ExpenseTableModel(BaseTableModel):
             net_income = getattr(obj, "net_income", 0) or 0
             return self.format_money(net_income) if net_income else "0 ₽"
         elif col == 11:
-            contractor_payment = getattr(obj, "contractor_payment", None)
-            if contractor_payment is None:
-                net_income = getattr(obj, "net_income", 0) or 0
-                contractor_payment = net_income * Decimal("0.2")
-            return (
-                self.format_money(contractor_payment) if contractor_payment else "0 ₽"
-            )
-        elif col == 12:
             return self.format_money(obj.amount) if obj.amount else "0 ₽"
-        elif col == 13:
+        elif col == 12:
             return obj.expense_date.strftime("%d.%m.%Y") if obj.expense_date else "—"
 
 
@@ -130,9 +121,8 @@ class ExpenseTableView(BaseTableView):
         8: expense_service.INCOME_TOTAL,
         9: expense_service.OTHER_EXPENSE_TOTAL,
         10: expense_service.NET_INCOME,
-        11: expense_service.CONTRACTOR_PAYMENT,
-        12: Expense.amount,
-        13: Expense.expense_date,
+        11: Expense.amount,
+        12: Expense.expense_date,
     }
 
     def __init__(self, parent=None, deal_id=None):
@@ -153,7 +143,7 @@ class ExpenseTableView(BaseTableView):
         self.form_class = ExpenseForm  # соответствующая форма
         self.virtual_fields = ["policy_num", "deal_desc", "client_name", "contractor"]
 
-        self.default_sort_column = 13
+        self.default_sort_column = 12
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = self.default_sort_order
