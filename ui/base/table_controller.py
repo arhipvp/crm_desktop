@@ -50,7 +50,7 @@ class TableController:
             self.view.paginator.update(
                 self.view.total_count, self.view.page, self.view.per_page
             )
-            self.view.data_loaded.emit(self.view.total_count)
+        self.view.data_loaded.emit(self.view.proxy.rowCount())
 
         QTimer.singleShot(0, self.view.load_table_settings)
 
@@ -67,7 +67,6 @@ class TableController:
         QApplication.processEvents()
 
         filters = self.get_filters()
-        cancelled = False
 
         def run_task() -> tuple[list, int]:
             items = self.get_page_func(self.view.page, self.view.per_page, **filters)
@@ -86,9 +85,27 @@ class TableController:
             progress.close()
             return
         progress.close()
-        self.set_model_class_and_items(
-            self.model_class, items, total_count=total
-        )
+        if getattr(self.view, "model", None) is None:
+            self.set_model_class_and_items(
+                self.model_class, items, total_count=total
+            )
+            return
+
+        self.view.model = BaseTableModel(items, self.model_class)
+        self.view.proxy.setSourceModel(self.view.model)
+        self.view.table.setModel(self.view.proxy)
+        try:
+            self.view.table.sortByColumn(
+                self.view.current_sort_column, self.view.current_sort_order
+            )
+        except NotImplementedError:
+            pass
+        if total is not None:
+            self.view.total_count = total
+            self.view.paginator.update(
+                self.view.total_count, self.view.page, self.view.per_page
+            )
+        self.view.data_loaded.emit(self.view.proxy.rowCount())
 
     def refresh(self):
         self.load_data()
