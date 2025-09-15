@@ -148,10 +148,6 @@ class ExpenseTableView(BaseTableView):
             checkbox_map=checkbox_map,
             date_filter_field="expense_date",
         )
-        self.controller.get_column_filters = self.get_column_filters
-        # Перенеподключаем сигнал фильтрации колонок, чтобы работать напрямую
-        self.column_filters.filter_changed.disconnect()
-        self.column_filters.filter_changed.connect(self._on_column_filter_changed)
         self.model_class = Expense  # или Client, Policy и т.д.
         self.form_class = ExpenseForm  # соответствующая форма
         self.virtual_fields = ["policy_num", "deal_desc", "client_name", "contractor"]
@@ -171,20 +167,6 @@ class ExpenseTableView(BaseTableView):
         self.delete_callback = self.delete_selected
 
         self.load_data()
-
-    def get_column_filters(self) -> dict:
-        """Собрать фильтры по столбцам в виде {Field | str: text}."""
-        header = self.table.horizontalHeader()
-        result: dict = {}
-        for visual in range(header.count()):
-            logical = header.logicalIndex(visual)
-            field = self.COLUMN_FIELD_MAP.get(logical)
-            if field is None:
-                continue
-            text = self.column_filters.get_text(visual)
-            if text:
-                result[field] = text
-        return result
 
     def load_data(self):
         filters = super().get_filters()
@@ -235,10 +217,6 @@ class ExpenseTableView(BaseTableView):
         self.page = 1
         self.save_table_settings()
         self.load_data()
-
-    def _on_column_filter_changed(self, column: int, text: str):
-        self.on_filter_changed()
-        self.save_table_settings()
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
         field = self.COLUMN_FIELD_MAP.get(column)
@@ -317,10 +295,8 @@ class ExpenseTableView(BaseTableView):
             dlg.exec()
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
-        prev_texts = [
-            self.column_filters.get_text(i)
-            for i in range(len(self.column_filters._editors))
-        ]
+        header = self.table.horizontalHeader()
+        prev_texts = header.get_all_filters()
         self.model = ExpenseTableModel(items, model_class)
         self.proxy_model.setSourceModel(self.model)
         self.table.setModel(self.proxy_model)
@@ -338,7 +314,7 @@ class ExpenseTableView(BaseTableView):
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(headers, prev_texts, self.COLUMN_FIELD_MAP)
+        header.set_headers(headers, prev_texts, self.COLUMN_FIELD_MAP)
         QTimer.singleShot(0, self.load_table_settings)
 
     def get_base_query(self):

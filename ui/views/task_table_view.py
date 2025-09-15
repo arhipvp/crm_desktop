@@ -134,14 +134,6 @@ class TaskTableView(BaseTableView):
         )
         self.left_layout.insertWidget(0, self.filter_controls)
 
-        try:
-            self.column_filters.filter_changed.disconnect()
-        except Exception:
-            pass
-        self.column_filters.filter_changed.connect(
-            self._on_column_filter_changed_db
-        )
-
         # ────────────────── Кнопка «Отправить» ──────────────────
         self.send_btn = styled_button(
             "Отправить",
@@ -298,13 +290,6 @@ class TaskTableView(BaseTableView):
             pass
         self.load_data()
 
-    def _on_column_filter_changed_db(self, column: int, text: str):
-        self.on_filter_changed()
-        try:
-            self.save_table_settings()
-        except Exception:
-            pass
-
     def load_data(self) -> None:
         logger.debug("📥 Используется метод загрузки: get_tasks_page")
 
@@ -345,10 +330,8 @@ class TaskTableView(BaseTableView):
             )
             total = build_task_query(**f).count()
 
-        prev_texts = [
-            self.column_filters.get_text(i)
-            for i in range(len(self.column_filters._editors))
-        ]
+        header = self.table.horizontalHeader()
+        prev_texts = header.get_all_filters()
 
         items = list(prefetch(items, Deal, Client, Policy, DealExecutor, Executor))
         self.model = TaskTableModel(items, Task)
@@ -371,7 +354,7 @@ class TaskTableView(BaseTableView):
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(
+        header.set_headers(
             headers, prev_texts, self.COLUMN_FIELD_MAP
         )
         QTimer.singleShot(0, self.load_table_settings)

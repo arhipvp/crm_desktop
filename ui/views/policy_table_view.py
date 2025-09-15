@@ -362,13 +362,14 @@ class PolicyTableView(BaseTableView):
             self.total_count = total_count
             self.paginator.update(self.total_count, self.page, self.per_page)
 
+        header = self.table.horizontalHeader()
         headers = [
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(
-            headers, column_field_map=self.COLUMN_FIELD_MAP
-        )
+        if hasattr(header, "set_headers"):
+            prev_texts = header.get_all_filters()
+            header.set_headers(headers, prev_texts, column_field_map=self.COLUMN_FIELD_MAP)
         QTimer.singleShot(0, self.load_table_settings)
 
     def on_sort_changed(self, logicalIndex: int, order: Qt.SortOrder):

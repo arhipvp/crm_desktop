@@ -1,7 +1,6 @@
 import logging
 from typing import Any, Callable, Iterable
 
-from peewee import Field
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QProgressDialog, QMessageBox
 
@@ -35,10 +34,8 @@ class TableController:
         self, model_class, items: list[Any], total_count: int | None = None
     ):
         """Устанавливает модель и обновляет связанные элементы UI."""
-        prev_texts = [
-            self.view.column_filters.get_text(i)
-            for i in range(len(self.view.column_filters._editors))
-        ]
+        header = self.view.table.horizontalHeader()
+        prev_texts = header.get_all_filters() if hasattr(header, "get_all_filters") else []
 
         self.view.model = BaseTableModel(items, model_class)
         self.view.proxy_model.setSourceModel(self.view.model)
@@ -63,9 +60,8 @@ class TableController:
             self.view.model.headerData(i, Qt.Horizontal)
             for i in range(self.view.model.columnCount())
         ]
-        self.view.column_filters.set_headers(
-            headers, prev_texts, self.view.COLUMN_FIELD_MAP
-        )
+        if hasattr(header, "set_headers"):
+            header.set_headers(headers, prev_texts, self.view.COLUMN_FIELD_MAP)
         QTimer.singleShot(0, self.view.load_table_settings)
 
     # --- Загрузка данных --------------------------------------------------
@@ -126,28 +122,34 @@ class TableController:
         self.view.save_table_settings()
         self.load_data()
 
-    def _on_column_filter_changed(self, column: int, text: str):
+    def _on_column_filter_changed(self, _column: int, _text: str):
         self.on_filter_changed()
         self.view.save_table_settings()
 
     def _on_reset_filters(self):
         self.view.filter_controls.clear_all()
-        self.view.column_filters.clear_all()
+        header = self.view.table.horizontalHeader()
+        if hasattr(header, "clear_all"):
+            header.clear_all()
         ui_settings.set_table_filters(self.view.settings_id, {})
         self.view.save_table_settings()
         self.on_filter_changed()
 
     # --- Фильтры ---------------------------------------------------------
-    def get_column_filters(self) -> dict[Field, str]:
+    def get_column_filters(self) -> dict:
         if not hasattr(self.view, "model") or not self.view.model:
             return {}
-        filters: dict[Field, str] = {}
+        filters: dict = {}
         header = self.view.table.horizontalHeader()
         for visual in range(header.count()):
             logical = header.logicalIndex(visual)
             if header.isSectionHidden(logical):
                 continue
-            text = self.view.column_filters.get_text(visual)
+            text = (
+                header.get_filter_text(visual)
+                if hasattr(header, "get_filter_text")
+                else ""
+            )
             if not text:
                 continue
             field = self.view.COLUMN_FIELD_MAP.get(
@@ -156,7 +158,7 @@ class TableController:
                 if logical < len(self.view.model.fields)
                 else None,
             )
-            if isinstance(field, Field):
+            if field is not None:
                 filters[field] = text
         return filters
 

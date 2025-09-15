@@ -33,10 +33,8 @@ class PaymentTableController(TableController):
             and p.payment_date < date.today()
         )
 
-        prev_texts = [
-            self.view.column_filters.get_text(i)
-            for i in range(len(self.view.column_filters._editors))
-        ]
+        header = self.view.table.horizontalHeader()
+        prev_texts = header.get_all_filters() if hasattr(header, "get_all_filters") else []
 
         self.view.model = PaymentTableModel(items, model_class)
         self.view.proxy_model.setSourceModel(self.view.model)
@@ -61,9 +59,8 @@ class PaymentTableController(TableController):
             self.view.model.headerData(i, Qt.Horizontal)
             for i in range(self.view.model.columnCount())
         ]
-        self.view.column_filters.set_headers(
-            headers, prev_texts, self.view.COLUMN_FIELD_MAP
-        )
+        if hasattr(header, "set_headers"):
+            header.set_headers(headers, prev_texts, self.view.COLUMN_FIELD_MAP)
         QTimer.singleShot(0, self.view.load_table_settings)
 
         self.view.paginator.set_summary(
