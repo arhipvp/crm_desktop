@@ -259,8 +259,10 @@ class PolicyForm(BaseEditForm):
     def save(self):
         data = self.collect_data()
         contractor = data.get("contractor")
-        contractor_changed = contractor and (
-            self.instance is None or contractor != (self.instance.contractor or "")
+        contractor_changed = (
+            self.instance is not None
+            and contractor not in (None, "-", "—")
+            and contractor != (self.instance.contractor or "")
         )
         try:
             saved = self.save_data(data)
@@ -273,8 +275,9 @@ class PolicyForm(BaseEditForm):
                         if cnt == 0 or confirm(
                             f"Уже есть {cnt} расход(ов) по этому полису. Все равно создать?"
                         ):
-                            add_contractor_expense(saved)
-                            show_info("Расход для контрагента создан.")
+                            if saved.contractor not in (None, "-", "—"):
+                                add_contractor_expense(saved)
+                                show_info("Расход для контрагента создан.")
                 self.saved_instance = saved
                 self.accept()
         except DuplicatePolicyError as e:
