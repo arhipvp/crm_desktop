@@ -1,3 +1,5 @@
+import logging
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
@@ -10,6 +12,9 @@ from ui.common.colors import HIGHLIGHT_COLOR_INCOME
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.expense_form import ExpenseForm
 from ui.views.expense_detail_view import ExpenseDetailView
+
+
+logger = logging.getLogger(__name__)
 
 
 class ExpenseTableModel(BaseTableModel):
@@ -179,6 +184,13 @@ class ExpenseTableView(BaseTableView):
         if date_range:
             filters["expense_date_range"] = date_range
 
+        logger.debug(
+            "Expense filters=%s order=%s %s page=%d",
+            filters,
+            self.order_by,
+            self.order_dir,
+            self.page,
+        )
         items = list(
             expense_service.get_expenses_page(
                 self.page,
@@ -188,6 +200,7 @@ class ExpenseTableView(BaseTableView):
                 **filters,
             )
         )
+        logger.debug("Expense result rows=%d", len(items))
         total = expense_service.build_expense_query(
             order_by=self.order_by, order_dir=self.order_dir, **filters
         ).count()

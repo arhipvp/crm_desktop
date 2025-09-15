@@ -198,6 +198,13 @@ class IncomeTableView(BaseTableView):
         )
         join_executor = order_field is Executor.full_name
 
+        logger.debug(
+            "Income filters=%s order=%s %s page=%d",
+            filters,
+            order_field,
+            order_dir,
+            self.page,
+        )
         query = get_incomes_page(
             self.page,
             self.per_page,
@@ -209,6 +216,7 @@ class IncomeTableView(BaseTableView):
         items = list(
             prefetch(query, Payment, Policy, Client, Deal, DealExecutor, Executor)
         )
+        logger.debug("Income result rows=%d", len(items))
         total = build_income_query(join_executor=join_executor, **filters).count()
         logger.debug("\U0001F4E6 Загружено доходов: %d", len(items))
 
