@@ -197,6 +197,9 @@ class FilterControls(QWidget):
             self._date_to.clear()
             self._date_to.blockSignals(False)
 
+        if self._settings_name:
+            self._save_current_filters()
+
     # ------------------------------------------------------------------
     # Persistence helpers
     # ------------------------------------------------------------------
