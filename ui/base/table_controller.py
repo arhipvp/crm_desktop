@@ -36,6 +36,8 @@ class TableController:
         self.view.model = BaseTableModel(items, model_class)
         self.view.proxy.setSourceModel(self.view.model)
         self.view.table.setModel(self.view.proxy)
+        self.view._sync_header_filter_icons()
+        self.view.save_table_settings()
 
         try:
             self.view.table.sortByColumn(
@@ -127,6 +129,8 @@ class TableController:
         self.view.model = BaseTableModel(items, self.model_class)
         self.view.proxy.setSourceModel(self.view.model)
         self.view.table.setModel(self.view.proxy)
+        self.view._sync_header_filter_icons()
+        self.view.save_table_settings()
         try:
             self.view.table.sortByColumn(
                 self.view.current_sort_column, self.view.current_sort_order
