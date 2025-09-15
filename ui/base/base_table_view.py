@@ -423,17 +423,18 @@ class BaseTableView(QWidget):
         from ui.views.deal_detail import DealDetailView
         DealDetailView(deal, parent=self).exec()
 
-    def export_csv(self, path: str | None = None, *_):
-        """Экспорт выделенных объектов в CSV.
+    def export_csv(self, path: str | None = None, *, all_rows: bool = False, **_):
+        """Экспорт объектов в CSV.
 
         - Логируем шаги (info/debug/warning).
         - Поддерживаем странный вызов с bool вместо пути (приводим к None).
         - Экспортируем только видимые колонки (по columnCount()).
+        - Если ``all_rows`` истинен, экспортируем все строки модели.
         """
         if isinstance(path, bool):
             path = None
 
-        objs = self.get_selected_objects()
+        objs = self.model.objects if all_rows else self.get_selected_objects()
         logger.info("Запрошен экспорт %d строк", len(objs))
 
         if not objs:
