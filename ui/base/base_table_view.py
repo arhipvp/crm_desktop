@@ -7,7 +7,7 @@ from datetime import date
 
 from peewee import Field
 
-from PySide6.QtCore import Qt, Signal, QRect, QPoint, QDate
+from PySide6.QtCore import Qt, Signal, QRect, QPoint
 from PySide6.QtGui import QShortcut, QPainter, QPainterPath, QPalette
 
 from PySide6.QtWidgets import (
@@ -125,7 +125,11 @@ class FilterHeaderView(QHeaderView):
 from ui.base.table_controller import TableController
 from ui.common.paginator import Paginator
 from ui.common.styled_widgets import styled_button
-from ui.common.date_utils import get_date_or_none
+from ui.common.date_utils import (
+    clear_optional_date,
+    configure_optional_date_edit,
+    get_date_or_none,
+)
 from ui.common.multi_filter_proxy import MultiFilterProxyModel
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
@@ -241,16 +245,13 @@ class BaseTableView(QWidget):
             self.date_from = QDateEdit()
             self.date_from.setCalendarPopup(True)
             self.date_from.setSpecialValueText("—")
-            self.date_from.clear()
+            configure_optional_date_edit(self.date_from)
             self.date_from.dateChanged.connect(self._on_filters_changed)
             self.date_to = QDateEdit()
             self.date_to.setCalendarPopup(True)
             self.date_to.setSpecialValueText("—")
-            self.date_to.clear()
+            configure_optional_date_edit(self.date_to)
             self.date_to.dateChanged.connect(self._on_filters_changed)
-            for widget in (self.date_from, self.date_to):
-                widget.setMinimumDate(QDate())
-                widget.setDate(QDate())
             self.toolbar.addWidget(QLabel("С:"))
             self.toolbar.addWidget(self.date_from)
             self.toolbar.addWidget(QLabel("По:"))
@@ -417,12 +418,10 @@ class BaseTableView(QWidget):
             box.blockSignals(False)
 
         if self.date_filter_field:
-            self.date_from.blockSignals(True)
-            self.date_from.clear()
-            self.date_from.blockSignals(False)
-            self.date_to.blockSignals(True)
-            self.date_to.clear()
-            self.date_to.blockSignals(False)
+            for widget in (self.date_from, self.date_to):
+                widget.blockSignals(True)
+                clear_optional_date(widget)
+                widget.blockSignals(False)
 
     def clear_column_filters(self) -> None:
         """Очищает сохранённые фильтры столбцов и сбрасывает их в прокси."""

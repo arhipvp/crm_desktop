@@ -16,7 +16,11 @@ from PySide6.QtWidgets import (
 
 from ui import settings as ui_settings
 
-from ui.common.date_utils import get_date_or_none
+from ui.common.date_utils import (
+    clear_optional_date,
+    configure_optional_date_edit,
+    get_date_or_none,
+)
 
 
 class FilterControls(QWidget):
@@ -79,11 +83,11 @@ class FilterControls(QWidget):
             self._date_from = QDateEdit()
             self._date_from.setCalendarPopup(True)
             self._date_from.setSpecialValueText("—")
-            self._date_from.clear()
+            configure_optional_date_edit(self._date_from)
             self._date_to = QDateEdit()
             self._date_to.setCalendarPopup(True)
             self._date_to.setSpecialValueText("—")
-            self._date_to.clear()
+            configure_optional_date_edit(self._date_to)
             if on_filter:
                 self._date_from.dateChanged.connect(on_filter)
                 self._date_to.dateChanged.connect(on_filter)
@@ -210,12 +214,12 @@ class FilterControls(QWidget):
 
         if hasattr(self, "_date_from"):
             self._date_from.blockSignals(True)
-            self._date_from.clear()
+            clear_optional_date(self._date_from)
             self._date_from.blockSignals(False)
 
         if hasattr(self, "_date_to"):
             self._date_to.blockSignals(True)
-            self._date_to.clear()
+            clear_optional_date(self._date_to)
             self._date_to.blockSignals(False)
 
         if self._settings_name:

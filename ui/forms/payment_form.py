@@ -15,7 +15,7 @@ from services.payment_service import add_payment, update_payment
 from services.policies import get_policy_by_id
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import create_policy_combobox
-from ui.common.date_utils import get_date_or_none
+from ui.common.date_utils import configure_optional_date_edit, get_date_or_none
 
 
 class PaymentForm(BaseEditForm):
@@ -58,7 +58,7 @@ class PaymentForm(BaseEditForm):
         self.actual_date_edit = QDateEdit(self)
         self.actual_date_edit.setCalendarPopup(True)
         self.actual_date_edit.setSpecialValueText("—")
-        self.actual_date_edit.clear()
+        configure_optional_date_edit(self.actual_date_edit)
         self.fields["actual_payment_date"] = self.actual_date_edit
         self.form_layout.addRow("Actual payment date:", self.actual_date_edit)
 
