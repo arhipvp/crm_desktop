@@ -139,14 +139,6 @@ class IncomeTableView(BaseTableView):
             checkbox_map=checkbox_map,
             date_filter_field="received_date",
         )
-        # Переопределяем обработку фильтров по столбцам: только БД
-        try:
-            self.column_filters.filter_changed.disconnect()
-        except Exception:
-            pass
-        self.column_filters.filter_changed.connect(
-            self._on_column_filter_changed_db
-        )
         self.deal_id = deal_id
         self.default_sort_column = 8
         self.default_sort_order = Qt.DescendingOrder
@@ -321,10 +313,6 @@ class IncomeTableView(BaseTableView):
         if income:
             dlg = self.detail_view_class(income)
             dlg.exec()
-
-    def _on_column_filter_changed_db(self, column: int, text: str):
-        """Обработка изменения фильтра без прокси-модели."""
-        self.on_filter_changed()
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
         """Reload data after header sort change."""
