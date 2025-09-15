@@ -21,6 +21,7 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._filters: Dict[int, QRegularExpression] = {}
+        self._filter_strings: Dict[int, str] = {}
 
     def set_filter(self, column: int, text: str) -> None:
         """Устанавливает фильтр для указанной колонки.
@@ -28,6 +29,7 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
         Пустая строка удаляет фильтр.
         """
 
+        previous_text = self._filter_strings.get(column)
         text = text.strip()
         if text:
             options = (
@@ -38,8 +40,12 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
             esc = QRegularExpression.escape(text)
             pattern = f".*{esc}.*"
             self._filters[column] = QRegularExpression(pattern, options)
+            self._filter_strings[column] = text
         else:
             self._filters.pop(column, None)
+            self._filter_strings.pop(column, None)
+        if previous_text != self._filter_strings.get(column):
+            self.headerDataChanged.emit(Qt.Horizontal, column, column)
         self.invalidateFilter()
 
     # ------------------------------------------------------------------
@@ -56,4 +62,23 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
             if not regex.match(value).hasMatch():
                 return False
         return True
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):  # type: ignore[override]
+        value = super().headerData(section, orientation, role)
+        if orientation != Qt.Horizontal:
+            return value
+        if role == Qt.DisplayRole and section in self._filter_strings:
+            base = "" if value is None else str(value)
+            if base:
+                return f"{base} ⏷"
+            return "⏷"
+        if role == Qt.ToolTipRole and section in self._filter_strings:
+            base = value
+            if not base:
+                base = super().headerData(section, orientation, Qt.DisplayRole)
+            filter_text = self._filter_strings.get(section, "")
+            if base:
+                return f"{base}\nФильтр: {filter_text}"
+            return f"Фильтр: {filter_text}"
+        return value
 

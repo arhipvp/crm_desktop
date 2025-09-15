@@ -1,5 +1,4 @@
 import logging
-from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -8,7 +7,7 @@ from datetime import date
 from peewee import Field
 
 from PySide6.QtCore import Qt, Signal, QRect, QPoint
-from PySide6.QtGui import QShortcut, QPainter, QPainterPath, QPalette
+from PySide6.QtGui import QShortcut
 
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -26,101 +25,7 @@ from PySide6.QtWidgets import (
     QDateEdit,
     QLabel,
     QWidgetAction,
-    QStyle,
-    QStyleOptionHeader,
 )
-
-
-class FilterHeaderView(QHeaderView):
-    """Заголовок таблицы с индикатором активных фильтров."""
-
-    _ICON_SIZE = 12
-    _ICON_MARGIN = 6
-
-    def __init__(self, orientation: Qt.Orientation, parent: QWidget | None = None):
-        super().__init__(orientation, parent)
-        self._filtered_sections: set[int] = set()
-
-    # ------------------------------------------------------------------
-    # API для управления индикаторами фильтров
-    # ------------------------------------------------------------------
-    def set_section_filtered(self, section: int, filtered: bool) -> None:
-        if section < 0 or section >= self.count():
-            return
-        logical = self.logicalIndex(section)
-        if logical < 0:
-            return
-        if filtered:
-            if logical not in self._filtered_sections:
-                self._filtered_sections.add(logical)
-                self.updateSection(logical)
-        elif logical in self._filtered_sections:
-            self._filtered_sections.remove(logical)
-            self.updateSection(logical)
-
-    def set_filtered_sections(self, sections: Iterable[int]) -> None:
-        count = self.count()
-        new_sections: set[int] = set()
-        for section in sections:
-            if section < 0 or section >= count:
-                continue
-            logical = self.logicalIndex(section)
-            if logical >= 0:
-                new_sections.add(logical)
-        if new_sections == self._filtered_sections:
-            return
-        changed = self._filtered_sections.symmetric_difference(new_sections)
-        self._filtered_sections = new_sections
-        if not changed:
-            self.viewport().update()
-            return
-        for section in changed:
-            self.updateSection(section)
-
-    def paintSection(self, painter: QPainter, rect: QRect, logicalIndex: int) -> None:  # noqa: N802
-        super().paintSection(painter, rect, logicalIndex)
-        if logicalIndex not in self._filtered_sections or not rect.isValid():
-            return
-
-        option = QStyleOptionHeader()
-        self.initStyleOption(option)
-        option.rect = rect
-        option.section = logicalIndex
-
-        icon_size = min(self._ICON_SIZE, rect.height() - 4)
-        if icon_size <= 0:
-            return
-
-        margin = min(self._ICON_MARGIN, max(2, rect.height() // 6))
-        available_right = rect.right() - margin
-        if self.isSortIndicatorShown() and self.sortIndicatorSection() == logicalIndex:
-            indicator = self.style().pixelMetric(QStyle.PM_HeaderMarkSize, option, self)
-            available_right -= indicator + margin
-
-        left = available_right - icon_size
-        if left < rect.left() + margin:
-            left = rect.left() + margin
-
-        top = rect.center().y() - icon_size / 2
-        bottom = top + icon_size
-        stem_top = top + icon_size * 0.6
-        stem_width = max(2.0, icon_size * 0.35)
-
-        funnel = QPainterPath()
-        funnel.moveTo(left, top)
-        funnel.lineTo(left + icon_size, top)
-        funnel.lineTo(left + icon_size / 2 + stem_width / 2, stem_top)
-        funnel.lineTo(left + icon_size / 2 + stem_width / 2, bottom)
-        funnel.lineTo(left + icon_size / 2 - stem_width / 2, bottom)
-        funnel.lineTo(left + icon_size / 2 - stem_width / 2, stem_top)
-        funnel.closeSubpath()
-
-        painter.save()
-        painter.setRenderHint(QPainter.Antialiasing, True)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(option.palette.color(QPalette.ButtonText))
-        painter.drawPath(funnel)
-        painter.restore()
 
 from ui.base.table_controller import TableController
 from ui.common.paginator import Paginator
@@ -326,10 +231,7 @@ class BaseTableView(QWidget):
         self.proxy_model = self.proxy  # backward compatibility
         self.table.setSortingEnabled(True)
 
-        header = FilterHeaderView(Qt.Horizontal, self.table)
-        self.table.setHorizontalHeader(header)
-        self._filter_header = header
-        self._sync_header_filter_icons()
+        header = self.table.horizontalHeader()
         header.setSectionsMovable(True)
         header.setSectionsClickable(True)
         header.sortIndicatorChanged.connect(self._on_sort_indicator_changed)
@@ -350,26 +252,6 @@ class BaseTableView(QWidget):
         self.paginator.per_page_changed.connect(self._on_per_page_changed)
         self.left_layout.addWidget(self.paginator)
 
-    def _update_header_filter_icon(self, logical: int) -> None:
-        header = getattr(self, "_filter_header", None)
-        if header is None:
-            return
-        visual = header.visualIndex(logical)
-        if visual < 0:
-            return
-        header.set_section_filtered(visual, logical in self._column_filters)
-
-    def _sync_header_filter_icons(self) -> None:
-        header = getattr(self, "_filter_header", None)
-        if header is None:
-            return
-        sections: list[int] = []
-        for logical in self._column_filters.keys():
-            visual = header.visualIndex(logical)
-            if visual >= 0:
-                sections.append(visual)
-        header.set_filtered_sections(sections)
-
     def apply_saved_filters(self) -> None:
         """Переустанавливает сохранённые фильтры столбцов в прокси-модель."""
         header = self.table.horizontalHeader()
@@ -378,7 +260,6 @@ class BaseTableView(QWidget):
             if column < 0 or column >= column_count:
                 continue
             self.proxy.set_filter(column, text)
-        self._sync_header_filter_icons()
 
     # ------------------------------------------------------------------
     # Helpers for toolbar-based filters
@@ -429,7 +310,6 @@ class BaseTableView(QWidget):
         self._column_filters.clear()
         for column in columns:
             self.proxy.set_filter(column, "")
-        self._sync_header_filter_icons()
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         if self.controller:
@@ -461,7 +341,7 @@ class BaseTableView(QWidget):
 
     def _on_reset_filters(self):
         if self.controller:
-            # Обновляем иконки фильтров заголовка до сохранения настроек в контроллере
+            # Сбрасываем фильтры столбцов до сохранения настроек в контроллере
             self.clear_column_filters()
             self.controller._on_reset_filters()
             return
@@ -789,7 +669,19 @@ class BaseTableView(QWidget):
             return
         menu = QMenu(self)
         line = QLineEdit(menu)
-        line.setPlaceholderText(str(self.table.model().headerData(column, Qt.Horizontal)))
+        header_text = ""
+        source_model = getattr(self.proxy, "sourceModel", None)
+        if callable(source_model):
+            model = source_model()
+        else:
+            model = None
+        if model is not None:
+            header_value = model.headerData(column, Qt.Horizontal, Qt.DisplayRole)
+            header_text = "" if header_value is None else str(header_value)
+        else:
+            header_value = self.table.model().headerData(column, Qt.Horizontal, Qt.DisplayRole)
+            header_text = "" if header_value is None else str(header_value)
+        line.setPlaceholderText(header_text)
         line.setText(self._column_filters.get(column, ""))
         action = QWidgetAction(menu)
         action.setDefaultWidget(line)
@@ -813,7 +705,6 @@ class BaseTableView(QWidget):
         else:
             self._column_filters.pop(logical, None)
         self.proxy.set_filter(logical, text)
-        self._update_header_filter_icon(logical)
         self.save_table_settings()
         self.on_filter_changed()
 
@@ -896,7 +787,6 @@ class BaseTableView(QWidget):
                 if text_str:
                     self._column_filters[col_int] = text_str
                 self.proxy.set_filter(col_int, text_str)
-        self._sync_header_filter_icons()
         per_page = saved.get("per_page")
         need_reload = False
         if per_page is not None:
