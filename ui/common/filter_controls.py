@@ -3,7 +3,14 @@
 from datetime import date
 
 from PySide6.QtCore import QDate
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget, QSizePolicy
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QWidget,
+    QSizePolicy,
+    QCheckBox,
+)
 
 from ui import settings as ui_settings
 
@@ -92,11 +99,18 @@ class FilterControls(QWidget):
             layout.addWidget(widget)
 
         # Кнопка экспорта
+        self.export_all_checkbox = None
         if export_callback:
             export_btn = QPushButton("📤 Экспорт CSV")
-            export_btn.clicked.connect(lambda: export_callback())
+            self.export_all_checkbox = QCheckBox("Экспортировать всё")
+            export_btn.clicked.connect(
+                lambda: export_callback(
+                    all_rows=self.export_all_checkbox.isChecked()
+                )
+            )
             export_btn.setFixedHeight(30)
             layout.addWidget(export_btn)
+            layout.addWidget(self.export_all_checkbox)
 
         # Кнопка сброса
         self.reset_btn = QPushButton("Сбросить")
