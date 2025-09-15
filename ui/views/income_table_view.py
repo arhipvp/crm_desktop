@@ -155,6 +155,15 @@ class IncomeTableView(BaseTableView):
         )
         self.row_double_clicked.connect(self.open_detail)
         self.delete_callback = self.delete_selected
+        # ensure toolbar reset action uses our override
+        for act in self.toolbar.actions():
+            if act.text() == "Сбросить":
+                try:
+                    act.triggered.disconnect()
+                except TypeError:
+                    pass
+                act.triggered.connect(self._on_reset_filters)
+                break
         self.load_data()
 
     def get_filters(self) -> dict:
@@ -212,6 +221,26 @@ class IncomeTableView(BaseTableView):
 
     def refresh(self):
         self.load_data()
+
+    def next_page(self):
+        self.page += 1
+        self.load_data()
+
+    def prev_page(self):
+        if self.page > 1:
+            self.page -= 1
+            self.load_data()
+
+    def _on_per_page_changed(self, per_page: int):
+        self.per_page = per_page
+        self.page = 1
+        self.save_table_settings()
+        self.load_data()
+
+    def _on_reset_filters(self):
+        self.clear_filters()
+        self.save_table_settings()
+        self.on_filter_changed()
 
     def on_filter_changed(self, *args, **kwargs):
         self.page = 1
