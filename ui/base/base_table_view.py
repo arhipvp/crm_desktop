@@ -562,6 +562,22 @@ class BaseTableView(QWidget):
         self.column_filters.set_editor_visible(index, visible)
         self.save_table_settings()
 
+    def _rebuild_column_filters(self) -> None:
+        """Пересоздаёт строку фильтров в соответствии с текущим порядком колонок."""
+        header = self.table.horizontalHeader()
+        texts = self.column_filters.get_all_texts()
+        headers = [
+            header.model().headerData(header.logicalIndex(i), Qt.Horizontal)
+            for i in range(header.count())
+        ]
+        self.column_filters.set_headers(
+            headers, texts, column_field_map=self.COLUMN_FIELD_MAP
+        )
+        for i in range(header.count()):
+            self.column_filters.set_editor_visible(
+                i, not self.table.isColumnHidden(i)
+            )
+
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
         """Сохраняет текущую сортировку таблицы."""
         self.current_sort_column = column
@@ -573,6 +589,7 @@ class BaseTableView(QWidget):
 
     def _on_section_moved(self, *_):
         self.save_table_settings()
+        self._rebuild_column_filters()
 
     def save_table_settings(self):
         """Сохраняет настройки сортировки и ширины колонок."""
@@ -631,6 +648,7 @@ class BaseTableView(QWidget):
         texts = saved.get("column_filter_texts", [])
         if texts:
             self.column_filters.set_all_texts(texts)
+        self._rebuild_column_filters()
         per_page = saved.get("per_page")
         need_reload = False
         if per_page is not None:
