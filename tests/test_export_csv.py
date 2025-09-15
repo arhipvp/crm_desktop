@@ -77,14 +77,12 @@ def test_export_button_triggers_csv(in_memory_db, qapp, tmp_path, monkeypatch):
         exported["path"] = path
         exported["objs"] = objs
 
-    # подменяем сам экспорт в CSV
     monkeypatch.setattr("ui.base.base_table_view.export_objects_to_csv", fake_export)
 
     path = tmp_path / "out.csv"
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(path), "csv"))
     monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
 
-    # находим кнопку «Экспорт» в FilterControls
     export_btn = next(
         btn
         for btn in view.filter_controls.findChildren(QPushButton)
@@ -137,7 +135,6 @@ def test_export_csv_all_rows_option(in_memory_db, qapp, tmp_path, monkeypatch):
 
 
 def test_export_csv_no_selection_warns(in_memory_db, qapp, tmp_path, monkeypatch):
-    # Наполнить таблицу, но ничего не выбирать
     Client.create(name="Alice")
     Client.create(name="Bob")
 
@@ -171,9 +168,7 @@ def test_export_button_calls_export_csv(in_memory_db, qapp, tmp_path, monkeypatc
 
     path = tmp_path / "out.csv"
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(path), "csv"))
-    monkeypatch.setattr(
-        "ui.base.base_table_view.export_objects_to_csv", lambda *a, **k: None
-    )
+    monkeypatch.setattr("ui.base.base_table_view.export_objects_to_csv", lambda *a, **k: None)
     monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
 
     view = BaseTableView(model_class=Client)
@@ -381,6 +376,43 @@ def test_export_csv_with_column_map(qapp, tmp_path, monkeypatch):
     text = path.read_text(encoding="utf-8")
     assert "Alice" in text
     assert "30" in text
+
+
+def test_export_csv_exception_shows_message(in_memory_db, qapp, tmp_path, monkeypatch):
+    client = Client.create(name="Alice")
+    view = BaseTableView(model_class=Client)
+    view.set_model_class_and_items(Client, [client], total_count=1)
+    view.table.selectRow(0)
+    qapp.processEvents()
+
+    path = tmp_path / "err.csv"
+
+    def fail_export(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("ui.base.base_table_view.export_objects_to_csv", fail_export)
+
+    shown: dict = {}
+
+    def fake_critical(self, title, text):
+        shown["title"] = title
+        shown["text"] = text
+
+    monkeypatch.setattr(QMessageBox, "critical", fake_critical)
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+
+    logged: dict = {}
+
+    def fake_exception(msg, *args, **kwargs):
+        logged["msg"] = msg
+
+    monkeypatch.setattr("ui.base.base_table_view.logger.exception", fake_exception)
+
+    view.export_csv(str(path))
+
+    assert shown["title"] == "Экспорт"
+    assert shown["text"] == "boom"
+    assert logged["msg"] == "Ошибка экспорта CSV"
 
 
 def test_export_csv_skips_hidden_columns(qapp, tmp_path, monkeypatch):
