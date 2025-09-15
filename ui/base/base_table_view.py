@@ -471,21 +471,35 @@ class BaseTableView(QWidget):
         column_map = getattr(self, "COLUMN_FIELD_MAP", {})
         visible_indices = [i for i in range(column_count) if not self.table.isColumnHidden(i)]
 
-        fields = []
+        fields: list[Field | None] = []
         for i in visible_indices:
             if len(model_fields) > i:
                 fields.append(model_fields[i])
             else:
                 fields.append(column_map.get(i))
-        fields = [f for f in fields if f is not None]
-        if len(fields) < len(visible_indices):
-            logger.warning("Найдено полей: %d < %d колонок", len(fields), len(visible_indices))
 
         # Заголовки берём из модели, если есть.
         try:
             headers = [self.model.headerData(i, Qt.Horizontal, Qt.DisplayRole) for i in visible_indices]
         except Exception:
             headers = None
+
+        # Отфильтровываем колонки без соответствующих полей
+        mask = [f is not None for f in fields]
+        visible_indices = [i for i, keep in zip(visible_indices, mask) if keep]
+        fields = [f for f in fields if f is not None]
+        if headers is not None:
+            headers = [h for h, keep in zip(headers, mask) if keep]
+
+        if headers is not None and len(headers) != len(fields):
+            logger.warning(
+                "Количество заголовков и полей не совпадает: %d != %d",
+                len(headers),
+                len(fields),
+            )
+            min_len = min(len(headers), len(fields))
+            headers = headers[:min_len]
+            fields = fields[:min_len]
 
         logger.debug("Заголовки CSV: %s", [getattr(f, "name", str(f)) for f in fields])
         logger.debug("Количество объектов к экспорту: %d", len(objs))
