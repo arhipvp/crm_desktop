@@ -401,6 +401,7 @@ class BaseTableView(QWidget):
         self._column_filters.clear()
         for column in columns:
             self.proxy.set_filter(column, "")
+        self._sync_header_filter_icons()
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         if self.controller:
@@ -432,7 +433,15 @@ class BaseTableView(QWidget):
 
     def _on_reset_filters(self):
         if self.controller:
+            # Обновляем иконки фильтров заголовка до сохранения настроек в контроллере
+            self.clear_column_filters()
             self.controller._on_reset_filters()
+            return
+
+        self.clear_filters()
+        self.clear_column_filters()
+        self.save_table_settings()
+        self.on_filter_changed()
 
     def get_filters(self) -> dict:
         if self.controller:
