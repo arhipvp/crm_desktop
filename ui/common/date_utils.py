@@ -21,7 +21,9 @@ def is_date_empty(d): ...
 
 def get_date_or_none(widget: QDateEdit):
     qd = widget.date()
-    if not qd.isValid() or qd == widget.minimumDate():
+    if not qd.isValid():
+        return None
+    if qd == widget.minimumDate():
         return None
     return qd.toPython()
 
