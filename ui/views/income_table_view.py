@@ -242,6 +242,7 @@ class IncomeTableView(BaseTableView):
 
     def _on_reset_filters(self):
         self.clear_filters()
+        self.clear_column_filters()
         self.save_table_settings()
         self.on_filter_changed()
 
