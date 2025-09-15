@@ -2,49 +2,168 @@ from __future__ import annotations
 
 """Прокси‑модель с поддержкой фильтрации по нескольким колонкам."""
 
-from typing import Dict
+from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
+import math
+from typing import Any, Callable, Dict, Mapping, Optional
 
 from PySide6.QtCore import (
+    QDate,
     QRegularExpression,
     Qt,
     QSortFilterProxyModel,
 )
 
 
+@dataclass(eq=True)
+class ColumnFilterState:
+    """Описывает выбранное пользователем состояние фильтра."""
+
+    type: str
+    value: Any
+    display: Optional[str] = None
+    meta: Optional[Dict[str, Any]] = None
+
+    def is_empty(self) -> bool:
+        """Проверяет, содержит ли фильтр фактическое значение."""
+
+        if self.type == "text":
+            return not str(self.value or "").strip()
+        if self.type == "bool":
+            return self.value is None
+        if self.type == "date_range":
+            if not isinstance(self.value, Mapping):
+                return True
+            return not (self.value.get("from") or self.value.get("to"))
+        if self.type == "number":
+            return self.value is None or str(self.value) == ""
+        return self.value is None
+
+    def display_text(self) -> str:
+        """Текст для отображения в заголовке таблицы."""
+
+        if self.display:
+            return self.display
+        if self.type == "text":
+            return str(self.value or "")
+        if self.type == "bool":
+            if self.value is True:
+                return "Да"
+            if self.value is False:
+                return "Нет"
+            return ""
+        if self.type == "date_range" and isinstance(self.value, Mapping):
+            start = self.value.get("from")
+            end = self.value.get("to")
+            parts: list[str] = []
+            if start:
+                parts.append(self._format_iso_date(start))
+            if end:
+                parts.append(self._format_iso_date(end))
+            return " — ".join(parts)
+        if self.type == "number":
+            return "" if self.value is None else str(self.value)
+        return "" if self.value is None else str(self.value)
+
+    def backend_value(self) -> Optional[str]:
+        """Возвращает представление фильтра для передачи в сервисы."""
+
+        if self.type == "text":
+            value = str(self.value or "").strip()
+            return value or None
+        if self.type == "bool":
+            if self.value is None:
+                return None
+            return "1" if bool(self.value) else "0"
+        if self.type == "number":
+            if self.value is None:
+                return None
+            return str(self.value)
+        # Для диапазонов и прочих сложных типов серверная фильтрация не поддерживается.
+        return None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Преобразует состояние фильтра к сериализуемому виду."""
+
+        data: Dict[str, Any] = {"type": self.type, "value": self.value}
+        if self.display is not None:
+            data["display"] = self.display
+        if self.meta:
+            data["meta"] = self.meta
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | None) -> Optional["ColumnFilterState"]:
+        """Восстанавливает состояние фильтра из словаря."""
+
+        if not isinstance(data, Mapping):
+            return None
+        type_ = data.get("type")
+        if not type_:
+            return None
+        value = data.get("value")
+        display = data.get("display")
+        meta = data.get("meta")
+        if meta is not None and not isinstance(meta, dict):
+            meta = None
+        return cls(str(type_), value, display if isinstance(display, str) else None, meta)
+
+    @staticmethod
+    def _format_iso_date(value: str) -> str:
+        try:
+            parsed = date.fromisoformat(value)
+        except (TypeError, ValueError):
+            return value
+        return parsed.strftime("%d.%m.%Y")
+
+
 class MultiFilterProxyModel(QSortFilterProxyModel):
     """Расширенная `QSortFilterProxyModel` с несколькими фильтрами.
 
-    Позволяет задавать отдельный текстовый фильтр для каждой колонки.
-    Фильтрация выполняется по всем активным фильтрам одновременно.
+    Позволяет задавать отдельный фильтр для каждой колонки.
+    Поддерживаются текстовые значения, булевы поля, числовые значения и диапазоны дат.
     """
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._filters: Dict[int, QRegularExpression] = {}
+        self._filters: Dict[int, Callable[[Any, Any], bool]] = {}
         self._filter_strings: Dict[int, str] = {}
+        self._filter_states: Dict[int, ColumnFilterState] = {}
 
-    def set_filter(self, column: int, text: str) -> None:
+    def set_filter(
+        self,
+        column: int,
+        state: ColumnFilterState | Mapping[str, Any] | str | None,
+    ) -> None:
         """Устанавливает фильтр для указанной колонки.
 
-        Пустая строка удаляет фильтр.
+        ``state`` может быть строкой, словарём (для восстановления из настроек)
+        или экземпляром :class:`ColumnFilterState`.
+        Пустое значение удаляет фильтр.
         """
 
-        previous_text = self._filter_strings.get(column)
-        text = text.strip()
-        if text:
-            options = (
-                QRegularExpression.CaseInsensitiveOption
-                if self.filterCaseSensitivity() == Qt.CaseInsensitive
-                else QRegularExpression.NoPatternOption
-            )
-            esc = QRegularExpression.escape(text)
-            pattern = f".*{esc}.*"
-            self._filters[column] = QRegularExpression(pattern, options)
-            self._filter_strings[column] = text
-        else:
+        previous_state = self._filter_states.get(column)
+        normalized = self._normalize_state(state)
+        if normalized is None or normalized.is_empty():
             self._filters.pop(column, None)
+            self._filter_states.pop(column, None)
             self._filter_strings.pop(column, None)
-        if previous_text != self._filter_strings.get(column):
+        else:
+            matcher = self._create_matcher(normalized)
+            if matcher is None:
+                self._filters.pop(column, None)
+                self._filter_states.pop(column, None)
+                self._filter_strings.pop(column, None)
+            else:
+                self._filters[column] = matcher
+                self._filter_states[column] = normalized
+                display_text = normalized.display_text()
+                if display_text:
+                    self._filter_strings[column] = display_text
+                else:
+                    self._filter_strings.pop(column, None)
+        if previous_state != self._filter_states.get(column):
             self.headerDataChanged.emit(Qt.Horizontal, column, column)
         self.invalidateFilter()
 
@@ -55,11 +174,11 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
         model = self.sourceModel()
         if not model:
             return True
-        for column, regex in self._filters.items():
+        for column, matcher in self._filters.items():
             index = model.index(source_row, column, source_parent)
-            data = model.data(index, self.filterRole())
-            value = "" if data is None else str(data)
-            if not regex.match(value).hasMatch():
+            raw_value = model.data(index, Qt.UserRole)
+            display_value = model.data(index, self.filterRole())
+            if not matcher(raw_value, display_value):
                 return False
         return True
 
@@ -81,4 +200,169 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
                 return f"{base}\nФильтр: {filter_text}"
             return f"Фильтр: {filter_text}"
         return value
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    def _normalize_state(
+        self,
+        state: ColumnFilterState | Mapping[str, Any] | str | None,
+    ) -> Optional[ColumnFilterState]:
+        if state is None:
+            return None
+        if isinstance(state, ColumnFilterState):
+            return state
+        if isinstance(state, str):
+            text = state.strip()
+            if not text:
+                return None
+            return ColumnFilterState("text", text)
+        return ColumnFilterState.from_dict(state)
+
+    def _create_matcher(
+        self, state: ColumnFilterState
+    ) -> Optional[Callable[[Any, Any], bool]]:
+        if state.type == "text":
+            text = str(state.value or "").strip()
+            if not text:
+                return None
+            options = (
+                QRegularExpression.CaseInsensitiveOption
+                if self.filterCaseSensitivity() == Qt.CaseInsensitive
+                else QRegularExpression.NoPatternOption
+            )
+            esc = QRegularExpression.escape(text)
+            pattern = f".*{esc}.*"
+            regex = QRegularExpression(pattern, options)
+            return lambda _raw, display: regex.match(
+                "" if display is None else str(display)
+            ).hasMatch()
+
+        if state.type == "bool":
+            desired = state.value
+            if desired is None:
+                return None
+            bool_value = bool(desired)
+
+            def matcher(raw: Any, _display: Any) -> bool:
+                if raw is None:
+                    return False
+                if isinstance(raw, bool):
+                    return raw is bool_value
+                if isinstance(raw, (int, float)):
+                    return bool(raw) is bool_value
+                if isinstance(raw, str):
+                    lowered = raw.lower()
+                    if lowered in {"true", "1", "yes", "да"}:
+                        return bool_value is True
+                    if lowered in {"false", "0", "no", "нет"}:
+                        return bool_value is False
+                return False
+
+            return matcher
+
+        if state.type == "date_range" and isinstance(state.value, Mapping):
+            start = self._parse_iso_date(state.value.get("from"))
+            end = self._parse_iso_date(state.value.get("to"))
+            if start is None and end is None:
+                return None
+
+            def matcher(raw: Any, _display: Any) -> bool:
+                current = self._coerce_to_date(raw)
+                if current is None:
+                    return False
+                if start and current < start:
+                    return False
+                if end and current > end:
+                    return False
+                return True
+
+            return matcher
+
+        if state.type == "number":
+            meta = state.meta or {}
+            value_type = meta.get("value_type")
+            target = self._to_number(state.value, value_type)
+            if target is None:
+                return None
+
+            def matcher(raw: Any, _display: Any) -> bool:
+                current = self._to_number(raw, value_type)
+                if current is None:
+                    return False
+                if value_type == "int":
+                    return int(current) == int(target)
+                return math.isclose(float(current), float(target), rel_tol=1e-9, abs_tol=1e-9)
+
+            return matcher
+
+        # Для неизвестных типов используем текстовое сравнение
+        text = str(state.value or "").strip()
+        if not text:
+            return None
+        options = (
+            QRegularExpression.CaseInsensitiveOption
+            if self.filterCaseSensitivity() == Qt.CaseInsensitive
+            else QRegularExpression.NoPatternOption
+        )
+        esc = QRegularExpression.escape(text)
+        pattern = f".*{esc}.*"
+        regex = QRegularExpression(pattern, options)
+        return lambda _raw, display: regex.match(
+            "" if display is None else str(display)
+        ).hasMatch()
+
+    @staticmethod
+    def _parse_iso_date(value: Any) -> Optional[date]:
+        if value in (None, ""):
+            return None
+        if isinstance(value, date):
+            return value
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, QDate):
+            return value.toPython()
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _coerce_to_date(value: Any) -> Optional[date]:
+        if value is None:
+            return None
+        if isinstance(value, date):
+            return value
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, QDate):
+            return value.toPython()
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _to_number(value: Any, value_type: Optional[str]) -> Optional[float]:
+        if value is None:
+            return None
+        if value_type == "int":
+            try:
+                return float(int(value))
+            except (TypeError, ValueError):
+                return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, Decimal):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        return None
 

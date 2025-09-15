@@ -185,7 +185,7 @@ class TableController:
         }
         header = self.view.table.horizontalHeader()
         column_filters = {}
-        for logical, text in self.view._column_filters.items():
+        for logical, state in self.view._column_filters.items():
             visual = header.visualIndex(logical)
             if visual < 0:
                 continue
@@ -195,7 +195,10 @@ class TableController:
             field = self.view.COLUMN_FIELD_MAP.get(logical_index)
             if not field:
                 continue
-            column_filters[field] = text
+            backend_value = state.backend_value() if state else None
+            if backend_value is None:
+                continue
+            column_filters[field] = backend_value
         filters["column_filters"] = column_filters
         date_range = self.view.get_date_filter()
         if date_range:
