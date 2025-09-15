@@ -155,7 +155,7 @@ def get_policies_page(
     show_deleted=False,
     deal_id=None,
     client_id=None,
-    order_by="start_date",
+    order_by: str | Field | None = Policy.start_date,
     order_dir="asc",
     include_renewed=True,
     without_deal_only=False,
@@ -180,6 +180,14 @@ def get_policies_page(
     Returns:
         ModelSelect: Отфильтрованная выборка полисов.
     """
+    if isinstance(order_by, Field):
+        order_field = order_by
+    elif isinstance(order_by, str):
+        candidate = getattr(Policy, order_by, None)
+        order_field = candidate if isinstance(candidate, Field) else Policy.start_date
+    else:
+        order_field = Policy.start_date
+
     query = build_policy_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -188,17 +196,13 @@ def get_policies_page(
         include_renewed=include_renewed,
         without_deal_only=without_deal_only,
         column_filters=column_filters,
+        order_by=order_field,
         **filters,
     )
-    # Выбираем поле сортировки
-    if hasattr(Policy, order_by):
-        order_field = getattr(Policy, order_by)
-        if order_dir == "desc":
-            query = query.order_by(order_field.desc())
-        else:
-            query = query.order_by(order_field.asc())
+    if order_dir == "desc":
+        query = query.order_by(order_field.desc())
     else:
-        query = query.order_by(Policy.start_date.asc())
+        query = query.order_by(order_field.asc())
     offset = (page - 1) * per_page
     return query.offset(offset).limit(per_page)
 
@@ -704,6 +708,7 @@ def build_policy_query(
     include_renewed: bool = True,
     without_deal_only: bool = False,
     column_filters: dict | None = None,
+    order_by: Field | str | None = None,
     **filters,
 ):
     """Сформировать запрос для выборки полисов с фильтрами."""
@@ -721,7 +726,10 @@ def build_policy_query(
         )
     if deal_id is None and without_deal_only:
         query = query.where(Policy.deal_id.is_null(True))
-    if column_filters and Deal.description in column_filters:
+    join_deal = bool(column_filters and Deal.description in column_filters)
+    if isinstance(order_by, Field) and order_by.model == Deal:
+        join_deal = True
+    if join_deal:
         query = query.switch(Policy).join(Deal, JOIN.LEFT_OUTER)
     query = apply_search_and_filters(query, Policy, search_text, column_filters)
     return query

@@ -67,7 +67,9 @@ def get_clients_page(
         show_deleted=show_deleted,
         column_filters=column_filters,
     )
-    if isinstance(order_by, str):
+    if not order_by:
+        field = Client.name
+    elif isinstance(order_by, str):
         field = getattr(Client, order_by, Client.name)
     else:
         field = order_by

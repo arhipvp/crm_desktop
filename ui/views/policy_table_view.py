@@ -48,16 +48,11 @@ class PolicyTableView(BaseTableView):
             "Показывать только полисы без сделок": self.on_filter_changed,
         }
 
-        self.order_by = "start_date"
-        self.order_dir = "asc"
-
         def _get_page(page, per_page, **f):
             items = list(
                 get_policies_page(
                     page,
                     per_page,
-                    order_by=self.order_by,
-                    order_dir=self.order_dir,
                     **f,
                 )
             )
@@ -345,14 +340,12 @@ class PolicyTableView(BaseTableView):
             model_class, items, total_count=total_count
         )
 
-    def on_sort_changed(self, logicalIndex: int, order: Qt.SortOrder):
-        field = self.model.fields[logicalIndex].name
-        if not hasattr(Policy, field):
+    def on_sort_changed(self, logical_index: int, order: Qt.SortOrder):
+        field = self.COLUMN_FIELD_MAP.get(logical_index)
+        if field is None:
             return
-        self.current_sort_column = logicalIndex
+        self.current_sort_column = logical_index
         self.current_sort_order = order
-        self.order_dir = "desc" if order == Qt.DescendingOrder else "asc"
-        self.order_by = field
         self.page = 1
         self.load_data()
 
