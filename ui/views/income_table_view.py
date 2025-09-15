@@ -166,6 +166,12 @@ class IncomeTableView(BaseTableView):
                 )
             }
         )
+        cf = filters.get("column_filters", {})
+        filters["column_filters"] = {
+            self.COLUMN_FIELD_MAP.get(col): text
+            for col, text in cf.items()
+            if self.COLUMN_FIELD_MAP.get(col)
+        }
         if self.deal_id:
             filters["deal_id"] = self.deal_id
         date_range = filters.pop("received_date", None)
