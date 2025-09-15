@@ -35,7 +35,8 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
                 if self.filterCaseSensitivity() == Qt.CaseInsensitive
                 else QRegularExpression.NoPatternOption
             )
-            pattern = QRegularExpression.escape(text)
+            esc = QRegularExpression.escape(text)
+            pattern = f".*{esc}.*"
             self._filters[column] = QRegularExpression(pattern, options)
         else:
             self._filters.pop(column, None)
