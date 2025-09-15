@@ -47,17 +47,26 @@ class FilterHeaderView(QHeaderView):
     def set_section_filtered(self, section: int, filtered: bool) -> None:
         if section < 0 or section >= self.count():
             return
+        logical = self.logicalIndex(section)
+        if logical < 0:
+            return
         if filtered:
-            if section not in self._filtered_sections:
-                self._filtered_sections.add(section)
-                self.updateSection(section)
-        elif section in self._filtered_sections:
-            self._filtered_sections.remove(section)
-            self.updateSection(section)
+            if logical not in self._filtered_sections:
+                self._filtered_sections.add(logical)
+                self.updateSection(logical)
+        elif logical in self._filtered_sections:
+            self._filtered_sections.remove(logical)
+            self.updateSection(logical)
 
     def set_filtered_sections(self, sections: Iterable[int]) -> None:
         count = self.count()
-        new_sections = {s for s in sections if 0 <= s < count}
+        new_sections: set[int] = set()
+        for section in sections:
+            if section < 0 or section >= count:
+                continue
+            logical = self.logicalIndex(section)
+            if logical >= 0:
+                new_sections.add(logical)
         if new_sections == self._filtered_sections:
             return
         changed = self._filtered_sections.symmetric_difference(new_sections)
@@ -340,15 +349,25 @@ class BaseTableView(QWidget):
         self.paginator.per_page_changed.connect(self._on_per_page_changed)
         self.left_layout.addWidget(self.paginator)
 
-    def _update_header_filter_icon(self, column: int) -> None:
+    def _update_header_filter_icon(self, logical: int) -> None:
         header = getattr(self, "_filter_header", None)
-        if header is not None:
-            header.set_section_filtered(column, column in self._column_filters)
+        if header is None:
+            return
+        visual = header.visualIndex(logical)
+        if visual < 0:
+            return
+        header.set_section_filtered(visual, logical in self._column_filters)
 
     def _sync_header_filter_icons(self) -> None:
         header = getattr(self, "_filter_header", None)
-        if header is not None:
-            header.set_filtered_sections(self._column_filters.keys())
+        if header is None:
+            return
+        sections: list[int] = []
+        for logical in self._column_filters.keys():
+            visual = header.visualIndex(logical)
+            if visual >= 0:
+                sections.append(visual)
+        header.set_filtered_sections(sections)
 
     # ------------------------------------------------------------------
     # Helpers for toolbar-based filters
@@ -756,6 +775,9 @@ class BaseTableView(QWidget):
         column = header.logicalIndexAt(pos)
         if column < 0:
             return
+        visual = header.visualIndex(column)
+        if visual < 0:
+            return
         menu = QMenu(self)
         line = QLineEdit(menu)
         line.setPlaceholderText(str(self.table.model().headerData(column, Qt.Horizontal)))
@@ -763,23 +785,27 @@ class BaseTableView(QWidget):
         action = QWidgetAction(menu)
         action.setDefaultWidget(line)
         menu.addAction(action)
-        line.textChanged.connect(lambda text, c=column: self._on_filter_text_changed(c, text))
+        line.textChanged.connect(lambda text, v=visual: self._on_filter_text_changed(v, text))
         menu.addSeparator()
         clear_action = menu.addAction("Очистить фильтр")
-        clear_action.triggered.connect(lambda c=column: self._on_filter_text_changed(c, ""))
+        clear_action.triggered.connect(lambda v=visual: self._on_filter_text_changed(v, ""))
         pos_x = header.sectionViewportPosition(column)
         width = header.sectionSize(column)
         rect = QRect(pos_x, 0, width, header.height())
         menu.popup(header.mapToGlobal(rect.bottomLeft()))
 
-    def _on_filter_text_changed(self, column: int, text: str) -> None:
+    def _on_filter_text_changed(self, visual: int, text: str) -> None:
+        header = self.table.horizontalHeader()
+        logical = header.logicalIndex(visual)
+        if logical < 0:
+            return
         text = text.strip()
         if text:
-            self._column_filters[column] = text
+            self._column_filters[logical] = text
         else:
-            self._column_filters.pop(column, None)
-        self.proxy.set_filter(column, text)
-        self._update_header_filter_icon(column)
+            self._column_filters.pop(logical, None)
+        self.proxy.set_filter(logical, text)
+        self._update_header_filter_icon(logical)
         self.save_table_settings()
         self.on_filter_changed()
 
