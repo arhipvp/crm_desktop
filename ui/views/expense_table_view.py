@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
 
@@ -206,11 +206,6 @@ class ExpenseTableView(BaseTableView):
                 **filters,
             )
         )
-        total_sum = sum(e.amount for e in items)
-        if items:
-            self.paginator.set_summary(f"Сумма: {total_sum:.2f} ₽")
-        else:
-            self.paginator.set_summary("")
         total = expense_service.build_expense_query(
             order_by=self.order_by, order_dir=self.order_dir, **filters
         ).count()
@@ -317,29 +312,12 @@ class ExpenseTableView(BaseTableView):
             dlg.exec()
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
-        prev_texts = [
-            self.column_filters.get_text(i)
-            for i in range(len(self.column_filters._editors))
-        ]
-        self.model = ExpenseTableModel(items, model_class)
-        self.proxy_model.setSourceModel(self.model)
-        self.table.setModel(self.proxy_model)
-        try:
-            self.table.horizontalHeader().setSortIndicator(
-                self.current_sort_column, self.current_sort_order
-            )
-            self.table.resizeColumnsToContents()
-        except NotImplementedError:
-            pass
-        if total_count is not None:
-            self.total_count = total_count
-            self.paginator.update(self.total_count, self.page, self.per_page)
-        headers = [
-            self.model.headerData(i, Qt.Horizontal)
-            for i in range(self.model.columnCount())
-        ]
-        self.column_filters.set_headers(headers, prev_texts, self.COLUMN_FIELD_MAP)
-        QTimer.singleShot(0, self.load_table_settings)
+        super().set_model_class_and_items(
+            model_class, items, total_count=total_count
+        )
+        total_sum = sum(e.amount for e in items)
+        summary = f"Сумма: {total_sum:.2f} ₽" if items else ""
+        self.paginator.set_summary(summary)
 
     def get_base_query(self):
         if self.deal_id:

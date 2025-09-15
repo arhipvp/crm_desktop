@@ -103,24 +103,8 @@ class CalculationTableView(BaseTableView):
         self.set_model_class_and_items(DealCalculation, items, total_count=len(items))
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
-        prev_texts = self.column_filters.get_all_texts()
-        self.model = CalculationTableModel(items, model_class)
-        self.proxy_model.setSourceModel(self.model)
-        self.table.setModel(self.proxy_model)
-        try:
-            self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
-            self.table.resizeColumnsToContents()
-        except NotImplementedError:
-            pass
-        if total_count is not None:
-            self.total_count = total_count
-            self.paginator.update(self.total_count, self.page, self.per_page)
-        headers = [
-            self.model.headerData(i, Qt.Horizontal)
-            for i in range(self.model.columnCount())
-        ]
-        self.column_filters.set_headers(
-            headers, prev_texts, column_field_map=self.COLUMN_FIELD_MAP
+        super().set_model_class_and_items(
+            model_class, items, total_count=total_count
         )
 
     # Ensure refresh/filter/pagination use our local loader (not TableController)
