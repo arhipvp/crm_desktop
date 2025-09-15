@@ -8,8 +8,8 @@
 При изменениях в этом каталоге запускайте тесты с таймаутом:
 
 ```bash
-PYTEST_TIMEOUT=120 pytest -vv tests/test_main_window_settings.py
-PYTEST_TIMEOUT=120 pytest -vv tests/test_search_and_filters.py
+PYTEST_TIMEOUT=120 pytest -vv tests/test_main_window.py
+PYTEST_TIMEOUT=120 pytest -vv tests/test_table_sorting.py
 ```
 
 Эти команды проверяют корректность работы основных виджетов.
