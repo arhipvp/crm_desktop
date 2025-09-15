@@ -106,7 +106,7 @@ class PaymentTableView(BaseTableView):
     def _apply_filters(self, filters: dict) -> dict:
         filters.update(
             {
-                "include_paid": self.filter_controls.is_checked("Показывать оплаченные"),
+                "include_paid": self.is_checked("Показывать оплаченные"),
             }
         )
         if self.deal_id is not None:

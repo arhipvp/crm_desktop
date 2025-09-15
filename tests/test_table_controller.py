@@ -6,10 +6,12 @@ from ui import settings as ui_settings
 
 
 def test_on_reset_filters(monkeypatch):
-    filter_controls = types.SimpleNamespace(clear_all=MagicMock())
+    header = types.SimpleNamespace(set_all_filters=MagicMock())
+    table = types.SimpleNamespace(horizontalHeader=lambda: header)
     view = types.SimpleNamespace(
-        filter_controls=filter_controls,
+        clear_filters=MagicMock(),
         save_table_settings=MagicMock(),
+        table=table,
     )
     controller = TableController(view)
     controller.on_filter_changed = MagicMock()
@@ -18,7 +20,7 @@ def test_on_reset_filters(monkeypatch):
 
     controller._on_reset_filters()
 
-    filter_controls.clear_all.assert_called_once()
+    view.clear_filters.assert_called_once()
     view.save_table_settings.assert_called_once()
     controller.on_filter_changed.assert_called_once()
     ui_settings.set_table_filters.assert_not_called()

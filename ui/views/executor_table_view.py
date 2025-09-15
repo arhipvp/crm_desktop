@@ -25,7 +25,10 @@ class ExecutorTableView(BaseTableView):
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = Qt.AscendingOrder
 
-        checkbox_map = {"Показывать неактивных": self.refresh}
+        checkbox_map = {
+            "Показывать неактивных": self.refresh,
+            "Показывать удалённые": None,
+        }
         super().__init__(
             parent=parent,
             model_class=Executor,
@@ -35,16 +38,6 @@ class ExecutorTableView(BaseTableView):
             checkbox_map=checkbox_map,
         )
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        # Скрыть нерелевантный чекбокс "Показывать удалённые" для исполнителей
-        try:
-            show_inactive_label = "�?�?������<�?���'�? �?�����'��?�?�<�:"
-            cbx = getattr(self.filter_controls, "_cbx", None)
-            if cbx:
-                for label, box in cbx.checkboxes.items():
-                    if label != show_inactive_label:
-                        box.setVisible(False)
-        except Exception:
-            pass
         self.row_double_clicked.connect(self.edit_selected)
         self.table.horizontalHeader().sortIndicatorChanged.connect(
             self.on_sort_changed
@@ -88,7 +81,7 @@ class ExecutorTableView(BaseTableView):
         filters = super().get_filters()
         filters.update(
             {
-                "show_inactive": self.filter_controls.is_checked("Показывать неактивных"),
+                "show_inactive": self.is_checked("Показывать неактивных"),
             }
         )
         filters.pop("show_deleted", None)

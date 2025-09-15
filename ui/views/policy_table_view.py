@@ -118,8 +118,8 @@ class PolicyTableView(BaseTableView):
     def _apply_filters(self, filters: dict) -> dict:
         filters.update(
             {
-                "include_renewed": self.filter_controls.is_checked("Показывать продленное"),
-                "without_deal_only": self.filter_controls.is_checked("Показывать только полисы без сделок"),
+                "include_renewed": self.is_checked("Показывать продленное"),
+                "without_deal_only": self.is_checked("Показывать только полисы без сделок"),
             }
         )
         if self.deal_id is not None:

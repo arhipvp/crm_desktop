@@ -28,7 +28,6 @@ from services.task_notifications import notify_task
 from ui.common.message_boxes import confirm, show_error
 from ui.base.base_table_view import BaseTableView
 from ui.common.delegates import StatusDelegate
-from ui.common.filter_controls import FilterControls
 from ui.common.styled_widgets import styled_button
 from ui.forms.task_form import TaskForm
 from ui.views.task_detail_view import TaskDetailView
@@ -106,6 +105,7 @@ class TaskTableView(BaseTableView):
             model_class=Task,
             form_class=TaskForm,
             detail_view_class=TaskDetailView,
+            checkbox_map={"Показывать выполненные": self.on_filter_changed},
         )
         self.sort_field = "due_date"
         self.sort_order = "asc"
@@ -117,22 +117,6 @@ class TaskTableView(BaseTableView):
             self.on_sort_changed
         )
         # Кнопка «Редактировать» должна сразу открывать форму задачи
-
-        # ────────────────── Панель фильтров ──────────────────
-        self.left_layout.removeWidget(self.filter_controls)
-        self.filter_controls.deleteLater()
-        self.filter_controls = FilterControls(
-            search_callback=self.on_filter_changed,
-            checkbox_map={
-                "Показывать удалённые": self.on_filter_changed,
-                "Показывать выполненные": self.on_filter_changed,
-            },
-            on_filter=self.on_filter_changed,
-            export_callback=self.export_csv,
-            search_placeholder="Поиск…",
-            settings_name=self.settings_id,
-        )
-        self.left_layout.insertWidget(0, self.filter_controls)
 
         # ────────────────── Кнопка «Отправить» ──────────────────
         self.send_btn = styled_button(
@@ -246,8 +230,8 @@ class TaskTableView(BaseTableView):
         filters = super().get_filters()
         filters.update(
             {
-                "include_deleted": self.filter_controls.is_checked("Показывать удалённые"),
-                "include_done": self.filter_controls.is_checked("Показывать выполненные"),
+                "include_deleted": self.is_checked("Показывать удалённые"),
+                "include_done": self.is_checked("Показывать выполненные"),
             }
         )
         filters.pop("show_deleted", None)

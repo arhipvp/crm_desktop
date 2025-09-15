@@ -202,7 +202,7 @@ class DealTableView(BaseTableView):
         filters = super().get_filters()
         filters.update(
             {
-                "show_closed": self.filter_controls.is_checked("Показать закрытые"),
+                "show_closed": self.is_checked("Показать закрытые"),
             }
         )
         return filters

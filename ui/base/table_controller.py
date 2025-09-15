@@ -130,7 +130,7 @@ class TableController:
         self.load_data()
 
     def _on_reset_filters(self):
-        self.view.filter_controls.clear_all()
+        self.view.clear_filters()
         header = self.view.table.horizontalHeader()
         if hasattr(header, "set_all_filters"):
             header.set_all_filters({})
@@ -140,12 +140,10 @@ class TableController:
     # --- Фильтры ---------------------------------------------------------
     def get_filters(self) -> dict:
         filters = {
-            "show_deleted": self.view.filter_controls.is_checked(
-                "Показывать удалённые"
-            ),
-            "search_text": self.view.filter_controls.get_search_text(),
+            "show_deleted": self.view.is_checked("Показывать удалённые"),
+            "search_text": self.view.get_search_text(),
         }
-        date_range = self.view.filter_controls.get_date_filter()
+        date_range = self.view.get_date_filter()
         if date_range:
             filters.update(date_range)
         if self.filter_func:
