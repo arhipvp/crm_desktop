@@ -170,6 +170,12 @@ class ExpenseTableView(BaseTableView):
 
     def load_data(self):
         filters = super().get_filters()
+        cf = filters.get("column_filters", {})
+        filters["column_filters"] = {
+            self.COLUMN_FIELD_MAP.get(col): text
+            for col, text in cf.items()
+            if self.COLUMN_FIELD_MAP.get(col)
+        }
         filters.update(
             {"include_paid": self.is_checked("Показывать выплаченные")}
         )
