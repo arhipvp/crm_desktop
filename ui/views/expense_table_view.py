@@ -174,11 +174,14 @@ class ExpenseTableView(BaseTableView):
 
     def get_column_filters(self) -> dict:
         """Собрать фильтры по столбцам в виде {Field | str: text}."""
+        header = self.table.horizontalHeader()
         result: dict = {}
-        for col, field in self.COLUMN_FIELD_MAP.items():
+        for visual in range(header.count()):
+            logical = header.logicalIndex(visual)
+            field = self.COLUMN_FIELD_MAP.get(logical)
             if field is None:
                 continue
-            text = self.column_filters.get_text(col)
+            text = self.column_filters.get_text(visual)
             if text:
                 result[field] = text
         return result

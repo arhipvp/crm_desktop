@@ -182,18 +182,6 @@ class IncomeTableView(BaseTableView):
         logger.debug("\U0001F4C3 column_filters=%s", filters.get("column_filters"))
         return filters
 
-    def get_column_filters(self) -> dict:
-        """Собрать фильтры по столбцам в виде {Field | str: text}."""
-        result: dict = {}
-        for col, field in self.COLUMN_FIELD_MAP.items():
-            if field is None:
-                continue
-            text = self.column_filters.get_text(col)
-            if text:
-                result[field] = text
-        return result
-
-
     def load_data(self):
         filters = self.get_filters()  # используем метод подкласса
         logger.debug("\U0001F4CA Фильтры доходов: %s", filters)
