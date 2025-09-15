@@ -578,17 +578,21 @@ class BaseTableView(QWidget):
             header.model().headerData(header.logicalIndex(i), Qt.Horizontal)
             for i in range(header.count())
         ]
-        field_map = {
-            i: self.COLUMN_FIELD_MAP.get(header.logicalIndex(i))
-            for i in range(header.count())
-        }
-        self.column_filters.set_headers(
-            headers, texts, column_field_map=field_map
-        )
-        for i in range(header.count()):
-            logical = header.logicalIndex(i)
+
+        field_map = None
+        if self.COLUMN_FIELD_MAP:
+            field_map = {
+                visual: self.COLUMN_FIELD_MAP[header.logicalIndex(visual)]
+                for visual in range(header.count())
+                if header.logicalIndex(visual) in self.COLUMN_FIELD_MAP
+            }
+
+        self.column_filters.set_headers(headers, texts, column_field_map=field_map)
+
+        for visual in range(header.count()):
+            logical = header.logicalIndex(visual)
             self.column_filters.set_editor_visible(
-                i, not self.table.isColumnHidden(logical)
+                visual, not self.table.isColumnHidden(logical)
             )
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
