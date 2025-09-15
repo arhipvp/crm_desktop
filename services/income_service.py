@@ -116,8 +116,7 @@ def get_incomes_page(
 
     order_fields = []
     if (
-        column_filters
-        and Executor.full_name in column_filters
+        (join_executor or (column_filters and Executor.full_name in column_filters))
         and not isinstance(db.obj, SqliteDatabase)
     ):
         order_fields.append(Income.id)
