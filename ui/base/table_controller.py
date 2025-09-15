@@ -183,10 +183,14 @@ class TableController:
         }
         header = self.view.table.horizontalHeader()
         column_filters = {}
-        for col, text in self.view._column_filters.items():
-            if header.isSectionHidden(col):
+        for logical, text in self.view._column_filters.items():
+            visual = header.visualIndex(logical)
+            if visual < 0:
                 continue
-            field = self.view.COLUMN_FIELD_MAP.get(col)
+            logical_index = header.logicalIndex(visual)
+            if logical_index < 0 or header.isSectionHidden(logical_index):
+                continue
+            field = self.view.COLUMN_FIELD_MAP.get(logical_index)
             if not field:
                 continue
             column_filters[field] = text
