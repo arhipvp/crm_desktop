@@ -34,12 +34,12 @@ class ClientTableView(BaseTableView):
         index = self.table.currentIndex()
         if not index.isValid():
             return None
-        source_row = self.proxy_model.mapToSource(index).row()
+        source_row = self.proxy.mapToSource(index).row()
         return self.model.get_item(source_row)
 
     def get_selected_multiple(self):
         indexes = self.table.selectionModel().selectedRows()
-        return [self.model.get_item(self.proxy_model.mapToSource(i).row()) for i in indexes]
+        return [self.model.get_item(self.proxy.mapToSource(i).row()) for i in indexes]
 
     def delete_selected(self):
         clients = self.get_selected_multiple()

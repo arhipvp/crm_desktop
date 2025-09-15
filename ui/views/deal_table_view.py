@@ -223,8 +223,8 @@ class DealTableView(BaseTableView):
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         self.model = DealTableModel(items, model_class)
-        self.proxy_model.setSourceModel(self.model)
-        self.table.setModel(self.proxy_model)
+        self.proxy.setSourceModel(self.model)
+        self.table.setModel(self.proxy)
 
         try:
             self.table.sortByColumn(self.current_sort_column, self.current_sort_order)

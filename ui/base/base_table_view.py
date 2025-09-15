@@ -3,7 +3,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from peewee import Field
-from PySide6.QtCore import Qt, Signal, QSortFilterProxyModel
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -22,6 +22,7 @@ from ui.common.filter_controls import FilterControls
 from ui.common.paginator import Paginator
 from ui.common.styled_widgets import styled_button
 from ui.common.filter_header_view import FilterHeaderView
+from ui.common.multi_filter_proxy import MultiFilterProxyModel
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
 from services.export_service import export_objects_to_csv
@@ -166,12 +167,13 @@ class BaseTableView(QWidget):
 
         # Таблица
         self.table = QTableView()
-        self.proxy_model = QSortFilterProxyModel(self)
-        self.proxy_model.setSortRole(Qt.UserRole)
-        self.proxy_model.setDynamicSortFilter(True)
+        self.proxy = MultiFilterProxyModel()
+        self.proxy.setSortRole(Qt.UserRole)
+        self.proxy.setDynamicSortFilter(True)
         self.table.setEditTriggers(QTableView.NoEditTriggers)
 
-        self.table.setModel(None)
+        self.table.setModel(self.proxy)
+        self.proxy_model = self.proxy  # backward compatibility
         self.table.setSortingEnabled(True)
         header = FilterHeaderView(self.table)
         self.table.setHorizontalHeader(header)
@@ -181,7 +183,8 @@ class BaseTableView(QWidget):
         header.sectionMoved.connect(self._on_section_moved)
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self._on_header_menu)
-        header.filter_changed.connect(self.controller._on_column_filter_changed)
+        header.filter_changed.connect(self.proxy.set_filter)
+        header.filter_changed.connect(lambda _c, _t: self.save_table_settings())
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setAlternatingRowColors(True)
         header.setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -377,7 +380,7 @@ class BaseTableView(QWidget):
 
     def _source_row(self, view_index):
         """Возвращает номер строки в исходной модели для индекса из таблицы."""
-        return self.proxy_model.mapToSource(view_index).row()
+        return self.proxy.mapToSource(view_index).row()
 
     # BaseTableView
     def get_selected_object(self):

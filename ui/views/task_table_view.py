@@ -332,8 +332,8 @@ class TaskTableView(BaseTableView):
 
         items = list(prefetch(items, Deal, Client, Policy, DealExecutor, Executor))
         self.model = TaskTableModel(items, Task)
-        self.proxy_model.setSourceModel(self.model)
-        self.table.setModel(self.proxy_model)
+        self.proxy.setSourceModel(self.model)
+        self.table.setModel(self.proxy)
 
         try:
             self.table.sortByColumn(
