@@ -558,9 +558,9 @@ class BaseTableView(QWidget):
         menu.exec(header.mapToGlobal(pos))
 
     def _toggle_column(self, index: int, visible: bool):
-        self.table.setColumnHidden(index, not visible)
         header = self.table.horizontalHeader()
         visual = header.visualIndex(index)
+        self.table.setColumnHidden(index, not visible)
         self.column_filters.set_editor_visible(visual, visible)
         self.save_table_settings()
 
