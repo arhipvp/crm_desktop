@@ -330,11 +330,6 @@ class TaskTableView(BaseTableView):
             )
             total = build_task_query(**f).count()
 
-        prev_texts = [
-            self.column_filters.get_text(i)
-            for i in range(len(self.column_filters._editors))
-        ]
-
         items = list(prefetch(items, Deal, Client, Policy, DealExecutor, Executor))
         self.model = TaskTableModel(items, Task)
         self.proxy_model.setSourceModel(self.model)
@@ -352,13 +347,6 @@ class TaskTableView(BaseTableView):
         self.paginator.update(self.total_count, self.page, self.per_page)
         self.data_loaded.emit(self.total_count)
 
-        headers = [
-            self.model.headerData(i, Qt.Horizontal)
-            for i in range(self.model.columnCount())
-        ]
-        self.column_filters.set_headers(
-            headers, prev_texts, self.COLUMN_FIELD_MAP
-        )
         QTimer.singleShot(0, self.load_table_settings)
 
         # при смене модели selectionModel пересоздаётся и теряет подключение
