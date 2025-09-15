@@ -199,11 +199,6 @@ class IncomeTableView(BaseTableView):
         items = list(
             prefetch(query, Payment, Policy, Client, Deal, DealExecutor, Executor)
         )
-        total_sum = sum(i.amount for i in items)
-        if items:
-            self.paginator.set_summary(f"Сумма: {total_sum:.2f} ₽")
-        else:
-            self.paginator.set_summary("")
         total = build_income_query(join_executor=join_executor, **filters).count()
         logger.debug("\U0001F4E6 Загружено доходов: %d", len(items))
 
@@ -218,37 +213,12 @@ class IncomeTableView(BaseTableView):
         self.load_data()
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
-        """Устанавливает модель таблицы и применяет сохранённые настройки."""
-        prev_texts = [
-            self.column_filters.get_text(i)
-            for i in range(len(self.column_filters._editors))
-        ]
-
-        self.model = IncomeTableModel(items, model_class)
-        self.proxy_model.setSourceModel(self.model)
-        self.table.setModel(self.proxy_model)
-
-        try:
-            self.table.resizeColumnsToContents()
-        except NotImplementedError:
-            pass
-
-        if total_count is not None:
-            self.total_count = total_count
-            self.paginator.update(self.total_count, self.page, self.per_page)
-            self.data_loaded.emit(self.total_count)
-
-        headers = [
-            self.model.headerData(i, Qt.Horizontal)
-            for i in range(self.model.columnCount())
-        ]
-        self.column_filters.set_headers(headers, prev_texts)
-        self.load_table_settings()
-
-        # Показать индикатор сортировки на текущем столбце
-        self.table.horizontalHeader().setSortIndicator(
-            self.current_sort_column, self.current_sort_order
+        super().set_model_class_and_items(
+            model_class, items, total_count=total_count
         )
+        total_sum = sum(i.amount for i in items)
+        summary = f"Сумма: {total_sum:.2f} ₽" if items else ""
+        self.paginator.set_summary(summary)
 
         # В интерактивном режиме пользователь сам выбирает ширину
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)

@@ -9,7 +9,7 @@ from services.policies import (
     attach_premium,
 )
 from PySide6.QtWidgets import QAbstractItemView, QMenu
-from PySide6.QtCore import Qt, QDate, QTimer
+from PySide6.QtCore import Qt, QDate
 from services.folder_utils import copy_text_to_clipboard
 from ui.base.base_table_view import BaseTableView
 from ui.base.base_table_model import BaseTableModel
@@ -341,35 +341,9 @@ class PolicyTableView(BaseTableView):
             dlg.exec()
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
-        self.model = PolicyTableModel(items, model_class)
-        self.proxy_model.setSourceModel(self.model)
-        self.table.setModel(self.proxy_model)
-        header = self.table.horizontalHeader()
-        header.blockSignals(True)
-        try:
-            # Показываем текущий индикатор сортировки, не выполняя
-            # повторную сортировку на уровне прокси‑модели (сортировку
-            # уже выполняет база данных).
-            header.setSortIndicator(
-                self.current_sort_column, self.current_sort_order
-            )
-            self.table.resizeColumnsToContents()
-        except NotImplementedError:
-            pass
-        finally:
-            header.blockSignals(False)
-        if total_count is not None:
-            self.total_count = total_count
-            self.paginator.update(self.total_count, self.page, self.per_page)
-
-        headers = [
-            self.model.headerData(i, Qt.Horizontal)
-            for i in range(self.model.columnCount())
-        ]
-        self.column_filters.set_headers(
-            headers, column_field_map=self.COLUMN_FIELD_MAP
+        super().set_model_class_and_items(
+            model_class, items, total_count=total_count
         )
-        QTimer.singleShot(0, self.load_table_settings)
 
     def on_sort_changed(self, logicalIndex: int, order: Qt.SortOrder):
         field = self.model.fields[logicalIndex].name
