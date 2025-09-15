@@ -3,8 +3,9 @@ import math
 
 logger = logging.getLogger(__name__)
 
-from datetime import date
-from typing import Callable, Optional
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any, Callable, Mapping, Optional
 
 from peewee import (
     Field,
@@ -19,7 +20,15 @@ from peewee import (
     ForeignKeyField,
 )
 
-from PySide6.QtCore import Qt, Signal, QRect, QPoint, QDate
+from PySide6.QtCore import (
+    Qt,
+    Signal,
+    QRect,
+    QPoint,
+    QDate,
+    QSortFilterProxyModel,
+    QRegularExpression,
+)
 from PySide6.QtGui import QShortcut
 
 from PySide6.QtWidgets import (
@@ -51,7 +60,7 @@ from ui.common.date_utils import (
     configure_optional_date_edit,
     get_date_or_none,
 )
-from ui.common.multi_filter_proxy import MultiFilterProxyModel, ColumnFilterState
+from ui.common.multi_filter_proxy import ColumnFilterState
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
 from services.export_service import export_objects_to_csv
@@ -59,6 +68,18 @@ from database.models import Deal
 
 
 class BaseTableView(QWidget):
+    class _ProxyModel(QSortFilterProxyModel):
+        def __init__(self, owner: "BaseTableView") -> None:
+            super().__init__(owner)
+            self._owner = owner
+
+        def filterAcceptsRow(self, source_row: int, source_parent) -> bool:  # type: ignore[override]
+            return self._owner._filter_accepts_row(source_row, source_parent)
+
+        def headerData(self, section, orientation, role=Qt.DisplayRole):  # type: ignore[override]
+            base = super().headerData(section, orientation, role)
+            return self._owner._proxy_header_data(section, orientation, role, base)
+
     row_double_clicked = Signal(object)  # объект строки по двойному клику
     data_loaded = Signal(int)  # сигнал о загрузке данных (количество)
 
@@ -237,11 +258,13 @@ class BaseTableView(QWidget):
 
         # Таблица
         self.table = QTableView()
-        self.proxy = MultiFilterProxyModel()
+        self.proxy = self._ProxyModel(self)
         self.proxy.setSortRole(Qt.UserRole)
         self.proxy.setDynamicSortFilter(True)
         self.table.setEditTriggers(QTableView.NoEditTriggers)
         self._column_filters: dict[int, ColumnFilterState] = {}
+        self._column_filter_matchers: dict[int, Callable[[Any, Any], bool]] = {}
+        self._column_filter_strings: dict[int, str] = {}
 
         self.table.setModel(self.proxy)
         self.proxy_model = self.proxy  # backward compatibility
@@ -272,10 +295,22 @@ class BaseTableView(QWidget):
         """Переустанавливает сохранённые фильтры столбцов в прокси-модель."""
         header = self.table.horizontalHeader()
         column_count = header.count() if header is not None else 0
-        for column, state in self._column_filters.items():
+        removed_invalid = False
+        for column, state in list(self._column_filters.items()):
             if column < 0 or column >= column_count:
+                self._column_filters.pop(column, None)
+                self._column_filter_matchers.pop(column, None)
+                self._column_filter_strings.pop(column, None)
+                removed_invalid = True
                 continue
-            self.proxy.set_filter(column, state)
+            self._apply_column_filter(
+                column,
+                state,
+                save_settings=False,
+                trigger_filter=False,
+            )
+        if removed_invalid:
+            self.proxy.invalidateFilter()
 
     # ------------------------------------------------------------------
     # Helpers for toolbar-based filters
@@ -323,9 +358,16 @@ class BaseTableView(QWidget):
     def clear_column_filters(self) -> None:
         """Очищает сохранённые фильтры столбцов и сбрасывает их в прокси."""
         columns = list(self._column_filters.keys())
-        self._column_filters.clear()
         for column in columns:
-            self.proxy.set_filter(column, None)
+            self._apply_column_filter(
+                column,
+                None,
+                save_settings=False,
+                trigger_filter=False,
+            )
+        self._column_filters.clear()
+        self._column_filter_matchers.clear()
+        self._column_filter_strings.clear()
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         if self.controller:
@@ -1005,20 +1047,240 @@ class BaseTableView(QWidget):
     def _apply_column_filter(
         self,
         column: int,
-        state: Optional[ColumnFilterState],
+        state: ColumnFilterState | Mapping[str, Any] | str | None,
         *,
         save_settings: bool = True,
         trigger_filter: bool = True,
     ) -> None:
-        if state is None or state.is_empty():
+        normalized = self._normalize_filter_state(state)
+        previous_state = self._column_filters.get(column)
+        previous_display = self._column_filter_strings.get(column)
+
+        if normalized is None or normalized.is_empty():
             self._column_filters.pop(column, None)
+            self._column_filter_matchers.pop(column, None)
+            self._column_filter_strings.pop(column, None)
         else:
-            self._column_filters[column] = state
-        self.proxy.set_filter(column, state)
+            matcher = self._create_filter_matcher(normalized)
+            if matcher is None:
+                self._column_filters.pop(column, None)
+                self._column_filter_matchers.pop(column, None)
+                self._column_filter_strings.pop(column, None)
+            else:
+                self._column_filters[column] = normalized
+                self._column_filter_matchers[column] = matcher
+                display = normalized.display_text()
+                if display:
+                    self._column_filter_strings[column] = display
+                else:
+                    self._column_filter_strings.pop(column, None)
+
+        new_state = self._column_filters.get(column)
+        new_display = self._column_filter_strings.get(column)
+        if previous_state != new_state or previous_display != new_display:
+            self.proxy.headerDataChanged.emit(Qt.Horizontal, column, column)
+
+        self.proxy.invalidateFilter()
+
         if save_settings:
             self.save_table_settings()
         if trigger_filter:
             self.on_filter_changed()
+
+    def _filter_accepts_row(self, source_row: int, source_parent) -> bool:
+        model = self.proxy.sourceModel()
+        if model is None:
+            return True
+        if not self._column_filter_matchers:
+            return True
+        for column, matcher in self._column_filter_matchers.items():
+            if matcher is None:
+                continue
+            index = model.index(source_row, column, source_parent)
+            raw_value = model.data(index, Qt.UserRole)
+            display_value = model.data(index, self.proxy.filterRole())
+            if not matcher(raw_value, display_value):
+                return False
+        return True
+
+    def _proxy_header_data(self, section, orientation, role, base_value):
+        if orientation != Qt.Horizontal:
+            return base_value
+        if role == Qt.DisplayRole and section in self._column_filter_strings:
+            base_text = "" if base_value is None else str(base_value)
+            return f"{base_text} ⏷" if base_text else "⏷"
+        if role == Qt.ToolTipRole and section in self._column_filter_strings:
+            base = base_value
+            if not base:
+                source_model = self.proxy.sourceModel()
+                if source_model is not None:
+                    base = source_model.headerData(section, orientation, Qt.DisplayRole)
+            filter_text = self._column_filter_strings.get(section, "")
+            if base:
+                return f"{base}\nФильтр: {filter_text}"
+            return f"Фильтр: {filter_text}"
+        return base_value
+
+    def _normalize_filter_state(
+        self,
+        state: ColumnFilterState | Mapping[str, Any] | str | None,
+    ) -> ColumnFilterState | None:
+        if state is None:
+            return None
+        if isinstance(state, ColumnFilterState):
+            return state
+        if isinstance(state, str):
+            text = state.strip()
+            if not text:
+                return None
+            return ColumnFilterState("text", text)
+        return ColumnFilterState.from_dict(state)
+
+    def _create_filter_matcher(
+        self, state: ColumnFilterState
+    ) -> Callable[[Any, Any], bool] | None:
+        if state.type == "text":
+            text = str(state.value or "").strip()
+            if not text:
+                return None
+            options = (
+                QRegularExpression.CaseInsensitiveOption
+                if self.proxy.filterCaseSensitivity() == Qt.CaseInsensitive
+                else QRegularExpression.NoPatternOption
+            )
+            esc = QRegularExpression.escape(text)
+            pattern = f".*{esc}.*"
+            regex = QRegularExpression(pattern, options)
+            return lambda _raw, display: regex.match(
+                "" if display is None else str(display)
+            ).hasMatch()
+
+        if state.type == "bool":
+            desired = state.value
+            if desired is None:
+                return None
+            bool_value = bool(desired)
+
+            def matcher(raw: Any, _display: Any) -> bool:
+                if raw is None:
+                    return False
+                if isinstance(raw, bool):
+                    return raw is bool_value
+                if isinstance(raw, (int, float)):
+                    return bool(raw) is bool_value
+                if isinstance(raw, str):
+                    lowered = raw.lower()
+                    if lowered in {"true", "1", "yes", "да"}:
+                        return bool_value is True
+                    if lowered in {"false", "0", "no", "нет"}:
+                        return bool_value is False
+                return False
+
+            return matcher
+
+        if state.type == "date_range" and isinstance(state.value, Mapping):
+            start = self._parse_iso_date(state.value.get("from"))
+            end = self._parse_iso_date(state.value.get("to"))
+            if start is None and end is None:
+                return None
+
+            def matcher(raw: Any, _display: Any) -> bool:
+                current = self._coerce_to_date(raw)
+                if current is None:
+                    return False
+                if start and current < start:
+                    return False
+                if end and current > end:
+                    return False
+                return True
+
+            return matcher
+
+        if state.type == "number":
+            meta = state.meta or {}
+            value_type = meta.get("value_type")
+            target = self._to_number(state.value, value_type)
+            if target is None:
+                return None
+
+            def matcher(raw: Any, _display: Any) -> bool:
+                current = self._to_number(raw, value_type)
+                if current is None:
+                    return False
+                if value_type == "int":
+                    return int(current) == int(target)
+                return math.isclose(float(current), float(target), rel_tol=1e-9, abs_tol=1e-9)
+
+            return matcher
+
+        text = str(state.value or "").strip()
+        if not text:
+            return None
+        options = (
+            QRegularExpression.CaseInsensitiveOption
+            if self.proxy.filterCaseSensitivity() == Qt.CaseInsensitive
+            else QRegularExpression.NoPatternOption
+        )
+        esc = QRegularExpression.escape(text)
+        pattern = f".*{esc}.*"
+        regex = QRegularExpression(pattern, options)
+        return lambda _raw, display: regex.match(
+            "" if display is None else str(display)
+        ).hasMatch()
+
+    @staticmethod
+    def _parse_iso_date(value: Any) -> date | None:
+        if value in (None, ""):
+            return None
+        if isinstance(value, date):
+            return value
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, QDate):
+            return value.toPython()
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _coerce_to_date(value: Any) -> date | None:
+        if value is None:
+            return None
+        if isinstance(value, date):
+            return value
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, QDate):
+            return value.toPython()
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _to_number(value: Any, value_type: Optional[str]) -> float | None:
+        if value is None:
+            return None
+        if value_type == "int":
+            try:
+                return float(int(value))
+            except (TypeError, ValueError):
+                return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, Decimal):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        return None
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
         """Сохраняет текущую сортировку таблицы."""
@@ -1089,7 +1351,12 @@ class BaseTableView(QWidget):
             if idx < model_columns:
                 self.table.setColumnHidden(idx, True)
         saved_filters = saved.get("column_filters", {})
+        previous_columns = set(self._column_filter_strings.keys())
         self._column_filters = {}
+        self._column_filter_matchers = {}
+        self._column_filter_strings = {}
+        cleared_columns: set[int] = set()
+        invalidated = False
         if isinstance(saved_filters, dict):
             for col, raw_state in saved_filters.items():
                 try:
@@ -1098,20 +1365,23 @@ class BaseTableView(QWidget):
                     continue
                 if col_int >= header.count():
                     continue
-                if isinstance(raw_state, ColumnFilterState):
-                    state = raw_state
-                elif isinstance(raw_state, dict):
-                    state = ColumnFilterState.from_dict(raw_state)
-                elif isinstance(raw_state, str):
-                    raw_text = raw_state.strip()
-                    state = ColumnFilterState("text", raw_text) if raw_text else None
-                else:
-                    state = None
+                state = self._normalize_filter_state(raw_state)
                 if state is None or state.is_empty():
-                    self.proxy.set_filter(col_int, None)
+                    cleared_columns.add(col_int)
                     continue
-                self._column_filters[col_int] = state
-                self.proxy.set_filter(col_int, state)
+                self._apply_column_filter(
+                    col_int,
+                    state,
+                    save_settings=False,
+                    trigger_filter=False,
+                )
+                invalidated = True
+        current_columns = set(self._column_filter_strings.keys())
+        for column in (previous_columns | cleared_columns) - current_columns:
+            if 0 <= column < header.count():
+                self.proxy.headerDataChanged.emit(Qt.Horizontal, column, column)
+        if not invalidated and (previous_columns or cleared_columns):
+            self.proxy.invalidateFilter()
         per_page = saved.get("per_page")
         need_reload = False
         if per_page is not None:
