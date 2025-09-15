@@ -6,7 +6,7 @@ from ui.common.combo_helpers import create_fk_combobox
 
 Изменения:
 ──────────
-• Для любого `DateField(null=True)` теперь используется `OptionalDateEdit`,
+• Для любого `DateField(null=True)` теперь используется `QDateEdit` с возможностью очистки,
   что позволяет очищать дату (✕ или Del) → в БД пишется NULL.
 • Обычные обязательные даты остались на `TypableDateEdit`.
 • Код автосохранения/валидаторов не трогался.
@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ui.common.date_utils import OptionalDateEdit, TypableDateEdit
+from ui.common.date_utils import TypableDateEdit
 from ui.common.message_boxes import confirm
 from ui.common.styled_widgets import styled_button
 from services.validators import normalize_number
@@ -135,11 +135,15 @@ class BaseEditForm(QDialog):
                 if field_name == "end_date":
                     widget = TypableDateEdit()
                 else:
-                    widget = OptionalDateEdit() if field.null else TypableDateEdit()
-
-                # по умолчанию — сегодняшняя дата, только при создании
-                if not field.null and self.instance is None:
-                    widget.setDate(QDate.currentDate())
+                    if field.null:
+                        widget = QDateEdit()
+                        widget.setCalendarPopup(True)
+                        widget.setSpecialValueText("—")
+                        widget.clear()
+                    else:
+                        widget = TypableDateEdit()
+                        if self.instance is None:
+                            widget.setDate(QDate.currentDate())
 
             # ---------- Default (Char / Text / Numeric) ----------
             else:

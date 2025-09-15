@@ -2,20 +2,20 @@ from __future__ import annotations
 
 """Форма добавления / редактирования дохода.
 
-• Поле *received_date* опционально благодаря OptionalDateEdit;
+• Поле *received_date* опционально благодаря QDateEdit с возможностью очистки;
   при пустом значении в БД уходит NULL.
 • Поддерживает «предзаполнение» payment_id (PaymentDetailView
   делает это через _prefill_payment_in_form). Поле после этого
   становится read‑only, чтобы пользователь не мог изменить привязку.
 """
 from PySide6.QtCore import QDate
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QLabel, QDateEdit
 
 from services.income_service import add_income, create_stub_income, update_income
 from services.payment_service import get_all_payments, get_payment_by_id
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import create_entity_combobox
-from ui.common.date_utils import OptionalDateEdit, get_date_or_none
+from ui.common.date_utils import get_date_or_none
 
 
 class IncomeForm(BaseEditForm):
@@ -35,7 +35,7 @@ class IncomeForm(BaseEditForm):
     # ------------------------------------------------------------------
     def collect_data(self) -> dict:
         """Получаем словарь полей формы.
-        Переопределяем, чтобы корректно превратить OptionalDateEdit → None.
+        Переопределяем, чтобы корректно превратить QDateEdit → None.
         """
         data = super().collect_data()
 
@@ -71,7 +71,9 @@ class IncomeForm(BaseEditForm):
         self.fields["payment_id"] = self.payment_combo
         self.form_layout.insertRow(0, "Платёж:", self.payment_combo)
 
-        self.received_date_edit = OptionalDateEdit()
+        self.received_date_edit = QDateEdit()
+        self.received_date_edit.setCalendarPopup(True)
+        self.received_date_edit.setSpecialValueText("—")
         if self._is_new or getattr(self.instance, "received_date", None) is None:
             # если дата не была заполнена ранее — ставим сегодняшнюю
             self.received_date_edit.setDate(QDate.currentDate())

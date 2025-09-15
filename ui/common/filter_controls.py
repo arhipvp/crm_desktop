@@ -11,12 +11,13 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QCheckBox,
     QLineEdit,
+    QDateEdit,
 )
 
 from ui import settings as ui_settings
 
 from ui.common.checkbox_filters import CheckboxFilters
-from ui.common.date_utils import OptionalDateEdit
+from ui.common.date_utils import get_date_or_none
 
 
 class FilterControls(QWidget):
@@ -76,8 +77,14 @@ class FilterControls(QWidget):
 
         self._date_filter_field = date_filter_field
         if date_filter_field:
-            self._date_from = OptionalDateEdit()
-            self._date_to = OptionalDateEdit()
+            self._date_from = QDateEdit()
+            self._date_from.setCalendarPopup(True)
+            self._date_from.setSpecialValueText("—")
+            self._date_from.clear()
+            self._date_to = QDateEdit()
+            self._date_to.setCalendarPopup(True)
+            self._date_to.setSpecialValueText("—")
+            self._date_to.clear()
             if on_filter:
                 self._date_from.dateChanged.connect(on_filter)
                 self._date_to.dateChanged.connect(on_filter)
@@ -156,8 +163,8 @@ class FilterControls(QWidget):
         Пример: {'due_date': datetime.date(2025, 5, 10)}
         """
         if self._date_filter_field:
-            d1 = self._date_from.date_or_none()
-            d2 = self._date_to.date_or_none()
+            d1 = get_date_or_none(self._date_from)
+            d2 = get_date_or_none(self._date_to)
             if d1 or d2:
                 return {self._date_filter_field: (d1, d2)}
         return None
