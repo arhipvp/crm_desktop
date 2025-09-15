@@ -324,7 +324,7 @@ def test_export_csv_related_fields(in_memory_db, tmp_path):
     )
     policy.policy = policy
     path = tmp_path / "related.csv"
-    fields = [Policy.policy_number, Client.name]
+    fields = [Policy.policy_number, "client__name"]
     export_objects_to_csv(str(path), [policy], fields)
     text = path.read_text(encoding="utf-8-sig")
     assert "PN123" in text

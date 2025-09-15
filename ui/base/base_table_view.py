@@ -32,8 +32,9 @@ class BaseTableView(QWidget):
     row_double_clicked = Signal(object)  # объект строки по двойному клику
     data_loaded = Signal(int)  # сигнал о загрузке данных (количество)
 
-    # Соответствие индекса столбца полю модели. Значение ``None`` скрывает фильтр.
-    COLUMN_FIELD_MAP: dict[int, Field | None] = {}
+    # Соответствие индекса столбца полю модели или строковому пути.
+    # Значение ``None`` скрывает фильтр.
+    COLUMN_FIELD_MAP: dict[int, Field | str | None] = {}
 
     def _on_filter_controls_changed(self, *args, **kwargs):
         """Безопасно обрабатывает изменение фильтров во время инициализации."""

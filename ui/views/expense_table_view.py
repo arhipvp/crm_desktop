@@ -174,7 +174,7 @@ class ExpenseTableView(BaseTableView):
         self.load_data()
 
     def get_column_filters(self) -> dict:
-        """Собрать фильтры по столбцам в виде {Field: text}."""
+        """Собрать фильтры по столбцам в виде {Field | str: text}."""
         result: dict = {}
         for col, field in self.COLUMN_FIELD_MAP.items():
             if field is None:
