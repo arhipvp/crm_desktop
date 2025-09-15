@@ -6,7 +6,6 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QProgressDialog, QMessageBox
 
 from ui.base.base_table_model import BaseTableModel
-from ui import settings as ui_settings
 
 
 logger = logging.getLogger(__name__)
@@ -132,8 +131,6 @@ class TableController:
 
     def _on_reset_filters(self):
         self.view.filter_controls.clear_all()
-        self.view.column_filters.clear_all()
-        ui_settings.set_table_filters(self.view.settings_id, {})
         self.view.save_table_settings()
         self.on_filter_changed()
 
