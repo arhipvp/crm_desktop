@@ -142,13 +142,17 @@ class TableController:
         if not hasattr(self.view, "model") or not self.view.model:
             return {}
         filters: dict[Field, str] = {}
-        for i in range(self.view.model.columnCount()):
-            text = self.view.column_filters.get_text(i)
+        header = self.view.table.horizontalHeader()
+        for visual in range(header.count()):
+            logical = header.logicalIndex(visual)
+            text = self.view.column_filters.get_text(visual)
             if not text:
                 continue
             field = self.view.COLUMN_FIELD_MAP.get(
-                i,
-                self.view.model.fields[i] if i < len(self.view.model.fields) else None,
+                logical,
+                self.view.model.fields[logical]
+                if logical < len(self.view.model.fields)
+                else None,
             )
             if isinstance(field, Field):
                 filters[field] = text
