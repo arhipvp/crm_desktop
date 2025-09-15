@@ -369,6 +369,16 @@ class BaseTableView(QWidget):
                 sections.append(visual)
         header.set_filtered_sections(sections)
 
+    def apply_saved_filters(self) -> None:
+        """Переустанавливает сохранённые фильтры столбцов в прокси-модель."""
+        header = self.table.horizontalHeader()
+        column_count = header.count() if header is not None else 0
+        for column, text in self._column_filters.items():
+            if column < 0 or column >= column_count:
+                continue
+            self.proxy.set_filter(column, text)
+        self._sync_header_filter_icons()
+
     # ------------------------------------------------------------------
     # Helpers for toolbar-based filters
     # ------------------------------------------------------------------
