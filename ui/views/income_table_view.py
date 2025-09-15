@@ -175,18 +175,13 @@ class IncomeTableView(BaseTableView):
                 )
             }
         )
-        cf = filters.get("column_filters", {})
-        filters["column_filters"] = {
-            self.COLUMN_FIELD_MAP.get(col): text
-            for col, text in cf.items()
-            if self.COLUMN_FIELD_MAP.get(col)
-        }
+        column_filters = filters.get("column_filters", {})
         if self.deal_id:
             filters["deal_id"] = self.deal_id
         date_range = filters.pop("received_date", None)
         if date_range:
             filters["received_date_range"] = date_range
-        logger.debug("\U0001F4C3 column_filters=%s", filters.get("column_filters"))
+        logger.debug("\U0001F4C3 column_filters=%s", column_filters)
         return filters
 
     def load_data(self):
