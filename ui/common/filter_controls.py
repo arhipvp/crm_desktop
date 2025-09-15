@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, QSignalBlocker
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -18,6 +18,7 @@ from ui import settings as ui_settings
 
 from ui.common.checkbox_filters import CheckboxFilters
 from ui.common.date_utils import get_date_or_none
+from ui.common.date_utils import OptionalDateEdit
 
 
 class FilterControls(QWidget):
@@ -97,10 +98,19 @@ class FilterControls(QWidget):
         layout.addWidget(self._search)
 
         # Чекбоксы
-        self._cbx = None
+        self._checkboxes: dict[str, QCheckBox] = {}
         if checkbox_map:
-            self._cbx = CheckboxFilters(checkbox_map, self)
-            layout.addWidget(self._cbx)
+            container = QWidget()
+            cb_layout = QHBoxLayout(container)
+            cb_layout.setContentsMargins(0, 0, 0, 0)
+            cb_layout.setSpacing(10)
+            for label, callback in checkbox_map.items():
+                checkbox = QCheckBox(label)
+                checkbox.stateChanged.connect(callback)
+                cb_layout.addWidget(checkbox)
+                self._checkboxes[label] = checkbox
+            cb_layout.addStretch()
+            layout.addWidget(container)
 
         # Дополнительные виджеты
         for label, widget in extra_widgets:
@@ -155,7 +165,8 @@ class FilterControls(QWidget):
 
     def is_checked(self, label: str) -> bool:
         """Проверяет, установлен ли чекбокс с заданной меткой."""
-        return self._cbx.is_checked(label) if self._cbx else False
+        box = self._checkboxes.get(label)
+        return box.isChecked() if box else False
 
     def get_date_filter(self) -> dict[str, date] | None:
         """
@@ -184,7 +195,7 @@ class FilterControls(QWidget):
         """Возвращает словарь всех фильтров: текст, чекбоксы, даты."""
         return {
             "search": self.get_search_text(),
-            "checkboxes": self._cbx.get_all_states() if self._cbx else {},
+            "checkboxes": {label: box.isChecked() for label, box in self._checkboxes.items()},
             "dates": self.get_date_filter() or {},
         }
 
@@ -194,11 +205,10 @@ class FilterControls(QWidget):
         self._search.clear()
         self._search.blockSignals(False)
 
-        if self._cbx:
-            for box in self._cbx.checkboxes.values():
-                box.blockSignals(True)
-                box.setChecked(False)
-                box.blockSignals(False)
+        for box in self._checkboxes.values():
+            box.blockSignals(True)
+            box.setChecked(False)
+            box.blockSignals(False)
 
         if hasattr(self, "_date_from"):
             self._date_from.blockSignals(True)
@@ -223,8 +233,13 @@ class FilterControls(QWidget):
         search = data.get("search")
         if search:
             self.set_text(search)
-        if self._cbx:
-            self._cbx.set_bulk(data.get("checkboxes", {}))
+        if self._checkboxes:
+            for label, value in data.get("checkboxes", {}).items():
+                cb = self._checkboxes.get(label)
+                if cb is not None:
+                    blocker = QSignalBlocker(cb)
+                    cb.setChecked(value)
+                    del blocker
         dates = data.get("dates", {})
         if self._date_filter_field and self._date_filter_field in dates:
             d1_str, d2_str = dates.get(self._date_filter_field, [None, None])
@@ -258,7 +273,6 @@ class FilterControls(QWidget):
             self._date_from.dateChanged.connect(self._save_current_filters)
         if hasattr(self, "_date_to"):
             self._date_to.dateChanged.connect(self._save_current_filters)
-        if self._cbx:
-            for cb in self._cbx.checkboxes.values():
-                cb.stateChanged.connect(self._save_current_filters)
+        for cb in self._checkboxes.values():
+            cb.stateChanged.connect(self._save_current_filters)
 

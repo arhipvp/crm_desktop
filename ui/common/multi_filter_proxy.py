@@ -6,10 +6,12 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
         super().__init__()
         self._filters: dict[int, QRegularExpression] = {}
 
-    def set_filter(self, column: int, text: str):
+    def set_filter(self, column: int, text: str) -> None:
         if text:
+            pattern = QRegularExpression.escape(text)
             self._filters[column] = QRegularExpression(
-                text, QRegularExpression.PatternOption.CaseInsensitiveOption
+                f".*{pattern}.*",
+                QRegularExpression.PatternOption.CaseInsensitiveOption,
             )
         else:
             self._filters.pop(column, None)
@@ -18,6 +20,7 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
     def filterAcceptsRow(self, source_row, source_parent):  # noqa: N802
         for col, regex in self._filters.items():
             index = self.sourceModel().index(source_row, col, source_parent)
-            if regex and regex.match(self.sourceModel().data(index)).isValid() is False:
+            data = str(self.sourceModel().data(index))
+            if regex and not regex.match(data).hasMatch():
                 return False
         return True

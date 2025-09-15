@@ -58,7 +58,9 @@ class FilterHeaderView(QHeaderView):
         menu.addSeparator()
         clear_action = menu.addAction("Очистить фильтр")
         clear_action.triggered.connect(lambda c=column: self._on_text_changed(c, ""))
-        rect = self.sectionRect(column)
+        pos = self.sectionViewportPosition(column)
+        width = self.sectionSize(column)
+        rect = QRect(pos, 0, width, self.height())
         menu.popup(self.mapToGlobal(rect.bottomLeft()))
         self._menu = menu
 
