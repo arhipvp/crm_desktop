@@ -1,5 +1,6 @@
 import datetime
 import logging
+from decimal import Decimal
 from types import SimpleNamespace
 
 from PySide6.QtCore import QItemSelectionModel, QAbstractTableModel, Qt
@@ -14,6 +15,7 @@ from PySide6.QtWidgets import (
 from database.models import Client, Deal, Expense, Payment, Policy
 from services.export_service import export_objects_to_csv
 from ui.base.base_table_view import BaseTableView
+from ui.views.expense_table_view import ExpenseTableView
 
 
 def test_export_csv_selected_rows(in_memory_db, qapp, tmp_path, monkeypatch):
@@ -355,6 +357,68 @@ def test_export_expense_deal_client(in_memory_db, tmp_path):
     text = path.read_text(encoding="utf-8-sig")
     assert "DealDesc" in text
     assert "Ivan" in text
+
+
+def test_expense_table_view_export_csv_matches_table(in_memory_db, qapp, tmp_path, monkeypatch):
+    client = Client.create(name="Alice")
+    deal = Deal.create(client=client, description="Deal", start_date=datetime.date.today())
+    policy = Policy.create(
+        client=client,
+        deal=deal,
+        policy_number="PN123",
+        start_date=datetime.date.today(),
+        contractor="Cont",
+    )
+    payment = Payment.create(
+        policy=policy,
+        amount=Decimal("500"),
+        payment_date=datetime.date(2024, 5, 1),
+    )
+    expense = Expense.create(
+        payment=payment,
+        amount=Decimal("100"),
+        expense_type="Type",
+        expense_date=datetime.date.today(),
+        policy=policy,
+    )
+
+    monkeypatch.setattr(ExpenseTableView, "load_data", lambda self: None)
+    view = ExpenseTableView()
+    view.set_model_class_and_items(Expense, [expense], total_count=1)
+    view.table.selectRow(0)
+    qapp.processEvents()
+
+    path = tmp_path / "expense_view.csv"
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    view.export_csv(str(path))
+
+    rows = [
+        line.strip()
+        for line in path.read_text(encoding="utf-8-sig").splitlines()
+        if line.strip()
+    ]
+    headers = rows[0].split(";")
+    values = rows[1].split(";")
+    csv_data = dict(zip(headers, values))
+
+    model = view.model
+    table_data = {
+        "Полис": model.data(model.index(0, 0)),
+        "Сделка": model.data(model.index(0, 1)),
+        "Клиент": model.data(model.index(0, 2)),
+        "Контрагент": model.data(model.index(0, 3)),
+        "Сумма платежа": model.data(model.index(0, 6)),
+        "Дата платежа": model.data(model.index(0, 7)),
+    }
+
+    for key in ["Полис", "Сделка", "Клиент", "Контрагент", "Дата платежа"]:
+        assert csv_data[key] == table_data[key]
+
+    csv_amount = Decimal(csv_data["Сумма платежа"].replace(" ", "").replace(",", "."))
+    table_amount = Decimal(
+        table_data["Сумма платежа"].split()[0].replace(" ", "").replace(",", ".")
+    )
+    assert csv_amount == table_amount
 
 
 def test_export_csv_with_column_map(qapp, tmp_path, monkeypatch):

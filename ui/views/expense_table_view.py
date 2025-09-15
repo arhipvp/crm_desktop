@@ -1,9 +1,8 @@
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
-from decimal import Decimal
 
-from database.models import Client, Deal, Expense, Payment, Policy
+from database.models import Expense
 from services import expense_service
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
@@ -124,19 +123,19 @@ class ExpenseTableModel(BaseTableModel):
 
 class ExpenseTableView(BaseTableView):
     COLUMN_FIELD_MAP = {
-        0: Policy.policy_number,
+        0: "policy__policy_number",
         1: "policy__deal__description",
         2: "policy__client__name",
-        3: Policy.contractor,
-        4: Policy.start_date,
-        5: Expense.expense_type,
-        6: Payment.amount,
-        7: Payment.payment_date,
+        3: "policy__contractor",
+        4: "policy__start_date",
+        5: "expense_type",
+        6: "payment__amount",
+        7: "payment__payment_date",
         8: expense_service.INCOME_TOTAL,
         9: expense_service.OTHER_EXPENSE_TOTAL,
         10: expense_service.NET_INCOME,
-        11: Expense.amount,
-        12: Expense.expense_date,
+        11: "amount",
+        12: "expense_date",
     }
 
     def __init__(self, parent=None, deal_id=None):

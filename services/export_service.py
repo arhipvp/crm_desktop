@@ -43,11 +43,7 @@ def export_objects_to_csv(path, objects, fields, headers=None):
                             rel = getattr(rel, step, None)
                             if rel is None:
                                 break
-                        value = (
-                            rel
-                            if isinstance(rel, str)
-                            else getattr(rel, "", "") if rel else ""
-                        )
+                        value = rel if rel is not None else ""
                     else:
                         rel = obj
                         for step in _split_path(f):
