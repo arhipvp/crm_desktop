@@ -31,7 +31,7 @@ def test_table_sorting(view_class, sort_order, in_memory_db, qapp, monkeypatch):
         view = BaseTableView(model_class=Payment)
         view.set_model_class_and_items(Payment, [pay1, pay2], total_count=2)
         # активируем фильтр, чтобы прокси-модель применяла сортировку при фильтрации
-        view.proxy_model.setFilterFixedString("P")
+        view.proxy.set_filter(0, "P")
         column = view.get_column_index("payment_date")
     else:
         p1 = Policy.create(
@@ -58,10 +58,10 @@ def test_table_sorting(view_class, sort_order, in_memory_db, qapp, monkeypatch):
     assert view.current_sort_order == sort_order
 
     if view_class is BaseTableView:
-        idx0 = view.proxy_model.index(0, column)
-        idx1 = view.proxy_model.index(1, column)
-        first_date = view.proxy_model.data(idx0, Qt.DisplayRole)
-        second_date = view.proxy_model.data(idx1, Qt.DisplayRole)
+        idx0 = view.proxy.index(0, column)
+        idx1 = view.proxy.index(1, column)
+        first_date = view.proxy.data(idx0, Qt.DisplayRole)
+        second_date = view.proxy.data(idx1, Qt.DisplayRole)
         if sort_order == Qt.AscendingOrder:
             assert first_date == "10.12.2023"
             assert second_date == "02.01.2024"
