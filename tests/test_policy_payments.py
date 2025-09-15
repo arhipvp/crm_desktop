@@ -2,6 +2,7 @@ import datetime
 import pytest
 
 from database.models import Client, Policy, Payment, Income, Expense
+from services import expense_service
 from services import payment_service as pay_svc
 from services.policies import policy_service as policy_svc
 
@@ -176,6 +177,26 @@ def test_add_payment_skips_dash_contractor(in_memory_db):
     assert Payment.select().count() == 1
     assert Income.select().count() == 1
     assert Expense.select().count() == 0
+
+
+def test_add_contractor_expense_creates_record(in_memory_db):
+    d = datetime.date(2024, 1, 1)
+    client = Client.create(name="C")
+    policy = Policy.create(
+        client=client,
+        policy_number="P",
+        start_date=d,
+        end_date=d,
+    )
+    Payment.create(policy=policy, amount=0, payment_date=d)
+    policy.contractor = "X"
+    policy.save()
+    assert expense_service.get_expense_count_by_policy(policy.id) == 0
+    policy_svc.add_contractor_expense(policy)
+    assert expense_service.get_expense_count_by_policy(policy.id) == 1
+    exp = Expense.get()
+    assert exp.expense_type == "контрагент"
+    assert exp.amount == 0
 
 
 def test_sync_policy_payments_removes_extra_duplicates(

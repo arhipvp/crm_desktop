@@ -23,6 +23,7 @@ from services.policies import (
     get_unique_policy_field_values,
     update_policy,
     DuplicatePolicyError,
+    add_contractor_expense,
 )
 
 from services.validators import normalize_policy_number, normalize_number
@@ -38,7 +39,8 @@ from ui.common.combo_helpers import (
     populate_combo,
 )
 from ui.common.date_utils import add_year_minus_one_day
-from ui.common.message_boxes import show_error, show_info
+from ui.common.message_boxes import confirm, show_error, show_info
+from services.expense_service import get_expense_count_by_policy
 
 logger = logging.getLogger(__name__)
 
@@ -256,9 +258,24 @@ class PolicyForm(BaseEditForm):
 
     def save(self):
         data = self.collect_data()
+        contractor_changed = (
+            self.instance is not None
+            and data.get("contractor")
+            and data.get("contractor") != (self.instance.contractor or "")
+        )
         try:
             saved = self.save_data(data)
             if saved:
+                if contractor_changed:
+                    cnt = get_expense_count_by_policy(saved.id)
+                    if confirm(
+                        f"Создать расход для контрагента '{data['contractor']}'?"
+                    ):
+                        if cnt == 0 or confirm(
+                            f"Уже есть {cnt} расход(ов) по этому полису. Все равно создать?"
+                        ):
+                            add_contractor_expense(saved)
+                            show_info("Расход для контрагента создан.")
                 self.saved_instance = saved
                 self.accept()
         except DuplicatePolicyError as e:
