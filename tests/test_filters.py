@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from database.models import Payment, Policy
 from ui import settings as ui_settings
 from ui.base.base_table_view import BaseTableView
+from ui.common.multi_filter_proxy import ColumnFilterState
 from ui.views.payment_table_view import PaymentTableView
 from ui.views import payment_table_view as payment_table_view_module
 from ui.common.date_utils import get_date_or_none
@@ -47,7 +48,10 @@ def test_header_filter_input_filters_proxy(
     index = view.proxy.index(0, 0)
     display_text = view.proxy.data(index, Qt.DisplayRole)
     assert "POL-001" in display_text
-    assert view._column_filters[0] == "POL-001"
+    state = view._column_filters[0]
+    assert isinstance(state, ColumnFilterState)
+    assert state.type == "text"
+    assert state.value == "POL-001"
     view.deleteLater()
 
 

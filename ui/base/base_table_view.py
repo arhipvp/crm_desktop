@@ -1,12 +1,25 @@
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
 from datetime import date
+from typing import Callable, Optional
 
-from peewee import Field
+from peewee import (
+    Field,
+    DateField,
+    BooleanField,
+    IntegerField,
+    FloatField,
+    DoubleField,
+    DecimalField,
+    BigIntegerField,
+    SmallIntegerField,
+    ForeignKeyField,
+)
 
-from PySide6.QtCore import Qt, Signal, QRect, QPoint
+from PySide6.QtCore import Qt, Signal, QRect, QPoint, QDate
 from PySide6.QtGui import QShortcut
 
 from PySide6.QtWidgets import (
@@ -25,6 +38,9 @@ from PySide6.QtWidgets import (
     QDateEdit,
     QLabel,
     QWidgetAction,
+    QComboBox,
+    QSpinBox,
+    QDoubleSpinBox,
 )
 
 from ui.base.table_controller import TableController
@@ -35,7 +51,7 @@ from ui.common.date_utils import (
     configure_optional_date_edit,
     get_date_or_none,
 )
-from ui.common.multi_filter_proxy import MultiFilterProxyModel
+from ui.common.multi_filter_proxy import MultiFilterProxyModel, ColumnFilterState
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
 from services.export_service import export_objects_to_csv
@@ -225,7 +241,7 @@ class BaseTableView(QWidget):
         self.proxy.setSortRole(Qt.UserRole)
         self.proxy.setDynamicSortFilter(True)
         self.table.setEditTriggers(QTableView.NoEditTriggers)
-        self._column_filters: dict[int, str] = {}
+        self._column_filters: dict[int, ColumnFilterState] = {}
 
         self.table.setModel(self.proxy)
         self.proxy_model = self.proxy  # backward compatibility
@@ -256,10 +272,10 @@ class BaseTableView(QWidget):
         """Переустанавливает сохранённые фильтры столбцов в прокси-модель."""
         header = self.table.horizontalHeader()
         column_count = header.count() if header is not None else 0
-        for column, text in self._column_filters.items():
+        for column, state in self._column_filters.items():
             if column < 0 or column >= column_count:
                 continue
-            self.proxy.set_filter(column, text)
+            self.proxy.set_filter(column, state)
 
     # ------------------------------------------------------------------
     # Helpers for toolbar-based filters
@@ -309,7 +325,7 @@ class BaseTableView(QWidget):
         columns = list(self._column_filters.keys())
         self._column_filters.clear()
         for column in columns:
-            self.proxy.set_filter(column, "")
+            self.proxy.set_filter(column, None)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         if self.controller:
@@ -659,6 +675,288 @@ class BaseTableView(QWidget):
         act_folder.setEnabled(has_path)
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
+    # ------------------------------------------------------------------
+    # Helpers for header filters
+    # ------------------------------------------------------------------
+    def _header_placeholder_text(self, column: int) -> str:
+        header_text = ""
+        source_model = getattr(self.proxy, "sourceModel", None)
+        model = source_model() if callable(source_model) else None
+        if model is not None:
+            header_value = model.headerData(column, Qt.Horizontal, Qt.DisplayRole)
+        else:
+            header_value = self.table.model().headerData(column, Qt.Horizontal, Qt.DisplayRole)
+        if header_value is None:
+            return ""
+        return str(header_value)
+
+    def _get_field_for_column(self, column: int) -> Field | str | None:
+        column_map = getattr(self, "COLUMN_FIELD_MAP", {})
+        if column in column_map:
+            return column_map[column]
+        model_fields = getattr(self.model, "fields", None)
+        if model_fields and 0 <= column < len(model_fields):
+            return model_fields[column]
+        return None
+
+    @staticmethod
+    def _is_date_field(field: Field | None) -> bool:
+        return isinstance(field, DateField)
+
+    @staticmethod
+    def _is_boolean_field(field: Field | None) -> bool:
+        return isinstance(field, BooleanField)
+
+    def _is_integer_field(self, field: Field | None) -> bool:
+        if not isinstance(field, Field) or isinstance(field, ForeignKeyField):
+            return False
+        return isinstance(field, (IntegerField, BigIntegerField, SmallIntegerField))
+
+    def _is_numeric_field(self, field: Field | None) -> bool:
+        if not isinstance(field, Field) or isinstance(field, ForeignKeyField):
+            return False
+        return isinstance(
+            field,
+            (
+                IntegerField,
+                BigIntegerField,
+                SmallIntegerField,
+                FloatField,
+                DoubleField,
+                DecimalField,
+            ),
+        )
+
+    @staticmethod
+    def _format_date_range_display(start: date | None, end: date | None) -> str:
+        parts: list[str] = []
+        if start:
+            parts.append(start.strftime("%d.%m.%Y"))
+        if end:
+            parts.append(end.strftime("%d.%m.%Y"))
+        return " — ".join(parts)
+
+    @staticmethod
+    def _numeric_is_clear(spinbox: QDoubleSpinBox | QSpinBox, value: float) -> bool:
+        minimum = spinbox.minimum()
+        if isinstance(spinbox, QDoubleSpinBox):
+            return math.isclose(value, minimum, rel_tol=1e-9, abs_tol=1e-9)
+        return int(value) == int(minimum)
+
+    def _create_text_filter_widget(
+        self,
+        menu: QMenu,
+        column: int,
+        visual: int,
+        state: Optional[ColumnFilterState],
+    ) -> Callable[[], None]:
+        line = QLineEdit(menu)
+        line.setPlaceholderText(self._header_placeholder_text(column))
+        current_text = ""
+        if isinstance(state, ColumnFilterState) and state.type == "text":
+            current_text = str(state.value or "")
+        line.setText(current_text)
+        action = QWidgetAction(menu)
+        action.setDefaultWidget(line)
+        menu.addAction(action)
+        line.textChanged.connect(lambda text, v=visual: self._on_filter_text_changed(v, text))
+
+        def clear() -> None:
+            line.blockSignals(True)
+            line.clear()
+            line.blockSignals(False)
+            self._on_filter_text_changed(visual, "")
+
+        return clear
+
+    def _create_date_filter_widget(
+        self,
+        menu: QMenu,
+        column: int,
+        state: Optional[ColumnFilterState],
+    ) -> Callable[[], None]:
+        container = QWidget(menu)
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        start_edit = QDateEdit(container)
+        start_edit.setCalendarPopup(True)
+        configure_optional_date_edit(start_edit)
+        end_edit = QDateEdit(container)
+        end_edit.setCalendarPopup(True)
+        configure_optional_date_edit(end_edit)
+        layout.addWidget(start_edit)
+        dash = QLabel("—", container)
+        dash.setAlignment(Qt.AlignCenter)
+        layout.addWidget(dash)
+        layout.addWidget(end_edit)
+        action = QWidgetAction(menu)
+        action.setDefaultWidget(container)
+        menu.addAction(action)
+
+        value = state.value if isinstance(state, ColumnFilterState) and state.type == "date_range" else None
+        start_iso = value.get("from") if isinstance(value, dict) else None
+        end_iso = value.get("to") if isinstance(value, dict) else None
+
+        for edit, iso in ((start_edit, start_iso), (end_edit, end_iso)):
+            edit.blockSignals(True)
+            if iso:
+                qdate = QDate.fromString(str(iso), Qt.ISODate)
+                if qdate.isValid():
+                    edit.setDate(qdate)
+                else:
+                    clear_optional_date(edit)
+            else:
+                clear_optional_date(edit)
+            edit.blockSignals(False)
+
+        def update() -> None:
+            start_date = get_date_or_none(start_edit)
+            end_date = get_date_or_none(end_edit)
+            if start_date and end_date and start_date > end_date:
+                qdate = QDate(start_date.year, start_date.month, start_date.day)
+                end_edit.blockSignals(True)
+                end_edit.setDate(qdate)
+                end_edit.blockSignals(False)
+                end_date = start_date
+            if start_date or end_date:
+                value_dict = {
+                    "from": start_date.isoformat() if start_date else None,
+                    "to": end_date.isoformat() if end_date else None,
+                }
+                display = self._format_date_range_display(start_date, end_date)
+                state_obj = ColumnFilterState("date_range", value_dict, display=display)
+            else:
+                state_obj = None
+            self._apply_column_filter(column, state_obj)
+
+        start_edit.dateChanged.connect(lambda *_: update())
+        end_edit.dateChanged.connect(lambda *_: update())
+
+        def clear() -> None:
+            for widget in (start_edit, end_edit):
+                widget.blockSignals(True)
+                clear_optional_date(widget)
+                widget.blockSignals(False)
+            self._apply_column_filter(column, None)
+
+        return clear
+
+    def _create_boolean_filter_widget(
+        self,
+        menu: QMenu,
+        column: int,
+        state: Optional[ColumnFilterState],
+    ) -> Callable[[], None]:
+        combo = QComboBox(menu)
+        combo.addItem("Все", None)
+        combo.addItem("Да", True)
+        combo.addItem("Нет", False)
+        action = QWidgetAction(menu)
+        action.setDefaultWidget(combo)
+        menu.addAction(action)
+
+        current_value = state.value if isinstance(state, ColumnFilterState) and state.type == "bool" else None
+        index = 0
+        for i in range(combo.count()):
+            if combo.itemData(i) == current_value:
+                index = i
+                break
+        combo.blockSignals(True)
+        combo.setCurrentIndex(index)
+        combo.blockSignals(False)
+
+        def on_changed(idx: int) -> None:
+            value = combo.itemData(idx)
+            if value is None:
+                self._apply_column_filter(column, None)
+                return
+            display = "Да" if value else "Нет"
+            self._apply_column_filter(
+                column,
+                ColumnFilterState("bool", bool(value), display=display),
+            )
+
+        combo.currentIndexChanged.connect(on_changed)
+
+        def clear() -> None:
+            combo.blockSignals(True)
+            combo.setCurrentIndex(0)
+            combo.blockSignals(False)
+            self._apply_column_filter(column, None)
+
+        return clear
+
+    def _create_numeric_filter_widget(
+        self,
+        menu: QMenu,
+        column: int,
+        state: Optional[ColumnFilterState],
+        field: Field,
+    ) -> Callable[[], None]:
+        is_integer = self._is_integer_field(field)
+        if is_integer:
+            spin: QDoubleSpinBox | QSpinBox = QSpinBox(menu)
+            spin.setRange(-1_000_000_000, 1_000_000_000)
+            spin.setSingleStep(1)
+            meta = {"value_type": "int"}
+        else:
+            spin = QDoubleSpinBox(menu)
+            spin.setRange(-1_000_000_000.0, 1_000_000_000.0)
+            decimals = getattr(field, "decimal_places", 2)
+            if not isinstance(decimals, int) or decimals < 0:
+                decimals = 2
+            spin.setDecimals(decimals)
+            step = 10 ** (-decimals) if decimals else 1.0
+            spin.setSingleStep(step)
+            meta = {"value_type": "float"}
+        spin.setKeyboardTracking(False)
+        spin.setAccelerated(True)
+        spin.setSpecialValueText("—")
+        action = QWidgetAction(menu)
+        action.setDefaultWidget(spin)
+        menu.addAction(action)
+
+        sentinel = spin.minimum()
+        value = None
+        if isinstance(state, ColumnFilterState) and state.type == "number":
+            value = state.value
+            meta.update(state.meta or {})
+
+        spin.blockSignals(True)
+        if value is None:
+            spin.setValue(sentinel)
+        else:
+            try:
+                if is_integer:
+                    spin.setValue(int(value))
+                else:
+                    spin.setValue(float(value))
+            except (TypeError, ValueError):
+                spin.setValue(sentinel)
+        spin.blockSignals(False)
+
+        def on_changed(val: float) -> None:
+            if self._numeric_is_clear(spin, val):
+                self._apply_column_filter(column, None)
+                return
+            numeric_value = int(val) if is_integer else float(val)
+            display = str(numeric_value)
+            self._apply_column_filter(
+                column,
+                ColumnFilterState("number", numeric_value, display=display, meta=dict(meta)),
+            )
+
+        spin.valueChanged.connect(on_changed)
+
+        def clear() -> None:
+            spin.blockSignals(True)
+            spin.setValue(sentinel)
+            spin.blockSignals(False)
+            self._apply_column_filter(column, None)
+
+        return clear
+
     def _on_header_section_clicked(self, pos: QPoint) -> None:
         header = self.table.horizontalHeader()
         column = header.logicalIndexAt(pos)
@@ -667,29 +965,30 @@ class BaseTableView(QWidget):
         visual = header.visualIndex(column)
         if visual < 0:
             return
+        column_map = getattr(self, "COLUMN_FIELD_MAP", {})
+        if column in column_map and column_map[column] is None:
+            return
+
+        field = self._get_field_for_column(column)
+        state = self._column_filters.get(column)
+
         menu = QMenu(self)
-        line = QLineEdit(menu)
-        header_text = ""
-        source_model = getattr(self.proxy, "sourceModel", None)
-        if callable(source_model):
-            model = source_model()
+        clear_callback: Optional[Callable[[], None]]
+        if isinstance(field, Field) and self._is_date_field(field):
+            clear_callback = self._create_date_filter_widget(menu, column, state)
+        elif isinstance(field, Field) and self._is_boolean_field(field):
+            clear_callback = self._create_boolean_filter_widget(menu, column, state)
+        elif isinstance(field, Field) and self._is_numeric_field(field):
+            clear_callback = self._create_numeric_filter_widget(menu, column, state, field)
         else:
-            model = None
-        if model is not None:
-            header_value = model.headerData(column, Qt.Horizontal, Qt.DisplayRole)
-            header_text = "" if header_value is None else str(header_value)
-        else:
-            header_value = self.table.model().headerData(column, Qt.Horizontal, Qt.DisplayRole)
-            header_text = "" if header_value is None else str(header_value)
-        line.setPlaceholderText(header_text)
-        line.setText(self._column_filters.get(column, ""))
-        action = QWidgetAction(menu)
-        action.setDefaultWidget(line)
-        menu.addAction(action)
-        line.textChanged.connect(lambda text, v=visual: self._on_filter_text_changed(v, text))
+            clear_callback = self._create_text_filter_widget(menu, column, visual, state)
+
         menu.addSeparator()
         clear_action = menu.addAction("Очистить фильтр")
-        clear_action.triggered.connect(lambda v=visual: self._on_filter_text_changed(v, ""))
+        if clear_callback:
+            clear_action.triggered.connect(clear_callback)
+        else:
+            clear_action.triggered.connect(lambda: self._apply_column_filter(column, None))
         pos_x = header.sectionViewportPosition(column)
         rect = QRect(pos_x, 0, header.sectionSize(column), header.height())
         menu.popup(header.mapToGlobal(rect.bottomLeft()))
@@ -700,13 +999,26 @@ class BaseTableView(QWidget):
         if logical < 0:
             return
         text = text.strip()
-        if text:
-            self._column_filters[logical] = text
+        state = ColumnFilterState("text", text) if text else None
+        self._apply_column_filter(logical, state)
+
+    def _apply_column_filter(
+        self,
+        column: int,
+        state: Optional[ColumnFilterState],
+        *,
+        save_settings: bool = True,
+        trigger_filter: bool = True,
+    ) -> None:
+        if state is None or state.is_empty():
+            self._column_filters.pop(column, None)
         else:
-            self._column_filters.pop(logical, None)
-        self.proxy.set_filter(logical, text)
-        self.save_table_settings()
-        self.on_filter_changed()
+            self._column_filters[column] = state
+        self.proxy.set_filter(column, state)
+        if save_settings:
+            self.save_table_settings()
+        if trigger_filter:
+            self.on_filter_changed()
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
         """Сохраняет текущую сортировку таблицы."""
@@ -726,7 +1038,10 @@ class BaseTableView(QWidget):
         widths = {i: header.sectionSize(i) for i in range(header.count())}
         hidden = [i for i in range(header.count()) if self.table.isColumnHidden(i)]
         order = [header.visualIndex(i) for i in range(header.count())]
-        filters = dict(self._column_filters)
+        filters = {
+            str(column): state.to_dict()
+            for column, state in self._column_filters.items()
+        }
         settings = {
             "sort_column": self.current_sort_column,
             "sort_order": self.current_sort_order.value,
@@ -776,17 +1091,27 @@ class BaseTableView(QWidget):
         saved_filters = saved.get("column_filters", {})
         self._column_filters = {}
         if isinstance(saved_filters, dict):
-            for col, text in saved_filters.items():
+            for col, raw_state in saved_filters.items():
                 try:
                     col_int = int(col)
-                    text_str = str(text)
-                except Exception:
+                except (TypeError, ValueError):
                     continue
                 if col_int >= header.count():
                     continue
-                if text_str:
-                    self._column_filters[col_int] = text_str
-                self.proxy.set_filter(col_int, text_str)
+                if isinstance(raw_state, ColumnFilterState):
+                    state = raw_state
+                elif isinstance(raw_state, dict):
+                    state = ColumnFilterState.from_dict(raw_state)
+                elif isinstance(raw_state, str):
+                    raw_text = raw_state.strip()
+                    state = ColumnFilterState("text", raw_text) if raw_text else None
+                else:
+                    state = None
+                if state is None or state.is_empty():
+                    self.proxy.set_filter(col_int, None)
+                    continue
+                self._column_filters[col_int] = state
+                self.proxy.set_filter(col_int, state)
         per_page = saved.get("per_page")
         need_reload = False
         if per_page is not None:
