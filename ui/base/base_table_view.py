@@ -581,11 +581,11 @@ class BaseTableView(QWidget):
 
         field_map = None
         if self.COLUMN_FIELD_MAP:
-            field_map = {
-                visual: self.COLUMN_FIELD_MAP[header.logicalIndex(visual)]
-                for visual in range(header.count())
-                if header.logicalIndex(visual) in self.COLUMN_FIELD_MAP
-            }
+            field_map = {}
+            for visual in range(header.count()):
+                logical = header.logicalIndex(visual)
+                if logical in self.COLUMN_FIELD_MAP:
+                    field_map[visual] = self.COLUMN_FIELD_MAP[logical]
 
         self.column_filters.set_headers(headers, texts, column_field_map=field_map)
 
