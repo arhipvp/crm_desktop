@@ -22,6 +22,24 @@ classDiagram
 2. Каждый наследник `BaseTableView` настраивает `TableController`, передавая сервисные функции для загрузки страниц и подсчёта записей. Контроллер обновляет модель и эмитит `data_loaded`.
 3. `BaseTableView` обновляет таблицу и фильтры. При редактировании открывается форма, наследующая `BaseEditForm`; она сохраняет данные через сервисы и инициирует обновление представления.
 
+## Пример использования `FilterHeaderView`
+
+```python
+from PySide6.QtWidgets import QTableView
+from ui.common.filter_header_view import FilterHeaderView
+
+
+class MyTableView(QTableView):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        header = FilterHeaderView(self)
+        self.setHorizontalHeader(header)
+        header.filter_changed.connect(self._on_filter)
+
+    def _on_filter(self, column: int, text: str) -> None:
+        ...  # примените фильтрацию
+```
+
 ## Ссылки
 
 - [MainWindow](../ui/main_window.py)
