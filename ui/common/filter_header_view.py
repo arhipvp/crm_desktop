@@ -88,3 +88,4 @@ class FilterHeaderView(QHeaderView):
             self.filter_changed.emit(col, "")
         for col, text in self._filters.items():
             self.filter_changed.emit(col, text)
+        self.update()
