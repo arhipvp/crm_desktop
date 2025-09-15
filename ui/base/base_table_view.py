@@ -559,7 +559,9 @@ class BaseTableView(QWidget):
 
     def _toggle_column(self, index: int, visible: bool):
         self.table.setColumnHidden(index, not visible)
-        self.column_filters.set_editor_visible(index, visible)
+        header = self.table.horizontalHeader()
+        visual = header.visualIndex(index)
+        self.column_filters.set_editor_visible(visual, visible)
         self.save_table_settings()
 
     def _rebuild_column_filters(self, texts: list[str] | None = None) -> None:
@@ -584,8 +586,9 @@ class BaseTableView(QWidget):
             headers, texts, column_field_map=field_map
         )
         for i in range(header.count()):
+            logical = header.logicalIndex(i)
             self.column_filters.set_editor_visible(
-                i, not self.table.isColumnHidden(i)
+                i, not self.table.isColumnHidden(logical)
             )
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
