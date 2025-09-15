@@ -1,9 +1,7 @@
 import pytest
 import logging
 
-from PySide6.QtWidgets import QWidget, QDialog, QTableView
-from PySide6.QtGui import QStandardItemModel
-from ui.common.filter_header_view import FilterHeaderView
+from PySide6.QtWidgets import QWidget, QDialog
 import base64
 
 from ui.main_window import MainWindow
@@ -94,27 +92,3 @@ def test_open_import_policy_json_message(
     assert len(messages) == expected_messages
     if expected_messages:
         assert "импорт" in messages[0].lower()
-
-
-def test_filter_header_view_emits_signal(qapp):
-    header = FilterHeaderView()
-    received: dict[int, str] = {}
-    header.filter_changed.connect(lambda c, t: received.__setitem__(c, t))
-    header.set_filter_text(1, "abc")
-    assert received[1] == "abc"
-
-
-def test_filter_header_view_preserves_indices_on_move(qapp):
-    table = QTableView()
-    model = QStandardItemModel(0, 3)
-    table.setModel(model)
-    header = FilterHeaderView(table)
-    table.setHorizontalHeader(header)
-    header.setSectionsMovable(True)
-
-    header.set_filter_text(0, "foo")
-    header.set_filter_text(1, "bar")
-
-    header.moveSection(0, 2)
-
-    assert header.get_all_filters() == {0: "foo", 1: "bar"}

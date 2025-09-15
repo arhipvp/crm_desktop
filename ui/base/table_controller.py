@@ -131,9 +131,8 @@ class TableController:
 
     def _on_reset_filters(self):
         self.view.filter_controls.clear_all()
-        header = self.view.table.horizontalHeader()
-        if hasattr(header, "set_all_filters"):
-            header.set_all_filters({})
+        if hasattr(self.view, "clear_header_filters"):
+            self.view.clear_header_filters()
         self.view.save_table_settings()
         self.on_filter_changed()
 

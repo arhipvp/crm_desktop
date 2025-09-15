@@ -10,6 +10,7 @@ def test_on_reset_filters(monkeypatch):
     view = types.SimpleNamespace(
         filter_controls=filter_controls,
         save_table_settings=MagicMock(),
+        clear_header_filters=MagicMock(),
     )
     controller = TableController(view)
     controller.on_filter_changed = MagicMock()
@@ -20,5 +21,6 @@ def test_on_reset_filters(monkeypatch):
 
     filter_controls.clear_all.assert_called_once()
     view.save_table_settings.assert_called_once()
+    view.clear_header_filters.assert_called_once()
     controller.on_filter_changed.assert_called_once()
     ui_settings.set_table_filters.assert_not_called()

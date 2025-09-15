@@ -8,11 +8,13 @@ from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
+    QLineEdit,
     QMenu,
     QSplitter,
     QTableView,
     QVBoxLayout,
     QWidget,
+    QWidgetAction,
     QFileDialog,
     QMessageBox,
 )
@@ -21,8 +23,7 @@ from ui.base.table_controller import TableController
 from ui.common.filter_controls import FilterControls
 from ui.common.paginator import Paginator
 from ui.common.styled_widgets import styled_button
-from ui.common.filter_header_view import FilterHeaderView
-from ui.common.multi_filter_proxy import MultiFilterProxyModel
+from ui.common.column_filter_proxy import ColumnFilterProxyModel
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
 from services.export_service import export_objects_to_csv
@@ -167,7 +168,7 @@ class BaseTableView(QWidget):
 
         # Таблица
         self.table = QTableView()
-        self.proxy = MultiFilterProxyModel()
+        self.proxy = ColumnFilterProxyModel()
         self.proxy.setSortRole(Qt.UserRole)
         self.proxy.setDynamicSortFilter(True)
         self.table.setEditTriggers(QTableView.NoEditTriggers)
@@ -175,16 +176,15 @@ class BaseTableView(QWidget):
         self.table.setModel(self.proxy)
         self.proxy_model = self.proxy  # backward compatibility
         self.table.setSortingEnabled(True)
-        header = FilterHeaderView(self.table)
+        header = QHeaderView(Qt.Horizontal, self.table)
         self.table.setHorizontalHeader(header)
         header.setSectionsMovable(True)
+        header.setSectionsClickable(True)
         header.sortIndicatorChanged.connect(self._on_sort_indicator_changed)
         header.sectionResized.connect(self._on_section_resized)
         header.sectionMoved.connect(self._on_section_moved)
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self._on_header_menu)
-        header.filter_changed.connect(self.proxy.set_filter)
-        header.filter_changed.connect(lambda _c, _t: self.save_table_settings())
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setAlternatingRowColors(True)
         header.setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -192,6 +192,8 @@ class BaseTableView(QWidget):
         self.table.customContextMenuRequested.connect(self._on_table_menu)
         self.table.doubleClicked.connect(self._on_row_double_clicked)
         self.left_layout.addWidget(self.table)
+
+        self.column_filters: dict[int, str] = {}
 
         # Пагинация
         self.paginator = Paginator(on_prev=self.prev_page, on_next=self.next_page, per_page=self.per_page)
@@ -540,18 +542,45 @@ class BaseTableView(QWidget):
 
     def _on_header_menu(self, pos):
         header = self.table.horizontalHeader()
+        logical = header.logicalIndexAt(pos)
         menu = QMenu(self)
+
+        line_edit = QLineEdit(menu)
+        line_edit.setPlaceholderText("Фильтр")
+        line_edit.setText(self.column_filters.get(logical, ""))
+        action = QWidgetAction(menu)
+        action.setDefaultWidget(line_edit)
+        menu.addAction(action)
+
+        line_edit.editingFinished.connect(
+            lambda c=logical, le=line_edit: self._apply_header_filter(c, le.text())
+        )
+
+        menu.addSeparator()
         for i in range(header.count()):
             text = header.model().headerData(i, Qt.Horizontal)
-            action = menu.addAction(str(text))
-            action.setCheckable(True)
-            action.setChecked(not header.isSectionHidden(i))
-            action.toggled.connect(lambda checked, i=i: self._toggle_column(i, checked))
+            act = menu.addAction(str(text))
+            act.setCheckable(True)
+            act.setChecked(not header.isSectionHidden(i))
+            act.toggled.connect(lambda checked, i=i: self._toggle_column(i, checked))
+
         menu.exec(header.mapToGlobal(pos))
 
     def _toggle_column(self, index: int, visible: bool):
         self.table.setColumnHidden(index, not visible)
         self.save_table_settings()
+
+    def _apply_header_filter(self, column: int, text: str) -> None:
+        if text:
+            self.column_filters[column] = text
+        else:
+            self.column_filters.pop(column, None)
+        self.proxy.set_filter(column, text)
+        self.save_table_settings()
+
+    def clear_header_filters(self) -> None:
+        self.column_filters.clear()
+        self.proxy.clear_filters()
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
         """Сохраняет текущую сортировку таблицы."""
@@ -571,9 +600,7 @@ class BaseTableView(QWidget):
         widths = {i: header.sectionSize(i) for i in range(header.count())}
         hidden = [i for i in range(header.count()) if self.table.isColumnHidden(i)]
         order = [header.visualIndex(i) for i in range(header.count())]
-        filters = {}
-        if hasattr(header, "get_all_filters"):
-            filters = header.get_all_filters()
+        filters = self.column_filters
         settings = {
             "sort_column": self.current_sort_column,
             "sort_order": self.current_sort_order.value,
@@ -621,11 +648,13 @@ class BaseTableView(QWidget):
             if idx < model_columns:
                 self.table.setColumnHidden(idx, True)
         saved_filters = saved.get("column_filters", {})
-        if hasattr(header, "set_all_filters"):
+        for idx, text in saved_filters.items():
             try:
-                header.set_all_filters(saved_filters)
-            except Exception:
-                pass
+                column = int(idx)
+            except (TypeError, ValueError):
+                continue
+            self.column_filters[column] = text
+            self.proxy.set_filter(column, text)
         per_page = saved.get("per_page")
         need_reload = False
         if per_page is not None:

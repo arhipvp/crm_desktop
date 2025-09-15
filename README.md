@@ -99,25 +99,9 @@ pip install -e .
 
 ## Быстрые фильтры
 
-В таблицах можно фильтровать данные прямо из заголовков. Нажмите правой кнопкой по иконке фильтра в нужном столбце — откроется поле ввода. Левый клик по этой иконке сбрасывает фильтр и возвращает исходные данные. Введённые значения сохраняются между запусками и восстанавливаются автоматически.
-
-### MultiFilterProxyModel
-
-Для комбинирования фильтров по нескольким столбцам используйте `MultiFilterProxyModel`,
-расширяющую `QSortFilterProxyModel`. Она хранит текстовые фильтры по колонкам и
-работает в паре с `FilterHeaderView`.
-
-```python
-from ui.common.multi_filter_proxy_model import MultiFilterProxyModel
-from ui.common.filter_header_view import FilterHeaderView
-
-proxy = MultiFilterProxyModel()
-proxy.setSourceModel(source_model)
-view.setModel(proxy)
-header = FilterHeaderView(view)
-view.setHorizontalHeader(header)
-header.filter_changed.connect(proxy.set_filter)
-```
+В таблицах используется стандартная `QSortFilterProxyModel`. Правый клик по заголовку столбца
+открывает меню с полем ввода фильтра для выбранной колонки. Введённые значения сохраняются
+между запусками и восстанавливаются автоматически.
 
 ## Запуск Telegram‑бота
 

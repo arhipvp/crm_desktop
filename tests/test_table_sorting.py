@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt
 from database.models import Client, Policy, Payment
 from ui.base.base_table_view import BaseTableView
 from ui.views.policy_table_view import PolicyTableView
-from ui.common.filter_header_view import FilterHeaderView
+from PySide6.QtWidgets import QHeaderView
 
 
 @pytest.mark.parametrize("view_class", [BaseTableView, PolicyTableView])
@@ -50,7 +50,7 @@ def test_table_sorting(view_class, sort_order, in_memory_db, qapp, monkeypatch):
         column = 2  # столбец номера полиса
 
     header = view.table.horizontalHeader()
-    assert isinstance(header, FilterHeaderView)
+    assert isinstance(header, QHeaderView)
     view.table.sortByColumn(column, sort_order)
     qapp.processEvents()
 
