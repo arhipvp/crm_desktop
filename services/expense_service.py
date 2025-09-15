@@ -59,6 +59,15 @@ def get_expense_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     return open_count, closed_count
 
 
+def get_expense_count_by_policy(policy_id: int) -> int:
+    """Подсчитать количество расходов, связанных с полисом."""
+    return (
+        Expense.active()
+        .where(Expense.policy_id == policy_id)
+        .count()
+    )
+
+
 def get_expense_by_id(expense_id: int) -> Expense | None:
     """Получить расход по идентификатору."""
     return Expense.get_or_none(Expense.id == expense_id)

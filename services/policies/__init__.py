@@ -13,6 +13,7 @@ from .policy_service import (
     update_policy,
     DuplicatePolicyError,
     build_policy_query,
+    add_contractor_expense,
     get_all_policies,
     get_policies_by_client_id,
     get_policies_by_deal_id,
@@ -46,4 +47,5 @@ __all__ = [
     "mark_policies_renewed",
     "get_unique_policy_field_values",
     "attach_premium",
+    "add_contractor_expense",
 ]

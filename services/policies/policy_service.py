@@ -8,6 +8,7 @@ from typing import Any
 from peewee import JOIN, Field, fn
 
 from database.db import db
+
 from database.models import Client, Deal, Payment, Policy
 from services import executor_service as es
 from services.clients import get_client_by_id
@@ -295,6 +296,26 @@ def _notify_policy_added(policy: Policy) -> None:
         f"📄 В вашу сделку #{deal.id}{desc} добавлен полис id={policy.id} №{policy.policy_number}"
     )
     notify_executor(ex.tg_id, text)
+
+
+def add_contractor_expense(policy: Policy):
+    """Создать нулевой расход 'контрагент' для первого платежа полиса."""
+    from services.expense_service import add_expense
+
+    first_payment = (
+        Payment.active()
+        .where(Payment.policy == policy)
+        .order_by(Payment.payment_date)
+        .first()
+    )
+    if not first_payment:
+        raise ValueError("У полиса отсутствуют платежи")
+    return add_expense(
+        payment=first_payment,
+        amount=Decimal("0"),
+        expense_type="контрагент",
+        note=f"выплата контрагенту {policy.contractor}",
+    )
 
 
 # ─────────────────────────── Добавление ───────────────────────────
