@@ -31,8 +31,8 @@ expense_subquery = (
     .alias("expense_subquery")
 )
 
-income_total_expr = fn.COALESCE(income_subquery.c.income_total, 0)
-expense_total_expr = fn.COALESCE(expense_subquery.c.expense_total, 0)
+income_total_expr = fn.COALESCE(fn.SUM(income_subquery.c.income_total), 0)
+expense_total_expr = fn.COALESCE(fn.SUM(expense_subquery.c.expense_total), 0)
 INCOME_TOTAL = income_total_expr.alias("income_total")
 OTHER_EXPENSE_TOTAL = (expense_total_expr - Expense.amount).alias("other_expense_total")
 net_income_expr = income_total_expr - expense_total_expr
