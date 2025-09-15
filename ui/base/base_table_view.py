@@ -772,6 +772,7 @@ class BaseTableView(QWidget):
         self.proxy.set_filter(column, text)
         self._update_header_filter_icon(column)
         self.save_table_settings()
+        self.on_filter_changed()
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
         """Сохраняет текущую сортировку таблицы."""
