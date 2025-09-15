@@ -570,8 +570,12 @@ class BaseTableView(QWidget):
             header.model().headerData(header.logicalIndex(i), Qt.Horizontal)
             for i in range(header.count())
         ]
+        field_map = {
+            i: self.COLUMN_FIELD_MAP.get(header.logicalIndex(i))
+            for i in range(header.count())
+        }
         self.column_filters.set_headers(
-            headers, texts, column_field_map=self.COLUMN_FIELD_MAP
+            headers, texts, column_field_map=field_map
         )
         for i in range(header.count()):
             self.column_filters.set_editor_visible(
