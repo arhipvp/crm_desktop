@@ -36,13 +36,10 @@ class ExecutorTableView(BaseTableView):
         )
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         # Скрыть нерелевантный чекбокс "Показывать удалённые" для исполнителей
-        try:
-            show_inactive_label = "Показывать неактивных"
-            for label, box in getattr(self.filter_controls, "_checkboxes", {}).items():
-                if label != show_inactive_label:
-                    box.setVisible(False)
-        except Exception:
-            pass
+        show_inactive_label = "Показывать неактивных"
+        for label, box in self.checkboxes.items():
+            if label != show_inactive_label:
+                box.setVisible(False)
         self.row_double_clicked.connect(self.edit_selected)
         self.table.horizontalHeader().sortIndicatorChanged.connect(
             self.on_sort_changed
@@ -86,7 +83,7 @@ class ExecutorTableView(BaseTableView):
         filters = super().get_filters()
         filters.update(
             {
-                "show_inactive": self.filter_controls.is_checked("Показывать неактивных"),
+                "show_inactive": self.is_checked("Показывать неактивных"),
             }
         )
         filters.pop("show_deleted", None)

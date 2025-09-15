@@ -161,7 +161,7 @@ class IncomeTableView(BaseTableView):
         filters = super().get_filters()
         filters.update(
             {
-                "include_received": self.filter_controls.is_checked(
+                "include_received": self.is_checked(
                     "Показывать выплаченные"
                 )
             }
