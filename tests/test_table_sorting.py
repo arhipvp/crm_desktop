@@ -1,11 +1,11 @@
 import datetime
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QHeaderView
 
 from database.models import Client, Policy, Payment
 from ui.base.base_table_view import BaseTableView
 from ui.views.policy_table_view import PolicyTableView
-from ui.common.filter_header_view import FilterHeaderView
 
 
 @pytest.mark.parametrize("view_class", [BaseTableView, PolicyTableView])
@@ -30,8 +30,6 @@ def test_table_sorting(view_class, sort_order, in_memory_db, qapp, monkeypatch):
 
         view = BaseTableView(model_class=Payment)
         view.set_model_class_and_items(Payment, [pay1, pay2], total_count=2)
-        # активируем фильтр, чтобы прокси-модель применяла сортировку при фильтрации
-        view.proxy.set_filter(0, "P")
         column = view.get_column_index("payment_date")
     else:
         p1 = Policy.create(
@@ -50,7 +48,7 @@ def test_table_sorting(view_class, sort_order, in_memory_db, qapp, monkeypatch):
         column = 2  # столбец номера полиса
 
     header = view.table.horizontalHeader()
-    assert isinstance(header, FilterHeaderView)
+    assert isinstance(header, QHeaderView)
     view.table.sortByColumn(column, sort_order)
     qapp.processEvents()
 
