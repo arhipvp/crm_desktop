@@ -82,6 +82,12 @@ def get_incomes_page(
     **kwargs,
 ):
     """Получить страницу доходов по фильтрам."""
+    logger.debug(
+        "get_incomes_page filters=%s order=%s %s",
+        column_filters,
+        order_by,
+        order_dir,
+    )
     if join_executor is None:
         join_executor = (
             isinstance(order_by, Field)
@@ -125,7 +131,19 @@ def get_incomes_page(
     logger.debug("\U0001F4DD final SQL: %s", query.sql())
 
     offset = (page - 1) * per_page
-    return query.limit(per_page).offset(offset)
+    paged_query = query.limit(per_page).offset(offset)
+    filters = {
+        "search_text": search_text,
+        "show_deleted": show_deleted,
+        "include_received": include_received,
+        "received_date_range": received_date_range,
+        "column_filters": column_filters,
+        "only_received": only_received,
+        **kwargs,
+    }
+    if not paged_query.exists():
+        logger.warning("No incomes found for filters=%s", filters)
+    return paged_query
 
 # Уведомления
 def _notify_income_received(income: Income) -> None:
@@ -328,6 +346,7 @@ def build_income_query(
         join_executor=join_executor,
     )
 
+    logger.debug("income query SQL: %s", query.sql())
     return query
 
 
