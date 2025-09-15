@@ -131,6 +131,7 @@ class TableController:
 
     def _on_reset_filters(self):
         self.view.clear_filters()
+        self.view.clear_column_filters()
         self.view.save_table_settings()
         self.on_filter_changed()
 

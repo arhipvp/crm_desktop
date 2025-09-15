@@ -6,8 +6,10 @@ logger = logging.getLogger(__name__)
 from datetime import date
 
 from peewee import Field
-from PySide6.QtCore import Qt, Signal, QRect, QPoint
+
+from PySide6.QtCore import Qt, Signal, QRect, QPoint, QDate
 from PySide6.QtGui import QShortcut, QPainter, QPainterPath, QPalette
+
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -237,6 +239,9 @@ class BaseTableView(QWidget):
             self.date_to.setSpecialValueText("—")
             self.date_to.clear()
             self.date_to.dateChanged.connect(self._on_filters_changed)
+            for widget in (self.date_from, self.date_to):
+                widget.setMinimumDate(QDate())
+                widget.setDate(QDate())
             self.toolbar.addWidget(QLabel("С:"))
             self.toolbar.addWidget(self.date_from)
             self.toolbar.addWidget(QLabel("По:"))
@@ -389,6 +394,13 @@ class BaseTableView(QWidget):
             self.date_to.blockSignals(True)
             self.date_to.clear()
             self.date_to.blockSignals(False)
+
+    def clear_column_filters(self) -> None:
+        """Очищает сохранённые фильтры столбцов и сбрасывает их в прокси."""
+        columns = list(self._column_filters.keys())
+        self._column_filters.clear()
+        for column in columns:
+            self.proxy.set_filter(column, "")
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         if self.controller:
