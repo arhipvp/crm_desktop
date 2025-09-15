@@ -617,10 +617,10 @@ class BaseTableView(QWidget):
             idx = int(idx)
             if idx < model_columns:
                 self.table.setColumnHidden(idx, True)
-        filters = saved.get("column_filters", {})
-        if filters and hasattr(header, "set_all_filters"):
+        saved_filters = saved.get("column_filters", {})
+        if hasattr(header, "set_all_filters"):
             try:
-                header.set_all_filters(filters)
+                header.set_all_filters(saved_filters)
             except Exception:
                 pass
         per_page = saved.get("per_page")

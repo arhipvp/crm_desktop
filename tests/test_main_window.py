@@ -1,7 +1,8 @@
 import pytest
 import logging
 
-from PySide6.QtWidgets import QWidget, QDialog
+from PySide6.QtWidgets import QWidget, QDialog, QTableView
+from PySide6.QtGui import QStandardItemModel
 from ui.common.filter_header_view import FilterHeaderView
 import base64
 
@@ -101,3 +102,19 @@ def test_filter_header_view_emits_signal(qapp):
     header.filter_changed.connect(lambda c, t: received.__setitem__(c, t))
     header.set_filter_text(1, "abc")
     assert received[1] == "abc"
+
+
+def test_filter_header_view_preserves_indices_on_move(qapp):
+    table = QTableView()
+    model = QStandardItemModel(0, 3)
+    table.setModel(model)
+    header = FilterHeaderView(table)
+    table.setHorizontalHeader(header)
+    header.setSectionsMovable(True)
+
+    header.set_filter_text(0, "foo")
+    header.set_filter_text(1, "bar")
+
+    header.moveSection(0, 2)
+
+    assert header.get_all_filters() == {0: "foo", 1: "bar"}
