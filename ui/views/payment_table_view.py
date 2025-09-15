@@ -56,9 +56,6 @@ class PaymentTableView(BaseTableView):
         self.default_sort_column = 2
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = Qt.AscendingOrder
-        self.order_by = Payment.payment_date
-        self.order_dir = "asc"
-
         checkbox_map = {
             "Показывать оплаченные": lambda state: self.load_data(),
             "Показывать удалённые": lambda state: self.load_data(),
@@ -68,11 +65,9 @@ class PaymentTableView(BaseTableView):
             self,
             model_class=Payment,
             get_page_func=lambda page, per_page, **f: get_payments_page(
-                page, per_page, order_by=self.order_by, order_dir=self.order_dir, **f
+                page, per_page, **f
             ),
-            get_total_func=lambda **f: build_payment_query(
-                order_by=self.order_by, order_dir=self.order_dir, **f
-            ).count(),
+            get_total_func=lambda **f: build_payment_query(**f).count(),
             filter_func=self._apply_filters,
         )
 
@@ -123,8 +118,6 @@ class PaymentTableView(BaseTableView):
         field = self.COLUMN_FIELD_MAP.get(column)
         if field is None:
             return
-        self.order_dir = "desc" if order == Qt.DescendingOrder else "asc"
-        self.order_by = field
         self.page = 1
         self.load_data()
 

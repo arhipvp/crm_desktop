@@ -53,7 +53,7 @@ def get_payments_page(
     deal_id: int | None = None,
     include_paid: bool = True,
     column_filters: dict | None = None,
-    order_by: str | Field = Payment.payment_date,
+    order_by: str | Field | None = Payment.payment_date,
     order_dir: str = "asc",
     **filters,
 ) -> ModelSelect:
@@ -68,7 +68,9 @@ def get_payments_page(
         order_dir=order_dir,
         **filters,
     )
-    if isinstance(order_by, str):
+    if not order_by:
+        order_field = Payment.payment_date
+    elif isinstance(order_by, str):
         order_field = getattr(Payment, order_by, Payment.payment_date)
     else:
         order_field = order_by

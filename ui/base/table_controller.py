@@ -68,10 +68,43 @@ class TableController:
 
         filters = self.get_filters()
 
+        sort_field = self.view.COLUMN_FIELD_MAP.get(
+            self.view.current_sort_column
+        )
+        if sort_field is None:
+            model_fields: list[Any] = []
+            model = getattr(self.view, "model", None)
+            if model is not None:
+                model_fields = getattr(model, "fields", [])
+            elif self.model_class is not None:
+                try:
+                    model_fields = BaseTableModel([], self.model_class).fields
+                except Exception:  # noqa: BLE001 - best effort fallback
+                    model_fields = []
+            index = self.view.current_sort_column
+            if model_fields and 0 <= index < len(model_fields):
+                sort_field = model_fields[index]
+
+        order_dir = (
+            "desc"
+            if self.view.current_sort_order == Qt.DescendingOrder
+            else "asc"
+        )
+
         def run_task() -> tuple[list, int]:
-            items = self.get_page_func(self.view.page, self.view.per_page, **filters)
+            items = self.get_page_func(
+                self.view.page,
+                self.view.per_page,
+                order_by=sort_field,
+                order_dir=order_dir,
+                **filters,
+            )
             total = (
-                self.get_total_func(**filters)
+                self.get_total_func(
+                    order_by=sort_field,
+                    order_dir=order_dir,
+                    **filters,
+                )
                 if self.get_total_func
                 else len(items)
             )
