@@ -790,8 +790,7 @@ class BaseTableView(QWidget):
         clear_action = menu.addAction("Очистить фильтр")
         clear_action.triggered.connect(lambda v=visual: self._on_filter_text_changed(v, ""))
         pos_x = header.sectionViewportPosition(column)
-        width = header.sectionSize(column)
-        rect = QRect(pos_x, 0, width, header.height())
+        rect = QRect(pos_x, 0, header.sectionSize(column), header.height())
         menu.popup(header.mapToGlobal(rect.bottomLeft()))
 
     def _on_filter_text_changed(self, visual: int, text: str) -> None:
