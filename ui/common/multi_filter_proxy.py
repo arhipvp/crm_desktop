@@ -8,8 +8,9 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
 
     def set_filter(self, column: int, text: str):
         if text:
+            pattern = f".*{QRegularExpression.escape(text)}.*"
             self._filters[column] = QRegularExpression(
-                text, QRegularExpression.PatternOption.CaseInsensitiveOption
+                pattern, QRegularExpression.PatternOption.CaseInsensitiveOption
             )
         else:
             self._filters.pop(column, None)
