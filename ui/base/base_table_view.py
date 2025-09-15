@@ -734,6 +734,8 @@ class BaseTableView(QWidget):
                     text_str = str(text)
                 except Exception:
                     continue
+                if col_int >= header.count():
+                    continue
                 if text_str:
                     self._column_filters[col_int] = text_str
                 self.proxy.set_filter(col_int, text_str)
