@@ -237,14 +237,6 @@ class DealTableView(BaseTableView):
             self.paginator.update(self.total_count, self.page, self.per_page)
             self.data_loaded.emit(self.total_count)
 
-        headers = [
-            self.model.headerData(i, Qt.Horizontal)
-            for i in range(self.model.columnCount())
-        ]
-        self.column_filters.set_headers(
-            headers, column_field_map=self.COLUMN_FIELD_MAP
-        )
-
         # какой столбец сейчас является полем сортировки?
         col = self.get_column_index(self.sort_field)
         order = Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder

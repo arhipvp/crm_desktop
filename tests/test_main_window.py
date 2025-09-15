@@ -2,6 +2,7 @@ import pytest
 import logging
 
 from PySide6.QtWidgets import QWidget, QDialog
+from ui.common.filter_header_view import FilterHeaderView
 import base64
 
 from ui.main_window import MainWindow
@@ -92,3 +93,11 @@ def test_open_import_policy_json_message(
     assert len(messages) == expected_messages
     if expected_messages:
         assert "импорт" in messages[0].lower()
+
+
+def test_filter_header_view_emits_signal(qapp):
+    header = FilterHeaderView()
+    received: dict[int, str] = {}
+    header.filter_changed.connect(lambda c, t: received.__setitem__(c, t))
+    header.set_filter_text(1, "abc")
+    assert received[1] == "abc"

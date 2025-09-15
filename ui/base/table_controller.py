@@ -34,11 +34,6 @@ class TableController:
         self, model_class, items: list[Any], total_count: int | None = None
     ):
         """Устанавливает модель и обновляет связанные элементы UI."""
-        prev_texts = [
-            self.view.column_filters.get_text(i)
-            for i in range(len(self.view.column_filters._editors))
-        ]
-
         self.view.model = BaseTableModel(items, model_class)
         self.view.proxy_model.setSourceModel(self.view.model)
         self.view.table.setModel(self.view.proxy_model)
@@ -58,13 +53,6 @@ class TableController:
             )
             self.view.data_loaded.emit(self.view.total_count)
 
-        headers = [
-            self.view.model.headerData(i, Qt.Horizontal)
-            for i in range(self.view.model.columnCount())
-        ]
-        self.view.column_filters.set_headers(
-            headers, prev_texts, self.view.COLUMN_FIELD_MAP
-        )
         QTimer.singleShot(0, self.view.load_table_settings)
 
     # --- Загрузка данных --------------------------------------------------
@@ -131,6 +119,9 @@ class TableController:
 
     def _on_reset_filters(self):
         self.view.filter_controls.clear_all()
+        header = self.view.table.horizontalHeader()
+        if hasattr(header, "set_all_filters"):
+            header.set_all_filters({})
         self.view.save_table_settings()
         self.on_filter_changed()
 
@@ -140,11 +131,13 @@ class TableController:
             return {}
         filters: dict[Field, str] = {}
         header = self.view.table.horizontalHeader()
-        for visual in range(header.count()):
-            logical = header.logicalIndex(visual)
+        for logical in range(header.count()):
             if header.isSectionHidden(logical):
                 continue
-            text = self.view.column_filters.get_text(visual)
+            if hasattr(header, "get_filter_text"):
+                text = header.get_filter_text(logical)
+            else:
+                text = ""
             if not text:
                 continue
             field = self.view.COLUMN_FIELD_MAP.get(
