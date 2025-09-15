@@ -1,12 +1,15 @@
 import logging
+from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
 from datetime import date
 
 from peewee import Field
+
 from PySide6.QtCore import Qt, Signal, QRect, QPoint, QDate
-from PySide6.QtGui import QShortcut
+from PySide6.QtGui import QShortcut, QPainter, QPainterPath, QPalette
+
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
@@ -23,7 +26,92 @@ from PySide6.QtWidgets import (
     QDateEdit,
     QLabel,
     QWidgetAction,
+    QStyle,
+    QStyleOptionHeader,
 )
+
+
+class FilterHeaderView(QHeaderView):
+    """Заголовок таблицы с индикатором активных фильтров."""
+
+    _ICON_SIZE = 12
+    _ICON_MARGIN = 6
+
+    def __init__(self, orientation: Qt.Orientation, parent: QWidget | None = None):
+        super().__init__(orientation, parent)
+        self._filtered_sections: set[int] = set()
+
+    # ------------------------------------------------------------------
+    # API для управления индикаторами фильтров
+    # ------------------------------------------------------------------
+    def set_section_filtered(self, section: int, filtered: bool) -> None:
+        if section < 0 or section >= self.count():
+            return
+        if filtered:
+            if section not in self._filtered_sections:
+                self._filtered_sections.add(section)
+                self.updateSection(section)
+        elif section in self._filtered_sections:
+            self._filtered_sections.remove(section)
+            self.updateSection(section)
+
+    def set_filtered_sections(self, sections: Iterable[int]) -> None:
+        count = self.count()
+        new_sections = {s for s in sections if 0 <= s < count}
+        if new_sections == self._filtered_sections:
+            return
+        changed = self._filtered_sections.symmetric_difference(new_sections)
+        self._filtered_sections = new_sections
+        if not changed:
+            self.viewport().update()
+            return
+        for section in changed:
+            self.updateSection(section)
+
+    def paintSection(self, painter: QPainter, rect: QRect, logicalIndex: int) -> None:  # noqa: N802
+        super().paintSection(painter, rect, logicalIndex)
+        if logicalIndex not in self._filtered_sections or not rect.isValid():
+            return
+
+        option = QStyleOptionHeader()
+        self.initStyleOption(option)
+        option.rect = rect
+        option.section = logicalIndex
+
+        icon_size = min(self._ICON_SIZE, rect.height() - 4)
+        if icon_size <= 0:
+            return
+
+        margin = min(self._ICON_MARGIN, max(2, rect.height() // 6))
+        available_right = rect.right() - margin
+        if self.isSortIndicatorShown() and self.sortIndicatorSection() == logicalIndex:
+            indicator = self.style().pixelMetric(QStyle.PM_HeaderMarkSize, option, self)
+            available_right -= indicator + margin
+
+        left = available_right - icon_size
+        if left < rect.left() + margin:
+            left = rect.left() + margin
+
+        top = rect.center().y() - icon_size / 2
+        bottom = top + icon_size
+        stem_top = top + icon_size * 0.6
+        stem_width = max(2.0, icon_size * 0.35)
+
+        funnel = QPainterPath()
+        funnel.moveTo(left, top)
+        funnel.lineTo(left + icon_size, top)
+        funnel.lineTo(left + icon_size / 2 + stem_width / 2, stem_top)
+        funnel.lineTo(left + icon_size / 2 + stem_width / 2, bottom)
+        funnel.lineTo(left + icon_size / 2 - stem_width / 2, bottom)
+        funnel.lineTo(left + icon_size / 2 - stem_width / 2, stem_top)
+        funnel.closeSubpath()
+
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(option.palette.color(QPalette.ButtonText))
+        painter.drawPath(funnel)
+        painter.restore()
 
 from ui.base.table_controller import TableController
 from ui.common.paginator import Paginator
@@ -227,7 +315,11 @@ class BaseTableView(QWidget):
         self.table.setModel(self.proxy)
         self.proxy_model = self.proxy  # backward compatibility
         self.table.setSortingEnabled(True)
-        header = self.table.horizontalHeader()
+
+        header = FilterHeaderView(Qt.Horizontal, self.table)
+        self.table.setHorizontalHeader(header)
+        self._filter_header = header
+        self._sync_header_filter_icons()
         header.setSectionsMovable(True)
         header.setSectionsClickable(True)
         header.sortIndicatorChanged.connect(self._on_sort_indicator_changed)
@@ -247,6 +339,16 @@ class BaseTableView(QWidget):
         self.paginator = Paginator(on_prev=self.prev_page, on_next=self.next_page, per_page=self.per_page)
         self.paginator.per_page_changed.connect(self._on_per_page_changed)
         self.left_layout.addWidget(self.paginator)
+
+    def _update_header_filter_icon(self, column: int) -> None:
+        header = getattr(self, "_filter_header", None)
+        if header is not None:
+            header.set_section_filtered(column, column in self._column_filters)
+
+    def _sync_header_filter_icons(self) -> None:
+        header = getattr(self, "_filter_header", None)
+        if header is not None:
+            header.set_filtered_sections(self._column_filters.keys())
 
     # ------------------------------------------------------------------
     # Helpers for toolbar-based filters
@@ -668,6 +770,7 @@ class BaseTableView(QWidget):
         else:
             self._column_filters.pop(column, None)
         self.proxy.set_filter(column, text)
+        self._update_header_filter_icon(column)
         self.save_table_settings()
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
@@ -749,6 +852,7 @@ class BaseTableView(QWidget):
                 if text_str:
                     self._column_filters[col_int] = text_str
                 self.proxy.set_filter(col_int, text_str)
+        self._sync_header_filter_icons()
         per_page = saved.get("per_page")
         need_reload = False
         if per_page is not None:
