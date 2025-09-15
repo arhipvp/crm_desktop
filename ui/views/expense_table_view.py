@@ -125,8 +125,8 @@ class ExpenseTableModel(BaseTableModel):
 class ExpenseTableView(BaseTableView):
     COLUMN_FIELD_MAP = {
         0: Policy.policy_number,
-        1: Deal.description,
-        2: Client.name,
+        1: "policy__deal__description",
+        2: "policy__client__name",
         3: Policy.contractor,
         4: Policy.start_date,
         5: Expense.expense_type,

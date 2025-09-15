@@ -37,12 +37,24 @@ def export_objects_to_csv(path, objects, fields, headers=None):
                     key = _split_path(f)[-1]
                     value = obj.get(key, "")
                 else:
-                    rel = obj
-                    for step in _split_path(f):
-                        rel = getattr(rel, step, None)
-                        if rel is None:
-                            break
-                    value = rel if rel is not None else ""
+                    if isinstance(f, str):
+                        rel = obj
+                        for step in f.split("__"):
+                            rel = getattr(rel, step, None)
+                            if rel is None:
+                                break
+                        value = (
+                            rel
+                            if isinstance(rel, str)
+                            else getattr(rel, "", "") if rel else ""
+                        )
+                    else:
+                        rel = obj
+                        for step in _split_path(f):
+                            rel = getattr(rel, step, None)
+                            if rel is None:
+                                break
+                        value = rel if rel is not None else ""
                 if isinstance(value, (datetime.date, datetime.datetime)):
                     value = value.strftime("%d.%m.%Y")
                 row.append(value)
