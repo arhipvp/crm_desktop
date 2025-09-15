@@ -91,6 +91,8 @@ class TableController:
             else "asc"
         )
 
+        logger.debug("load_data filters=%s sort=%s %s", filters, sort_field, order_dir)
+
         def run_task() -> tuple[list, int]:
             items = self.get_page_func(
                 self.view.page,
@@ -112,6 +114,7 @@ class TableController:
 
         try:
             items, total = run_task()
+            logger.debug("loaded %d items of %d", len(items), total)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Ошибка при загрузке данных")
             QMessageBox.critical(self.view, "Ошибка", str(exc))
