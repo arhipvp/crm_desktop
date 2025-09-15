@@ -145,6 +145,8 @@ class TableController:
         header = self.view.table.horizontalHeader()
         for visual in range(header.count()):
             logical = header.logicalIndex(visual)
+            if header.isSectionHidden(logical):
+                continue
             text = self.view.column_filters.get_text(visual)
             if not text:
                 continue
