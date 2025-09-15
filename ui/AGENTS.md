@@ -11,6 +11,7 @@
 ```bash
 PYTEST_TIMEOUT=120 pytest -vv tests/test_main_window.py
 PYTEST_TIMEOUT=120 pytest -vv tests/test_table_sorting.py
+PYTEST_TIMEOUT=120 pytest -vv tests/test_filters.py
 ```
 
 Эти команды проверяют корректность работы основных виджетов.
