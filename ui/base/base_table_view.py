@@ -423,17 +423,24 @@ class BaseTableView(QWidget):
         from ui.views.deal_detail import DealDetailView
         DealDetailView(deal, parent=self).exec()
 
-    def export_csv(self, path: str | None = None, *_):
-        """Экспорт выделенных объектов в CSV.
+    def export_csv(self, path: str | None = None, *, all_rows: bool = False, **_):
+        """Экспорт объектов в CSV.
 
         - Логируем шаги (info/debug/warning).
         - Поддерживаем странный вызов с bool вместо пути (приводим к None).
         - Экспортируем только видимые колонки (по columnCount()).
+        - Если ``all_rows`` истинен, экспортируем все строки модели.
         """
         if isinstance(path, bool):
             path = None
 
-        objs = self.get_selected_objects()
+        objs = getattr(self.model, "objects", None) if all_rows else self.get_selected_objects()
+        if all_rows and objs is None:
+            # запасной путь на случай, если модель не хранит objects
+            try:
+                objs = [self.model.get_item(r) for r in range(self.model.rowCount())]
+            except Exception:
+                objs = []
         logger.info("Запрошен экспорт %d строк", len(objs))
 
         if not objs:
@@ -454,30 +461,35 @@ class BaseTableView(QWidget):
             logger.warning("Экспорт отменён пользователем")
             return
 
-        # Выбираем только видимые поля модели (по количеству колонок модели).
+        # Выбираем только видимые поля модели и/или из COLUMN_FIELD_MAP.
         try:
-            visible_cols = self.model.columnCount()
+            column_count = self.model.columnCount()
         except Exception:
-            visible_cols = len(getattr(self.model, "fields", []))
+            column_count = len(getattr(self.model, "fields", []))
+
         model_fields = getattr(self.model, "fields", [])
         column_map = getattr(self, "COLUMN_FIELD_MAP", {})
-        if len(model_fields) >= visible_cols:
-            fields = [model_fields[i] for i in range(visible_cols)]
-        else:
-            fields = [column_map.get(i) for i in range(visible_cols)]
+        visible_indices = [i for i in range(column_count) if not self.table.isColumnHidden(i)]
+
+        fields = []
+        for i in visible_indices:
+            if len(model_fields) > i:
+                fields.append(model_fields[i])
+            else:
+                fields.append(column_map.get(i))
         fields = [f for f in fields if f is not None]
-        if len(fields) < visible_cols:
-            logger.warning(
-                "Найдено полей: %d < %d колонок", len(fields), visible_cols
-            )
+        if len(fields) < len(visible_indices):
+            logger.warning("Найдено полей: %d < %d колонок", len(fields), len(visible_indices))
+
+        # Заголовки берём из модели, если есть.
+        try:
+            headers = [self.model.headerData(i, Qt.Horizontal, Qt.DisplayRole) for i in visible_indices]
+        except Exception:
+            headers = None
+
         logger.debug("Заголовки CSV: %s", [getattr(f, "name", str(f)) for f in fields])
         logger.debug("Количество объектов к экспорту: %d", len(objs))
         logger.debug("Сохраняем CSV в %s", path)
-
-        headers = [
-            self.model.headerData(i, Qt.Horizontal, Qt.DisplayRole)
-            for i in range(visible_cols)
-        ]
 
         try:
             export_objects_to_csv(path, objs, fields, headers=headers)
@@ -486,9 +498,7 @@ class BaseTableView(QWidget):
             QMessageBox.critical(self, "Экспорт", str(e))
         else:
             logger.info("Экспортировано %d строк в %s", len(objs), path)
-            QMessageBox.information(
-                self, "Экспорт", f"Экспортировано: {len(objs)}"
-            )
+            QMessageBox.information(self, "Экспорт", f"Экспортировано: {len(objs)}")
 
     def _on_row_double_clicked(self, index):
         if not index.isValid():
