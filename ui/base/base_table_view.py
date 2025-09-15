@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 from datetime import date
 
 from peewee import Field
-from PySide6.QtCore import Qt, Signal, QSortFilterProxyModel, QRect
+from PySide6.QtCore import Qt, Signal, QRect
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -29,6 +29,7 @@ from ui.base.table_controller import TableController
 from ui.common.paginator import Paginator
 from ui.common.styled_widgets import styled_button
 from ui.common.date_utils import get_date_or_none
+from ui.common.multi_filter_proxy import MultiFilterProxyModel
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
 from services.export_service import export_objects_to_csv
@@ -214,7 +215,7 @@ class BaseTableView(QWidget):
 
         # Таблица
         self.table = QTableView()
-        self.proxy = QSortFilterProxyModel()
+        self.proxy = MultiFilterProxyModel()
         self.proxy.setSortRole(Qt.UserRole)
         self.proxy.setDynamicSortFilter(True)
         self.table.setEditTriggers(QTableView.NoEditTriggers)
@@ -662,12 +663,10 @@ class BaseTableView(QWidget):
     def _on_filter_text_changed(self, column: int, text: str) -> None:
         text = text.strip()
         if text:
-            self._column_filters = {column: text}
-            self.proxy.setFilterKeyColumn(column)
-            self.proxy.setFilterFixedString(text)
+            self._column_filters[column] = text
         else:
             self._column_filters.pop(column, None)
-            self.proxy.setFilterFixedString("")
+        self.proxy.set_filter(column, text)
         self.save_table_settings()
 
     def _toggle_column(self, index: int, visible: bool):
@@ -692,7 +691,7 @@ class BaseTableView(QWidget):
         widths = {i: header.sectionSize(i) for i in range(header.count())}
         hidden = [i for i in range(header.count()) if self.table.isColumnHidden(i)]
         order = [header.visualIndex(i) for i in range(header.count())]
-        filters = self._column_filters
+        filters = dict(self._column_filters)
         settings = {
             "sort_column": self.current_sort_column,
             "sort_order": self.current_sort_order.value,
@@ -740,15 +739,17 @@ class BaseTableView(QWidget):
             if idx < model_columns:
                 self.table.setColumnHidden(idx, True)
         saved_filters = saved.get("column_filters", {})
-        if saved_filters:
-            try:
-                col, text = next(iter(saved_filters.items()))
-                col = int(col)
-                self._column_filters = {col: text}
-                self.proxy.setFilterKeyColumn(col)
-                self.proxy.setFilterFixedString(text)
-            except Exception:
-                self._column_filters = {}
+        self._column_filters = {}
+        if isinstance(saved_filters, dict):
+            for col, text in saved_filters.items():
+                try:
+                    col_int = int(col)
+                    text_str = str(text)
+                except Exception:
+                    continue
+                if text_str:
+                    self._column_filters[col_int] = text_str
+                self.proxy.set_filter(col_int, text_str)
         per_page = saved.get("per_page")
         need_reload = False
         if per_page is not None:
