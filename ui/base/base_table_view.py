@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 from datetime import date
 
 from peewee import Field
-from PySide6.QtCore import Qt, Signal, QRect
+from PySide6.QtCore import Qt, Signal, QRect, QPoint
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -231,8 +231,7 @@ class BaseTableView(QWidget):
         header.sectionResized.connect(self._on_section_resized)
         header.sectionMoved.connect(self._on_section_moved)
         header.setContextMenuPolicy(Qt.CustomContextMenu)
-        header.customContextMenuRequested.connect(self._on_header_menu)
-        header.sectionClicked.connect(self._on_header_section_clicked)
+        header.customContextMenuRequested.connect(self._on_header_section_clicked)
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setAlternatingRowColors(True)
         header.setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -631,18 +630,11 @@ class BaseTableView(QWidget):
         act_folder.setEnabled(has_path)
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
-    def _on_header_menu(self, pos):
+    def _on_header_section_clicked(self, pos: QPoint) -> None:
         header = self.table.horizontalHeader()
-        menu = QMenu(self)
-        for i in range(header.count()):
-            text = header.model().headerData(i, Qt.Horizontal)
-            action = menu.addAction(str(text))
-            action.setCheckable(True)
-            action.setChecked(not header.isSectionHidden(i))
-            action.toggled.connect(lambda checked, i=i: self._toggle_column(i, checked))
-        menu.exec(header.mapToGlobal(pos))
-
-    def _on_header_section_clicked(self, column: int) -> None:
+        column = header.logicalIndexAt(pos)
+        if column < 0:
+            return
         menu = QMenu(self)
         line = QLineEdit(menu)
         line.setPlaceholderText(str(self.table.model().headerData(column, Qt.Horizontal)))
@@ -654,10 +646,9 @@ class BaseTableView(QWidget):
         menu.addSeparator()
         clear_action = menu.addAction("Очистить фильтр")
         clear_action.triggered.connect(lambda c=column: self._on_filter_text_changed(c, ""))
-        header = self.table.horizontalHeader()
-        pos = header.sectionViewportPosition(column)
+        pos_x = header.sectionViewportPosition(column)
         width = header.sectionSize(column)
-        rect = QRect(pos, 0, width, header.height())
+        rect = QRect(pos_x, 0, width, header.height())
         menu.popup(header.mapToGlobal(rect.bottomLeft()))
 
     def _on_filter_text_changed(self, column: int, text: str) -> None:
@@ -667,10 +658,6 @@ class BaseTableView(QWidget):
         else:
             self._column_filters.pop(column, None)
         self.proxy.set_filter(column, text)
-        self.save_table_settings()
-
-    def _toggle_column(self, index: int, visible: bool):
-        self.table.setColumnHidden(index, not visible)
         self.save_table_settings()
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
