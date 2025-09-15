@@ -15,7 +15,7 @@ from services.income_service import add_income, create_stub_income, update_incom
 from services.payment_service import get_all_payments, get_payment_by_id
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import create_entity_combobox
-from ui.common.date_utils import get_date_or_none
+from ui.common.date_utils import configure_optional_date_edit, get_date_or_none
 
 
 class IncomeForm(BaseEditForm):
@@ -74,6 +74,7 @@ class IncomeForm(BaseEditForm):
         self.received_date_edit = QDateEdit()
         self.received_date_edit.setCalendarPopup(True)
         self.received_date_edit.setSpecialValueText("—")
+        configure_optional_date_edit(self.received_date_edit)
         if self._is_new or getattr(self.instance, "received_date", None) is None:
             # если дата не была заполнена ранее — ставим сегодняшнюю
             self.received_date_edit.setDate(QDate.currentDate())

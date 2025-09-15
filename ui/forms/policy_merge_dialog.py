@@ -28,7 +28,11 @@ from ui.common.combo_helpers import (
     create_deal_combobox,
     populate_combo,
 )
-from ui.common.date_utils import get_date_or_none, to_qdate
+from ui.common.date_utils import (
+    configure_optional_date_edit,
+    get_date_or_none,
+    to_qdate,
+)
 
 from database.models import Policy, Payment
 
@@ -108,10 +112,9 @@ class PolicyMergeDialog(QDialog):
                 edit = QDateEdit()
                 edit.setCalendarPopup(True)
                 edit.setSpecialValueText("—")
+                configure_optional_date_edit(edit)
                 if isinstance(new_val, date):
                     edit.setDate(to_qdate(new_val))
-                else:
-                    edit.clear()
                 edit.dateChanged.connect(
                     lambda _=None, r=row, f=field: self._update_final(r, f)
                 )

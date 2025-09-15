@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ui.common.date_utils import TypableDateEdit
+from ui.common.date_utils import TypableDateEdit, configure_optional_date_edit
 from ui.common.message_boxes import confirm
 from ui.common.styled_widgets import styled_button
 from services.validators import normalize_number
@@ -139,7 +139,7 @@ class BaseEditForm(QDialog):
                         widget = QDateEdit()
                         widget.setCalendarPopup(True)
                         widget.setSpecialValueText("—")
-                        widget.clear()
+                        configure_optional_date_edit(widget)
                     else:
                         widget = TypableDateEdit()
                         if self.instance is None:

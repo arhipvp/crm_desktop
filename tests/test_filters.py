@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from PySide6.QtCore import Qt
 
@@ -10,6 +12,7 @@ from ui import settings as ui_settings
 from ui.base.base_table_view import BaseTableView
 from ui.views.payment_table_view import PaymentTableView
 from ui.views import payment_table_view as payment_table_view_module
+from ui.common.date_utils import get_date_or_none
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
@@ -109,5 +112,42 @@ def test_column_filter_passed_to_payment_service(
     sql, params = captured_sql[-1]
     assert "policy_number\" AS TEXT) LIKE ?" in sql
     assert any("PAY-001" in str(param) for param in params)
+
+    view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_date_filter_resets_to_minimum(qapp):
+    """Диапазон дат не сохраняется после очистки фильтров."""
+
+    ui_settings._CACHE = None
+
+    view = BaseTableView(model_class=Payment, date_filter_field="created_at")
+    qapp.processEvents()
+
+    min_date_q = view.date_from.minimumDate()
+    assert min_date_q == view.date_to.minimumDate()
+    assert min_date_q.toPython() == date(2000, 1, 1)
+
+    # По умолчанию фильтр пустой
+    assert view.get_date_filter() is None
+    assert get_date_or_none(view.date_from) is None
+
+    later_start = min_date_q.addDays(5)
+    later_end = min_date_q.addDays(10)
+    view.date_from.setDate(later_start)
+    view.date_to.setDate(later_end)
+    qapp.processEvents()
+
+    date_filter = view.get_date_filter()
+    assert date_filter is not None
+    rng = date_filter["created_at"]
+    assert rng == (later_start.toPython(), later_end.toPython())
+
+    view.clear_filters()
+    qapp.processEvents()
+
+    assert view.get_date_filter() is None
+    assert get_date_or_none(view.date_from) is None
 
     view.deleteLater()
