@@ -6,7 +6,7 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
         super().__init__()
         self._filters: dict[int, QRegularExpression] = {}
 
-    def set_filter(self, column: int, text: str):
+    def set_filter(self, column: int, text: str) -> None:
         if text:
             pattern = QRegularExpression.escape(text)
             self._filters[column] = QRegularExpression(
