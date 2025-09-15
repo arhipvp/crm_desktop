@@ -562,10 +562,16 @@ class BaseTableView(QWidget):
         self.column_filters.set_editor_visible(index, visible)
         self.save_table_settings()
 
-    def _rebuild_column_filters(self) -> None:
-        """Пересоздаёт строку фильтров в соответствии с текущим порядком колонок."""
+    def _rebuild_column_filters(self, texts: list[str] | None = None) -> None:
+        """Пересоздаёт строку фильтров в соответствии с текущим порядком колонок.
+
+        Args:
+            texts: Список текстов фильтров в порядке отображения. Если не
+                указан, будет получен из ``column_filters``.
+        """
         header = self.table.horizontalHeader()
-        texts = self.column_filters.get_all_texts()
+        if texts is None:
+            texts = self.column_filters.get_all_texts()
         headers = [
             header.model().headerData(header.logicalIndex(i), Qt.Horizontal)
             for i in range(header.count())
@@ -587,9 +593,11 @@ class BaseTableView(QWidget):
     def _on_section_resized(self, *_):
         self.save_table_settings()
 
-    def _on_section_moved(self, *_):
+    def _on_section_moved(self, logical: int, old_visual: int, new_visual: int) -> None:
+        texts = self.column_filters.get_all_texts()
+        texts.insert(new_visual, texts.pop(old_visual))
+        self._rebuild_column_filters(texts)
         self.save_table_settings()
-        self._rebuild_column_filters()
 
     def save_table_settings(self):
         """Сохраняет настройки сортировки и ширины колонок."""
