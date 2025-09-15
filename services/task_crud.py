@@ -2,7 +2,7 @@
 
 import logging
 
-from peewee import JOIN, fn
+from peewee import JOIN, Field, fn
 from playhouse.shortcuts import prefetch
 
 from utils.time_utils import now_str
@@ -234,14 +234,24 @@ def build_task_query(
 
     from services.query_utils import apply_column_filters, apply_field_filters
 
-    field_filters: dict = {}
+    field_filters: dict[Field, str] = {}
     name_filters: dict[str, str] = {}
     if column_filters:
         for key, val in column_filters.items():
-            if key == "full_name":
+            if isinstance(key, Field):
+                if key is Executor.full_name:
+                    field_filters[Executor.full_name] = val
+                else:
+                    name = key.name
+                    if name:
+                        name_filters[name] = val
+                continue
+
+            key_str = getattr(key, "name", None) or str(key)
+            if key_str == "full_name":
                 field_filters[Executor.full_name] = val
             else:
-                name_filters[key] = val
+                name_filters[key_str] = val
 
     query = apply_column_filters(query, name_filters, Task)
 
@@ -289,6 +299,7 @@ def get_tasks_page(
         else "due_date"
     )
     offset = (page - 1) * per_page
+    logger.debug("column_filters=%s", column_filters)
     query = build_task_query(
         column_filters=column_filters, sort_field=sort_field, **filters
     )

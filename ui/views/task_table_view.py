@@ -239,11 +239,6 @@ class TaskTableView(BaseTableView):
             }
         )
         filters.pop("show_deleted", None)
-        cf = filters.get("column_filters")
-        if cf:
-            filters["column_filters"] = {
-                getattr(k, "name", k): v for k, v in cf.items()
-            }
         return filters
 
     def refresh(self):
@@ -281,42 +276,30 @@ class TaskTableView(BaseTableView):
     def load_data(self) -> None:
         logger.debug("📥 Используется метод загрузки: get_tasks_page")
 
-        f = self.get_filters()
+        filters = self.get_filters()
+        column_filters = filters.get("column_filters")
+        logger.debug("column_filters=%s", column_filters)
         logger.debug(
             "📋 Сортировка задач: field=%s, order=%s", self.sort_field, self.sort_order
         )
 
+        common_kwargs = {
+            "include_done": filters["include_done"],
+            "include_deleted": filters["include_deleted"],
+            "search_text": filters["search_text"],
+            "sort_field": self.sort_field,
+            "sort_order": self.sort_order,
+            "column_filters": column_filters,
+        }
         if self.deal_id:
-            items = get_tasks_page(
-                page=self.page,
-                per_page=self.per_page,
-                include_done=f["include_done"],
-                include_deleted=f["include_deleted"],
-                search_text=f["search_text"],
-                sort_field=self.sort_field,
-                sort_order=self.sort_order,
-                deal_id=self.deal_id,
-                column_filters=f.get("column_filters"),
-            )
-            total = build_task_query(
-                include_done=f["include_done"],
-                include_deleted=f["include_deleted"],
-                search_text=f["search_text"],
-                deal_id=self.deal_id,
-                column_filters=f.get("column_filters"),
-            ).count()
-        else:
-            items = get_tasks_page(
-                page=self.page,
-                per_page=self.per_page,
-                include_done=f["include_done"],
-                include_deleted=f["include_deleted"],
-                search_text=f["search_text"],
-                sort_field=self.sort_field,
-                sort_order=self.sort_order,
-                column_filters=f.get("column_filters"),
-            )
-            total = build_task_query(**f).count()
+            common_kwargs["deal_id"] = self.deal_id
+
+        items = get_tasks_page(
+            page=self.page,
+            per_page=self.per_page,
+            **common_kwargs,
+        )
+        total = build_task_query(**common_kwargs).count()
 
         items = list(prefetch(items, Deal, Client, Policy, DealExecutor, Executor))
         self.model = TaskTableModel(items, Task)
