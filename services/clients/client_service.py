@@ -81,6 +81,7 @@ def get_clients_page_dto(
     per_page: int,
     order_by: str | Any = "name",
     order_dir: str = "asc",
+    column_filters: dict[str, str] | None = None,
     **filters,
 ) -> list[ClientDTO]:
     """Получить страницу клиентов в виде DTO."""
@@ -89,6 +90,7 @@ def get_clients_page_dto(
         per_page,
         order_by=order_by,
         order_dir=order_dir,
+        column_filters=column_filters,
         **filters,
     )
     return [ClientDTO.from_model(c) for c in clients]

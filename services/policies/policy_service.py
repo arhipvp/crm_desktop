@@ -159,6 +159,7 @@ def get_policies_page(
     order_dir="asc",
     include_renewed=True,
     without_deal_only=False,
+    column_filters: dict | None = None,
     **filters,
 ):
     """Получить страницу полисов с указанными фильтрами.
@@ -174,6 +175,7 @@ def get_policies_page(
         order_dir: Направление сортировки.
         include_renewed: Показывать продлённые полисы.
         without_deal_only: Только полисы без сделки.
+        column_filters: Фильтры по столбцам.
 
     Returns:
         ModelSelect: Отфильтрованная выборка полисов.
@@ -185,6 +187,7 @@ def get_policies_page(
         client_id=client_id,
         include_renewed=include_renewed,
         without_deal_only=without_deal_only,
+        column_filters=column_filters,
         **filters,
     )
     # Выбираем поле сортировки
