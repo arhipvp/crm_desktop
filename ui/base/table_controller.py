@@ -141,7 +141,11 @@ class TableController:
             "show_deleted": self.view.is_checked("Показывать удалённые"),
             "search_text": self.view.get_search_text(),
         }
-        filters["column_filters"] = self.view._column_filters.copy()
+        filters["column_filters"] = {
+            self.view.COLUMN_FIELD_MAP.get(col): text
+            for col, text in self.view._column_filters.items()
+            if self.view.COLUMN_FIELD_MAP.get(col)
+        }
         date_range = self.view.get_date_filter()
         if date_range:
             filters.update(date_range)
