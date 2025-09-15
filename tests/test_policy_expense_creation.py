@@ -45,7 +45,7 @@ def test_expense_created_on_confirm(policy_form, monkeypatch):
     show_info_mock.assert_called_once()
 
 
-def test_no_expense_when_previous_contractor_invalid(monkeypatch, qapp, in_memory_db):
+def test_expense_created_when_previous_contractor_invalid(monkeypatch, qapp, in_memory_db):
     client = Client.create(name="C")
     policy = Policy.create(
         client=client,
@@ -59,11 +59,47 @@ def test_no_expense_when_previous_contractor_invalid(monkeypatch, qapp, in_memor
     from ui.forms import policy_form as module
 
     confirm_mock = MagicMock(return_value=True)
+    show_info_mock = MagicMock()
+    add_expense_mock = MagicMock()
+
+    monkeypatch.setattr(form, "collect_data", lambda: {"contractor": "X"})
+    def fake_save_data(data):
+        policy.contractor = data.get("contractor")
+        return policy
+    monkeypatch.setattr(form, "save_data", fake_save_data)
+    monkeypatch.setattr(module, "confirm", confirm_mock)
+    monkeypatch.setattr(module, "show_info", show_info_mock)
+    monkeypatch.setattr(module, "add_contractor_expense", add_expense_mock)
+    monkeypatch.setattr(module, "get_expense_count_by_policy", lambda pid: 0)
+
+    form.save()
+
+    confirm_mock.assert_called_once()
+    add_expense_mock.assert_called_once_with(policy)
+    show_info_mock.assert_called_once()
+
+
+def test_no_confirm_when_contractor_unchanged(monkeypatch, qapp, in_memory_db):
+    client = Client.create(name="C")
+    policy = Policy.create(
+        client=client,
+        policy_number="P",
+        start_date=date.today(),
+        end_date=date.today(),
+        contractor="X",
+    )
+    form = PolicyForm(policy)
+
+    from ui.forms import policy_form as module
+
+    confirm_mock = MagicMock(return_value=True)
+    show_info_mock = MagicMock()
     add_expense_mock = MagicMock()
 
     monkeypatch.setattr(form, "collect_data", lambda: {"contractor": "X"})
     monkeypatch.setattr(form, "save_data", lambda data: policy)
     monkeypatch.setattr(module, "confirm", confirm_mock)
+    monkeypatch.setattr(module, "show_info", show_info_mock)
     monkeypatch.setattr(module, "add_contractor_expense", add_expense_mock)
     monkeypatch.setattr(module, "get_expense_count_by_policy", lambda pid: 0)
 
@@ -71,6 +107,7 @@ def test_no_expense_when_previous_contractor_invalid(monkeypatch, qapp, in_memor
 
     confirm_mock.assert_not_called()
     add_expense_mock.assert_not_called()
+    show_info_mock.assert_not_called()
 
 
 def test_expense_not_created_on_cancel(policy_form, monkeypatch):
