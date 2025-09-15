@@ -394,6 +394,7 @@ def get_deals_page(
     **filters,
 ) -> ModelSelect:
     """Вернуть страницу сделок с указанными фильтрами."""
+    logger.debug("column_filters=%s", column_filters)
     query = build_deal_query(
         search_text=search_text,
         show_deleted=show_deleted,

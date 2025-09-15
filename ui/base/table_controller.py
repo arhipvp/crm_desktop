@@ -69,6 +69,8 @@ class TableController:
         QApplication.processEvents()
 
         filters = self.get_filters()
+        column_filters = filters.get("column_filters")
+        logger.debug("column_filters=%s", column_filters)
 
         sort_field = self.view.COLUMN_FIELD_MAP.get(
             self.view.current_sort_column

@@ -1,3 +1,5 @@
+import logging
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QShortcut
 from PySide6.QtWidgets import QLineEdit, QComboBox, QHBoxLayout, QAbstractItemView
@@ -10,6 +12,9 @@ from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.deal_form import DealForm
 from ui.views.deal_detail import DealDetailView
+
+
+logger = logging.getLogger(__name__)
 
 
 class DealTableModel(BaseTableModel):
@@ -209,6 +214,8 @@ class DealTableView(BaseTableView):
 
     def load_data(self):
         filters = self.get_filters()
+        column_filters = filters.get("column_filters")
+        logger.debug("column_filters=%s", column_filters)
 
         # Получаем имя поля сортировки (self.sort_field)
         items = get_deals_page(
