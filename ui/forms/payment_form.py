@@ -5,17 +5,17 @@ from __future__ import annotations
 • Полис выбирается из выпадающего списка (или фиксируется, если передан
   `forced_policy`).
 • Поле «Actual payment date» допускает пустое значение благодаря
-  `OptionalDateEdit`.
+  `QDateEdit`.
 """
 
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QLabel, QDateEdit
 
 from database.models import Payment
 from services.payment_service import add_payment, update_payment
 from services.policies import get_policy_by_id
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import create_policy_combobox
-from ui.common.date_utils import OptionalDateEdit
+from ui.common.date_utils import get_date_or_none
 
 
 class PaymentForm(BaseEditForm):
@@ -55,7 +55,10 @@ class PaymentForm(BaseEditForm):
             self.policy_combo.setEnabled(False)
 
         # ── Опциональная фактическая дата ───────────────────────────────
-        self.actual_date_edit = OptionalDateEdit(self)
+        self.actual_date_edit = QDateEdit(self)
+        self.actual_date_edit.setCalendarPopup(True)
+        self.actual_date_edit.setSpecialValueText("—")
+        self.actual_date_edit.clear()
         self.fields["actual_payment_date"] = self.actual_date_edit
         self.form_layout.addRow("Actual payment date:", self.actual_date_edit)
 
@@ -71,7 +74,7 @@ class PaymentForm(BaseEditForm):
         data.pop("policy", None)
 
         # actual_payment_date – None или date
-        data["actual_payment_date"] = self.actual_date_edit.date_or_none()
+        data["actual_payment_date"] = get_date_or_none(self.actual_date_edit)
 
         return data
 

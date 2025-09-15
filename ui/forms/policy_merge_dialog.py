@@ -28,7 +28,7 @@ from ui.common.combo_helpers import (
     create_deal_combobox,
     populate_combo,
 )
-from ui.common.date_utils import OptionalDateEdit, to_qdate
+from ui.common.date_utils import get_date_or_none, to_qdate
 
 from database.models import Policy, Payment
 
@@ -105,9 +105,13 @@ class PolicyMergeDialog(QDialog):
                     lambda _=None, r=row, f=field: self._update_final(r, f)
                 )
             elif field in {"start_date", "end_date"}:
-                edit = OptionalDateEdit()
+                edit = QDateEdit()
+                edit.setCalendarPopup(True)
+                edit.setSpecialValueText("—")
                 if isinstance(new_val, date):
                     edit.setDate(to_qdate(new_val))
+                else:
+                    edit.clear()
                 edit.dateChanged.connect(
                     lambda _=None, r=row, f=field: self._update_final(r, f)
                 )
@@ -201,8 +205,8 @@ class PolicyMergeDialog(QDialog):
         widget = self.table.cellWidget(row, 2)
         if isinstance(widget, QComboBox):
             val = widget.currentData()
-        elif isinstance(widget, OptionalDateEdit):
-            val = widget.date_or_none()
+        elif isinstance(widget, QDateEdit):
+            val = get_date_or_none(widget)
         elif isinstance(widget, QSpinBox):
             v = widget.value()
             val = None if v == widget.minimum() else v
@@ -409,8 +413,8 @@ class PolicyMergeDialog(QDialog):
                 val = widget.currentData()
                 data[field] = int(val) if val is not None else None
                 continue
-            if isinstance(widget, OptionalDateEdit):
-                data[field] = widget.date_or_none()
+            if isinstance(widget, QDateEdit):
+                data[field] = get_date_or_none(widget)
                 continue
             if isinstance(widget, QSpinBox):
                 v = widget.value()
