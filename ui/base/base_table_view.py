@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 from datetime import date
 
 from peewee import Field
-from PySide6.QtCore import Qt, Signal, QRect, QPoint
+from PySide6.QtCore import Qt, Signal, QRect, QPoint, QDate
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -151,6 +151,9 @@ class BaseTableView(QWidget):
             self.date_to.setSpecialValueText("—")
             self.date_to.clear()
             self.date_to.dateChanged.connect(self._on_filters_changed)
+            for widget in (self.date_from, self.date_to):
+                widget.setMinimumDate(QDate())
+                widget.setDate(QDate())
             self.toolbar.addWidget(QLabel("С:"))
             self.toolbar.addWidget(self.date_from)
             self.toolbar.addWidget(QLabel("По:"))
