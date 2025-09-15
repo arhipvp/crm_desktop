@@ -259,10 +259,9 @@ class PolicyForm(BaseEditForm):
     def save(self):
         data = self.collect_data()
         contractor = data.get("contractor")
-        contractor_changed = (
-            self.instance is not None
-            and contractor not in (None, "-", "—")
-            and contractor != (self.instance.contractor or "")
+        contractor_provided = contractor not in (None, "-", "—")
+        contractor_changed = contractor_provided and (
+            self.instance is None or contractor != (self.instance.contractor or "")
         )
         try:
             saved = self.save_data(data)
