@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMessageBox,
     QPushButton,
+    QCheckBox,
 )
 
 from database.models import Client, Policy
@@ -51,12 +52,11 @@ def test_export_button_triggers_csv(in_memory_db, qapp, tmp_path, monkeypatch):
     called = {"count": 0}
     original = BaseTableView.export_csv
 
-    def spy(self, path: str | None = None):
+    def spy(self, path: str | None = None, all_rows: bool = False):
         called["count"] += 1
-        # на всякий случай приводим странные значения к None
         if isinstance(path, bool):
             path = None
-        return original(self, path)
+        return original(self, path, all_rows=all_rows)
 
     monkeypatch.setattr(BaseTableView, "export_csv", spy)
 
@@ -100,6 +100,42 @@ def test_export_button_triggers_csv(in_memory_db, qapp, tmp_path, monkeypatch):
     assert "Bob" not in exported_names
 
 
+def test_export_csv_all_rows_option(in_memory_db, qapp, tmp_path, monkeypatch):
+    c1 = Client.create(name="Alice")
+    c2 = Client.create(name="Bob")
+    c3 = Client.create(name="Charlie")
+
+    view = BaseTableView(model_class=Client)
+    view.set_model_class_and_items(Client, [c1, c2, c3], total_count=3)
+    view.table.selectRow(0)
+    qapp.processEvents()
+
+    exported: dict = {}
+
+    def fake_export(path, objs, fields, headers=None):
+        exported["objs"] = objs
+
+    monkeypatch.setattr("ui.base.base_table_view.export_objects_to_csv", fake_export)
+    path = tmp_path / "all.csv"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(path), "csv"))
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+
+    export_all = next(
+        cb for cb in view.filter_controls.findChildren(QCheckBox)
+        if "Экспортировать всё" in cb.text()
+    )
+    export_all.setChecked(True)
+
+    export_btn = next(
+        btn for btn in view.filter_controls.findChildren(QPushButton)
+        if "Экспорт" in btn.text()
+    )
+    export_btn.click()
+
+    exported_names = {obj.name for obj in exported["objs"]}
+    assert exported_names == {"Alice", "Bob", "Charlie"}
+
+
 def test_export_csv_no_selection_warns(in_memory_db, qapp, tmp_path, monkeypatch):
     # Наполнить таблицу, но ничего не выбирать
     Client.create(name="Alice")
@@ -127,9 +163,9 @@ def test_export_button_calls_export_csv(in_memory_db, qapp, tmp_path, monkeypatc
     original = BaseTableView.export_csv
     called = {"called": False}
 
-    def spy(self, path: str | None = None, *_):
+    def spy(self, path: str | None = None, *args, **kwargs):
         called["called"] = True
-        return original(self, path)
+        return original(self, path, *args, **kwargs)
 
     monkeypatch.setattr(BaseTableView, "export_csv", spy)
 
