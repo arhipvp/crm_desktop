@@ -12,7 +12,6 @@ from services.policies import get_policies_page
 from ui.widgets.policy_card import PolicyCard
 from ui.forms.policy_form import PolicyForm
 from ui.common.paginator import Paginator
-from ui.common.refresh_button import RefreshButton
 
 
 class PolicyView(QWidget):
@@ -31,7 +30,8 @@ class PolicyView(QWidget):
         self.add_btn.clicked.connect(self.add_policy)
         control_layout.addWidget(self.add_btn)
 
-        self.refresh_btn = RefreshButton(self.load_policies)
+        self.refresh_btn = QPushButton("🔄 Обновить")
+        self.refresh_btn.clicked.connect(self.load_policies)
         control_layout.addWidget(self.refresh_btn)
 
         self.show_deleted_checkbox = QCheckBox("Показывать удалённые")
