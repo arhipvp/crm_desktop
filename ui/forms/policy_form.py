@@ -258,10 +258,9 @@ class PolicyForm(BaseEditForm):
 
     def save(self):
         data = self.collect_data()
-        contractor_changed = (
-            self.instance is not None
-            and data.get("contractor")
-            and data.get("contractor") != (self.instance.contractor or "")
+        contractor = data.get("contractor")
+        contractor_changed = contractor and (
+            self.instance is None or contractor != (self.instance.contractor or "")
         )
         try:
             saved = self.save_data(data)
@@ -269,7 +268,7 @@ class PolicyForm(BaseEditForm):
                 if contractor_changed:
                     cnt = get_expense_count_by_policy(saved.id)
                     if confirm(
-                        f"Создать расход для контрагента '{data['contractor']}'?"
+                        f"Создать расход для контрагента '{contractor}'?"
                     ):
                         if cnt == 0 or confirm(
                             f"Уже есть {cnt} расход(ов) по этому полису. Все равно создать?"
