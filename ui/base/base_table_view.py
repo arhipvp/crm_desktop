@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 from datetime import date
 
 from peewee import Field
-from PySide6.QtCore import Qt, Signal, QSortFilterProxyModel
+from PySide6.QtCore import Qt, Signal, QSortFilterProxyModel, QRect
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -654,7 +654,9 @@ class BaseTableView(QWidget):
         clear_action = menu.addAction("Очистить фильтр")
         clear_action.triggered.connect(lambda c=column: self._on_filter_text_changed(c, ""))
         header = self.table.horizontalHeader()
-        rect = header.sectionRect(column)
+        pos = header.sectionViewportPosition(column)
+        width = header.sectionSize(column)
+        rect = QRect(pos, 0, width, header.height())
         menu.popup(header.mapToGlobal(rect.bottomLeft()))
 
     def _on_filter_text_changed(self, column: int, text: str) -> None:
