@@ -25,9 +25,16 @@ def export_objects_to_csv(path, objects, fields, headers=None):
             row = []
             for f in fields:
                 name = getattr(f, "name", str(f))
-                if isinstance(f, Field) and f.model is not type(obj):
-                    related = getattr(obj, f.model._meta.name, None)
-                    value = getattr(related, f.name, "") if related else ""
+
+                value = ""
+                if isinstance(f, Field):
+                    rel = obj
+                    for step in f.model._meta.name.split("__"):
+                        rel = getattr(rel, step, None)
+                        if rel is None:
+                            break
+                    if rel is not None:
+                        value = getattr(rel, name, "")
                 elif isinstance(obj, dict):
                     value = obj.get(name, "")
                 else:

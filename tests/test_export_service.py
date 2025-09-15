@@ -1,9 +1,10 @@
 import csv
+import datetime
 from codecs import BOM_UTF8
 from types import SimpleNamespace
 
 from services.export_service import export_objects_to_csv
-from database.models import Client
+from database.models import Client, Deal, Policy, Payment, Expense
 
 
 def test_export_model_and_dict(in_memory_db, tmp_path):
@@ -35,3 +36,46 @@ def test_export_writes_bom_and_ru_headers(tmp_path):
         headers = next(reader)
 
     assert headers == ["Дата платежа"]
+
+
+def test_export_expense_with_nested_relations(in_memory_db, tmp_path, monkeypatch):
+    client = Client.create(name="Alice")
+    deal = Deal.create(client=client, description="Deal", start_date=datetime.date.today())
+    policy = Policy.create(
+        client=client,
+        deal=deal,
+        policy_number="PN123",
+        start_date=datetime.date.today(),
+    )
+    payment = Payment.create(policy=policy, amount=0, payment_date=datetime.date.today())
+    expense = Expense.create(
+        payment=payment,
+        amount=100,
+        expense_type="Type",
+        expense_date=datetime.date.today(),
+        policy=policy,
+    )
+
+    monkeypatch.setattr(
+        Deal.description,
+        "model",
+        SimpleNamespace(
+            __name__="policy__deal",
+            _meta=SimpleNamespace(name="policy__deal"),
+        ),
+    )
+    monkeypatch.setattr(
+        Client.name,
+        "model",
+        SimpleNamespace(
+            __name__="policy__deal__client",
+            _meta=SimpleNamespace(name="policy__deal__client"),
+        ),
+    )
+
+    path = tmp_path / "nested.csv"
+    fields = [Policy.policy_number, Deal.description, Client.name]
+    export_objects_to_csv(str(path), [expense], fields)
+
+    line = path.read_text(encoding="utf-8-sig").splitlines()[1]
+    assert line == "PN123;Deal;Alice"

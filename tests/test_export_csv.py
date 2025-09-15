@@ -322,6 +322,7 @@ def test_export_csv_related_fields(in_memory_db, tmp_path):
     policy = Policy.create(
         client=client, policy_number="PN123", start_date=datetime.date.today()
     )
+    policy.policy = policy
     path = tmp_path / "related.csv"
     fields = [Policy.policy_number, Client.name]
     export_objects_to_csv(str(path), [policy], fields)
