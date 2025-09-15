@@ -57,7 +57,7 @@ class ColumnFilterRow(QWidget):
         self,
         headers: list[str],
         texts: list[str] | None = None,
-        column_field_map: dict[int, Field | None] | None = None,
+        column_field_map: dict[int, Field | str | None] | None = None,
     ):
         """Создаёт по одному полю ввода на каждый столбец.
 
