@@ -242,6 +242,12 @@ def get_expenses_page(
     Returns:
         ModelSelect: Выборка расходов.
     """
+    logger.debug(
+        "get_expenses_page filters=%s order=%s %s",
+        column_filters,
+        order_by,
+        order_dir,
+    )
     query = build_expense_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -253,7 +259,18 @@ def get_expenses_page(
         order_dir=order_dir,
     )
     offset = (page - 1) * per_page
-    return query.limit(per_page).offset(offset)
+    paged_query = query.limit(per_page).offset(offset)
+    filters = {
+        "search_text": search_text,
+        "show_deleted": show_deleted,
+        "deal_id": deal_id,
+        "include_paid": include_paid,
+        "expense_date_range": expense_date_range,
+        "column_filters": column_filters,
+    }
+    if not paged_query.exists():
+        logger.warning("No expenses found for filters=%s", filters)
+    return paged_query
 
 
 def apply_expense_filters(
@@ -371,6 +388,7 @@ def build_expense_query(
             field = order_by
         order_expr = field.desc() if order_dir == "desc" else field.asc()
         query = query.order_by(order_expr)
+    logger.debug("expense query SQL: %s", query.sql())
     return query
 
 
