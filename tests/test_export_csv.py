@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
 )
 
-from database.models import Client, Policy
+from database.models import Client, Deal, Expense, Payment, Policy
 from services.export_service import export_objects_to_csv
 from ui.base.base_table_view import BaseTableView
 
@@ -329,6 +329,32 @@ def test_export_csv_related_fields(in_memory_db, tmp_path):
     text = path.read_text(encoding="utf-8-sig")
     assert "PN123" in text
     assert "Alice" in text
+
+
+def test_export_expense_deal_client(in_memory_db, tmp_path):
+    client = Client.create(name="Ivan")
+    deal = Deal.create(
+        client=client, description="DealDesc", start_date=datetime.date.today()
+    )
+    policy = Policy.create(
+        client=client, deal=deal, policy_number="PN1", start_date=datetime.date.today()
+    )
+    payment = Payment.create(policy=policy, amount=100, payment_date=datetime.date.today())
+    expense = Expense.create(
+        payment=payment,
+        amount=50,
+        expense_type="Комиссия",
+        expense_date=datetime.date.today(),
+        policy=policy,
+    )
+
+    path = tmp_path / "expense.csv"
+    fields = ["policy__deal__description", "policy__client__name"]
+    export_objects_to_csv(str(path), [expense], fields)
+
+    text = path.read_text(encoding="utf-8-sig")
+    assert "DealDesc" in text
+    assert "Ivan" in text
 
 
 def test_export_csv_with_column_map(qapp, tmp_path, monkeypatch):
