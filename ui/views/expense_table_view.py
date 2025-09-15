@@ -171,7 +171,7 @@ class ExpenseTableView(BaseTableView):
     def load_data(self):
         filters = super().get_filters()
         filters.update(
-            {"include_paid": self.filter_controls.is_checked("Показывать выплаченные")}
+            {"include_paid": self.is_checked("Показывать выплаченные")}
         )
         if self.deal_id:
             filters["deal_id"] = self.deal_id
@@ -293,6 +293,10 @@ class ExpenseTableView(BaseTableView):
         super().set_model_class_and_items(
             model_class, items, total_count=total_count
         )
+        # Используем специализированную модель для отображения человекочитаемых колонок
+        self.model = ExpenseTableModel(items, model_class)
+        self.proxy.setSourceModel(self.model)
+        self.table.setModel(self.proxy)
         total_sum = sum(e.amount for e in items)
         summary = f"Сумма: {total_sum:.2f} ₽" if items else ""
         self.paginator.set_summary(summary)

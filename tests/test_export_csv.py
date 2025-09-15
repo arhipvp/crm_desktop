@@ -4,13 +4,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 from PySide6.QtCore import QItemSelectionModel, QAbstractTableModel, Qt
-from PySide6.QtWidgets import (
-    QAbstractItemView,
-    QFileDialog,
-    QMessageBox,
-    QPushButton,
-    QCheckBox,
-)
+from PySide6.QtWidgets import QAbstractItemView, QFileDialog, QMessageBox
 
 from database.models import Client, Deal, Expense, Payment, Policy
 from services.export_service import export_objects_to_csv
@@ -85,12 +79,10 @@ def test_export_button_triggers_csv(in_memory_db, qapp, tmp_path, monkeypatch):
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(path), "csv"))
     monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
 
-    export_btn = next(
-        btn
-        for btn in view.filter_controls.findChildren(QPushButton)
-        if "Экспорт" in btn.text()
+    export_action = next(
+        act for act in view.toolbar.actions() if "Экспорт" in act.text()
     )
-    export_btn.click()
+    export_action.trigger()
 
     assert called["count"] == 1
     assert exported["path"] == str(path)
@@ -120,17 +112,12 @@ def test_export_csv_all_rows_option(in_memory_db, qapp, tmp_path, monkeypatch):
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(path), "csv"))
     monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
 
-    export_all = next(
-        cb for cb in view.filter_controls.findChildren(QCheckBox)
-        if "Экспортировать всё" in cb.text()
-    )
-    export_all.setChecked(True)
+    view.export_all_checkbox.setChecked(True)
 
-    export_btn = next(
-        btn for btn in view.filter_controls.findChildren(QPushButton)
-        if "Экспорт" in btn.text()
+    export_action = next(
+        act for act in view.toolbar.actions() if "Экспорт" in act.text()
     )
-    export_btn.click()
+    export_action.trigger()
 
     exported_names = {obj.name for obj in exported["objs"]}
     assert exported_names == {"Alice", "Bob", "Charlie"}
@@ -178,12 +165,10 @@ def test_export_button_calls_export_csv(in_memory_db, qapp, tmp_path, monkeypatc
     view.table.selectRow(0)
     qapp.processEvents()
 
-    export_btn = next(
-        btn
-        for btn in view.filter_controls.findChildren(QPushButton)
-        if "Экспорт" in btn.text()
+    export_action = next(
+        act for act in view.toolbar.actions() if "Экспорт" in act.text()
     )
-    export_btn.click()
+    export_action.trigger()
 
     assert called["called"]
 

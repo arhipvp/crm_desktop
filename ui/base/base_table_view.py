@@ -2,6 +2,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from datetime import date
+
 from peewee import Field
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QShortcut
@@ -15,14 +17,19 @@ from PySide6.QtWidgets import (
     QWidget,
     QFileDialog,
     QMessageBox,
+    QToolBar,
+    QLineEdit,
+    QCheckBox,
+    QDateEdit,
+    QLabel,
 )
 
 from ui.base.table_controller import TableController
-from ui.common.filter_controls import FilterControls
 from ui.common.paginator import Paginator
 from ui.common.styled_widgets import styled_button
 from ui.common.filter_header_view import FilterHeaderView
 from ui.common.multi_filter_proxy import MultiFilterProxyModel
+from ui.common.date_utils import get_date_or_none
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
 from services.export_service import export_objects_to_csv
@@ -37,9 +44,9 @@ class BaseTableView(QWidget):
     # Значение ``None`` скрывает фильтр.
     COLUMN_FIELD_MAP: dict[int, Field | str | None] = {}
 
-    def _on_filter_controls_changed(self, *args, **kwargs):
+    def _on_filters_changed(self, *args, **kwargs):
         """Безопасно обрабатывает изменение фильтров во время инициализации."""
-        if hasattr(self, "filter_controls"):
+        if hasattr(self, "toolbar"):
             self.on_filter_changed(*args, **kwargs)
 
     def __init__(
@@ -114,22 +121,63 @@ class BaseTableView(QWidget):
         self.outer_layout.addWidget(self.splitter)
         self.setLayout(self.outer_layout)
 
-        # Фильтры
+        # Фильтры на QToolBar
         checkbox_map = kwargs.get("checkbox_map") or {}
-        checkbox_map.setdefault("Показывать удалённые", lambda state: self.on_filter_changed())
-
-        self.filter_controls = FilterControls(
-            search_callback=self._on_filter_controls_changed,
-            checkbox_map=checkbox_map,
-            on_filter=self._on_filter_controls_changed,
-            export_callback=self.export_csv,
-            settings_name=self.settings_id,
-            date_filter_field=date_filter_field,
-            reset_callback=self._on_reset_filters,
+        checkbox_map.setdefault(
+            "Показывать удалённые", lambda state: self._on_filters_changed()
         )
 
-        self.left_layout.addWidget(self.filter_controls)
-        QShortcut("Ctrl+F", self, activated=self.filter_controls.focus_search)
+        self.date_filter_field = date_filter_field
+        self.toolbar = QToolBar()
+        self.toolbar.setMovable(False)
+        self.left_layout.addWidget(self.toolbar)
+
+        # Поле поиска
+        self.search_edit = QLineEdit()
+        self.search_edit.setClearButtonEnabled(True)
+        self.search_edit.setPlaceholderText("Поиск…")
+        self.search_edit.textChanged.connect(self._on_filters_changed)
+        self.toolbar.addWidget(self.search_edit)
+
+        # Фильтр по дате
+        if date_filter_field:
+            self.date_from = QDateEdit()
+            self.date_from.setCalendarPopup(True)
+            self.date_from.setSpecialValueText("—")
+            self.date_from.clear()
+            self.date_from.dateChanged.connect(self._on_filters_changed)
+            self.date_to = QDateEdit()
+            self.date_to.setCalendarPopup(True)
+            self.date_to.setSpecialValueText("—")
+            self.date_to.clear()
+            self.date_to.dateChanged.connect(self._on_filters_changed)
+            self.toolbar.addWidget(QLabel("С:"))
+            self.toolbar.addWidget(self.date_from)
+            self.toolbar.addWidget(QLabel("По:"))
+            self.toolbar.addWidget(self.date_to)
+
+        # Чекбоксы
+        self.checkboxes: dict[str, QCheckBox] = {}
+        for label, callback in checkbox_map.items():
+            box = QCheckBox(label)
+            box.stateChanged.connect(callback)
+            self.toolbar.addWidget(box)
+            self.checkboxes[label] = box
+
+        # Экспорт и сброс
+        self.export_all_checkbox = QCheckBox("Экспортировать всё")
+        export_action = self.toolbar.addAction("📤 Экспорт CSV")
+        self.toolbar.addWidget(self.export_all_checkbox)
+        export_action.triggered.connect(
+            lambda: self.export_csv(
+                all_rows=self.export_all_checkbox.isChecked()
+            )
+        )
+
+        reset_action = self.toolbar.addAction("Сбросить")
+        reset_action.triggered.connect(self._on_reset_filters)
+
+        QShortcut("Ctrl+F", self, activated=self.focus_search)
 
         # Кнопки
         self.button_row = QHBoxLayout()
@@ -197,6 +245,51 @@ class BaseTableView(QWidget):
         self.paginator = Paginator(on_prev=self.prev_page, on_next=self.next_page, per_page=self.per_page)
         self.paginator.per_page_changed.connect(self._on_per_page_changed)
         self.left_layout.addWidget(self.paginator)
+
+    # ------------------------------------------------------------------
+    # Helpers for toolbar-based filters
+    # ------------------------------------------------------------------
+    def focus_search(self) -> None:
+        """Устанавливает фокус на поле поиска."""
+        self.search_edit.setFocus()
+
+    def get_search_text(self) -> str:
+        """Возвращает текст из поля поиска."""
+        return self.search_edit.text().strip()
+
+    def is_checked(self, label: str) -> bool:
+        """Возвращает состояние чекбокса по метке."""
+        box = self.checkboxes.get(label)
+        return box.isChecked() if box else False
+
+    def get_date_filter(self) -> dict[str, date] | None:
+        """Возвращает диапазон дат из виджетов фильтра."""
+        if not self.date_filter_field:
+            return None
+        d1 = get_date_or_none(getattr(self, "date_from", None))
+        d2 = get_date_or_none(getattr(self, "date_to", None))
+        if d1 or d2:
+            return {self.date_filter_field: (d1, d2)}
+        return None
+
+    def clear_filters(self) -> None:
+        """Сбрасывает состояние всех фильтров на панели."""
+        self.search_edit.blockSignals(True)
+        self.search_edit.clear()
+        self.search_edit.blockSignals(False)
+
+        for box in self.checkboxes.values():
+            box.blockSignals(True)
+            box.setChecked(False)
+            box.blockSignals(False)
+
+        if self.date_filter_field:
+            self.date_from.blockSignals(True)
+            self.date_from.clear()
+            self.date_from.blockSignals(False)
+            self.date_to.blockSignals(True)
+            self.date_to.clear()
+            self.date_to.blockSignals(False)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         if self.controller:
