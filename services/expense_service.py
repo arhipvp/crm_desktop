@@ -271,6 +271,8 @@ def apply_expense_filters(
         Policy.policy_number,
         Client.name,
         Deal.description,
+        Policy.contractor,
+        Policy.start_date,
         Policy.note,
     ]
 

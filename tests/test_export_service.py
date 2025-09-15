@@ -38,7 +38,7 @@ def test_export_writes_bom_and_ru_headers(tmp_path):
     assert headers == ["Дата платежа"]
 
 
-def test_export_expense_with_path_strings(in_memory_db, tmp_path):
+def test_export_expense_with_fields(in_memory_db, tmp_path):
     client = Client.create(name="Alice")
     deal = Deal.create(client=client, description="Deal", start_date=datetime.date.today())
     policy = Policy.create(
@@ -58,9 +58,9 @@ def test_export_expense_with_path_strings(in_memory_db, tmp_path):
 
     path = tmp_path / "nested.csv"
     fields = [
-        "policy__policy_number",
-        "policy__deal__description",
-        "policy__client__name",
+        Policy.policy_number,
+        Deal.description,
+        Client.name,
     ]
     export_objects_to_csv(str(path), [expense], fields)
 
@@ -87,7 +87,7 @@ def test_export_expense_deal_description(in_memory_db, tmp_path):
     )
 
     path = tmp_path / "desc.csv"
-    fields = ["policy__deal__description"]
+    fields = [Deal.description]
     export_objects_to_csv(str(path), [expense], fields)
 
     line = path.read_text(encoding="utf-8-sig").splitlines()[1]

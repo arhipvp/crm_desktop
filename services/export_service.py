@@ -1,17 +1,41 @@
 import csv
 import datetime
 import logging
+from collections import deque
 
-from peewee import Field
+from peewee import Field, ForeignKeyField
 from ui.common.ru_headers import RU_HEADERS
 
 
 logger = logging.getLogger(__name__)
 
 
-def _split_path(field: Field | str | object) -> list[str]:
+def _model_path(start, target) -> list[str] | None:
+    if start == target:
+        return []
+    queue = deque([(start, [])])
+    visited: set = {start}
+    while queue:
+        model, path = queue.popleft()
+        for f in model._meta.sorted_fields:
+            if isinstance(f, ForeignKeyField):
+                rel = f.rel_model
+                if rel in visited:
+                    continue
+                new_path = path + [f.name]
+                if rel == target:
+                    return new_path
+                queue.append((rel, new_path))
+                visited.add(rel)
+    return None
+
+
+def _split_path(field: Field | str | object, obj=None) -> list[str]:
     if isinstance(field, str):
         return field.split("__")
+    if isinstance(field, Field) and obj is not None:
+        path = _model_path(obj.__class__, field.model) or []
+        return path + [field.name]
     name = getattr(field, "name", str(field))
     return [name]
 
@@ -46,7 +70,7 @@ def export_objects_to_csv(path, objects, fields, headers=None):
                         value = rel if rel is not None else ""
                     else:
                         rel = obj
-                        for step in _split_path(f):
+                        for step in _split_path(f, obj):
                             rel = getattr(rel, step, None)
                             if rel is None:
                                 break

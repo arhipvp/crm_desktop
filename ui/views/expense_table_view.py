@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
 
-from database.models import Expense
+from database.models import Client, Deal, Expense, Policy
 from services import expense_service
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
@@ -123,11 +123,11 @@ class ExpenseTableModel(BaseTableModel):
 
 class ExpenseTableView(BaseTableView):
     COLUMN_FIELD_MAP = {
-        0: "policy__policy_number",
-        1: "policy__deal__description",
-        2: "policy__client__name",
-        3: "policy__contractor",
-        4: "policy__start_date",
+        0: Policy.policy_number,
+        1: Deal.description,
+        2: Client.name,
+        3: Policy.contractor,
+        4: Policy.start_date,
         5: "expense_type",
         6: "payment__amount",
         7: "payment__payment_date",
