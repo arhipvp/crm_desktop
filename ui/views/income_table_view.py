@@ -222,12 +222,12 @@ class IncomeTableView(BaseTableView):
         super().set_model_class_and_items(
             model_class, items, total_count=total_count
         )
+        self.model = IncomeTableModel(items, model_class)
+        self.proxy.setSourceModel(self.model)
+        self.table.setModel(self.proxy)
         total_sum = sum(i.amount for i in items)
         summary = f"Сумма: {total_sum:.2f} ₽" if items else ""
         self.paginator.set_summary(summary)
-
-        # В интерактивном режиме пользователь сам выбирает ширину
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
 
     def get_selected(self):
         idx = self.table.currentIndex()
