@@ -131,3 +131,34 @@ def test_get_incomes_page_sort_by_executor_includes_income_id(in_memory_db):
     assert names == ["A", "B"]
 
 
+@pytest.mark.parametrize(
+    "received_date_range",
+    [
+        (None, None),
+        (date.today() - timedelta(days=1), date.today() + timedelta(days=1)),
+    ],
+)
+def test_get_incomes_page_ignores_date_range_when_excluding_received(
+    in_memory_db, make_policy_with_payment, received_date_range
+):
+    """Проверяет игнорирование диапазона дат при ``include_received``=False."""
+
+    today = date.today()
+    _, _, _policy, payment = make_policy_with_payment()
+    pending_income = Income.create(payment=payment, amount=50)
+    Income.create(payment=payment, amount=75, received_date=today)
+
+    page = list(
+        get_incomes_page(
+            page=1,
+            per_page=10,
+            include_received=False,
+            received_date_range=received_date_range,
+            order_by="id",
+            order_dir="asc",
+        )
+    )
+
+    assert [income.id for income in page] == [pending_income.id]
+
+

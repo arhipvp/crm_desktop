@@ -299,7 +299,7 @@ def apply_income_filters(
         query = query.where(Income.received_date.is_null(False))
     elif not include_received:
         query = query.where(Income.received_date.is_null(True))
-    if received_date_range:
+    if include_received and received_date_range:
         date_from, date_to = received_date_range
         if date_from:
             query = query.where(Income.received_date >= date_from)

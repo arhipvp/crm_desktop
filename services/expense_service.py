@@ -306,7 +306,7 @@ def apply_expense_filters(
 
     if not include_paid:
         query = query.where(Expense.expense_date.is_null(True))
-    if expense_date_range:
+    if include_paid and expense_date_range:
         date_from, date_to = expense_date_range
         if date_from:
             query = query.where(Expense.expense_date >= date_from)
