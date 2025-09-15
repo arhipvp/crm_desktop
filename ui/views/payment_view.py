@@ -12,7 +12,6 @@ from services.payment_service import get_payments_page
 from ui.widgets.payment_card import PaymentCard
 from ui.forms.payment_form import PaymentForm
 from ui.common.paginator import Paginator
-from ui.common.refresh_button import RefreshButton
 
 
 class PaymentView(QWidget):
@@ -31,7 +30,8 @@ class PaymentView(QWidget):
         self.add_btn.clicked.connect(self.add_payment)
         control_layout.addWidget(self.add_btn)
 
-        self.refresh_btn = RefreshButton(self.load_payments)
+        self.refresh_btn = QPushButton("🔄 Обновить")
+        self.refresh_btn.clicked.connect(self.load_payments)
         control_layout.addWidget(self.refresh_btn)
 
         self.show_deleted_checkbox = QCheckBox("Показывать удалённые")

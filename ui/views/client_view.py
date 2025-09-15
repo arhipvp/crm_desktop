@@ -12,7 +12,6 @@ from services.clients import get_clients_page
 from ui.widgets.client_card import ClientCard
 from ui.forms.client_form import ClientForm
 from ui.common.paginator import Paginator
-from ui.common.refresh_button import RefreshButton
 
 
 class ClientView(QWidget):
@@ -31,7 +30,8 @@ class ClientView(QWidget):
         self.add_btn.clicked.connect(self.add_client)
         control_layout.addWidget(self.add_btn)
 
-        self.refresh_btn = RefreshButton(self.load_clients)
+        self.refresh_btn = QPushButton("🔄 Обновить")
+        self.refresh_btn.clicked.connect(self.load_clients)
         control_layout.addWidget(self.refresh_btn)
 
         self.show_deleted_checkbox = QCheckBox("Показывать удалённых")
