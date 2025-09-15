@@ -14,6 +14,7 @@ def policy_form(monkeypatch, qapp, in_memory_db):
         policy_number="P",
         start_date=date.today(),
         end_date=date.today(),
+        contractor="Y",
     )
     form = PolicyForm(policy)
     monkeypatch.setattr(form, "collect_data", lambda: {"contractor": "X"})
@@ -42,6 +43,34 @@ def test_expense_created_on_confirm(policy_form, monkeypatch):
     assert confirm_mock.call_count == 1
     add_expense_mock.assert_called_once_with(policy)
     show_info_mock.assert_called_once()
+
+
+def test_no_expense_when_previous_contractor_invalid(monkeypatch, qapp, in_memory_db):
+    client = Client.create(name="C")
+    policy = Policy.create(
+        client=client,
+        policy_number="P",
+        start_date=date.today(),
+        end_date=date.today(),
+        contractor="-",
+    )
+    form = PolicyForm(policy)
+
+    from ui.forms import policy_form as module
+
+    confirm_mock = MagicMock(return_value=True)
+    add_expense_mock = MagicMock()
+
+    monkeypatch.setattr(form, "collect_data", lambda: {"contractor": "X"})
+    monkeypatch.setattr(form, "save_data", lambda data: policy)
+    monkeypatch.setattr(module, "confirm", confirm_mock)
+    monkeypatch.setattr(module, "add_contractor_expense", add_expense_mock)
+    monkeypatch.setattr(module, "get_expense_count_by_policy", lambda pid: 0)
+
+    form.save()
+
+    confirm_mock.assert_not_called()
+    add_expense_mock.assert_not_called()
 
 
 def test_expense_not_created_on_cancel(policy_form, monkeypatch):

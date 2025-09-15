@@ -199,6 +199,22 @@ def test_add_contractor_expense_creates_record(in_memory_db):
     assert exp.amount == 0
 
 
+def test_add_contractor_expense_requires_contractor(in_memory_db):
+    d = datetime.date(2024, 1, 1)
+    client = Client.create(name="C")
+    policy = Policy.create(
+        client=client,
+        policy_number="P",
+        start_date=d,
+        end_date=d,
+        contractor="—",
+    )
+    Payment.create(policy=policy, amount=0, payment_date=d)
+    with pytest.raises(ValueError):
+        policy_svc.add_contractor_expense(policy)
+    assert expense_service.get_expense_count_by_policy(policy.id) == 0
+
+
 def test_sync_policy_payments_removes_extra_duplicates(
     in_memory_db, mock_payments, make_policy_with_payment
 ):

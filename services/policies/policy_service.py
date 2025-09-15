@@ -301,6 +301,9 @@ def _notify_policy_added(policy: Policy) -> None:
 def add_contractor_expense(policy: Policy):
     """Создать нулевой расход 'контрагент' для первого платежа полиса."""
     from services.expense_service import add_expense
+    contractor = (policy.contractor or "").strip()
+    if contractor in {"", "-", "—"}:
+        raise ValueError("У полиса отсутствует контрагент")
 
     first_payment = (
         Payment.active()
@@ -314,7 +317,7 @@ def add_contractor_expense(policy: Policy):
         payment=first_payment,
         amount=Decimal("0"),
         expense_type="контрагент",
-        note=f"выплата контрагенту {policy.contractor}",
+        note=f"выплата контрагенту {contractor}",
     )
 
 
