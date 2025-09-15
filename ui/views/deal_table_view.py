@@ -237,13 +237,14 @@ class DealTableView(BaseTableView):
             self.paginator.update(self.total_count, self.page, self.per_page)
             self.data_loaded.emit(self.total_count)
 
+        header = self.table.horizontalHeader()
         headers = [
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(
-            headers, column_field_map=self.COLUMN_FIELD_MAP
-        )
+        if hasattr(header, "set_headers"):
+            prev_texts = header.get_all_filters()
+            header.set_headers(headers, prev_texts, column_field_map=self.COLUMN_FIELD_MAP)
 
         # какой столбец сейчас является полем сортировки?
         col = self.get_column_index(self.sort_field)

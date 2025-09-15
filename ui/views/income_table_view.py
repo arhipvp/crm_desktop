@@ -140,11 +140,12 @@ class IncomeTableView(BaseTableView):
             date_filter_field="received_date",
         )
         # Переопределяем обработку фильтров по столбцам: только БД
+        header = self.table.horizontalHeader()
         try:
-            self.column_filters.filter_changed.disconnect()
+            header.filter_changed.disconnect()
         except Exception:
             pass
-        self.column_filters.filter_changed.connect(
+        header.filter_changed.connect(
             self._on_column_filter_changed_db
         )
         self.deal_id = deal_id
@@ -227,10 +228,8 @@ class IncomeTableView(BaseTableView):
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         """Устанавливает модель таблицы и применяет сохранённые настройки."""
-        prev_texts = [
-            self.column_filters.get_text(i)
-            for i in range(len(self.column_filters._editors))
-        ]
+        header = self.table.horizontalHeader()
+        prev_texts = header.get_all_filters()
 
         self.model = IncomeTableModel(items, model_class)
         self.proxy_model.setSourceModel(self.model)
@@ -250,7 +249,7 @@ class IncomeTableView(BaseTableView):
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(headers, prev_texts)
+        header.set_headers(headers, prev_texts)
         self.load_table_settings()
 
         # Показать индикатор сортировки на текущем столбце

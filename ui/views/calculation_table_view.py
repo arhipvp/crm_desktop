@@ -103,7 +103,8 @@ class CalculationTableView(BaseTableView):
         self.set_model_class_and_items(DealCalculation, items, total_count=len(items))
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
-        prev_texts = self.column_filters.get_all_texts()
+        header = self.table.horizontalHeader()
+        prev_texts = header.get_all_filters()
         self.model = CalculationTableModel(items, model_class)
         self.proxy_model.setSourceModel(self.model)
         self.table.setModel(self.proxy_model)
@@ -119,7 +120,7 @@ class CalculationTableView(BaseTableView):
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(
+        header.set_headers(
             headers, prev_texts, column_field_map=self.COLUMN_FIELD_MAP
         )
 

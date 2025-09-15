@@ -134,11 +134,12 @@ class TaskTableView(BaseTableView):
         )
         self.left_layout.insertWidget(0, self.filter_controls)
 
+        header = self.table.horizontalHeader()
         try:
-            self.column_filters.filter_changed.disconnect()
+            header.filter_changed.disconnect()
         except Exception:
             pass
-        self.column_filters.filter_changed.connect(
+        header.filter_changed.connect(
             self._on_column_filter_changed_db
         )
 
@@ -345,10 +346,8 @@ class TaskTableView(BaseTableView):
             )
             total = build_task_query(**f).count()
 
-        prev_texts = [
-            self.column_filters.get_text(i)
-            for i in range(len(self.column_filters._editors))
-        ]
+        header = self.table.horizontalHeader()
+        prev_texts = header.get_all_filters()
 
         items = list(prefetch(items, Deal, Client, Policy, DealExecutor, Executor))
         self.model = TaskTableModel(items, Task)
@@ -371,7 +370,7 @@ class TaskTableView(BaseTableView):
             self.model.headerData(i, Qt.Horizontal)
             for i in range(self.model.columnCount())
         ]
-        self.column_filters.set_headers(
+        header.set_headers(
             headers, prev_texts, self.COLUMN_FIELD_MAP
         )
         QTimer.singleShot(0, self.load_table_settings)
