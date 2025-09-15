@@ -10,13 +10,13 @@ from PySide6.QtWidgets import (
     QWidget,
     QSizePolicy,
     QCheckBox,
+    QLineEdit,
 )
 
 from ui import settings as ui_settings
 
 from ui.common.checkbox_filters import CheckboxFilters
 from ui.common.date_utils import OptionalDateEdit
-from ui.common.search_box import SearchBox
 
 
 class FilterControls(QWidget):
@@ -69,8 +69,10 @@ class FilterControls(QWidget):
         layout.setSpacing(6)
 
         # Поиск
-        self._search = SearchBox(search_callback)
-        self._search.search_input.setPlaceholderText(search_placeholder)
+        self._search = QLineEdit()
+        self._search.setClearButtonEnabled(True)
+        self._search.textChanged.connect(search_callback)
+        self._search.setPlaceholderText(search_placeholder)
 
         self._date_filter_field = date_filter_field
         if date_filter_field:
@@ -134,11 +136,15 @@ class FilterControls(QWidget):
 
     def get_search_text(self) -> str:
         """Возвращает текст из поля поиска (без пробелов)."""
-        return self._search.get_text().strip()
+        return self._search.text().strip()
+
+    def set_text(self, text: str) -> None:
+        """Устанавливает текст в поле поиска."""
+        self._search.setText(text)
 
     def focus_search(self) -> None:
         """Устанавливает фокус на поле поиска."""
-        self._search.search_input.setFocus()
+        self._search.setFocus()
 
     def is_checked(self, label: str) -> bool:
         """Проверяет, установлен ли чекбокс с заданной меткой."""
@@ -177,9 +183,9 @@ class FilterControls(QWidget):
 
     def clear_all(self):
         """Сбрасывает все фильтры: поиск, даты, чекбоксы, не излучая сигналов."""
-        self._search.search_input.blockSignals(True)
-        self._search.search_input.clear()
-        self._search.search_input.blockSignals(False)
+        self._search.blockSignals(True)
+        self._search.clear()
+        self._search.blockSignals(False)
 
         if self._cbx:
             for box in self._cbx.checkboxes.values():
@@ -209,7 +215,7 @@ class FilterControls(QWidget):
             return
         search = data.get("search")
         if search:
-            self._search.set_text(search)
+            self.set_text(search)
         if self._cbx:
             self._cbx.set_bulk(data.get("checkboxes", {}))
         dates = data.get("dates", {})
@@ -240,7 +246,7 @@ class FilterControls(QWidget):
         ui_settings.set_table_filters(self._settings_name, self._collect_filters_for_save())
 
     def _connect_save_signals(self):
-        self._search.search_input.textChanged.connect(self._save_current_filters)
+        self._search.textChanged.connect(self._save_current_filters)
         if hasattr(self, "_date_from"):
             self._date_from.dateChanged.connect(self._save_current_filters)
         if hasattr(self, "_date_to"):
