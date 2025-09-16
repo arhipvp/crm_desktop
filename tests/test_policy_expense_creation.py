@@ -1,9 +1,10 @@
 import pytest
 from unittest.mock import MagicMock
 
-from database.models import Client, Policy
+from database.models import Client, Policy, Payment, Expense
 from datetime import date
 from ui.forms.policy_form import PolicyForm
+from services.policies import add_contractor_expense
 
 
 @pytest.fixture
@@ -178,3 +179,39 @@ def test_expense_created_for_new_policy(monkeypatch, qapp, in_memory_db):
     assert confirm_mock.call_count == 1
     add_expense_mock.assert_called_once_with(policy)
     show_info_mock.assert_called_once()
+
+
+def test_create_expenses_for_all_payments(in_memory_db):
+    first_payment_date = date(2024, 1, 1)
+    second_payment_date = date(2024, 2, 1)
+    client = Client.create(name="C")
+    policy = Policy.create(
+        client=client,
+        policy_number="P-1",
+        start_date=first_payment_date,
+        end_date=second_payment_date,
+        contractor=None,
+    )
+
+    p1 = Payment.create(policy=policy, amount=100, payment_date=first_payment_date)
+    p2 = Payment.create(policy=policy, amount=200, payment_date=second_payment_date)
+
+    assert Expense.select().count() == 0
+
+    policy.contractor = "Контрагент"
+    policy.save()
+
+    created_expenses = add_contractor_expense(policy)
+
+    assert len(created_expenses) == 2
+    assert all(expense.amount == 0 for expense in created_expenses)
+
+    for payment in (p1, p2):
+        contractor_expenses = (
+            Expense.active()
+            .where(
+                (Expense.payment == payment)
+                & (Expense.expense_type == "контрагент")
+            )
+        )
+        assert contractor_expenses.count() == 1
