@@ -270,20 +270,22 @@ class PolicyForm(BaseEditForm):
             if saved:
                 if contractor_changed:
                     cnt = get_expense_count_by_policy(saved.id)
-                    if confirm(
-                        f"Создать расход для контрагента '{contractor}'?"
-                    ):
-                        if cnt == 0 or confirm(
-                            f"Уже есть {cnt} расход(ов) по этому полису. Все равно создать?"
+                    is_new_policy = self.instance is None
+                    if not (is_new_policy and cnt > 0):
+                        if confirm(
+                            f"Создать расход для контрагента '{contractor}'?"
                         ):
-                            if saved.contractor not in (None, "-", "—"):
-                                created_expenses = add_contractor_expense(saved)
-                                if created_expenses:
-                                    show_info("Расходы для контрагента созданы.")
-                                else:
-                                    show_info(
-                                        "Расходы для контрагента уже существовали."
-                                    )
+                            if cnt == 0 or confirm(
+                                f"Уже есть {cnt} расход(ов) по этому полису. Все равно создать?"
+                            ):
+                                if saved.contractor not in (None, "-", "—"):
+                                    created_expenses = add_contractor_expense(saved)
+                                    if created_expenses:
+                                        show_info("Расходы для контрагента созданы.")
+                                    else:
+                                        show_info(
+                                            "Расходы для контрагента уже существовали."
+                                        )
                 self.saved_instance = saved
                 self.accept()
         except DuplicatePolicyError as e:
