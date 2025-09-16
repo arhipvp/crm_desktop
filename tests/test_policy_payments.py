@@ -104,6 +104,42 @@ def test_sync_policy_payments_removes_zero_when_real_exists(
     )
 
 
+def test_sync_policy_payments_marks_zero_relations_deleted(in_memory_db):
+    d0 = datetime.date(2024, 1, 1)
+    d1 = datetime.date(2024, 2, 1)
+    client = Client.create(name="C")
+    policy = Policy.create(
+        client=client,
+        policy_number="P",
+        start_date=d0,
+        end_date=d1,
+        contractor="Контрагент",
+    )
+    zero_payment = pay_svc.add_payment(
+        policy=policy,
+        amount=0,
+        payment_date=d0,
+    )
+    zero_income = zero_payment.incomes.get()
+    zero_expense = zero_payment.expenses.get()
+
+    pay_svc.sync_policy_payments(
+        policy,
+        [
+            {"amount": 0, "payment_date": d0},
+            {"amount": 100, "payment_date": d1},
+        ],
+    )
+
+    refreshed_payment = Payment.get_by_id(zero_payment.id)
+    refreshed_income = Income.get_by_id(zero_income.id)
+    refreshed_expense = Expense.get_by_id(zero_expense.id)
+
+    assert refreshed_payment.is_deleted is True
+    assert refreshed_income.is_deleted is True
+    assert refreshed_expense.is_deleted is True
+
+
 def test_add_policy_rolls_back_on_payment_error(
     in_memory_db, monkeypatch, policy_folder_patches, mock_payments
 ):
