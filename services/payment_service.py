@@ -262,10 +262,31 @@ def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
             .where((Payment.policy == policy) & (Payment.amount == Decimal("0")))
             .select(Payment.id)
         )
-        (
-            Payment.update(is_deleted=True)
-            .where(Payment.id.in_(subq))
-            .execute()
+        zero_payment_ids = [pid for (pid,) in subq.tuples()]
+        zero_payments_deleted = income_deleted = expense_deleted = 0
+        if zero_payment_ids:
+            with db.atomic():
+                zero_payments_deleted = (
+                    Payment.update(is_deleted=True)
+                    .where(Payment.id.in_(zero_payment_ids))
+                    .execute()
+                )
+                income_deleted = (
+                    Income.update(is_deleted=True)
+                    .where(Income.payment_id.in_(zero_payment_ids))
+                    .execute()
+                )
+                expense_deleted = (
+                    Expense.update(is_deleted=True)
+                    .where(Expense.payment_id.in_(zero_payment_ids))
+                    .execute()
+                )
+        logger.info(
+            "🗑️ Для полиса id=%s авто-нулевые платежи удалены: платежей=%s, доходов=%s, расходов=%s",
+            policy.id,
+            zero_payments_deleted,
+            income_deleted,
+            expense_deleted,
         )
         payments = [
             p for p in payments if Decimal(str(p.get("amount", 0))) != Decimal("0")
