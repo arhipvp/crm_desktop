@@ -29,6 +29,7 @@ from services.policies import (
 from services.validators import normalize_policy_number, normalize_number
 
 from services.deal_service import get_all_deals, get_deals_by_client_id
+from ui.forms.contractor_expense_dialog import ContractorExpenseDialog
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import (
@@ -39,7 +40,7 @@ from ui.common.combo_helpers import (
     populate_combo,
 )
 from ui.common.date_utils import add_year_minus_one_day
-from ui.common.message_boxes import confirm, show_error, show_info
+from ui.common.message_boxes import show_error, show_info
 from services.expense_service import get_expense_count_by_policy
 
 logger = logging.getLogger(__name__)
@@ -271,17 +272,26 @@ class PolicyForm(BaseEditForm):
                 if contractor_changed:
                     cnt = get_expense_count_by_policy(saved.id)
                     is_new_policy = self.instance is None
-                    if not (is_new_policy and cnt > 0):
-                        if confirm(
-                            f"Создать расход для контрагента '{contractor}'?"
-                        ):
-                            if cnt == 0 or confirm(
-                                f"Уже есть {cnt} расход(ов) по этому полису. Все равно создать?"
-                            ):
-                                if saved.contractor not in (None, "-", "—"):
-                                    created_expenses = add_contractor_expense(saved)
-                                    if created_expenses:
+                    should_show_dialog = not (is_new_policy and cnt > 0)
+                    contractor_name = (saved.contractor or "").strip()
+                    if should_show_dialog and contractor_name not in {"", "-", "—"}:
+                        dialog = ContractorExpenseDialog(
+                            saved, contractor_name, parent=self
+                        )
+                        if dialog.exec() == QDialog.Accepted:
+                            selected_payments = dialog.get_selected_payments()
+                            if selected_payments:
+                                try:
+                                    result = add_contractor_expense(
+                                        saved, payments=selected_payments
+                                    )
+                                except ValueError as err:
+                                    show_error(str(err))
+                                else:
+                                    if result.created:
                                         show_info("Расходы для контрагента созданы.")
+                                    elif result.updated:
+                                        show_info("Расходы для контрагента обновлены.")
                                     else:
                                         show_info(
                                             "Расходы для контрагента уже существовали."
