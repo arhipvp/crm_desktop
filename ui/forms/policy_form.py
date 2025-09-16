@@ -219,6 +219,9 @@ class PolicyForm(BaseEditForm):
     def save_data(self, data=None):
         data = data or self.collect_data()
 
+        if hasattr(self, "payments_table"):
+            self._update_draft_payments_from_table()
+
         for idx, pay in enumerate(self._draft_payments):
             chk = self.payments_table.cellWidget(idx, 2)
             if isinstance(chk, QCheckBox):
@@ -365,6 +368,7 @@ class PolicyForm(BaseEditForm):
             "Оплачен",
             "",
         ])
+        self.payments_table.itemChanged.connect(self.on_payment_item_changed)
         vbox.addWidget(self.payments_table)
 
         if self.instance:
@@ -406,12 +410,16 @@ class PolicyForm(BaseEditForm):
         if not dt or amount is None:
             return
         row = self.payments_table.rowCount()
-        self.payments_table.insertRow(row)
-        qd = QDate(dt.year, dt.month, dt.day)
-        item_date = QTableWidgetItem(qd.toString("dd.MM.yyyy"))
-        item_date.setData(Qt.UserRole, pay)
-        self.payments_table.setItem(row, 0, item_date)
-        self.payments_table.setItem(row, 1, QTableWidgetItem(f"{float(amount):.2f}"))
+        was_blocked = self.payments_table.blockSignals(True)
+        try:
+            self.payments_table.insertRow(row)
+            qd = QDate(dt.year, dt.month, dt.day)
+            item_date = QTableWidgetItem(qd.toString("dd.MM.yyyy"))
+            item_date.setData(Qt.UserRole, pay)
+            self.payments_table.setItem(row, 0, item_date)
+            self.payments_table.setItem(row, 1, QTableWidgetItem(f"{float(amount):.2f}"))
+        finally:
+            self.payments_table.blockSignals(was_blocked)
         chk = QCheckBox()
         chk.setChecked(bool(pay.get("actual_payment_date")))
         chk.stateChanged.connect(
@@ -457,4 +465,87 @@ class PolicyForm(BaseEditForm):
                     self._draft_payments.remove(pay)
                 self.payments_table.removeRow(row)
                 break
+
+    def on_payment_item_changed(self, item: QTableWidgetItem) -> None:
+        if not item:
+            return
+        row = item.row()
+        date_item = item if item.column() == 0 else self.payments_table.item(row, 0)
+        if date_item is None:
+            return
+        pay = date_item.data(Qt.UserRole)
+        if not isinstance(pay, dict):
+            pay = {}
+            date_item.setData(Qt.UserRole, pay)
+
+        if item.column() == 0:
+            text = item.text().strip()
+            qdate = QDate.fromString(text, "dd.MM.yyyy")
+            if qdate.isValid():
+                pay["payment_date"] = qdate.toPython()
+                was_blocked = self.payments_table.blockSignals(True)
+                try:
+                    item.setText(qdate.toString("dd.MM.yyyy"))
+                    date_item.setData(Qt.UserRole, pay)
+                finally:
+                    self.payments_table.blockSignals(was_blocked)
+            else:
+                prev_date = pay.get("payment_date")
+                if prev_date:
+                    prev_qdate = QDate(prev_date.year, prev_date.month, prev_date.day)
+                    was_blocked = self.payments_table.blockSignals(True)
+                    try:
+                        item.setText(prev_qdate.toString("dd.MM.yyyy"))
+                    finally:
+                        self.payments_table.blockSignals(was_blocked)
+        elif item.column() == 1:
+            text = item.text().strip()
+            try:
+                normalized = normalize_number(text) if text else None
+                if normalized in (None, ""):
+                    amount = 0.0
+                else:
+                    amount = float(normalized)
+            except ValueError:
+                amount = pay.get("amount", 0.0)
+            pay["amount"] = amount
+            was_blocked = self.payments_table.blockSignals(True)
+            try:
+                item.setText(f"{amount:.2f}")
+            finally:
+                self.payments_table.blockSignals(was_blocked)
+
+    def _update_draft_payments_from_table(self) -> None:
+        payments: list[dict] = []
+        was_blocked = self.payments_table.blockSignals(True)
+        try:
+            for row in range(self.payments_table.rowCount()):
+                date_item = self.payments_table.item(row, 0)
+                amount_item = self.payments_table.item(row, 1)
+                if date_item is None or amount_item is None:
+                    continue
+                pay = date_item.data(Qt.UserRole)
+                if not isinstance(pay, dict):
+                    pay = {}
+                text_date = date_item.text().strip()
+                qdate = QDate.fromString(text_date, "dd.MM.yyyy")
+                if qdate.isValid():
+                    pay["payment_date"] = qdate.toPython()
+                    date_item.setText(qdate.toString("dd.MM.yyyy"))
+                text_amount = amount_item.text().strip()
+                try:
+                    normalized = normalize_number(text_amount) if text_amount else None
+                    if normalized in (None, ""):
+                        amount = 0.0
+                    else:
+                        amount = float(normalized)
+                except ValueError:
+                    amount = pay.get("amount", 0.0)
+                pay["amount"] = amount
+                amount_item.setText(f"{amount:.2f}")
+                date_item.setData(Qt.UserRole, pay)
+                payments.append(pay)
+        finally:
+            self.payments_table.blockSignals(was_blocked)
+        self._draft_payments = payments
 
