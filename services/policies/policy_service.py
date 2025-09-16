@@ -9,7 +9,7 @@ from peewee import JOIN, Field, fn
 
 from database.db import db
 
-from database.models import Client, Deal, Payment, Policy
+from database.models import Client, Deal, Expense, Payment, Policy
 from services import executor_service as es
 from services.clients import get_client_by_id
 from services.deal_service import get_deal_by_id
@@ -306,26 +306,42 @@ def _notify_policy_added(policy: Policy) -> None:
 
 
 def add_contractor_expense(policy: Policy):
-    """Создать нулевой расход 'контрагент' для первого платежа полиса."""
+    """Создать нулевые расходы "контрагент" для всех платежей полиса."""
     from services.expense_service import add_expense
     contractor = (policy.contractor or "").strip()
     if contractor in {"", "-", "—"}:
         raise ValueError("У полиса отсутствует контрагент")
 
-    first_payment = (
+    payments_query = (
         Payment.active()
         .where(Payment.policy == policy)
         .order_by(Payment.payment_date)
-        .first()
     )
-    if not first_payment:
+    if not payments_query.exists():
         raise ValueError("У полиса отсутствуют платежи")
-    return add_expense(
-        payment=first_payment,
-        amount=Decimal("0"),
-        expense_type="контрагент",
-        note=f"выплата контрагенту {contractor}",
-    )
+
+    created_expenses = []
+    for payment in payments_query:
+        has_contractor_expense = (
+            Expense.active()
+            .where(
+                (Expense.payment == payment)
+                & (Expense.expense_type == "контрагент")
+            )
+            .exists()
+        )
+        if has_contractor_expense:
+            continue
+        created_expenses.append(
+            add_expense(
+                payment=payment,
+                amount=Decimal("0"),
+                expense_type="контрагент",
+                note=f"выплата контрагенту {contractor}",
+            )
+        )
+
+    return created_expenses
 
 
 # ─────────────────────────── Добавление ───────────────────────────

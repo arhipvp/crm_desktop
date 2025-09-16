@@ -274,8 +274,13 @@ class PolicyForm(BaseEditForm):
                             f"Уже есть {cnt} расход(ов) по этому полису. Все равно создать?"
                         ):
                             if saved.contractor not in (None, "-", "—"):
-                                add_contractor_expense(saved)
-                                show_info("Расход для контрагента создан.")
+                                created_expenses = add_contractor_expense(saved)
+                                if created_expenses:
+                                    show_info("Расходы для контрагента созданы.")
+                                else:
+                                    show_info(
+                                        "Расходы для контрагента уже существовали."
+                                    )
                 self.saved_instance = saved
                 self.accept()
         except DuplicatePolicyError as e:
