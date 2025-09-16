@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QDialog
 
 from database.models import Client, Policy, Payment, Expense
 from ui.forms.policy_form import PolicyForm
-from services.policies import add_contractor_expense
+from services.policies import add_contractor_expense, add_policy
 
 
 @pytest.fixture
@@ -31,6 +31,42 @@ def policy_form(monkeypatch, qapp, in_memory_db):
 
     monkeypatch.setattr(form, "save_data", fake_save_data)
     return form, policy
+
+
+def test_add_policy_first_payment_paid_sets_contractor_expense_date(
+    in_memory_db, policy_folder_patches
+):
+    client = Client.create(name="Client")
+    start_date = date(2024, 1, 1)
+
+    policy = add_policy(
+        client=client,
+        policy_number="P-NEW",
+        start_date=start_date,
+        end_date=start_date,
+        contractor="Контрагент",
+        first_payment_paid=True,
+    )
+
+    payment = (
+        Payment.active()
+        .where(Payment.policy == policy)
+        .order_by(Payment.payment_date)
+        .first()
+    )
+    assert payment is not None
+    assert payment.actual_payment_date == payment.payment_date
+
+    expense = (
+        Expense.active()
+        .where(
+            (Expense.payment == payment)
+            & (Expense.expense_type == "контрагент")
+        )
+        .first()
+    )
+    assert expense is not None
+    assert expense.expense_date == payment.actual_payment_date
 
 
 def test_dialog_creates_expenses_for_selected_payments(policy_form, monkeypatch):

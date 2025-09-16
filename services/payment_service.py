@@ -210,12 +210,27 @@ def add_payment(**kwargs):
 
             # Авто-расход контрагенту (если указан в полисе)
             if contractor:
-                add_expense(
+                expense_date = None
+                if (
+                    "actual_payment_date" in clean_data
+                    and clean_data["actual_payment_date"]
+                ):
+                    expense_date = clean_data["actual_payment_date"]
+                elif "payment_date" in clean_data and clean_data["payment_date"]:
+                    expense_date = clean_data["payment_date"]
+                else:
+                    expense_date = payment.actual_payment_date or payment.payment_date
+
+                expense_kwargs = dict(
                     payment=payment,
                     amount=Decimal("0"),
                     expense_type="контрагент",
                     note=f"выплата контрагенту {contractor}",
                 )
+                if expense_date:
+                    expense_kwargs["expense_date"] = expense_date
+
+                add_expense(**expense_kwargs)
                 logger.info(
                     "💸 Авто-расход контрагенту: платёж id=%s ↔ полис id=%s №%s (%s)",
                     payment.id,
