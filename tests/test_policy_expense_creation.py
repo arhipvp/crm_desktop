@@ -172,13 +172,13 @@ def test_expense_created_for_new_policy(monkeypatch, qapp, in_memory_db):
     monkeypatch.setattr(module, "confirm", confirm_mock)
     monkeypatch.setattr(module, "show_info", show_info_mock)
     monkeypatch.setattr(module, "add_contractor_expense", add_expense_mock)
-    monkeypatch.setattr(module, "get_expense_count_by_policy", lambda pid: 0)
+    monkeypatch.setattr(module, "get_expense_count_by_policy", lambda pid: 1)
 
     form.save()
 
-    assert confirm_mock.call_count == 1
-    add_expense_mock.assert_called_once_with(policy)
-    show_info_mock.assert_called_once()
+    confirm_mock.assert_not_called()
+    add_expense_mock.assert_not_called()
+    show_info_mock.assert_not_called()
 
 
 def test_create_expenses_for_all_payments(in_memory_db):

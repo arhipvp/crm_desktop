@@ -265,12 +265,15 @@ class PolicyForm(BaseEditForm):
         contractor_provided = contractor not in (None, "-", "—")
         current_contractor = getattr(self.instance, "contractor", None)
         contractor_changed = contractor_provided and contractor != current_contractor
+        was_new_policy = self.instance is None
+
         try:
             saved = self.save_data(data)
             if saved:
                 if contractor_changed:
                     cnt = get_expense_count_by_policy(saved.id)
-                    if confirm(
+                    skip_expense_creation = was_new_policy and cnt > 0
+                    if not skip_expense_creation and confirm(
                         f"Создать расход для контрагента '{contractor}'?"
                     ):
                         if cnt == 0 or confirm(
