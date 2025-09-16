@@ -1,9 +1,10 @@
 """Сервис управления страховыми полисами."""
 
 import logging
+from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, Iterable
 
 from peewee import JOIN, Field, fn
 
@@ -146,6 +147,17 @@ def _check_duplicate_policy(
     ]
 
     raise DuplicatePolicyError(existing, diffs)
+
+
+@dataclass(slots=True)
+class ContractorExpenseResult:
+    """Результат создания расходов для контрагента."""
+
+    created: list[Expense]
+    updated: list[Expense]
+
+    def has_changes(self) -> bool:
+        return bool(self.created or self.updated)
 
 
 def get_policies_page(
@@ -305,43 +317,105 @@ def _notify_policy_added(policy: Policy) -> None:
     notify_executor(ex.tg_id, text)
 
 
-def add_contractor_expense(policy: Policy):
-    """Создать нулевые расходы "контрагент" для всех платежей полиса."""
+def add_contractor_expense(
+    policy: Policy, payments: Iterable[Payment] | None = None
+) -> ContractorExpenseResult:
+    """Создать или обновить расходы "контрагент" для выбранных платежей."""
+
     from services.expense_service import add_expense
+
     contractor = (policy.contractor or "").strip()
     if contractor in {"", "-", "—"}:
         raise ValueError("У полиса отсутствует контрагент")
 
-    payments_query = (
-        Payment.active()
-        .where(Payment.policy == policy)
-        .order_by(Payment.payment_date)
-    )
-    if not payments_query.exists():
-        raise ValueError("У полиса отсутствуют платежи")
+    if payments is None:
+        payment_objects = list(
+            Payment.active()
+            .where(Payment.policy == policy)
+            .order_by(Payment.payment_date)
+        )
+        if not payment_objects:
+            raise ValueError("У полиса отсутствуют платежи")
+    else:
+        payment_objects: list[Payment] = []
+        for payment in payments:
+            if isinstance(payment, Payment):
+                payment_obj = payment
+            elif hasattr(payment, "id"):
+                payment_id = getattr(payment, "id")
+                payment_obj = (
+                    Payment.active()
+                    .where((Payment.id == payment_id) & (Payment.policy == policy))
+                    .get_or_none()
+                )
+            else:
+                payment_obj = (
+                    Payment.active()
+                    .where((Payment.id == payment) & (Payment.policy == policy))
+                    .get_or_none()
+                )
 
-    created_expenses = []
-    for payment in payments_query:
-        has_contractor_expense = (
+            if payment_obj is None or payment_obj.policy_id != policy.id:
+                raise ValueError("Платёж не найден или не принадлежит полису")
+
+            payment_objects.append(payment_obj)
+
+        if not payment_objects:
+            return ContractorExpenseResult(created=[], updated=[])
+
+        unique: dict[int, Payment] = {}
+        for payment_obj in payment_objects:
+            unique[payment_obj.id] = payment_obj
+        payment_objects = sorted(
+            unique.values(), key=lambda p: p.payment_date or date.min
+        )
+
+    payment_ids = [p.id for p in payment_objects]
+    expenses_map: dict[int, list[Expense]] = {pid: [] for pid in payment_ids}
+
+    if payment_ids:
+        expenses_query = (
             Expense.active()
             .where(
-                (Expense.payment == payment)
+                (Expense.payment_id.in_(payment_ids))
                 & (Expense.expense_type == "контрагент")
             )
-            .exists()
         )
-        if has_contractor_expense:
-            continue
-        created_expenses.append(
-            add_expense(
-                payment=payment,
-                amount=Decimal("0"),
-                expense_type="контрагент",
-                note=f"выплата контрагенту {contractor}",
-            )
-        )
+        for expense in expenses_query:
+            expenses_map.setdefault(expense.payment_id, []).append(expense)
 
-    return created_expenses
+    created_expenses: list[Expense] = []
+    updated_expenses: list[Expense] = []
+    note_template = f"выплата контрагенту {contractor}"
+
+    with db.atomic():
+        for payment in payment_objects:
+            expenses = expenses_map.get(payment.id, [])
+            if not expenses:
+                created_expenses.append(
+                    add_expense(
+                        payment=payment,
+                        amount=Decimal("0"),
+                        expense_type="контрагент",
+                        note=note_template,
+                    )
+                )
+                continue
+
+            actual_date = payment.actual_payment_date or payment.payment_date
+            for expense in expenses:
+                changed = False
+                if expense.note != note_template:
+                    expense.note = note_template
+                    changed = True
+                if actual_date and expense.expense_date is None:
+                    expense.expense_date = actual_date
+                    changed = True
+                if changed:
+                    expense.save(only=[Expense.note, Expense.expense_date])
+                    updated_expenses.append(expense)
+
+    return ContractorExpenseResult(created=created_expenses, updated=updated_expenses)
 
 
 # ─────────────────────────── Добавление ───────────────────────────
