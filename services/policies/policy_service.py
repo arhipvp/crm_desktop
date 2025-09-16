@@ -390,25 +390,27 @@ def add_contractor_expense(
 
     with db.atomic():
         for payment in payment_objects:
+            actual_date = payment.actual_payment_date or payment.payment_date
             expenses = expenses_map.get(payment.id, [])
             if not expenses:
-                created_expenses.append(
-                    add_expense(
-                        payment=payment,
-                        amount=Decimal("0"),
-                        expense_type="контрагент",
-                        note=note_template,
-                    )
+                expense_kwargs = dict(
+                    payment=payment,
+                    amount=Decimal("0"),
+                    expense_type="контрагент",
+                    note=note_template,
                 )
+                if actual_date:
+                    expense_kwargs["expense_date"] = actual_date
+
+                created_expenses.append(add_expense(**expense_kwargs))
                 continue
 
-            actual_date = payment.actual_payment_date or payment.payment_date
             for expense in expenses:
                 changed = False
                 if expense.note != note_template:
                     expense.note = note_template
                     changed = True
-                if actual_date and expense.expense_date is None:
+                if actual_date and expense.expense_date != actual_date:
                     expense.expense_date = actual_date
                     changed = True
                 if changed:
@@ -528,9 +530,14 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
                 .order_by(Payment.payment_date)
                 .first()
             )
-            if first_payment and first_payment.actual_payment_date is None:
-                first_payment.actual_payment_date = first_payment.payment_date
-                first_payment.save()
+            if first_payment:
+                if first_payment.actual_payment_date is None:
+                    first_payment.actual_payment_date = first_payment.payment_date
+                    first_payment.save()
+
+                contractor_name = (policy.contractor or "").strip()
+                if contractor_name not in {"", "-", "—"}:
+                    add_contractor_expense(policy, payments=[first_payment])
 
     # ────────── Папка полиса ──────────
     deal_description = deal.description if deal else None
@@ -726,9 +733,14 @@ def update_policy(
                 .order_by(Payment.payment_date)
                 .first()
             )
-            if first_payment and first_payment.actual_payment_date is None:
-                first_payment.actual_payment_date = first_payment.payment_date
-                first_payment.save()
+            if first_payment:
+                if first_payment.actual_payment_date is None:
+                    first_payment.actual_payment_date = first_payment.payment_date
+                    first_payment.save()
+
+                contractor_name = (policy.contractor or "").strip()
+                if contractor_name not in {"", "-", "—"}:
+                    add_contractor_expense(policy, payments=[first_payment])
 
     new_number = policy.policy_number
     new_deal_desc = policy.deal.description if policy.deal_id else None
