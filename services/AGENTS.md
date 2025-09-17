@@ -17,7 +17,7 @@ with db.atomic():
 PYTEST_TIMEOUT=120 pytest -vv tests/test_policy_payments.py
 PYTEST_TIMEOUT=120 pytest -vv tests/test_expense_service.py
 PYTEST_TIMEOUT=120 pytest -vv tests/test_income_service.py
-PYTEST_TIMEOUT=120 pytest -vv tests/test_policy_json_import.py  # проверяет импорт полиса через AI и создание связанных платежей
+PYTEST_TIMEOUT=120 pytest -vv tests/test_policy_json_import.py  # покрывает обработку импорта полиса из AI и синхронизацию связанных платежей, обязательно запускайте при правках импорта
 ```
 
 Эти тесты проверяют целостность транзакций, корректность расчетов по расходам и синхронизацию платежей между сервисами.
