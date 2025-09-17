@@ -199,28 +199,37 @@ def test_merge_clients_transfers_relations_and_updates_fields(monkeypatch):
 
 
 @pytest.mark.usefixtures("in_memory_db")
-def test_merge_clients_requires_duplicates():
-    client = Client.create(name="Solo")
+def test_merge_clients_empty_duplicates_raise():
+    primary = Client.create(name="Primary")
 
     with pytest.raises(ClientMergeError, match="Список дубликатов пуст"):
-        merge_clients(client.id, [])
+        merge_clients(primary.id, [])
 
 
 @pytest.mark.usefixtures("in_memory_db")
-def test_merge_clients_rejects_primary_in_duplicates():
+def test_merge_clients_self_merge_forbidden():
     primary = Client.create(name="Primary")
-    duplicate = Client.create(name="Duplicate")
 
     with pytest.raises(
         ClientMergeError, match="Список дубликатов не должен содержать основной id"
     ):
-        merge_clients(primary.id, [duplicate.id, primary.id])
+        merge_clients(primary.id, [primary.id])
 
 
 @pytest.mark.usefixtures("in_memory_db")
-def test_merge_clients_missing_ids():
+def test_merge_clients_missing_duplicate_id_raise():
     primary = Client.create(name="Primary")
     missing_id = primary.id + 1
 
-    with pytest.raises(ClientMergeError, match="Не найдены клиенты с id"):
+    with pytest.raises(ClientMergeError, match="Не найдены клиенты") as exc:
         merge_clients(primary.id, [missing_id])
+
+    assert str(missing_id) in str(exc.value)
+
+
+@pytest.mark.usefixtures("in_memory_db")
+def test_merge_clients_missing_primary_id_raise():
+    duplicate = Client.create(name="Duplicate")
+
+    with pytest.raises(ClientMergeError, match="Не найдены клиенты"):
+        merge_clients(9999, [duplicate.id])
