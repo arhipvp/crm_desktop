@@ -14,7 +14,7 @@ from database.models import Client, Deal, Expense, Payment, Policy
 from services import executor_service as es
 from services.clients import get_client_by_id
 from services.deal_service import get_deal_by_id
-from services.folder_utils import create_policy_folder, open_folder
+from services.folder_utils import create_policy_folder, is_drive_link, open_folder
 from services.payment_service import (
     add_payment,
     sync_policy_payments,
@@ -234,7 +234,9 @@ def mark_policy_deleted(policy_id: int):
                 policy.client.name,
                 new_number,
                 policy.deal.description if policy.deal_id else None,
-                policy.drive_folder_link,
+                policy.drive_folder_link
+                if is_drive_link(policy.drive_folder_link)
+                else None,
             )
             policy.policy_number = new_number
             if new_path:
@@ -760,7 +762,9 @@ def update_policy(
                 new_client_name,
                 new_number,
                 new_deal_desc,
-                policy.drive_folder_link,
+                policy.drive_folder_link
+                if is_drive_link(policy.drive_folder_link)
+                else None,
             )
             if new_path and new_path != policy.drive_folder_link:
                 policy.drive_folder_link = new_path

@@ -16,6 +16,7 @@ from functools import lru_cache
 import time
 from pathlib import Path
 from typing import Optional, Tuple
+from urllib.parse import urlparse
 
 try:
     from google.oauth2.service_account import Credentials
@@ -74,6 +75,27 @@ def extract_folder_id(link: str | None) -> str | None:
         return None
 
     return link.rstrip("/").split("/")[-1]
+
+
+def is_drive_link(link: str | None) -> bool:
+    """Проверить, что ссылка указывает на удалённое хранилище."""
+
+    if not link:
+        return False
+
+    link = link.strip()
+    if not link:
+        return False
+
+    if "://" in link:
+        return True
+
+    parsed = urlparse(link if "//" in link else f"//{link}", scheme="")
+    host = (parsed.netloc or parsed.path).lower()
+    if "google" in host:
+        return True
+
+    return False
 
 
 def create_drive_folder(folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> str:
@@ -529,16 +551,15 @@ def rename_policy_folder(
     except Exception:
         logger.exception("Не удалось переименовать локальную папку полиса")
 
-    if drive_link:
+    file_id = extract_folder_id(drive_link) if is_drive_link(drive_link) else None
+    if file_id:
         try:
             service = get_drive_service()
-            file_id = extract_folder_id(drive_link)
-            if file_id:
-                service.files().update(
-                    fileId=file_id,
-                    body={"name": sanitize_name(f"Полис - {new_policy_number}")},
-                    fields="id",
-                ).execute()
+            service.files().update(
+                fileId=file_id,
+                body={"name": sanitize_name(f"Полис - {new_policy_number}")},
+                fields="id",
+            ).execute()
         except Exception:
             logger.exception("Не удалось переименовать папку полиса на Drive")
 
