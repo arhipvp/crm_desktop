@@ -296,8 +296,17 @@ def merge_clients(
         )
 
         normalized_updates: dict[str, Any] = {}
+        is_active_value_present = False
+        is_active_value = False
         if updates:
+            if "is_active" in updates:
+                active_raw = updates["is_active"]
+                if active_raw not in (None, ""):
+                    is_active_value_present = True
+                    is_active_value = bool(active_raw)
             for key, value in updates.items():
+                if key == "is_active":
+                    continue
                 if key not in CLIENT_ALLOWED_FIELDS or value in (None, ""):
                     continue
                 if key == "name":
@@ -307,14 +316,22 @@ def merge_clients(
                     _check_duplicate_phone(value, exclude_id=primary_client.id)
                 normalized_updates[key] = value
 
+        updates_to_log: dict[str, Any] = {}
         if normalized_updates:
+            updates_to_log.update(normalized_updates)
+        if is_active_value_present:
+            updates_to_log["is_active"] = is_active_value
+
+        if updates_to_log:
             logger.info(
                 "✏️ Обновление основного клиента id=%s при объединении: %s",
                 primary_client.id,
-                normalized_updates,
+                updates_to_log,
             )
             for key, value in normalized_updates.items():
                 setattr(primary_client, key, value)
+            if is_active_value_present:
+                primary_client.is_deleted = not is_active_value
             primary_client.save()
 
         for duplicate in duplicates:
