@@ -230,6 +230,10 @@ class PolicyTableView(BaseTableView):
             )
             form.fields["calculations"].setText(calc_text)
 
+            status_widget = form.fields.get("status")
+            if status_widget is not None and hasattr(status_widget, "setText"):
+                status_widget.setText("Автоматически созданная сделка")
+
             if form.exec():
                 deal = getattr(form, "saved_instance", None)
                 if deal:
