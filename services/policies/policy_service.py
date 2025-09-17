@@ -149,6 +149,21 @@ def _check_duplicate_policy(
     raise DuplicatePolicyError(existing, diffs)
 
 
+def _get_first_payment_date(
+    payments: Iterable[dict], *, fallback: date | None = None
+) -> date | None:
+    first_date: date | None = None
+    for payment in payments:
+        if not isinstance(payment, dict):
+            continue
+        payment_date = payment.get("payment_date") or fallback
+        if payment_date is None:
+            continue
+        if first_date is None or payment_date < first_date:
+            first_date = payment_date
+    return first_date
+
+
 @dataclass(slots=True)
 class ContractorExpenseResult:
     """Результат создания расходов для контрагента."""
@@ -484,6 +499,19 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
     if start_date and end_date and end_date < start_date:
         raise ValueError("Дата окончания полиса не может быть меньше даты начала.")
 
+    if payments:
+        if not start_date:
+            raise ValueError(
+                "Поле 'start_date' обязательно при указании платежей."
+            )
+        first_payment_date = _get_first_payment_date(payments, fallback=start_date)
+        if first_payment_date is None:
+            raise ValueError("Список платежей должен содержать хотя бы один платёж.")
+        if first_payment_date != start_date:
+            raise ValueError(
+                "Дата первого платежа должна совпадать с датой начала полиса."
+            )
+
     # ────────── Проверка дубликата ──────────
     _check_duplicate_policy(
         clean_data.get("policy_number"),
@@ -624,6 +652,19 @@ def update_policy(
         raise ValueError("Поле 'end_date' обязательно для заполнения.")
     if start_date and end_date and end_date < start_date:
         raise ValueError("Дата окончания полиса не может быть меньше даты начала.")
+
+    if payments:
+        if not start_date:
+            raise ValueError(
+                "Поле 'start_date' обязательно при указании платежей."
+            )
+        first_payment_date = _get_first_payment_date(payments, fallback=start_date)
+        if first_payment_date is None:
+            raise ValueError("Список платежей должен содержать хотя бы один платёж.")
+        if first_payment_date != start_date:
+            raise ValueError(
+                "Дата первого платежа должна совпадать с датой начала полиса."
+            )
 
     # ... дальше стандартная логика ...
 
