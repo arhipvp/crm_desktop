@@ -24,8 +24,6 @@ from .policy_service import (
     get_policy_by_id,
     mark_policy_deleted,
     mark_policies_deleted,
-    mark_policy_renewed,
-    mark_policies_renewed,
     get_unique_policy_field_values,
     attach_premium,
 )
@@ -45,8 +43,6 @@ __all__ = [
     "get_policy_by_id",
     "mark_policy_deleted",
     "mark_policies_deleted",
-    "mark_policy_renewed",
-    "mark_policies_renewed",
     "get_unique_policy_field_values",
     "attach_premium",
     "add_contractor_expense",
