@@ -199,6 +199,20 @@ def test_merge_clients_transfers_relations_and_updates_fields(monkeypatch):
 
 
 @pytest.mark.usefixtures("in_memory_db")
+def test_merge_clients_activates_deleted_primary_when_is_active_true():
+    primary = Client.create(name="Primary", is_deleted=True)
+    duplicate = Client.create(name="Duplicate")
+
+    merge_clients(primary.id, [duplicate.id], updates={"is_active": True})
+
+    refreshed_primary = Client.get_by_id(primary.id)
+    refreshed_duplicate = Client.get_by_id(duplicate.id)
+
+    assert refreshed_primary.is_deleted is False
+    assert refreshed_duplicate.is_deleted is True
+
+
+@pytest.mark.usefixtures("in_memory_db")
 def test_merge_clients_reactivates_primary_when_is_active_true():
     primary = Client.create(name="Primary", is_deleted=True)
     duplicate = Client.create(name="Duplicate")

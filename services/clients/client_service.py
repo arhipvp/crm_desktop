@@ -197,7 +197,12 @@ def add_client(**kwargs) -> Client:
 
 def update_client(client: Client, **kwargs) -> Client:
     """Обновить данные клиента и переименовать папку при смене имени."""
-    updates = {k: v for k, v in kwargs.items() if k in CLIENT_ALLOWED_FIELDS and v not in ("", None)}
+    raw_is_active = kwargs.get("is_active")
+    is_active_provided = "is_active" in kwargs and raw_is_active not in (None, "")
+
+    updates = {
+        k: v for k, v in kwargs.items() if k in CLIENT_ALLOWED_FIELDS and v not in ("", None)
+    }
 
     if "name" in updates:
         updates["name"] = normalize_full_name(updates["name"])
@@ -205,7 +210,7 @@ def update_client(client: Client, **kwargs) -> Client:
         updates["phone"] = normalize_phone(updates["phone"])
         _check_duplicate_phone(updates["phone"], exclude_id=client.id)
 
-    if not updates:
+    if not updates and not is_active_provided:
         return client
 
 
@@ -218,6 +223,9 @@ def update_client(client: Client, **kwargs) -> Client:
         else:
             log_updates[key] = value
 
+    if is_active_provided:
+        log_updates["is_active"] = bool(raw_is_active)
+
     logger.info("✏️ Обновление клиента id=%s: %s", client.id, log_updates)
 
 
@@ -226,6 +234,10 @@ def update_client(client: Client, **kwargs) -> Client:
 
     for k, v in updates.items():
         setattr(client, k, v)
+
+    if is_active_provided:
+        client.is_deleted = not bool(raw_is_active)
+
     client.save()
 
     if old_name != new_name:
@@ -296,14 +308,14 @@ def merge_clients(
         )
 
         normalized_updates: dict[str, Any] = {}
-        is_active_value_present = False
-        is_active_value = False
+        raw_is_active = updates.get("is_active") if updates else None
+        is_active_value = (
+            bool(raw_is_active)
+            if updates and "is_active" in updates and raw_is_active not in (None, "")
+            else None
+        )
+
         if updates:
-            if "is_active" in updates:
-                active_raw = updates["is_active"]
-                if active_raw not in (None, ""):
-                    is_active_value_present = True
-                    is_active_value = bool(active_raw)
             for key, value in updates.items():
                 if key == "is_active":
                     continue
@@ -319,7 +331,7 @@ def merge_clients(
         updates_to_log: dict[str, Any] = {}
         if normalized_updates:
             updates_to_log.update(normalized_updates)
-        if is_active_value_present:
+        if is_active_value is not None:
             updates_to_log["is_active"] = is_active_value
 
         if updates_to_log:
@@ -330,7 +342,7 @@ def merge_clients(
             )
             for key, value in normalized_updates.items():
                 setattr(primary_client, key, value)
-            if is_active_value_present:
+            if is_active_value is not None:
                 primary_client.is_deleted = not is_active_value
             primary_client.save()
 
