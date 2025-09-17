@@ -4,13 +4,14 @@ from PySide6.QtWidgets import QAbstractItemView
 from PySide6.QtCore import Qt
 
 from services.clients.client_table_controller import ClientTableController
-from services.clients.client_service import get_client_by_id
+from services.clients.client_service import get_client_by_id, merge_clients
 from services.clients.dto import ClientDTO
 from services.folder_utils import open_folder
 from ui.base.base_table_view import BaseTableView
-from ui.common.message_boxes import confirm, show_error
+from ui.common.message_boxes import confirm, show_error, show_info
 from ui.common.styled_widgets import styled_button
 from ui.forms.client_form import ClientForm
+from ui.forms.client_merge_dialog import ClientMergeDialog
 from ui.views.client_detail_view import ClientDetailView
 
 
@@ -26,8 +27,19 @@ class ClientTableView(BaseTableView):
         )
         folder_btn = styled_button("📂 Папка", tooltip="Открыть папку клиента")
         folder_btn.clicked.connect(self.open_selected_folder)
+        self.merge_btn = styled_button(
+            "Объединить",
+            tooltip="Объединить выбранных клиентов",
+        )
+        self.merge_btn.setEnabled(False)
+        self.merge_btn.clicked.connect(self.merge_selected_clients)
         # Добавляем перед растягивающим элементом
         self.button_row.insertWidget(self.button_row.count() - 1, folder_btn)
+        self.button_row.insertWidget(self.button_row.count() - 1, self.merge_btn)
+        selection_model = self.table.selectionModel()
+        if selection_model:
+            selection_model.selectionChanged.connect(self.on_selection_changed)
+        self.update_merge_button_state()
         self.load_data()
 
     def get_selected(self):
@@ -79,3 +91,53 @@ class ClientTableView(BaseTableView):
         self.current_sort_column = column
         self.current_sort_order = order
         self.load_data()
+
+    # ------------------------------------------------------------------
+    # Объединение клиентов
+    # ------------------------------------------------------------------
+
+    def on_selection_changed(self, *_args):
+        self.update_merge_button_state()
+
+    def update_merge_button_state(self) -> None:
+        selection_model = self.table.selectionModel()
+        if not selection_model:
+            self.merge_btn.setEnabled(False)
+            return
+        self.merge_btn.setEnabled(len(selection_model.selectedRows()) >= 2)
+
+    def merge_selected_clients(self) -> None:
+        clients = self.get_selected_multiple()
+        if len(clients) < 2:
+            return
+
+        full_clients = []
+        for client in clients:
+            full_client = get_client_by_id(client.id)
+            if not full_client:
+                show_error(f"Клиент с id={client.id} не найден")
+                return
+            full_clients.append(full_client)
+
+        try:
+            dialog = ClientMergeDialog(full_clients, parent=self)
+        except Exception as exc:  # ValueError и др. ошибки инициализации
+            show_error(str(exc))
+            return
+
+        if not dialog.exec():
+            return
+
+        primary_id = dialog.get_primary_client_id()
+        duplicate_ids = dialog.get_duplicate_client_ids()
+        final_values = dialog.get_final_values()
+
+        try:
+            merge_clients(primary_id, duplicate_ids, final_values)
+        except Exception as exc:
+            show_error(str(exc))
+            return
+
+        self.refresh()
+        self.merge_btn.setEnabled(False)
+        show_info("Клиенты успешно объединены")
