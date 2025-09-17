@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
 
-from database.models import Client, Deal, Expense, Policy
+from database.models import Client, Deal, Expense, Payment, Policy
 from services import expense_service
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
@@ -134,8 +134,8 @@ class ExpenseTableView(BaseTableView):
         3: Policy.contractor,
         4: Policy.start_date,
         5: "expense_type",
-        6: "payment__amount",
-        7: "payment__payment_date",
+        6: Payment.amount,
+        7: Payment.payment_date,
         8: expense_service.INCOME_TOTAL,
         9: expense_service.OTHER_EXPENSE_TOTAL,
         10: expense_service.NET_INCOME,
