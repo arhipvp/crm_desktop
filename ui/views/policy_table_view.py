@@ -225,23 +225,29 @@ class PolicyTableView(BaseTableView):
 
             policy_numbers = ", ".join(p.policy_number for p in policies if p.policy_number)
             calc_text = (
-                "Автоматически сгенеррированая сделка из полиса "
+                "Автоматически сгенерированная сделка из полиса "
                 f"{policy_numbers}"
             )
             form.fields["calculations"].setText(calc_text)
 
+            # установка статуса, если есть поле
             status_widget = form.fields.get("status")
             if status_widget is not None and hasattr(status_widget, "setText"):
                 status_widget.setText("Автоматически созданная сделка")
 
-            if form.exec():
-                deal = getattr(form, "saved_instance", None)
-                if deal:
-                    for p in policies:
-                        update_policy(p, deal_id=deal.id)
-                    self.refresh()
-                    dlg = DealDetailView(deal, parent=self)
-                    dlg.exec()
+            if not form.exec():
+                return
+
+            deal = getattr(form, "saved_instance", None)
+            if not deal:
+                return
+
+            for p in policies:
+                update_policy(p, deal_id=deal.id)
+            self.refresh()
+
+            dlg = DealDetailView(deal, parent=self)
+            dlg.exec()
         except Exception as e:
             show_error(str(e))
 
