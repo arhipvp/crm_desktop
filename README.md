@@ -141,6 +141,9 @@ TG_BOT_TOKEN=000000:telegram-bot-token
 APPROVED_EXECUTOR_IDS=111,222
 GOOGLE_DRIVE_LOCAL_ROOT=/path/to/drive  # опционально
 GOOGLE_CREDENTIALS=credentials.json     # опционально
+LOG_LEVEL=INFO  # уровень логирования (например, DEBUG)
+DETAILED_LOGGING=0  # подробный режим логирования (DEBUG + SQL-запросы)
+LOG_DIR=/app/logs  # каталог для файлов логов внутри контейнера
 ```
 
 Запустите сервисы командой:
@@ -150,6 +153,8 @@ docker-compose up -d
 ```
 
 Сервис `db` использует том `db_data:/var/lib/postgresql/data`.
+
+> ℹ️ Чтобы логи бота сохранялись на хостовой машине (монтирование `./logs:/app/logs`), оставьте значение `LOG_DIR=/app/logs` в `telegram_bot/.env`.
 
 ## Тесты
 
