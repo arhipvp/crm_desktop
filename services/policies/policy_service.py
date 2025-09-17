@@ -289,33 +289,6 @@ def mark_policies_deleted(policy_ids: list[int]) -> int:
     return count
 
 
-def mark_policy_renewed(policy_id: int):
-    """Пометить полис как продлённый без привязки к новому."""
-    policy = Policy.get_or_none(Policy.id == policy_id)
-    if policy:
-        policy.renewed_to = True
-        policy.save()
-        logger.info(
-            "🔁 Полис id=%s №%s помечен продлённым",
-            policy.id,
-            policy.policy_number,
-        )
-    else:
-        msg = "❗ Полис id=%s не найден для продления"
-        logger.warning(msg, policy_id)
-
-
-def mark_policies_renewed(policy_ids: list[int]) -> int:
-    """Массово пометить полисы как продлённые без привязки к новому."""
-    if not policy_ids:
-        return 0
-    return (
-        Policy.update(renewed_to=True)
-        .where(Policy.id.in_(policy_ids))
-        .execute()
-    )
-
-
 # Уведомления
 def _notify_policy_added(policy: Policy) -> None:
     """Уведомить исполнителя сделки о добавленном полисе."""
