@@ -140,6 +140,59 @@ def test_sync_policy_payments_marks_zero_relations_deleted(in_memory_db):
     assert refreshed_expense.is_deleted is True
 
 
+def test_sync_policy_payments_auto_deletes_zero_expenses(in_memory_db, make_policy_with_payment):
+    d1 = datetime.date(2024, 1, 1)
+    _, _, policy, payment = make_policy_with_payment(
+        policy_kwargs={"policy_number": "P", "start_date": d1, "end_date": d1},
+        payment_kwargs={"amount": 100, "payment_date": d1},
+    )
+    income = Income.create(payment=payment, amount=100, received_date=d1)
+    zero_expense = Expense.create(
+        payment=payment,
+        policy=policy,
+        amount=0,
+        expense_type="контрагент",
+        expense_date=d1,
+    )
+
+    pay_svc.sync_policy_payments(policy, [])
+
+    refreshed_payment = Payment.get_by_id(payment.id)
+    assert refreshed_payment.is_deleted is True
+    assert Income.get_by_id(income.id).is_deleted is True
+    assert Expense.get_by_id(zero_expense.id).is_deleted is True
+
+
+def test_sync_policy_payments_keeps_payment_with_non_zero_expense(
+    in_memory_db, make_policy_with_payment, caplog
+):
+    d1 = datetime.date(2024, 1, 1)
+    _, _, policy, payment = make_policy_with_payment(
+        policy_kwargs={"policy_number": "P", "start_date": d1, "end_date": d1},
+        payment_kwargs={"amount": 100, "payment_date": d1},
+    )
+    income = Income.create(payment=payment, amount=100, received_date=d1)
+    expense = Expense.create(
+        payment=payment,
+        policy=policy,
+        amount=50,
+        expense_type="контрагент",
+        expense_date=d1,
+    )
+
+    with caplog.at_level("WARNING", logger=pay_svc.logger.name):
+        pay_svc.sync_policy_payments(policy, [])
+
+    refreshed_payment = Payment.get_by_id(payment.id)
+    assert refreshed_payment.is_deleted is False
+    assert Income.get_by_id(income.id).is_deleted is True
+    assert Expense.get_by_id(expense.id).is_deleted is False
+    assert any(
+        "не удалён из-за активных ненулевых расходов" in record.getMessage()
+        for record in caplog.records
+    )
+
+
 def test_add_policy_rolls_back_on_payment_error(
     in_memory_db, monkeypatch, policy_folder_patches, mock_payments
 ):

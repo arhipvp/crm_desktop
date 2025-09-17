@@ -18,6 +18,78 @@ ACTIVE = (Payment.is_deleted == False)
 logger = logging.getLogger(__name__)
 
 
+def _soft_delete_payment_relations(
+    payment: Payment, *, keep_non_zero_expenses: bool
+) -> tuple[int, int, bool]:
+    """Удалить связанные записи платежа с учётом ненулевых расходов."""
+
+    def _delete_payment(target: Payment) -> None:
+        if hasattr(target, "soft_delete"):
+            target.soft_delete()
+        else:
+            target.delete_instance()
+
+    incomes_deleted = expenses_deleted = 0
+    has_active_non_zero_expenses = False
+    payment_deleted = False
+
+    with db.atomic():
+        active_incomes = list(
+            Income.select().where(
+                (Income.payment == payment) & (Income.is_deleted == False)
+            )
+        )
+        if active_incomes:
+            income_ids = [income.id for income in active_incomes]
+            incomes_deleted = (
+                Income.update(is_deleted=True)
+                .where(Income.id.in_(income_ids))
+                .execute()
+            )
+
+        active_expenses = list(
+            Expense.select().where(
+                (Expense.payment == payment) & (Expense.is_deleted == False)
+            )
+        )
+        zero_expense_ids = [
+            expense.id for expense in active_expenses if expense.amount == 0
+        ]
+        non_zero_expense_ids = [
+            expense.id for expense in active_expenses if expense.amount != 0
+        ]
+
+        if zero_expense_ids:
+            expenses_deleted += (
+                Expense.update(is_deleted=True)
+                .where(Expense.id.in_(zero_expense_ids))
+                .execute()
+            )
+
+        if keep_non_zero_expenses:
+            has_active_non_zero_expenses = bool(non_zero_expense_ids)
+            if not has_active_non_zero_expenses:
+                _delete_payment(payment)
+                payment_deleted = True
+        else:
+            if non_zero_expense_ids:
+                expenses_deleted += (
+                    Expense.update(is_deleted=True)
+                    .where(Expense.id.in_(non_zero_expense_ids))
+                    .execute()
+                )
+            _delete_payment(payment)
+            payment_deleted = True
+
+    if keep_non_zero_expenses and has_active_non_zero_expenses:
+        logger.warning(
+            "⚠️ Платёж id=%s не удалён из-за активных ненулевых расходов",
+            payment.id,
+        )
+
+    return incomes_deleted, expenses_deleted, payment_deleted
+
+
 # ───────────────────────── базовые CRUD ─────────────────────────
 
 
@@ -88,18 +160,9 @@ def mark_payment_deleted(payment_id: int):
         logger.warning("❗ Платёж с id=%s не найден для удаления", payment_id)
         return
 
-    with db.atomic():
-        income_deleted = (
-            Income.update(is_deleted=True)
-            .where(Income.payment == payment)
-            .execute()
-        )
-        expense_deleted = (
-            Expense.update(is_deleted=True)
-            .where(Expense.payment == payment)
-            .execute()
-        )
-        payment.soft_delete()
+    income_deleted, expense_deleted, _ = _soft_delete_payment_relations(
+        payment, keep_non_zero_expenses=False
+    )
 
     logger.info(
         "🗑️ Помечен удалённым платёж id=%s; доходов=%s, расходов=%s",
@@ -321,10 +384,9 @@ def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
 
     for payments_list in existing.values():
         for payment in payments_list:
-            if hasattr(payment, "soft_delete"):
-                payment.soft_delete()
-            else:
-                payment.delete_instance()
+            _soft_delete_payment_relations(
+                payment, keep_non_zero_expenses=True
+            )
 
 
 # ─────────────────────────── Обновление ───────────────────────────
