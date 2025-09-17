@@ -230,14 +230,19 @@ class PolicyTableView(BaseTableView):
             )
             form.fields["calculations"].setText(calc_text)
 
-            if form.exec():
-                deal = getattr(form, "saved_instance", None)
-                if deal:
-                    for p in policies:
-                        update_policy(p, deal_id=deal.id)
-                    self.refresh()
-                    dlg = DealDetailView(deal, parent=self)
-                    dlg.exec()
+            if not form.exec():
+                return
+
+            deal = getattr(form, "saved_instance", None)
+            if not deal:
+                return
+
+            for p in policies:
+                update_policy(p, deal_id=deal.id)
+            self.refresh()
+
+            dlg = DealDetailView(deal, parent=self)
+            dlg.exec()
         except Exception as e:
             show_error(str(e))
 
