@@ -5,11 +5,16 @@ import re
 import urllib.parse
 import webbrowser
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Sequence
 from peewee import Model, ModelSelect, fn
 
 from database.models import Client, Deal, db
-from services.folder_utils import create_client_drive_folder, rename_client_folder
+from services.folder_utils import (
+    create_client_drive_folder,
+    rename_client_folder,
+    rename_deal_folder,
+    rename_policy_folder,
+)
 from services.validators import normalize_phone, normalize_full_name
 from services.query_utils import apply_search_and_filters
 from .dto import ClientDTO
@@ -28,6 +33,10 @@ class DuplicatePhoneError(ValueError):
         )
         self.phone = phone
         self.existing = existing
+
+
+class ClientMergeError(RuntimeError):
+    """Ошибки, возникающие при объединении клиентов."""
 
 
 # ──────────────────────────── Получение ─────────────────────────────
@@ -233,8 +242,6 @@ def update_client(client: Client, **kwargs) -> Client:
 
         # переименовываем папки всех сделок клиента
         try:
-            from services.folder_utils import rename_deal_folder
-
             for deal in client.deals:
                 new_deal_path, _ = rename_deal_folder(
                     old_name,
@@ -253,6 +260,180 @@ def update_client(client: Client, **kwargs) -> Client:
             )
 
     return client
+
+
+def merge_clients(
+    primary_id: int,
+    duplicate_ids: Sequence[int],
+    updates: dict | None = None,
+) -> Client:
+    """Объединить клиентов, перенеся все связанные сущности к основному."""
+
+    if not duplicate_ids:
+        raise ClientMergeError("Список дубликатов пуст")
+
+    unique_duplicates = [cid for cid in dict.fromkeys(duplicate_ids)]
+    if primary_id in unique_duplicates:
+        raise ClientMergeError("Список дубликатов не должен содержать основной id")
+
+    ids_to_fetch = [primary_id, *unique_duplicates]
+    clients = Client.select().where(Client.id.in_(ids_to_fetch))
+    clients_by_id = {client.id: client for client in clients}
+    missing_ids = [cid for cid in ids_to_fetch if cid not in clients_by_id]
+    if missing_ids:
+        raise ClientMergeError(
+            f"Не найдены клиенты с id: {', '.join(map(str, missing_ids))}"
+        )
+
+    primary_client = clients_by_id[primary_id]
+    duplicates = [clients_by_id[cid] for cid in unique_duplicates]
+
+    with db.atomic():
+        logger.info(
+            "🔄 Начало объединения клиента id=%s с дубликатами %s",
+            primary_client.id,
+            ", ".join(str(d.id) for d in duplicates),
+        )
+
+        normalized_updates: dict[str, Any] = {}
+        if updates:
+            for key, value in updates.items():
+                if key not in CLIENT_ALLOWED_FIELDS or value in (None, ""):
+                    continue
+                if key == "name":
+                    value = normalize_full_name(value)
+                elif key == "phone":
+                    value = normalize_phone(value)
+                    _check_duplicate_phone(value, exclude_id=primary_client.id)
+                normalized_updates[key] = value
+
+        if normalized_updates:
+            logger.info(
+                "✏️ Обновление основного клиента id=%s при объединении: %s",
+                primary_client.id,
+                normalized_updates,
+            )
+            for key, value in normalized_updates.items():
+                setattr(primary_client, key, value)
+            primary_client.save()
+
+        for duplicate in duplicates:
+            logger.info(
+                "➡️ Перенос данных клиента id=%s → id=%s",
+                duplicate.id,
+                primary_client.id,
+            )
+            for deal in duplicate.deals:
+                new_path, new_link = rename_deal_folder(
+                    duplicate.name,
+                    deal.description,
+                    primary_client.name,
+                    deal.description,
+                    deal.drive_folder_link,
+                    deal.drive_folder_path,
+                )
+                deal.client = primary_client
+                if new_path and new_path != deal.drive_folder_path:
+                    deal.drive_folder_path = new_path
+                if new_link and new_link != deal.drive_folder_link:
+                    deal.drive_folder_link = new_link
+                deal.save()
+                logger.info(
+                    "📁 Сделка id=%s перенесена к клиенту id=%s",
+                    deal.id,
+                    primary_client.id,
+                )
+
+            for policy in duplicate.policies:
+                old_deal_desc = policy.deal.description if policy.deal_id else None
+                new_deal_desc = (
+                    policy.deal.description if policy.deal_id else None
+                )
+                new_path, new_link = rename_policy_folder(
+                    duplicate.name,
+                    policy.policy_number,
+                    old_deal_desc,
+                    primary_client.name,
+                    policy.policy_number,
+                    new_deal_desc,
+                    policy.drive_folder_link,
+                )
+                policy.client = primary_client
+                if (
+                    policy.deal_id
+                    and policy.deal.client_id != primary_client.id
+                ):
+                    policy.deal = Deal.get_by_id(policy.deal_id)
+                if new_path and new_path != policy.drive_folder_link:
+                    policy.drive_folder_link = new_path
+                elif new_link and new_link != policy.drive_folder_link:
+                    policy.drive_folder_link = new_link
+                policy.save()
+                logger.info(
+                    "📄 Полис id=%s перенесён к клиенту id=%s",
+                    policy.id,
+                    primary_client.id,
+                )
+
+        notes: list[str] = []
+        if primary_client.note:
+            notes.append(primary_client.note)
+        for duplicate in duplicates:
+            if duplicate.note:
+                notes.append(duplicate.note)
+        combined_note = "\n\n".join(dict.fromkeys(notes)) if notes else None
+
+        primary_updates: dict[str, Any] = {}
+        if combined_note and combined_note != primary_client.note:
+            primary_updates["note"] = combined_note
+
+        if not primary_client.email:
+            for duplicate in duplicates:
+                if duplicate.email:
+                    primary_updates["email"] = duplicate.email
+                    break
+
+        if not primary_client.phone:
+            for duplicate in duplicates:
+                if duplicate.phone:
+                    try:
+                        normalized_phone = normalize_phone(duplicate.phone)
+                        _check_duplicate_phone(
+                            normalized_phone,
+                            exclude_id=primary_client.id,
+                        )
+                    except ValueError:
+                        continue
+                    primary_updates["phone"] = normalized_phone
+                    break
+
+        if primary_updates:
+            logger.info(
+                "🧩 Обновление полей клиента id=%s после объединения: %s",
+                primary_client.id,
+                primary_updates,
+            )
+            for key, value in primary_updates.items():
+                setattr(primary_client, key, value)
+            primary_client.save()
+
+        for duplicate in duplicates:
+            duplicate.is_deleted = True
+            duplicate.drive_folder_path = None
+            duplicate.drive_folder_link = None
+            duplicate.save()
+            logger.info(
+                "🗑️ Клиент id=%s помечен удалённым после объединения с id=%s",
+                duplicate.id,
+                primary_client.id,
+            )
+
+        logger.info(
+            "✅ Завершено объединение клиента id=%s",
+            primary_client.id,
+        )
+
+    return primary_client
 
 
 
