@@ -3,8 +3,6 @@ from services.policies import (
     build_policy_query,
     get_policies_page,
     mark_policy_deleted,
-    mark_policy_renewed,
-    mark_policies_renewed,
     mark_policies_deleted,
     attach_premium,
 )
@@ -88,11 +86,6 @@ class PolicyTableView(BaseTableView):
 
         self.row_double_clicked.connect(self.open_detail)
 
-        self.mark_renewed_btn = styled_button("Полис продлен (без привязки)")
-        idx = self.button_row.count() - 1
-        self.button_row.insertWidget(idx, self.mark_renewed_btn)
-        self.mark_renewed_btn.clicked.connect(self._on_mark_renewed)
-
         self.make_deal_btn = styled_button("Сделать сделку из полиса")
         idx = self.button_row.count() - 1
         self.button_row.insertWidget(idx, self.make_deal_btn)
@@ -171,24 +164,6 @@ class PolicyTableView(BaseTableView):
                 self.refresh()
             except Exception as e:
                 show_error(str(e))
-
-    def _on_mark_renewed(self):
-        policies = self.get_selected_multiple()
-        if not policies:
-            return
-        try:
-            if len(policies) == 1:
-                mark_policy_renewed(policies[0].id)
-            else:
-                if not confirm(
-                    f"Отметить {len(policies)} полис(ов) продлёнными?"
-                ):
-                    return
-                ids = [p.id for p in policies]
-                mark_policies_renewed(ids)
-            self.refresh()
-        except Exception as e:
-            show_error(str(e))
 
     def _on_make_deal(self):
         policies = self.get_selected_multiple()
