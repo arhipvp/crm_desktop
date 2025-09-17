@@ -59,5 +59,10 @@ def setup_logging(settings: Settings | None = None) -> None:
 
     # Скрываем SELECT-запросы от peewee
     peewee_logger = logging.getLogger("peewee")
+
+    for existing_filter in list(peewee_logger.filters):
+        if isinstance(existing_filter, PeeweeFilter):
+            peewee_logger.removeFilter(existing_filter)
+
     if not settings.detailed_logging:
         peewee_logger.addFilter(PeeweeFilter())
