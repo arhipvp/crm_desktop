@@ -14,8 +14,9 @@ with db.atomic():
 При изменениях в сервисах запускайте релевантные тесты с таймаутом:
 
 ```bash
-PYTEST_TIMEOUT=120 pytest -vv tests/test_payment_rollback.py
 PYTEST_TIMEOUT=120 pytest -vv tests/test_policy_payments.py
+PYTEST_TIMEOUT=120 pytest -vv tests/test_expense_service.py
+PYTEST_TIMEOUT=120 pytest -vv tests/test_income_service.py
 ```
 
-Эти тесты помогают убедиться в корректной работе транзакций и запросов.
+Эти тесты проверяют целостность транзакций, корректность расчетов по расходам и синхронизацию платежей между сервисами.
