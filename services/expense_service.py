@@ -382,12 +382,31 @@ def build_expense_query(
         column_filters=column_filters,
     )
     if order_by:
+        field_obj = None
         if isinstance(order_by, str):
-            field = getattr(Expense, order_by, Expense.expense_date)
+            field_obj = getattr(Expense, order_by, None)
+            if field_obj is None and "__" in order_by:
+                prefix, attr = order_by.split("__", 1)
+                related_map = {
+                    "payment": Payment,
+                    "policy": Policy,
+                    "client": Client,
+                    "deal": Deal,
+                }
+                model = related_map.get(prefix)
+                if model is not None:
+                    field_obj = getattr(model, attr, None)
+            if field_obj is None:
+                logger.debug(
+                    "Unknown order_by='%s', defaulting to expense_date", order_by
+                )
+                field_obj = Expense.expense_date
         else:
-            field = order_by
-        order_expr = field.desc() if order_dir == "desc" else field.asc()
-        query = query.order_by(order_expr)
+            field_obj = order_by
+
+        if field_obj is not None and hasattr(field_obj, "asc") and hasattr(field_obj, "desc"):
+            order_expr = field_obj.desc() if order_dir == "desc" else field_obj.asc()
+            query = query.order_by(order_expr)
     logger.debug("expense query SQL: %s", query.sql())
     return query
 
