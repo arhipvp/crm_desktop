@@ -444,8 +444,8 @@ def rename_deal_folder(
     new_description: str,
     drive_link: str | None,
     current_path: str | None = None,
-):
-    """Переименовать или переместить папку сделки."""
+) -> tuple[str, str | None]:
+    """Переименовать или переместить папку сделки и вернуть новый путь."""
 
     default_old_path = (
         GOOGLE_DRIVE_LOCAL_ROOT
@@ -495,7 +495,7 @@ def rename_deal_folder(
         except Exception:
             logger.exception("Не удалось переименовать папку сделки на Drive")
 
-    return new_path, drive_link
+    return str(new_path), drive_link
 
 
 def rename_policy_folder(
