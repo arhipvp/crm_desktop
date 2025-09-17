@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QDateEdit,
     QCheckBox,
+    QMessageBox,
 )
 
 from services.folder_utils import open_folder
@@ -223,6 +224,36 @@ class PolicyForm(BaseEditForm):
         if hasattr(self, "payments_table"):
             self._update_draft_payments_from_table()
 
+            payments = self._draft_payments
+            start_date = data.get("start_date")
+            if not payments:
+                QMessageBox.warning(
+                    self,
+                    "Предупреждение",
+                    "Добавьте хотя бы один платёж перед сохранением.",
+                )
+                return None
+
+            payment_dates = [
+                pay.get("payment_date") for pay in payments if pay.get("payment_date")
+            ]
+            if not payment_dates:
+                QMessageBox.warning(
+                    self,
+                    "Предупреждение",
+                    "Не удалось определить дату первого платежа.",
+                )
+                return None
+
+            first_payment_date = min(payment_dates)
+            if start_date and first_payment_date != start_date:
+                QMessageBox.warning(
+                    self,
+                    "Предупреждение",
+                    "Дата первого платежа должна совпадать с датой начала полиса.",
+                )
+                return None
+
         for idx, pay in enumerate(self._draft_payments):
             chk = self.payments_table.cellWidget(idx, 2)
             if isinstance(chk, QCheckBox):
@@ -233,8 +264,6 @@ class PolicyForm(BaseEditForm):
                 else:
                     pay["actual_payment_date"] = None
         if not data.get("end_date"):
-            from PySide6.QtWidgets import QMessageBox
-
             QMessageBox.warning(
                 self, "Ошибка", "Дата окончания полиса обязательна для заполнения!"
             )
@@ -328,8 +357,6 @@ class PolicyForm(BaseEditForm):
             show_error(str(e))
         except Exception:
             logger.exception("❌ Ошибка при сохранении в %s", self.__class__.__name__)
-            from PySide6.QtWidgets import QMessageBox
-
             QMessageBox.critical(
                 self, "Ошибка", f"Не удалось сохранить {self.entity_name}."
             )

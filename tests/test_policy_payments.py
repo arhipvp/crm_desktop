@@ -52,6 +52,7 @@ def test_update_policy_syncs_payments_and_marks_first_paid(
 
     policy_svc.update_policy(
         policy,
+        start_date=d2,
         payments=[
             {"amount": 200, "payment_date": d2},  # остаётся
             {"amount": 300, "payment_date": d3},  # новый
@@ -249,6 +250,29 @@ def test_add_payment_rolls_back_on_related_error(
     assert Payment.select().count() == 0
     assert Income.select().count() == 0
     assert Expense.select().count() == 0
+
+
+def test_add_policy_rejects_mismatched_first_payment_date(
+    in_memory_db, policy_folder_patches
+):
+    client = Client.create(name="C")
+    start_date = datetime.date(2024, 1, 10)
+    wrong_payment_date = datetime.date(2024, 1, 5)
+
+    with pytest.raises(
+        ValueError,
+        match="Дата первого платежа должна совпадать с датой начала полиса.",
+    ):
+        policy_svc.add_policy(
+            client=client,
+            policy_number="PX-1",
+            start_date=start_date,
+            end_date=start_date + datetime.timedelta(days=30),
+            payments=[{"amount": 100, "payment_date": wrong_payment_date}],
+        )
+
+    assert Policy.select().count() == 0
+    assert Payment.select().count() == 0
 
 
 def test_add_payment_skips_dash_contractor(in_memory_db):
