@@ -201,6 +201,10 @@ class PolicyTableView(BaseTableView):
 
             first = policies[0]
             form = DealForm(parent=self)
+            if "reminder_date" in form.fields:
+                form.fields["reminder_date"].setDate(
+                    QDate.currentDate().addDays(7)
+                )
             form.refresh_client_combo(first.client_id)
 
             if first.start_date:
