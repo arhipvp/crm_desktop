@@ -109,11 +109,30 @@ class AiPolicyTextDialog(QDialog):
             self.conv_edit.append(f"{role}: {text}")
 
     def _start_worker(self):
+        if self._worker:
+            if self._worker.isRunning():
+                return
+            self._cleanup_worker()
+
         self._worker = _Worker(self._messages)
         self._worker.progress.connect(self._append)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
         self._worker.start()
+
+    def _cleanup_worker(self, *, wait: bool = False):
+        if not self._worker:
+            return
+
+        worker = self._worker
+        if wait and worker.isRunning():
+            worker.requestInterruption()
+            worker.quit()
+            worker.wait()
+
+        if not worker.isRunning():
+            worker.deleteLater()
+            self._worker = None
 
     # ------------------------------------------------------------------
     def dragEnterEvent(self, event):  # noqa: D401 - Qt override
@@ -166,7 +185,7 @@ class AiPolicyTextDialog(QDialog):
 
     # ------------------------------------------------------------------
     def _on_finished(self, data, messages, transcript):
-        self._worker = None
+        self._cleanup_worker()
         self._messages = messages
         self.process_btn.setEnabled(True)
         self.input_edit.setVisible(False)
@@ -199,10 +218,14 @@ class AiPolicyTextDialog(QDialog):
             self.process_btn.setEnabled(True)
 
     def _on_failed(self, error, messages, transcript):
-        self._worker = None
+        self._cleanup_worker()
         self._messages = messages
         self.process_btn.setEnabled(True)
         self.input_edit.setVisible(True)
         self.process_btn.setText("Отправить")
         if error:
             QMessageBox.warning(self, "Ошибка", error)
+
+    def closeEvent(self, event):  # noqa: D401 - Qt override
+        self._cleanup_worker(wait=True)
+        super().closeEvent(event)
