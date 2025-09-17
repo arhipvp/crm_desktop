@@ -46,6 +46,9 @@
 ## ai_policy_service
 - `process_policy_text_with_ai` импортирует полис, отправляя текст или PDF в OpenAI и получая JSON‑структуру и протокол диалога【F:services/policies/ai_policy_service.py†L196-L209】【F:services/policies/ai_policy_service.py†L350-L359】.
 - Системный промпт задаётся переменной окружения `AI_POLICY_PROMPT`【F:config.py†L24】【F:config.py†L49】【F:services/policies/ai_policy_service.py†L117-L119】.
+- Основные правила дефолтного промпта: не придумывать данные, объединять полисы только при совпадении объекта/периода/страховой, жёстко фиксировать `note` = «импортировано через ChatGPT», держать `actual_payment_date` равным `payment_date`, оставлять `contractor` пустым, тянуть VIN при наличии, соблюдать формат дат ISO и ограничение `end_date ≤ start_date + 1 год`. При необходимости можно переопределить любую из этих инструкций через `AI_POLICY_PROMPT`.
+- Полный текст промпта лежит в [`services/policies/ai_policy_service.py`](../services/policies/ai_policy_service.py) внутри константы `DEFAULT_PROMPT`.
+- Для многострочного собственного промпта при генерации `.env` удобно применять here-doc (`cat <<'EOF' >> .env`), либо хранить текст в отдельном файле и подставлять его при запуске: `AI_POLICY_PROMPT="$(<prompt.txt)"`.
 
 ## dashboard_service
 - `get_basic_stats` возвращает количество клиентов, сделок, полисов и задач【F:services/dashboard_service.py†L9-L18】.
