@@ -225,10 +225,15 @@ class PolicyTableView(BaseTableView):
 
             policy_numbers = ", ".join(p.policy_number for p in policies if p.policy_number)
             calc_text = (
-                "Автоматически сгенеррированая сделка из полиса "
+                "Автоматически сгенерированная сделка из полиса "
                 f"{policy_numbers}"
             )
             form.fields["calculations"].setText(calc_text)
+
+            # установка статуса, если есть поле
+            status_widget = form.fields.get("status")
+            if status_widget is not None and hasattr(status_widget, "setText"):
+                status_widget.setText("Автоматически созданная сделка")
 
             if not form.exec():
                 return
