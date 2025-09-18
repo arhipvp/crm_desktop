@@ -1,3 +1,6 @@
+from datetime import date
+
+from dateutil.relativedelta import relativedelta
 from database.models import Policy, Client, Deal
 from services.policies import (
     build_policy_query,
@@ -178,8 +181,14 @@ class PolicyTableView(BaseTableView):
             first = policies[0]
             form = DealForm(parent=self)
             if "reminder_date" in form.fields:
+                base_date = first.start_date or date.today()
+                reminder_date = base_date + relativedelta(months=9)
                 form.fields["reminder_date"].setDate(
-                    QDate.currentDate().addDays(7)
+                    QDate(
+                        reminder_date.year,
+                        reminder_date.month,
+                        reminder_date.day,
+                    )
                 )
             form.refresh_client_combo(first.client_id)
 
