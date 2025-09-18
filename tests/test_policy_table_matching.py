@@ -216,24 +216,24 @@ def test_search_dialog_score_sorting(qapp):
             "title": "Клиент A",
             "subtitle": "",
             "comment": "",
-            "value": {"type": "candidate"},
-            "details": [],
+            "value": {"type": "candidate", "id": "A"},
+            "details": ["детали A"],
         },
         {
             "score": 0.9,
             "title": "Клиент B",
             "subtitle": "",
             "comment": "",
-            "value": {"type": "candidate"},
-            "details": [],
+            "value": {"type": "candidate", "id": "B"},
+            "details": ["детали B"],
         },
         {
             "score": 0.75,
             "title": "Клиент C",
             "subtitle": "",
             "comment": "",
-            "value": {"type": "candidate"},
-            "details": [],
+            "value": {"type": "candidate", "id": "C"},
+            "details": ["детали C"],
         },
     ]
 
@@ -251,5 +251,19 @@ def test_search_dialog_score_sorting(qapp):
             for row in range(dlg.model.rowCount())
         ]
         assert sorted_scores == sorted(sorted_scores, reverse=True)
+
+        top_index = dlg.model.index(0, 0)
+        dlg.table_view.setCurrentIndex(top_index)
+        dlg.table_view.selectRow(0)
+        qapp.processEvents()
+        dlg._apply_selection(top_index)
+
+        top_item = dlg.model.item(0, 0).data(Qt.UserRole + 1)
+        assert isinstance(top_item, dict)
+        assert top_item["value"]["id"] == "B"
+        assert dlg.selected_index == top_item["value"]
+
+        details_text = dlg.detail_view.toPlainText()
+        assert "детали B" in details_text
     finally:
         dlg.close()

@@ -117,6 +117,8 @@ class SearchDialog(QDialog):
                 score_item.setText("")
                 score_item.setData(float("-inf"), Qt.UserRole)
 
+            score_item.setData(item, Qt.UserRole + 1)
+
             title = item.get("title", "")
             subtitle = item.get("subtitle", "")
             if title and subtitle:
@@ -153,14 +155,27 @@ class SearchDialog(QDialog):
             self.selected_index = None
             self._set_details_for_item(None)
             return
-        row = index.row()
-        if 0 <= row < len(self.filtered_items):
-            item = self.filtered_items[row]
-            self.selected_index = item["value"]
-            self._set_details_for_item(item)
-        else:
+        model = index.model()
+        if model is None:
             self.selected_index = None
             self._set_details_for_item(None)
+            return
+
+        row = index.row()
+        source_item = model.item(row, 0)
+        if source_item is None:
+            self.selected_index = None
+            self._set_details_for_item(None)
+            return
+
+        item = source_item.data(Qt.UserRole + 1)
+        if not isinstance(item, dict):
+            self.selected_index = None
+            self._set_details_for_item(None)
+            return
+
+        self.selected_index = item.get("value")
+        self._set_details_for_item(item)
 
     def _set_details_for_item(self, item):
         if not item:
@@ -187,6 +202,10 @@ class SearchDialog(QDialog):
             if self.model.rowCount() == 0:
                 return
             index = self.model.index(0, 0)
+
+        if index.column() != 0:
+            index = index.model().index(index.row(), 0)
+
         self._on_row_selected(index)
         if self.selected_index is not None:
             self.accept()
