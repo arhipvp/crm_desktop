@@ -8,6 +8,7 @@ from ui.base.base_table_model import BaseTableModel
 
 from database.models import Deal, Client, Executor, DealStatus
 from services.deal_service import build_deal_query, get_deals_page, mark_deal_deleted
+from services import deal_journal
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.deal_form import DealForm
@@ -63,6 +64,14 @@ class DealTableModel(BaseTableModel):
                 ex = getattr(obj, "_executor", None)
                 return ex.full_name if ex else "—"
             return None
+        field = self.fields[col]
+        if field.name == "calculations" and role in {Qt.DisplayRole, Qt.ToolTipRole}:
+            formatted = deal_journal.format_for_display(
+                getattr(obj, field.name), active_only=True
+            )
+            if role == Qt.DisplayRole:
+                return self.shorten_text(formatted) if formatted else "—"
+            return formatted or None
         return super().data(index, role)
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):

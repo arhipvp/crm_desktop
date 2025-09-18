@@ -1,7 +1,6 @@
 from datetime import date, timedelta
 
 from PySide6.QtCore import Qt, QDate
-from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import (
     QLabel,
     QFormLayout,
@@ -18,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from database.models import Task
 from services.deal_service import get_distinct_statuses
+from services import deal_journal
 from ui.common.date_utils import TypableDateEdit, format_date
 from ui.common.styled_widgets import styled_button
 from ..calculation_table_view import CalculationTableView
@@ -26,7 +26,8 @@ from ..income_table_view import IncomeTableView
 from ..payment_table_view import PaymentTableView
 from ..policy_table_view import PolicyTableView
 from ..task_table_view import TaskTableView
-from .widgets import _CalcHighlighter, _with_day_separators, CollapsibleWidget
+from .widgets import CollapsibleWidget
+from .sticky_notes import StickyNotesBoard
 
 
 class DealTabsMixin:
@@ -110,13 +111,10 @@ class DealTabsMixin:
         self.calc_append.setFixedHeight(50)
         journal_form.addRow("Добавить:", self.calc_append)
 
-        self.calc_view = QTextEdit()
-        self.calc_view.setReadOnly(True)
-        self.calc_view.setFixedHeight(140)
-        self.calc_view.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self.calc_view.setPlainText(_with_day_separators(self.instance.calculations))
-        self._calc_highlighter = _CalcHighlighter(self.calc_view.document())
-        journal_form.addRow("История:", self.calc_view)
+        self.notes_board = StickyNotesBoard()
+        self.notes_board.archive_requested.connect(self._on_archive_note)
+        self.notes_board.load_entries(self.instance)
+        journal_form.addRow("Заметки:", self.notes_board)
 
         self.btn_exec_task = styled_button("📤 Новая задача исполнителю")
         self.btn_exec_task.clicked.connect(self._on_new_exec_task)
@@ -278,6 +276,11 @@ class DealTabsMixin:
         )
 
         self.tabs.setCurrentIndex(min(current, self.tabs.count() - 1))
+
+    def _on_archive_note(self, entry_id: str) -> None:
+        archived = deal_journal.archive_entry(self.instance, entry_id)
+        if archived:
+            self.notes_board.load_entries(self.instance)
 
     def _postpone_reminder(self, days: int) -> None:
         """Set reminder to today + ``days`` and save/close."""

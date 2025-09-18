@@ -9,7 +9,6 @@ from __future__ import annotations
 """
 import logging
 from datetime import date, datetime
-from utils.time_utils import now_str
 
 from peewee import JOIN, ModelSelect, Model  # если ещё не импортирован
 
@@ -31,6 +30,7 @@ from services.folder_utils import (
     extract_folder_id,
     Credentials,
 )
+from services import deal_journal
 
 logger = logging.getLogger(__name__)
 
@@ -97,14 +97,14 @@ def add_deal(**kwargs):
         if key in kwargs and kwargs[key] not in ("", None)
     }
 
-    if "calculations" in clean_data:
-        ts = now_str()
-        clean_data["calculations"] = f"[{ts}]: {clean_data['calculations']}"
+    initial_note = clean_data.pop("calculations", None)
 
     # FK клиент
     clean_data["client"] = client
     with db.atomic():
         deal: Deal = Deal.create(**clean_data)
+        if initial_note:
+            deal_journal.append_entry(deal, initial_note)
         logger.info(
             "✅ Сделка id=%s создана: клиент %s — %s",
             deal.id,
@@ -254,24 +254,12 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
         # calculations -> отдельная таблица
         new_calc: str | None = kwargs.get("calculations")
         new_note: str | None = journal_entry
+        auto_note: str | None = None
 
-        # Если закрываем сделку — пишем причину в журнал
         if kwargs.get("is_closed") and kwargs.get("closed_reason"):
-            reason = kwargs["closed_reason"]
-            ts = now_str()
-            auto_note = f"[{ts}]: Сделка закрыта. Причина: {reason}"
-            old = deal.calculations or ""
-            deal.calculations = f"{auto_note}\n{old}"
+            auto_note = f"Сделка закрыта. Причина: {kwargs['closed_reason']}"
 
-        # Добавляем произвольную запись в журнал
-        if new_note:
-            ts = now_str()
-            entry = f"[{ts}]: {new_note}"
-            old = deal.calculations or ""
-            deal.calculations = f"{entry}\n{old}" if old else entry
-
-        # Если нечего обновлять — возвращаем сделку как есть
-        if not updates and not new_calc and not new_note:
+        if not updates and not new_calc and not new_note and not auto_note:
             return deal
 
         # Применяем простые обновления
@@ -315,9 +303,16 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
             except Exception:
                 logger.exception("Не удалось переименовать папку сделки")
 
+        if auto_note:
+            deal_journal.append_entry(deal, auto_note)
+
+        if new_note:
+            deal_journal.append_entry(deal, new_note)
+
         # Добавляем расчётную запись
         if new_calc:
             from services.calculation_service import add_calculation
+
             add_calculation(deal.id, note=new_calc)
         return deal
 

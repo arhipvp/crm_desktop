@@ -13,6 +13,7 @@ from playhouse.shortcuts import prefetch
 from peewee import fn
 
 from database.models import Client, Deal, Expense, Policy
+from services import deal_journal
 
 
 logger = logging.getLogger(__name__)
@@ -543,7 +544,9 @@ def find_strict_matches(
                         f"Номер полиса {policy_profile.policy_number} найден в описании сделки"
                     )
                 calculations_normalized = _normalize_text_for_match(
-                    deal_profile.deal.calculations
+                    deal_journal.format_for_display(
+                        deal_profile.deal.calculations, active_only=True
+                    )
                 )
                 if (
                     calculations_normalized

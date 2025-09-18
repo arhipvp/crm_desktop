@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 from html import escape
 from services.validators import normalize_number
+from services import deal_journal
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -139,9 +140,9 @@ def fmt_task(t: Task) -> str:
                 lines.append(f"📂 {folder}")
 
         lines.append("\n<b>Журнал:</b>")
-        if d.calculations:
-            calc = escape(d.calculations)
-            lines.append(f"<pre>{calc}</pre>")
+        calc_text = deal_journal.format_for_display(d.calculations, active_only=True)
+        if calc_text:
+            lines.append(f"<pre>{escape(calc_text)}</pre>")
         else:
             lines.append("—")
 
@@ -333,8 +334,9 @@ async def h_choose_client(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 
     info_lines = []
     for d in deals:
-        calc = escape(d.calculations) if d.calculations else "журнал пуст"
-        info_lines.append(f"<b>{d.description}</b>\n<pre>{calc}</pre>")
+        calc = deal_journal.format_for_display(d.calculations, active_only=True)
+        calc_html = escape(calc) if calc else "журнал пуст"
+        info_lines.append(f"<b>{d.description}</b>\n<pre>{calc_html}</pre>")
     info = "\n\n".join(info_lines)
 
     await q.message.reply_html(
