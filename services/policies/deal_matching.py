@@ -140,10 +140,10 @@ def find_candidate_deal_ids(policy: Policy) -> Optional[Set[int]]:
     normalized_contractor = _normalize_string(getattr(policy, "contractor", None))
     if normalized_contractor:
         contractor_query = (
-            Expense.select(Policy.deal_id)
-            .join(Policy)
-            .switch(Policy)
+            Policy.select(Policy.deal_id)
             .join(Deal)
+            .switch(Policy)
+            .join(Expense)
             .where(
                 (Expense.is_deleted == False)
                 & (Policy.is_deleted == False)

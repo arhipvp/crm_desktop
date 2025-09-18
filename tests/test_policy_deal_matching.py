@@ -3,7 +3,7 @@ from datetime import date
 
 import pytest
 
-from database.models import Client, Deal, Policy
+from database.models import Client, Deal, Expense, Payment, Policy
 from services.policies import find_candidate_deals
 from services.policies.deal_matching import (
     BRAND_MODEL_DATE_WEIGHT,
@@ -169,6 +169,45 @@ def test_find_candidate_deal_ids_matches_phone_with_eight_prefix():
     )
 
     assert find_candidate_deal_ids(policy) == {deal.id}
+
+
+@pytest.mark.usefixtures("in_memory_db")
+def test_find_candidate_deal_ids_matches_contractor_with_expense():
+    client = Client.create(name="ООО Заказчик")
+    deal = Deal.create(
+        client=client,
+        description="Сделка с подрядчиком",
+        start_date=date(2024, 5, 15),
+    )
+    matched_policy = Policy.create(
+        client=client,
+        deal=deal,
+        policy_number="CONTRACTOR-001",
+        start_date=date(2024, 5, 20),
+        contractor="Acme Contractor",
+    )
+    payment = Payment.create(
+        policy=matched_policy,
+        amount=1000,
+        payment_date=date(2024, 5, 21),
+    )
+    Expense.create(
+        policy=matched_policy,
+        payment=payment,
+        amount=500,
+        expense_type="commission",
+    )
+
+    candidate_client = Client.create(name="ООО Новый Клиент")
+    candidate_policy = Policy.create(
+        client=candidate_client,
+        deal=None,
+        policy_number="CONTRACTOR-NEW",
+        start_date=date(2024, 6, 1),
+        contractor="  acme contractor  ",
+    )
+
+    assert find_candidate_deal_ids(candidate_policy) == {deal.id}
 
 
 @pytest.mark.usefixtures("in_memory_db")
