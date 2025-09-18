@@ -16,6 +16,7 @@ from database.models import (
     Executor,
 )
 from .task_states import IDLE, QUEUED
+from services import deal_journal
 
 
 logger = logging.getLogger(__name__)
@@ -156,9 +157,7 @@ def update_task(task: Task, **fields) -> Task:
             if task.deal_id:
                 deal = Deal.get_or_none(Deal.id == task.deal_id)
                 if deal:
-                    existing = deal.calculations or ""
-                    deal.calculations = entry + existing
-                    deal.save()
+                    deal_journal.append_entry(deal, entry)
 
             if task.policy_id:
                 policy = Policy.get_or_none(Policy.id == task.policy_id)
