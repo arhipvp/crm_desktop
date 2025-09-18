@@ -9,6 +9,9 @@ from __future__ import annotations
 """
 import logging
 from datetime import date, datetime
+from dateutil.relativedelta import relativedelta
+from utils.time_utils import now_str
+
 
 from peewee import JOIN, ModelSelect, Model  # если ещё не импортирован
 
@@ -144,11 +147,14 @@ def add_deal_from_policy(policy: Policy) -> Deal:
         parts.append(brand)
     description = " ".join(parts).strip() or f"Из полиса {policy.policy_number}"
 
+    start_date = policy.start_date or date.today()
+    reminder_date = start_date + relativedelta(months=9)
+
     deal = add_deal(
         client_id=policy.client_id,
-        start_date=policy.start_date,
+        start_date=start_date,
         description=description,
-        reminder_date=date.today(),
+        reminder_date=reminder_date,
     )
 
     try:
