@@ -236,18 +236,79 @@ class PolicyTableView(BaseTableView):
             return
         try:
             from services.deal_service import get_all_deals
-            from services.policies import update_policy
+            from services.policies import find_candidate_deals, update_policy
 
             deals = list(get_all_deals())
             if not deals:
                 show_error("Нет доступных сделок")
                 return
 
-            labels = [f"{d.client.name} - {d.description}" for d in deals]
-            dlg = SearchDialog(labels, parent=self)
-            if dlg.exec() and dlg.selected_index:
-                idx = labels.index(dlg.selected_index)
-                deal = deals[idx]
+            first_policy = policies[0]
+            candidates = find_candidate_deals(first_policy, limit=5)
+            deals_by_id = {deal.id: deal for deal in deals}
+
+            candidate_items = []
+            used_ids = set()
+            for candidate in candidates:
+                deal = candidate.deal or deals_by_id.get(candidate.deal_id)
+                if deal is None:
+                    continue
+                used_ids.add(deal.id)
+                client_name = getattr(deal.client, "name", "Без клиента")
+                description = deal.description or ""
+                title_parts = [f"⭐ {candidate.score:.2f}", f"Клиент {client_name}"]
+                if description:
+                    title_parts.append(description)
+                label = " — ".join(filter(None, title_parts))
+                reasons = "; ".join(candidate.reasons)
+                candidate_items.append(
+                    {
+                        "label": label,
+                        "description": reasons,
+                        "value": {"type": "candidate", "deal": deal},
+                    }
+                )
+
+            manual_items = []
+            for deal in deals:
+                if deal.id in used_ids:
+                    continue
+                client_name = getattr(deal.client, "name", "Без клиента")
+                if deal.description:
+                    label = f"{client_name} — {deal.description}"
+                else:
+                    label = client_name
+                manual_items.append(
+                    {
+                        "label": label,
+                        "description": "",
+                        "value": {"type": "manual", "deal": deal},
+                    }
+                )
+
+            dialog_items = candidate_items + manual_items
+            dlg = SearchDialog(dialog_items, parent=self)
+            if dlg.exec():
+                selected = dlg.selected_index
+                if not selected:
+                    return
+                if isinstance(selected, dict) and "deal" in selected:
+                    deal = selected["deal"]
+                else:
+                    deal = None
+                    if isinstance(selected, str):
+                        deal = next(
+                            (
+                                item["value"]["deal"]
+                                for item in dialog_items
+                                if item["label"] == selected
+                            ),
+                            None,
+                        )
+                    elif hasattr(selected, "id"):
+                        deal = selected
+                if not deal:
+                    return
                 for p in policies:
                     update_policy(p, deal_id=deal.id)
                 self.refresh()
