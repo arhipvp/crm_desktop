@@ -113,7 +113,8 @@ class DealTabsMixin:
 
         self.notes_board = StickyNotesBoard()
         self.notes_board.archive_requested.connect(self._on_archive_note)
-        self.notes_board.load_entries(self.instance)
+        active_entries, archived_entries = deal_journal.load_entries(self.instance)
+        self.notes_board.set_entries(active_entries, archived_entries)
         journal_form.addRow("Заметки:", self.notes_board)
 
         self.btn_exec_task = styled_button("📤 Новая задача исполнителю")
