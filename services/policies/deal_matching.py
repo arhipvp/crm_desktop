@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import re
 from datetime import date
+from difflib import SequenceMatcher
+import re
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from playhouse.shortcuts import prefetch
 
-from database.models import Client, Deal, Policy
+from database.models import Client, Deal, Expense, Policy
 
 
 def _normalize_string(value: Optional[str]) -> Optional[str]:
@@ -73,6 +74,15 @@ class PolicyMatchProfile:
     start_date: Optional[date]
     end_date: Optional[date]
     drive_folder_link: Optional[str]
+    client_phones: Set[str] = field(default_factory=set)
+    client_emails: Set[str] = field(default_factory=set)
+    contractors: Set[str] = field(default_factory=set)
+    brand_model_pairs: Set[Tuple[str, str]] = field(default_factory=set)
+    min_start: Optional[date] = None
+    max_end: Optional[date] = None
+    insurance_companies: Set[str] = field(default_factory=set)
+    insurance_types: Set[str] = field(default_factory=set)
+    sales_channels: Set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -89,6 +99,13 @@ class DealMatchProfile:
     folder_paths: Set[str] = field(default_factory=set)
     client_phones: Set[str] = field(default_factory=set)
     client_emails: Set[str] = field(default_factory=set)
+    brand_model_pairs: Set[Tuple[str, str]] = field(default_factory=set)
+    min_start: Optional[date] = None
+    max_end: Optional[date] = None
+    insurance_companies: Set[str] = field(default_factory=set)
+    insurance_types: Set[str] = field(default_factory=set)
+    sales_channels: Set[str] = field(default_factory=set)
+    expense_contractors: Set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -100,6 +117,16 @@ class CandidateDeal:
     reasons: List[str] = field(default_factory=list)
 
 
+PHONE_MATCH_WEIGHT = 0.6
+EMAIL_MATCH_WEIGHT = 0.6
+CONTRACTOR_NAME_WEIGHT = 0.5
+BRAND_MODEL_DATE_WEIGHT = 0.5
+INSURANCE_CHANNEL_WEIGHT = 0.5
+EXPENSE_CONTRACTOR_WEIGHT = 0.3
+CONTRACTOR_SIMILARITY_THRESHOLD = 0.8
+DATE_DIFF_TOLERANCE_DAYS = 30
+
+
 def make_policy_profile(policy: Policy) -> PolicyMatchProfile:
     """Построить профиль полиса с нормализованными значениями."""
 
@@ -107,6 +134,41 @@ def make_policy_profile(policy: Policy) -> PolicyMatchProfile:
     normalized_vin = _normalize_vin(policy.vehicle_vin)
     normalized_contractor = _normalize_string(policy.contractor)
     drive_link = policy.drive_folder_link.strip() if policy.drive_folder_link else None
+
+    client_phones: Set[str] = set()
+    client_emails: Set[str] = set()
+    if policy.client_id:
+        phone_normalized = _normalize_phone(policy.client.phone)
+        if phone_normalized:
+            client_phones.add(phone_normalized)
+        email_normalized = _normalize_string(policy.client.email)
+        if email_normalized:
+            client_emails.add(email_normalized)
+
+    contractors: Set[str] = set()
+    if normalized_contractor:
+        contractors.add(normalized_contractor)
+
+    brand_model_pairs: Set[Tuple[str, str]] = set()
+    brand_normalized = _normalize_string(policy.vehicle_brand)
+    model_normalized = _normalize_string(policy.vehicle_model)
+    if brand_normalized and model_normalized:
+        brand_model_pairs.add((brand_normalized, model_normalized))
+
+    insurance_companies: Set[str] = set()
+    insurance_company_normalized = _normalize_string(policy.insurance_company)
+    if insurance_company_normalized:
+        insurance_companies.add(insurance_company_normalized)
+
+    insurance_types: Set[str] = set()
+    insurance_type_normalized = _normalize_string(policy.insurance_type)
+    if insurance_type_normalized:
+        insurance_types.add(insurance_type_normalized)
+
+    sales_channels: Set[str] = set()
+    sales_channel_normalized = _normalize_string(policy.sales_channel)
+    if sales_channel_normalized:
+        sales_channels.add(sales_channel_normalized)
 
     return PolicyMatchProfile(
         policy=policy,
@@ -119,6 +181,15 @@ def make_policy_profile(policy: Policy) -> PolicyMatchProfile:
         start_date=policy.start_date,
         end_date=policy.end_date,
         drive_folder_link=drive_link,
+        client_phones=client_phones,
+        client_emails=client_emails,
+        contractors=contractors,
+        brand_model_pairs=brand_model_pairs,
+        min_start=policy.start_date,
+        max_end=policy.end_date,
+        insurance_companies=insurance_companies,
+        insurance_types=insurance_types,
+        sales_channels=sales_channels,
     )
 
 
@@ -153,27 +224,39 @@ def build_deal_match_index(deal_ids: Iterable[int] | None = None) -> Dict[int, D
             return {}
         base_query = base_query.where(Deal.id.in_(ids))
 
-    deals = prefetch(base_query, Client, Policy)
+    deals = prefetch(base_query, Client, Policy, Expense)
     result: Dict[int, DealMatchProfile] = {}
 
     for deal in deals:
         client: Client = deal.client
-        policy_profiles = [
-            make_policy_profile(policy)
+        policies = [
+            policy
             for policy in deal.policies
             if getattr(policy, "is_deleted", False) is False
         ]
+        policy_profiles = [make_policy_profile(policy) for policy in policies]
 
         vins = {p.normalized_vehicle_vin for p in policy_profiles if p.normalized_vehicle_vin}
-        policy_numbers = {p.normalized_policy_number for p in policy_profiles if p.normalized_policy_number}
-        contractors = {p.normalized_contractor for p in policy_profiles if p.normalized_contractor}
+        policy_numbers = {
+            p.normalized_policy_number for p in policy_profiles if p.normalized_policy_number
+        }
+        contractors: Set[str] = set()
+        brand_model_pairs: Set[Tuple[str, str]] = set()
+        insurance_companies: Set[str] = set()
+        insurance_types: Set[str] = set()
+        sales_channels: Set[str] = set()
 
         start_dates = [p.start_date for p in policy_profiles if p.start_date]
         end_dates = [p.end_date for p in policy_profiles if p.end_date]
-        policy_date_range = (
-            min(start_dates) if start_dates else None,
-            max(end_dates) if end_dates else None,
-        )
+        min_start = min(start_dates) if start_dates else None
+        max_end = max(end_dates) if end_dates else None
+
+        for profile in policy_profiles:
+            contractors.update(profile.contractors)
+            brand_model_pairs.update(profile.brand_model_pairs)
+            insurance_companies.update(profile.insurance_companies)
+            insurance_types.update(profile.insurance_types)
+            sales_channels.update(profile.sales_channels)
 
         folder_paths = _collect_folder_paths(deal, client, policy_profiles)
 
@@ -188,6 +271,21 @@ def build_deal_match_index(deal_ids: Iterable[int] | None = None) -> Dict[int, D
         if email_normalized:
             client_emails.add(email_normalized)
 
+        for profile in policy_profiles:
+            client_phones.update(profile.client_phones)
+            client_emails.update(profile.client_emails)
+
+        expense_contractors: Set[str] = set()
+        for policy in policies:
+            contractor_normalized = _normalize_string(policy.contractor)
+            if not contractor_normalized:
+                continue
+            has_expense = any(
+                getattr(expense, "is_deleted", False) is False for expense in policy.expenses
+            )
+            if has_expense:
+                expense_contractors.add(contractor_normalized)
+
         result[deal.id] = DealMatchProfile(
             deal=deal,
             client=client,
@@ -195,10 +293,17 @@ def build_deal_match_index(deal_ids: Iterable[int] | None = None) -> Dict[int, D
             vins=vins,
             policy_numbers=policy_numbers,
             contractors=contractors,
-            policy_date_range=policy_date_range,
+            policy_date_range=(min_start, max_end),
             folder_paths=folder_paths,
             client_phones=client_phones,
             client_emails=client_emails,
+            brand_model_pairs=brand_model_pairs,
+            min_start=min_start,
+            max_end=max_end,
+            insurance_companies=insurance_companies,
+            insurance_types=insurance_types,
+            sales_channels=sales_channels,
+            expense_contractors=expense_contractors,
         )
 
     return result
@@ -291,5 +396,131 @@ def find_strict_matches(
         if reasons:
             matches.append(CandidateDeal(deal_id=deal_id, reasons=reasons))
 
+    return matches
+
+
+def _format_similarity(value: float) -> str:
+    return f"{value:.2f}"
+
+
+def collect_indirect_matches(
+    policy_profile: PolicyMatchProfile, deal_index: Dict[int, DealMatchProfile]
+) -> List[CandidateDeal]:
+    """Собрать кандидатов по косвенным правилам сопоставления."""
+
+    matches: List[CandidateDeal] = []
+
+    for deal_id, deal_profile in deal_index.items():
+        score = 0.0
+        reasons: List[str] = []
+
+        phone_matches = policy_profile.client_phones & deal_profile.client_phones
+        if phone_matches:
+            score += PHONE_MATCH_WEIGHT
+            phone_example = next(iter(phone_matches))
+            reasons.append(f"Совпадает телефон клиента: {phone_example}")
+
+        email_matches = policy_profile.client_emails & deal_profile.client_emails
+        if email_matches:
+            score += EMAIL_MATCH_WEIGHT
+            email_example = next(iter(email_matches))
+            reasons.append(f"Совпадает email клиента: {email_example}")
+
+        contractor_reason_added = False
+        normalized_contractor = policy_profile.normalized_contractor
+        if normalized_contractor:
+            client_name_normalized = _normalize_string(deal_profile.client.name)
+            if client_name_normalized:
+                similarity = SequenceMatcher(
+                    None, normalized_contractor, client_name_normalized
+                ).ratio()
+                if similarity >= CONTRACTOR_SIMILARITY_THRESHOLD:
+                    score += CONTRACTOR_NAME_WEIGHT
+                    reasons.append(
+                        "Контрагент полиса похож на имя клиента сделки "
+                        f"(совпадение {_format_similarity(similarity)})"
+                    )
+                    contractor_reason_added = True
+
+            if not contractor_reason_added:
+                best_similarity = 0.0
+                for contractor in deal_profile.contractors:
+                    similarity = SequenceMatcher(
+                        None, normalized_contractor, contractor
+                    ).ratio()
+                    if similarity >= CONTRACTOR_SIMILARITY_THRESHOLD and similarity > best_similarity:
+                        best_similarity = similarity
+                if best_similarity >= CONTRACTOR_SIMILARITY_THRESHOLD:
+                    score += CONTRACTOR_NAME_WEIGHT
+                    reasons.append(
+                        "Контрагент полиса похож на контрагента сделки "
+                        f"(совпадение {_format_similarity(best_similarity)})"
+                    )
+
+        vin_intersects = (
+            policy_profile.normalized_vehicle_vin
+            and policy_profile.normalized_vehicle_vin in deal_profile.vins
+        )
+        brand_model_matches = (
+            policy_profile.brand_model_pairs & deal_profile.brand_model_pairs
+        )
+        if brand_model_matches and not vin_intersects:
+            date_match = False
+            if policy_profile.start_date and deal_profile.min_start:
+                start_diff = abs(
+                    (policy_profile.start_date - deal_profile.min_start).days
+                )
+                if start_diff <= DATE_DIFF_TOLERANCE_DAYS:
+                    date_match = True
+            if (
+                not date_match
+                and policy_profile.end_date
+                and deal_profile.max_end
+            ):
+                end_diff = abs(
+                    (policy_profile.end_date - deal_profile.max_end).days
+                )
+                if end_diff <= DATE_DIFF_TOLERANCE_DAYS:
+                    date_match = True
+            if date_match:
+                score += BRAND_MODEL_DATE_WEIGHT
+                brand_normalized, model_normalized = next(iter(brand_model_matches))
+                reasons.append(
+                    "Совпадают марка и модель без совпадения VIN ("
+                    f"{policy_profile.policy.vehicle_brand or brand_normalized} / "
+                    f"{policy_profile.policy.vehicle_model or model_normalized})"
+                )
+
+        if (
+            policy_profile.insurance_companies
+            and policy_profile.insurance_types
+            and policy_profile.sales_channels
+            and policy_profile.insurance_companies
+            & deal_profile.insurance_companies
+            and policy_profile.insurance_types & deal_profile.insurance_types
+            and policy_profile.sales_channels & deal_profile.sales_channels
+        ):
+            score += INSURANCE_CHANNEL_WEIGHT
+            reasons.append(
+                "Совпадают страховая компания, тип страхования и канал продаж ("
+                f"{policy_profile.policy.insurance_company or ''} / "
+                f"{policy_profile.policy.insurance_type or ''} / "
+                f"{policy_profile.policy.sales_channel or ''})"
+            )
+
+        if (
+            normalized_contractor
+            and normalized_contractor in deal_profile.expense_contractors
+        ):
+            score += EXPENSE_CONTRACTOR_WEIGHT
+            reasons.append(
+                "В сделке есть расходы по контрагенту "
+                f"{policy_profile.contractor or normalized_contractor}"
+            )
+
+        if score > 0:
+            matches.append(CandidateDeal(deal_id=deal_id, score=score, reasons=reasons))
+
+    matches.sort(key=lambda candidate: candidate.score, reverse=True)
     return matches
 

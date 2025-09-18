@@ -32,6 +32,7 @@ from .deal_matching import (
     DealMatchProfile,
     PolicyMatchProfile,
     build_deal_match_index,
+    collect_indirect_matches,
     find_strict_matches,
     make_policy_profile,
 )
@@ -58,6 +59,7 @@ __all__ = [
     "DealMatchProfile",
     "PolicyMatchProfile",
     "build_deal_match_index",
+    "collect_indirect_matches",
     "find_strict_matches",
     "make_policy_profile",
 ]
