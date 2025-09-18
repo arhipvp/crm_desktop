@@ -5,12 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 from difflib import SequenceMatcher
+import logging
 import re
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from playhouse.shortcuts import prefetch
 
 from database.models import Client, Deal, Expense, Policy
+
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_string(value: Optional[str]) -> Optional[str]:
@@ -113,6 +117,7 @@ class CandidateDeal:
     """Результат строгого сопоставления полиса со сделкой."""
 
     deal_id: int
+    deal: Optional[Deal] = None
     score: float = 1.0
     reasons: List[str] = field(default_factory=list)
 
@@ -523,4 +528,59 @@ def collect_indirect_matches(
 
     matches.sort(key=lambda candidate: candidate.score, reverse=True)
     return matches
+
+
+def find_candidate_deals(policy: Policy, limit: int = 10) -> List[CandidateDeal]:
+    """Сформировать список кандидатов для привязки полиса к сделкам."""
+
+    if limit <= 0:
+        return []
+
+    policy_profile = make_policy_profile(policy)
+    deal_index = build_deal_match_index()
+
+    strict_matches = find_strict_matches(policy_profile, deal_index)
+    indirect_matches = collect_indirect_matches(policy_profile, deal_index)
+
+    combined: Dict[int, CandidateDeal] = {}
+
+    for source in strict_matches + indirect_matches:
+        deal_profile = deal_index.get(source.deal_id)
+        if deal_profile is None:
+            continue
+
+        candidate = combined.get(source.deal_id)
+        if candidate is None:
+            candidate = CandidateDeal(
+                deal_id=source.deal_id,
+                deal=deal_profile.deal,
+                score=0.0,
+                reasons=[],
+            )
+            combined[source.deal_id] = candidate
+
+        candidate.score += source.score
+        for reason in source.reasons:
+            if reason not in candidate.reasons:
+                candidate.reasons.append(reason)
+
+    result: List[CandidateDeal] = []
+    for candidate in combined.values():
+        candidate.score = min(1.0, candidate.score)
+        result.append(candidate)
+
+    result.sort(key=lambda item: (-item.score, item.deal_id))
+    limited = result[:limit]
+
+    for candidate in limited:
+        top_reasons = candidate.reasons[:3]
+        logger.info(
+            "Policy %s candidate deal %s score %.2f reasons: %s",
+            getattr(policy, "id", None) or policy.policy_number,
+            candidate.deal_id,
+            candidate.score,
+            top_reasons,
+        )
+
+    return limited
 
