@@ -11,8 +11,37 @@ from ui.common.search_dialog import SearchDialog
 from ui.views.policy_table_view import PolicyTableView
 
 
+class DummySearchDialog:
+    auto_accept = True
+    last_items: list[dict] | None = None
+    last_instance: "DummySearchDialog | None" = None
+
+    def __init__(self, items, parent=None, make_deal_callback=None):
+        self.items = items
+        self.parent = parent
+        self.selected_index = None
+        self.make_deal_callback = make_deal_callback
+        self.closed = False
+        DummySearchDialog.last_items = items
+        DummySearchDialog.last_instance = self
+
+    def exec(self):
+        if not DummySearchDialog.auto_accept or not self.items:
+            return QDialog.Rejected
+        self.selected_index = self.items[0]["value"]
+        return QDialog.Accepted
+
+    def trigger_make_deal(self):
+        if self.make_deal_callback is not None:
+            self.make_deal_callback()
+            self.closed = True
+
+
 def test_link_deal_prefills_candidates(monkeypatch, in_memory_db, qapp):
     monkeypatch.setattr(PolicyTableView, "load_data", lambda self: None)
+    DummySearchDialog.auto_accept = True
+    DummySearchDialog.last_items = None
+    DummySearchDialog.last_instance = None
 
     client = Client.create(name="Иванов")
     other_client = Client.create(name="Петров")
@@ -69,22 +98,6 @@ def test_link_deal_prefills_candidates(monkeypatch, in_memory_db, qapp):
 
     monkeypatch.setattr("services.policies.update_policy", fake_update_policy)
 
-    class DummySearchDialog:
-        auto_accept = True
-        last_items: list[dict] | None = None
-
-        def __init__(self, items, parent=None):
-            self.items = items
-            self.parent = parent
-            self.selected_index = None
-            DummySearchDialog.last_items = items
-
-        def exec(self):
-            if not DummySearchDialog.auto_accept or not self.items:
-                return QDialog.Rejected
-            self.selected_index = self.items[0]["value"]
-            return QDialog.Accepted
-
     monkeypatch.setattr("ui.views.policy_table_view.SearchDialog", DummySearchDialog)
 
     view._on_link_deal()
@@ -107,6 +120,55 @@ def test_link_deal_prefills_candidates(monkeypatch, in_memory_db, qapp):
         (policy_one.id, candidate_deal.id),
         (policy_two.id, candidate_deal.id),
     ]
+
+
+def test_link_deal_make_deal_button_triggers_callback(
+    monkeypatch, in_memory_db, qapp
+):
+    monkeypatch.setattr(PolicyTableView, "load_data", lambda self: None)
+
+    client = Client.create(name="Иванов")
+    deal = Deal.create(
+        client=client,
+        description="КАСКО",
+        start_date=dt.date(2024, 1, 1),
+    )
+    policy = Policy.create(
+        client=client,
+        policy_number="P-003",
+        start_date=dt.date(2024, 3, 1),
+    )
+
+    view = PolicyTableView()
+    monkeypatch.setattr(view, "get_selected_multiple", lambda: [policy])
+
+    monkeypatch.setattr(
+        "services.policies.find_candidate_deals",
+        lambda policy, limit=10: [],
+    )
+    monkeypatch.setattr(
+        "services.deal_service.get_all_deals",
+        lambda: [deal],
+    )
+
+    called = []
+    monkeypatch.setattr(view, "_on_make_deal", lambda: called.append(True))
+
+    DummySearchDialog.auto_accept = False
+    DummySearchDialog.last_instance = None
+    monkeypatch.setattr("ui.views.policy_table_view.SearchDialog", DummySearchDialog)
+
+    view._on_link_deal()
+
+    dlg_instance = DummySearchDialog.last_instance
+    assert dlg_instance is not None
+    assert dlg_instance.make_deal_callback is not None
+
+    dlg_instance.trigger_make_deal()
+
+    assert called == [True]
+
+    DummySearchDialog.auto_accept = True
 
 
 def test_search_dialog_displays_candidate_details(qapp):

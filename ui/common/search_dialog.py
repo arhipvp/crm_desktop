@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 
 class SearchDialog(QDialog):
-    def __init__(self, items, parent=None):
+    def __init__(self, items, parent=None, make_deal_callback=None):
         super().__init__(parent)
         self.setWindowTitle("Выберите элемент")
 
@@ -23,6 +23,7 @@ class SearchDialog(QDialog):
         self.filtered_items = list(self.items)
         self.selected_index = None
         self._default_details_html = "<p><i>Выберите элемент, чтобы увидеть детали.</i></p>"
+        self._make_deal_callback = make_deal_callback
 
         self.model = QStandardItemModel(self)
         self.model.setHorizontalHeaderLabels(["Оценка", "Сделка", "Комментарий"])
@@ -57,6 +58,11 @@ class SearchDialog(QDialog):
         self.first_button = QPushButton("Выбрать первый", self)
         self.first_button.clicked.connect(self.accept_first)
 
+        self.make_deal_button = None
+        if self._make_deal_callback is not None:
+            self.make_deal_button = QPushButton("Сделать новую сделку", self)
+            self.make_deal_button.clicked.connect(self._on_make_deal_clicked)
+
         self._update_model()
 
         layout = QVBoxLayout(self)
@@ -70,9 +76,17 @@ class SearchDialog(QDialog):
 
         button_row = QHBoxLayout()
         button_row.addWidget(self.first_button)
+        if self.make_deal_button is not None:
+            button_row.addWidget(self.make_deal_button)
         button_row.addStretch(1)
         button_row.addWidget(self.ok_button)
         layout.addLayout(button_row)
+
+    def _on_make_deal_clicked(self):
+        if self._make_deal_callback is None:
+            return
+        self._make_deal_callback()
+        self.reject()
 
     def filter_items(self, text):
         query = text.strip().lower()
