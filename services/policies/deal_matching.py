@@ -26,6 +26,32 @@ def _normalize_vin(value: Optional[str]) -> Optional[str]:
     return re.sub(r"[^0-9a-z]", "", normalized)
 
 
+def _normalize_policy_number_for_match(value: Optional[str]) -> Optional[str]:
+    normalized = _normalize_string(value)
+    if normalized is None:
+        return None
+    compact = re.sub(r"[^0-9a-zа-яё]", "", normalized)
+    return compact or None
+
+
+def _normalize_text_for_match(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    normalized = value.lower()
+    compact = re.sub(r"[^0-9a-zа-яё]", "", normalized)
+    return compact or None
+
+
+def _is_subpath(child: str, parent: str) -> bool:
+    child_clean = child.strip().rstrip("/")
+    parent_clean = parent.strip().rstrip("/")
+    if not parent_clean:
+        return False
+    if child_clean == parent_clean:
+        return True
+    return child_clean.startswith(parent_clean + "/")
+
+
 def _normalize_phone(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
@@ -63,6 +89,15 @@ class DealMatchProfile:
     folder_paths: Set[str] = field(default_factory=set)
     client_phones: Set[str] = field(default_factory=set)
     client_emails: Set[str] = field(default_factory=set)
+
+
+@dataclass
+class CandidateDeal:
+    """Результат строгого сопоставления полиса со сделкой."""
+
+    deal_id: int
+    score: float = 1.0
+    reasons: List[str] = field(default_factory=list)
 
 
 def make_policy_profile(policy: Policy) -> PolicyMatchProfile:
@@ -167,4 +202,94 @@ def build_deal_match_index(deal_ids: Iterable[int] | None = None) -> Dict[int, D
         )
 
     return result
+
+
+def find_strict_matches(
+    policy_profile: PolicyMatchProfile, deal_index: Dict[int, DealMatchProfile]
+) -> List[CandidateDeal]:
+    """Найти сделки, удовлетворяющие строгим правилам сопоставления."""
+
+    matches: List[CandidateDeal] = []
+    policy_vin = policy_profile.normalized_vehicle_vin
+    policy_number_search = _normalize_policy_number_for_match(
+        policy_profile.policy_number
+    )
+    policy_drive_link = (
+        policy_profile.drive_folder_link.strip()
+        if policy_profile.drive_folder_link
+        else None
+    )
+
+    for deal_id, deal_profile in deal_index.items():
+        reasons: List[str] = []
+
+        if policy_vin and policy_vin in deal_profile.vins:
+            matched_policy = next(
+                (
+                    p
+                    for p in deal_profile.policy_profiles
+                    if p.normalized_vehicle_vin == policy_vin
+                ),
+                None,
+            )
+            if matched_policy is not None:
+                reasons.append(
+                    f"VIN совпадает с полисом №{matched_policy.policy_number}"
+                )
+            else:
+                reasons.append("VIN совпадает с полисом сделки")
+
+        if policy_number_search:
+            existing_policy = next(
+                (
+                    p
+                    for p in deal_profile.policy_profiles
+                    if _normalize_policy_number_for_match(p.policy_number)
+                    == policy_number_search
+                ),
+                None,
+            )
+            if existing_policy is not None:
+                reasons.append(
+                    f"Номер полиса совпадает с полисом №{existing_policy.policy_number}"
+                )
+            else:
+                description_normalized = _normalize_text_for_match(
+                    deal_profile.deal.description
+                )
+                if (
+                    description_normalized
+                    and policy_number_search in description_normalized
+                ):
+                    reasons.append(
+                        f"Номер полиса {policy_profile.policy_number} найден в описании сделки"
+                    )
+                calculations_normalized = _normalize_text_for_match(
+                    deal_profile.deal.calculations
+                )
+                if (
+                    calculations_normalized
+                    and policy_number_search in calculations_normalized
+                ):
+                    reasons.append(
+                        f"Номер полиса {policy_profile.policy_number} найден в расчётах сделки"
+                    )
+
+        if policy_drive_link:
+            deal_folder_candidates = [
+                deal_profile.deal.drive_folder_path,
+                deal_profile.deal.drive_folder_link,
+            ]
+            if any(
+                candidate and _is_subpath(policy_drive_link, candidate)
+                for candidate in deal_folder_candidates
+            ):
+                reasons.append(
+                    "Ссылка на диск полиса вложена в папку сделки"
+                )
+
+        if reasons:
+            matches.append(CandidateDeal(deal_id=deal_id, reasons=reasons))
+
+    return matches
 
