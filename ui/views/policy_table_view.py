@@ -256,15 +256,13 @@ class PolicyTableView(BaseTableView):
                 used_ids.add(deal.id)
                 client_name = getattr(deal.client, "name", "Без клиента")
                 description = deal.description or ""
-                title_parts = [f"⭐ {candidate.score:.2f}", f"Клиент {client_name}"]
-                if description:
-                    title_parts.append(description)
-                label = " — ".join(filter(None, title_parts))
                 reasons = "; ".join(candidate.reasons)
                 candidate_items.append(
                     {
-                        "label": label,
-                        "description": reasons,
+                        "score": candidate.score,
+                        "title": client_name,
+                        "subtitle": description,
+                        "comment": reasons,
                         "value": {"type": "candidate", "deal": deal},
                         "details": list(candidate.reasons),
                     }
@@ -275,14 +273,12 @@ class PolicyTableView(BaseTableView):
                 if deal.id in used_ids:
                     continue
                 client_name = getattr(deal.client, "name", "Без клиента")
-                if deal.description:
-                    label = f"{client_name} — {deal.description}"
-                else:
-                    label = client_name
                 manual_items.append(
                     {
-                        "label": label,
-                        "description": "",
+                        "score": None,
+                        "title": client_name,
+                        "subtitle": deal.description or "",
+                        "comment": "",
                         "value": {"type": "manual", "deal": deal},
                         "details": [],
                     }
@@ -303,7 +299,13 @@ class PolicyTableView(BaseTableView):
                             (
                                 item["value"]["deal"]
                                 for item in dialog_items
-                                if item["label"] == selected
+                                if selected
+                                in {
+                                    item.get("title"),
+                                    f"{item.get('title', '')} — {item.get('subtitle', '')}".strip(
+                                        " —"
+                                    ),
+                                }
                             ),
                             None,
                         )

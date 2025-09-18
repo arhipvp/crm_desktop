@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog
 
 from database.models import Client, Deal, Policy
@@ -91,11 +92,13 @@ def test_link_deal_prefills_candidates(monkeypatch, in_memory_db, qapp):
     assert DummySearchDialog.last_items is not None
     first_item = DummySearchDialog.last_items[0]
     assert first_item["value"]["type"] == "candidate"
-    assert first_item["label"].startswith("⭐ 0.85")
-    assert "совпал телефон" in first_item["description"]
+    assert first_item["score"] == candidate.score
+    assert first_item["title"] == "Иванов"
+    assert first_item["subtitle"] == "КАСКО"
+    assert "совпал телефон" in first_item["comment"]
     assert first_item["details"] == candidate.reasons
 
-    manual_labels = [item["label"] for item in DummySearchDialog.last_items[1:]]
+    manual_labels = [item["title"] for item in DummySearchDialog.last_items[1:]]
     assert any("Петров" in label for label in manual_labels)
     manual_details = [item["details"] for item in DummySearchDialog.last_items[1:]]
     assert all(details == [] for details in manual_details)
@@ -110,14 +113,18 @@ def test_search_dialog_displays_candidate_details(qapp):
     candidate_reasons = ["совпал телефон", "есть полис с VIN TEST123"]
     items = [
         {
-            "label": "⭐ 0.85 — Клиент Иванов",
-            "description": "; ".join(candidate_reasons),
+            "score": 0.85,
+            "title": "Иванов",
+            "subtitle": "",
+            "comment": "; ".join(candidate_reasons),
             "value": {"type": "candidate"},
             "details": candidate_reasons,
         },
         {
-            "label": "Петров — ОСАГО",
-            "description": "",
+            "score": None,
+            "title": "Петров",
+            "subtitle": "ОСАГО",
+            "comment": "",
             "value": {"type": "manual"},
             "details": [],
         },
@@ -136,5 +143,51 @@ def test_search_dialog_displays_candidate_details(qapp):
         qapp.processEvents()
         manual_text = dlg.detail_view.toPlainText()
         assert "Причин нет — ручной выбор" in manual_text
+    finally:
+        dlg.close()
+
+
+def test_search_dialog_score_sorting(qapp):
+    items = [
+        {
+            "score": 0.5,
+            "title": "Клиент A",
+            "subtitle": "",
+            "comment": "",
+            "value": {"type": "candidate"},
+            "details": [],
+        },
+        {
+            "score": 0.9,
+            "title": "Клиент B",
+            "subtitle": "",
+            "comment": "",
+            "value": {"type": "candidate"},
+            "details": [],
+        },
+        {
+            "score": 0.75,
+            "title": "Клиент C",
+            "subtitle": "",
+            "comment": "",
+            "value": {"type": "candidate"},
+            "details": [],
+        },
+    ]
+
+    dlg = SearchDialog(items)
+    try:
+        qapp.processEvents()
+        first_item = dlg.model.item(0, 0)
+        assert first_item.data(Qt.DisplayRole) == "0.50"
+        assert isinstance(first_item.data(Qt.UserRole), float)
+
+        dlg.table_view.sortByColumn(0, Qt.DescendingOrder)
+        qapp.processEvents()
+        sorted_scores = [
+            dlg.model.item(row, 0).data(Qt.UserRole)
+            for row in range(dlg.model.rowCount())
+        ]
+        assert sorted_scores == sorted(sorted_scores, reverse=True)
     finally:
         dlg.close()
