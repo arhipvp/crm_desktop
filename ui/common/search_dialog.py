@@ -25,7 +25,8 @@ class SearchDialog(QDialog):
         self._default_details_html = "<p><i>Выберите элемент, чтобы увидеть детали.</i></p>"
 
         self.model = QStandardItemModel(self)
-        self.model.setHorizontalHeaderLabels(["Вариант", "Комментарий"])
+        self.model.setHorizontalHeaderLabels(["Оценка", "Сделка", "Комментарий"])
+        self.model.setSortRole(Qt.UserRole)
 
         self.search = QLineEdit(self)
         self.search.setPlaceholderText("Поиск...")
@@ -39,6 +40,7 @@ class SearchDialog(QDialog):
         self.table_view.setEditTriggers(QTableView.NoEditTriggers)
         self.table_view.horizontalHeader().setStretchLastSection(True)
         self.table_view.verticalHeader().setVisible(False)
+        self.table_view.setSortingEnabled(True)
         self.table_view.clicked.connect(self._on_row_selected)
         self.table_view.doubleClicked.connect(self.accept_current)
         self.table_view.selectionModel().currentRowChanged.connect(
@@ -80,19 +82,41 @@ class SearchDialog(QDialog):
             self.filtered_items = [
                 item
                 for item in self.items
-                if query in item["label"].lower()
-                or query in item["description"].lower()
+                if query in (item.get("title", "").lower())
+                or query in (item.get("subtitle", "").lower())
+                or query in (item.get("comment", "").lower())
             ]
         self._update_model()
 
     def _update_model(self):
         self.model.setRowCount(0)
         for item in self.filtered_items:
-            label_item = QStandardItem(item["label"])
-            label_item.setEditable(False)
-            description_item = QStandardItem(item["description"])
-            description_item.setEditable(False)
-            self.model.appendRow([label_item, description_item])
+            score_item = QStandardItem()
+            score_item.setEditable(False)
+            score_item.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+
+            score = item.get("score")
+            if score is not None:
+                score_item.setText(f"{score:.2f}")
+                score_item.setData(float(score), Qt.UserRole)
+            else:
+                score_item.setText("")
+                score_item.setData(float("-inf"), Qt.UserRole)
+
+            title = item.get("title", "")
+            subtitle = item.get("subtitle", "")
+            if title and subtitle:
+                deal_text = f"{title} — {subtitle}"
+            else:
+                deal_text = title or subtitle
+            deal_item = QStandardItem(deal_text)
+            deal_item.setEditable(False)
+
+            comment = item.get("comment", "")
+            comment_item = QStandardItem(comment)
+            comment_item.setEditable(False)
+
+            self.model.appendRow([score_item, deal_item, comment_item])
 
         if self.model.rowCount() > 0:
             first = self.model.index(0, 0)
@@ -165,18 +189,41 @@ class SearchDialog(QDialog):
     @staticmethod
     def _normalize_item(item):
         if isinstance(item, dict):
-            label = str(item.get("label", ""))
-            description = str(item.get("description", ""))
+            score = item.get("score")
+            if score is not None:
+                try:
+                    score = float(score)
+                except (TypeError, ValueError):
+                    score = None
+            title = str(
+                item.get(
+                    "title",
+                    item.get("label", ""),
+                )
+            )
+            subtitle = str(item.get("subtitle", ""))
+            comment = str(
+                item.get(
+                    "comment",
+                    item.get("description", ""),
+                )
+            )
             value = item.get("value", item.get("label"))
             details = [str(detail) for detail in item.get("details", [])]
         else:
-            label = str(item)
-            description = ""
+            score = None
+            title = str(item)
+            subtitle = ""
+            comment = ""
             value = item
             details = []
         return {
-            "label": label,
-            "description": description,
+            "score": score,
+            "title": title,
+            "subtitle": subtitle,
+            "comment": comment,
+            "label": title,
+            "description": comment,
             "value": value,
             "details": details,
         }
