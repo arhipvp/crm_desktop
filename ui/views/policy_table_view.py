@@ -243,30 +243,102 @@ class PolicyTableView(BaseTableView):
                 show_error("Нет доступных сделок")
                 return
 
-            first_policy = policies[0]
-            candidates = find_candidate_deals(first_policy, limit=5)
             deals_by_id = {deal.id: deal for deal in deals}
 
+            aggregated_candidates: dict[int, dict] = {}
+            for policy in policies:
+                policy_candidates = find_candidate_deals(policy, limit=5)
+                for candidate in policy_candidates:
+                    deal = candidate.deal or deals_by_id.get(candidate.deal_id)
+                    if deal is None:
+                        continue
+                    entry = aggregated_candidates.setdefault(
+                        candidate.deal_id,
+                        {
+                            "deal": deal,
+                            "score": 0.0,
+                            "combined_reasons": [],
+                            "policy_reasons": {},
+                            "supported_policies": set(),
+                        },
+                    )
+                    entry["score"] += float(candidate.score or 0.0)
+                    entry["supported_policies"].add(policy.id)
+                    policy_reasons = list(candidate.reasons or [])
+                    entry["policy_reasons"][policy.id] = policy_reasons
+                    for reason in policy_reasons:
+                        if reason not in entry["combined_reasons"]:
+                            entry["combined_reasons"].append(reason)
+
             candidate_items = []
-            used_ids = set()
-            for candidate in candidates:
-                deal = candidate.deal or deals_by_id.get(candidate.deal_id)
+            selected_policies = list(policies)
+            for deal_id, entry in aggregated_candidates.items():
+                deal = entry["deal"]
                 if deal is None:
                     continue
-                used_ids.add(deal.id)
                 client_name = getattr(deal.client, "name", "Без клиента")
                 description = deal.description or ""
-                reasons = "; ".join(candidate.reasons)
+                missing_policies = [
+                    policy
+                    for policy in selected_policies
+                    if policy.id not in entry["policy_reasons"]
+                ]
+
+                details: list[str] = []
+                for policy in selected_policies:
+                    policy_label = policy.policy_number or f"ID {policy.id}"
+                    reasons = entry["policy_reasons"].get(policy.id)
+                    if reasons:
+                        detail = f"Полис {policy_label}: {', '.join(reasons)}"
+                    else:
+                        detail = f"Полис {policy_label}: ⚠️ нет совпадений"
+                    details.append(detail)
+
+                comment_parts: list[str] = []
+                if entry["combined_reasons"]:
+                    comment_parts.append("; ".join(entry["combined_reasons"]))
+                if missing_policies:
+                    missing_labels = ", ".join(
+                        policy.policy_number or f"ID {policy.id}"
+                        for policy in missing_policies
+                    )
+                    comment_parts.append(f"⚠️ Нет совпадений для: {missing_labels}")
+
                 candidate_items.append(
                     {
-                        "score": candidate.score,
+                        "score": entry["score"],
                         "title": client_name,
                         "subtitle": description,
-                        "comment": reasons,
-                        "value": {"type": "candidate", "deal": deal},
-                        "details": list(candidate.reasons),
+                        "comment": " | ".join(comment_parts),
+                        "value": {
+                            "type": "candidate",
+                            "deal": deal,
+                            "supported_policy_ids": list(entry["supported_policies"]),
+                            "unsupported_policy_ids": [
+                                policy.id for policy in missing_policies
+                            ],
+                        },
+                        "details": details,
                     }
                 )
+
+            def _candidate_sort_key(item: dict):
+                score = -float(item.get("score") or 0.0)
+                value = item.get("value") or {}
+                deal_obj = value.get("deal")
+                deal_id = getattr(deal_obj, "id", 0) if deal_obj is not None else 0
+                return (score, deal_id)
+
+            candidate_items.sort(key=_candidate_sort_key)
+            max_candidates = 5
+            if len(candidate_items) > max_candidates:
+                candidate_items = candidate_items[:max_candidates]
+
+            used_ids = {
+                getattr(item.get("value", {}).get("deal"), "id", None)
+                for item in candidate_items
+                if item.get("value", {}).get("deal") is not None
+            }
 
             manual_items = []
             for deal in deals:
@@ -294,10 +366,16 @@ class PolicyTableView(BaseTableView):
                 selected = dlg.selected_index
                 if not selected:
                     return
-                if isinstance(selected, dict) and "deal" in selected:
-                    deal = selected["deal"]
+                deal = None
+                unsupported_policy_ids: list[int] = []
+                value_type = None
+                if isinstance(selected, dict):
+                    deal = selected.get("deal")
+                    unsupported_policy_ids = list(
+                        selected.get("unsupported_policy_ids") or []
+                    )
+                    value_type = selected.get("type")
                 else:
-                    deal = None
                     if isinstance(selected, str):
                         deal = next(
                             (
@@ -317,6 +395,24 @@ class PolicyTableView(BaseTableView):
                         deal = selected
                 if not deal:
                     return
+
+                unsupported_policies = [
+                    policy
+                    for policy in policies
+                    if policy.id in set(unsupported_policy_ids)
+                ]
+                if value_type == "candidate" and unsupported_policies:
+                    policy_labels = ", ".join(
+                        policy.policy_number or f"ID {policy.id}"
+                        for policy in unsupported_policies
+                    )
+                    message = (
+                        "Сделка не подтверждена для полисов: "
+                        f"{policy_labels}. Привязать все равно?"
+                    )
+                    if not confirm(message):
+                        return
+
                 for p in policies:
                     update_policy(p, deal_id=deal.id)
                 self.refresh()
