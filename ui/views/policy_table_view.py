@@ -285,7 +285,11 @@ class PolicyTableView(BaseTableView):
                 )
 
             dialog_items = candidate_items + manual_items
-            dlg = SearchDialog(dialog_items, parent=self)
+            dlg = SearchDialog(
+                dialog_items,
+                parent=self,
+                make_deal_callback=lambda: self._on_make_deal(),
+            )
             if dlg.exec():
                 selected = dlg.selected_index
                 if not selected:
