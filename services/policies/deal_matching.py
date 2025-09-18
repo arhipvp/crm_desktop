@@ -287,6 +287,7 @@ class CandidateDeal:
     deal: Optional[Deal] = None
     score: float = 1.0
     reasons: List[str] = field(default_factory=list)
+    is_strict: bool = False
 
 
 PHONE_MATCH_WEIGHT = 0.6
@@ -566,7 +567,13 @@ def find_strict_matches(
                 )
 
         if reasons:
-            matches.append(CandidateDeal(deal_id=deal_id, reasons=reasons))
+            matches.append(
+                CandidateDeal(
+                    deal_id=deal_id,
+                    reasons=reasons,
+                    is_strict=True,
+                )
+            )
 
     return matches
 
@@ -727,10 +734,12 @@ def find_candidate_deals(policy: Policy, limit: int = 10) -> List[CandidateDeal]
                 deal=deal_profile.deal,
                 score=0.0,
                 reasons=[],
+                is_strict=False,
             )
             combined[source.deal_id] = candidate
 
         candidate.score += source.score
+        candidate.is_strict = candidate.is_strict or source.is_strict
         for reason in source.reasons:
             if reason not in candidate.reasons:
                 candidate.reasons.append(reason)

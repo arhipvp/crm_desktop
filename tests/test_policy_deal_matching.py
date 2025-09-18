@@ -116,6 +116,7 @@ def test_find_candidate_deals_orders_and_merges(caplog, monkeypatch):
         f"VIN совпадает с полисом №{existing_policy.policy_number}",
         f"Совпадает телефон клиента: {expected_phone}",
     ]
+    assert strict_candidate.is_strict is True
 
     email_candidate = candidates[1]
     assert email_candidate.deal == deal_email
@@ -123,6 +124,7 @@ def test_find_candidate_deals_orders_and_merges(caplog, monkeypatch):
     assert email_candidate.reasons == [
         "Совпадает email клиента: shared@example.com",
     ]
+    assert email_candidate.is_strict is False
 
     brand_candidate = candidates[2]
     assert brand_candidate.deal == deal_brand
@@ -130,6 +132,7 @@ def test_find_candidate_deals_orders_and_merges(caplog, monkeypatch):
     assert brand_candidate.reasons == [
         "Совпадают марка и модель без совпадения VIN (Toyota / Camry)",
     ]
+    assert brand_candidate.is_strict is False
 
     logged_reasons = [
         record.args[3]
