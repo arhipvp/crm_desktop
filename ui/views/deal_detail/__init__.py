@@ -1,11 +1,11 @@
 from .view import DealDetailView
 from .dialogs import CloseDealDialog
-from .widgets import CollapsibleWidget, _CalcHighlighter, _with_day_separators
+from .widgets import CollapsibleWidget
+from .sticky_notes import StickyNotesBoard
 
 __all__ = [
     "DealDetailView",
     "CloseDealDialog",
     "CollapsibleWidget",
-    "_CalcHighlighter",
-    "_with_day_separators",
+    "StickyNotesBoard",
 ]

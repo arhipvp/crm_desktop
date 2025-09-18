@@ -36,7 +36,6 @@ from ui.forms.policy_form import PolicyForm
 from ui.forms.task_form import TaskForm
 
 from .dialogs import CloseDealDialog
-from .widgets import _with_day_separators
 
 logger = logging.getLogger(__name__)
 
@@ -399,9 +398,7 @@ class DealActionsMixin:
                 journal_entry=new_calc_part or None,
             )
             self.calc_append.clear()
-            self.calc_view.setPlainText(
-                _with_day_separators(self.instance.calculations)
-            )
+            self.notes_board.load_entries(self.instance)
             if new_calc_part:
                 self.calc_table.refresh()
         except Exception as e:
