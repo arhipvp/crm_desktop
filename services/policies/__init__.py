@@ -28,9 +28,11 @@ from .policy_service import (
     attach_premium,
 )
 from .deal_matching import (
+    CandidateDeal,
     DealMatchProfile,
     PolicyMatchProfile,
     build_deal_match_index,
+    find_strict_matches,
     make_policy_profile,
 )
 
@@ -52,8 +54,10 @@ __all__ = [
     "get_unique_policy_field_values",
     "attach_premium",
     "add_contractor_expense",
+    "CandidateDeal",
     "DealMatchProfile",
     "PolicyMatchProfile",
     "build_deal_match_index",
+    "find_strict_matches",
     "make_policy_profile",
 ]
