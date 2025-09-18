@@ -62,6 +62,12 @@ def _normalize_phone(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
     digits = re.sub(r"\D", "", value)
+    if not digits:
+        return None
+    if len(digits) == 10:
+        digits = "7" + digits
+    elif len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
     return digits or None
 
 
@@ -157,17 +163,33 @@ def find_candidate_deal_ids(policy: Policy) -> Optional[Set[int]]:
         phone_expr = _normalize_field_expression(
             Client.phone, remove=[" ", "-", "(", ")", "+", "."]
         )
-        phone_query = (
-            Deal.select(Deal.id)
-            .join(Client)
+        possible_phone_values = {normalized_phone}
+        if len(normalized_phone) == 11:
+            local_part = normalized_phone[1:]
+            possible_phone_values.add(local_part)
+            possible_phone_values.add(f"8{local_part}")
+        clients_with_phone_query = (
+            Client.select(Client.id, Client.phone)
             .where(
-                (Deal.is_deleted == False)
-                & (Client.is_deleted == False)
+                (Client.is_deleted == False)
                 & (Client.phone.is_null(False))
-                & (phone_expr == normalized_phone)
+                & (phone_expr.in_(tuple(possible_phone_values)))
             )
         )
-        candidate_ids.update(item.id for item in phone_query)
+        matching_client_ids = [
+            client_item.id
+            for client_item in clients_with_phone_query
+            if _normalize_phone(client_item.phone) == normalized_phone
+        ]
+        if matching_client_ids:
+            phone_deals_query = (
+                Deal.select(Deal.id)
+                .where(
+                    (Deal.is_deleted == False)
+                    & (Deal.client_id.in_(matching_client_ids))
+                )
+            )
+            candidate_ids.update(item.id for item in phone_deals_query)
 
     normalized_email = _normalize_string(getattr(client, "email", None)) if client else None
     if normalized_email:

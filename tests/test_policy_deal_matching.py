@@ -143,6 +143,32 @@ def test_find_candidate_deals_orders_and_merges(caplog, monkeypatch):
 
 
 @pytest.mark.usefixtures("in_memory_db")
+def test_find_candidate_deal_ids_matches_phone_with_eight_prefix():
+    deal_client = Client.create(
+        name="ООО Телефон", phone="8 (905) 123-45-67", email="phone@example.com"
+    )
+    deal = Deal.create(
+        client=deal_client,
+        description="Страхование автомобиля",
+        start_date=date(2024, 5, 1),
+    )
+
+    policy_client = Client.create(
+        name="ООО Телефон Полис",
+        phone="+7 905 123 45 67",
+        email="policy-phone@example.com",
+    )
+    policy = Policy.create(
+        client=policy_client,
+        deal=None,
+        policy_number="PHONE-001",
+        start_date=date(2024, 6, 1),
+    )
+
+    assert find_candidate_deal_ids(policy) == {deal.id}
+
+
+@pytest.mark.usefixtures("in_memory_db")
 def test_find_candidate_deals_fallback_without_candidates(monkeypatch):
     unrelated_client = Client.create(name="ООО Дельта")
     Deal.create(
