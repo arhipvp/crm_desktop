@@ -10,6 +10,7 @@ import re
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from playhouse.shortcuts import prefetch
+from peewee import fn
 
 from database.models import Client, Deal, Expense, Policy
 
@@ -62,6 +63,150 @@ def _normalize_phone(value: Optional[str]) -> Optional[str]:
         return None
     digits = re.sub(r"\D", "", value)
     return digits or None
+
+
+def _normalize_field_expression(field, remove: Sequence[str] = ()):
+    """Сформировать SQL-выражение с грубой нормализацией поля."""
+
+    expr = fn.lower(field)
+    for symbol in remove:
+        expr = fn.replace(expr, symbol, "")
+    return expr
+
+
+def _normalize_trimmed_string_expression(field):
+    return fn.lower(fn.trim(field))
+
+
+def find_candidate_deal_ids(policy: Policy) -> Optional[Set[int]]:
+    """Подобрать список сделок, которые потенциально совпадают с полисом."""
+
+    candidate_ids: Set[int] = set()
+
+    if policy.client_id:
+        same_client_query = Deal.select(Deal.id).where(
+            (Deal.is_deleted == False) & (Deal.client_id == policy.client_id)
+        )
+        candidate_ids.update(item.id for item in same_client_query)
+
+    normalized_vin = _normalize_vin(getattr(policy, "vehicle_vin", None))
+    if normalized_vin:
+        vin_expr = _normalize_field_expression(
+            Policy.vehicle_vin, remove=[" ", "-", "_", ".", ",", "/", "\\"]
+        )
+        vin_query = (
+            Policy.select(Policy.deal_id)
+            .join(Deal)
+            .where(
+                (Policy.is_deleted == False)
+                & (Deal.is_deleted == False)
+                & (Policy.deal_id.is_null(False))
+                & (Policy.vehicle_vin.is_null(False))
+                & (vin_expr == normalized_vin)
+            )
+        )
+        candidate_ids.update(
+            item.deal_id for item in vin_query if item.deal_id is not None
+        )
+
+    normalized_number = _normalize_policy_number_for_match(
+        getattr(policy, "policy_number", None)
+    )
+    if normalized_number:
+        number_expr = _normalize_field_expression(
+            Policy.policy_number, remove=[" ", "-", "_", ".", ",", "/", "\\"]
+        )
+        number_query = (
+            Policy.select(Policy.deal_id)
+            .join(Deal)
+            .where(
+                (Policy.is_deleted == False)
+                & (Deal.is_deleted == False)
+                & (Policy.deal_id.is_null(False))
+                & (Policy.policy_number.is_null(False))
+                & (number_expr == normalized_number)
+            )
+        )
+        candidate_ids.update(
+            item.deal_id for item in number_query if item.deal_id is not None
+        )
+
+    normalized_contractor = _normalize_string(getattr(policy, "contractor", None))
+    if normalized_contractor:
+        contractor_query = (
+            Expense.select(Policy.deal_id)
+            .join(Policy)
+            .switch(Policy)
+            .join(Deal)
+            .where(
+                (Expense.is_deleted == False)
+                & (Policy.is_deleted == False)
+                & (Deal.is_deleted == False)
+                & (Policy.deal_id.is_null(False))
+                & (Policy.contractor.is_null(False))
+                & (_normalize_trimmed_string_expression(Policy.contractor) == normalized_contractor)
+            )
+        )
+        candidate_ids.update(
+            item.deal_id for item in contractor_query if item.deal_id is not None
+        )
+
+    client = getattr(policy, "client", None)
+    normalized_phone = _normalize_phone(getattr(client, "phone", None)) if client else None
+    if normalized_phone:
+        phone_expr = _normalize_field_expression(
+            Client.phone, remove=[" ", "-", "(", ")", "+", "."]
+        )
+        phone_query = (
+            Deal.select(Deal.id)
+            .join(Client)
+            .where(
+                (Deal.is_deleted == False)
+                & (Client.is_deleted == False)
+                & (Client.phone.is_null(False))
+                & (phone_expr == normalized_phone)
+            )
+        )
+        candidate_ids.update(item.id for item in phone_query)
+
+    normalized_email = _normalize_string(getattr(client, "email", None)) if client else None
+    if normalized_email:
+        email_expr = _normalize_trimmed_string_expression(Client.email)
+        email_query = (
+            Deal.select(Deal.id)
+            .join(Client)
+            .where(
+                (Deal.is_deleted == False)
+                & (Client.is_deleted == False)
+                & (Client.email.is_null(False))
+                & (email_expr == normalized_email)
+            )
+        )
+        candidate_ids.update(item.id for item in email_query)
+
+    brand_normalized = _normalize_string(getattr(policy, "vehicle_brand", None))
+    model_normalized = _normalize_string(getattr(policy, "vehicle_model", None))
+    if brand_normalized and model_normalized:
+        brand_expr = _normalize_trimmed_string_expression(Policy.vehicle_brand)
+        model_expr = _normalize_trimmed_string_expression(Policy.vehicle_model)
+        brand_query = (
+            Policy.select(Policy.deal_id)
+            .join(Deal)
+            .where(
+                (Policy.is_deleted == False)
+                & (Deal.is_deleted == False)
+                & (Policy.deal_id.is_null(False))
+                & (Policy.vehicle_brand.is_null(False))
+                & (Policy.vehicle_model.is_null(False))
+                & (brand_expr == brand_normalized)
+                & (model_expr == model_normalized)
+            )
+        )
+        candidate_ids.update(
+            item.deal_id for item in brand_query if item.deal_id is not None
+        )
+
+    return candidate_ids or None
 
 
 @dataclass
@@ -537,7 +682,11 @@ def find_candidate_deals(policy: Policy, limit: int = 10) -> List[CandidateDeal]
         return []
 
     policy_profile = make_policy_profile(policy)
-    deal_index = build_deal_match_index()
+    candidate_ids = find_candidate_deal_ids(policy)
+    if candidate_ids is None:
+        deal_index = build_deal_match_index()
+    else:
+        deal_index = build_deal_match_index(candidate_ids)
 
     strict_matches = find_strict_matches(policy_profile, deal_index)
     indirect_matches = collect_indirect_matches(policy_profile, deal_index)

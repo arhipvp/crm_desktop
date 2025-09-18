@@ -8,11 +8,13 @@ from services.policies import find_candidate_deals
 from services.policies.deal_matching import (
     BRAND_MODEL_DATE_WEIGHT,
     EMAIL_MATCH_WEIGHT,
+    build_deal_match_index,
+    find_candidate_deal_ids,
 )
 
 
 @pytest.mark.usefixtures("in_memory_db")
-def test_find_candidate_deals_orders_and_merges(caplog):
+def test_find_candidate_deals_orders_and_merges(caplog, monkeypatch):
     caplog.set_level(logging.INFO, logger="services.policies.deal_matching")
 
     strict_client = Client.create(
@@ -83,6 +85,21 @@ def test_find_candidate_deals_orders_and_merges(caplog):
         sales_channel="Онлайн",
     )
 
+    expected_candidates = {deal_strict.id, deal_email.id, deal_brand.id}
+    assert find_candidate_deal_ids(candidate_policy) == expected_candidates
+
+    original_build = build_deal_match_index
+    captured_calls: list[set[int] | None] = []
+
+    def fake_build(ids=None):
+        captured_calls.append(None if ids is None else set(ids))
+        return original_build(ids)
+
+    monkeypatch.setattr(
+        "services.policies.deal_matching.build_deal_match_index",
+        fake_build,
+    )
+
     candidates = find_candidate_deals(candidate_policy, limit=5)
 
     assert [candidate.deal_id for candidate in candidates] == [
@@ -121,4 +138,41 @@ def test_find_candidate_deals_orders_and_merges(caplog):
         and record.name == "services.policies.deal_matching"
     ]
     assert logged_reasons == [candidate.reasons[:3] for candidate in candidates]
+
+    assert captured_calls == [expected_candidates]
+
+
+@pytest.mark.usefixtures("in_memory_db")
+def test_find_candidate_deals_fallback_without_candidates(monkeypatch):
+    unrelated_client = Client.create(name="ООО Дельта")
+    Deal.create(
+        client=unrelated_client,
+        description="Несвязанная сделка",
+        start_date=date(2024, 3, 1),
+    )
+
+    policy_client = Client.create(name="ООО Эпсилон")
+    candidate_policy = Policy.create(
+        client=policy_client,
+        deal=None,
+        policy_number="UNIQ-42",
+        start_date=date(2024, 4, 1),
+    )
+
+    assert find_candidate_deal_ids(candidate_policy) is None
+
+    original_build = build_deal_match_index
+    captured_calls: list[set[int] | None] = []
+
+    def fake_build(ids=None):
+        captured_calls.append(None if ids is None else set(ids))
+        return original_build(ids)
+
+    monkeypatch.setattr(
+        "services.policies.deal_matching.build_deal_match_index",
+        fake_build,
+    )
+
+    assert find_candidate_deals(candidate_policy, limit=5) == []
+    assert captured_calls == [None]
 
