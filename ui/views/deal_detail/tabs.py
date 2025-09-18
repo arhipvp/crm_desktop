@@ -113,6 +113,9 @@ class DealTabsMixin:
 
         self.notes_board = StickyNotesBoard()
         self.notes_board.archive_requested.connect(self._on_archive_note)
+        self.notes_board.show_archived_changed.connect(
+            self._on_notes_mode_changed
+        )
         self.notes_board.load_entries(self.instance)
         journal_form.addRow("Заметки:", self.notes_board)
 
@@ -281,6 +284,9 @@ class DealTabsMixin:
         archived = deal_journal.archive_entry(self.instance, entry_id)
         if archived:
             self.notes_board.load_entries(self.instance)
+
+    def _on_notes_mode_changed(self, _: bool) -> None:
+        self.notes_board.load_entries(self.instance)
 
     def _postpone_reminder(self, days: int) -> None:
         """Set reminder to today + ``days`` and save/close."""
