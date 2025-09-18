@@ -230,12 +230,23 @@ class SearchDialog(QDialog):
         if self.selected_index is not None:
             self.accept()
 
-    def closeEvent(self, event):
+    def _save_geometry(self):
         st = {
             "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
         }
         ui_settings.set_window_settings("SearchDialog", st)
+
+    def closeEvent(self, event):
+        self._save_geometry()
         super().closeEvent(event)
+
+    def accept(self):
+        self._save_geometry()
+        super().accept()
+
+    def reject(self):
+        self._save_geometry()
+        super().reject()
 
     @staticmethod
     def _normalize_item(item):
