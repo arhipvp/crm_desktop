@@ -1,4 +1,7 @@
+import base64
 import html
+
+from ui import settings as ui_settings
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
@@ -81,6 +84,14 @@ class SearchDialog(QDialog):
         button_row.addStretch(1)
         button_row.addWidget(self.ok_button)
         layout.addLayout(button_row)
+
+        st = ui_settings.get_window_settings("SearchDialog")
+        geom = st.get("geometry")
+        if geom:
+            try:
+                self.restoreGeometry(base64.b64decode(geom))
+            except Exception:
+                pass
 
     def _on_make_deal_clicked(self):
         if self._make_deal_callback is None:
@@ -218,6 +229,13 @@ class SearchDialog(QDialog):
         self._on_row_selected(index)
         if self.selected_index is not None:
             self.accept()
+
+    def closeEvent(self, event):
+        st = {
+            "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
+        }
+        ui_settings.set_window_settings("SearchDialog", st)
+        super().closeEvent(event)
 
     @staticmethod
     def _normalize_item(item):
