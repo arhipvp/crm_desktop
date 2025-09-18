@@ -59,8 +59,8 @@ class StickyNotesBoard(QWidget):
 
         self._all_entries: list[tuple[bool, JournalEntry]] = []
         self._entries: list[tuple[bool, JournalEntry]] = []
-        self._active_entries: list[JournalEntry] = []
-        self._archived_entries: list[JournalEntry] = []
+        self._active_entries: list[tuple[bool, JournalEntry]] = []
+        self._archived_entries: list[tuple[bool, JournalEntry]] = []
         self._search_term: str = ""
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
@@ -94,7 +94,7 @@ class StickyNotesBoard(QWidget):
 
         show_archive = self._archive_toggle.isChecked() and bool(self._archived_entries)
 
-        sections: list[tuple[str | None, Sequence[JournalEntry]]] = []
+        sections: list[tuple[str | None, Sequence[tuple[bool, JournalEntry]]]] = []
         if show_archive:
             sections.append(("Активные", self._active_entries))
             sections.append(("Архив", self._archived_entries))
@@ -109,8 +109,8 @@ class StickyNotesBoard(QWidget):
                 self._container_layout.addWidget(header)
 
             if entries:
-                for entry in entries:
-                    card = self._create_card(entry)
+                for is_archived, entry in entries:
+                    card = self._create_card(entry, is_archived)
                     self._container_layout.addWidget(card)
                     has_cards = True
             else:
@@ -137,7 +137,7 @@ class StickyNotesBoard(QWidget):
 
         self._container_layout.addStretch()
 
-    def _create_card(self, entry: JournalEntry) -> QWidget:
+    def _create_card(self, entry: JournalEntry, is_archived: bool = False) -> QWidget:
         card = QFrame()
         card.setObjectName("stickyCard")
         card.setStyleSheet(
@@ -173,9 +173,16 @@ class StickyNotesBoard(QWidget):
 
         button_row = QHBoxLayout()
         button_row.addStretch()
-        archive_btn: QPushButton = styled_button("В архив")
-        archive_btn.clicked.connect(lambda _=False, eid=entry.entry_id: self.archive_requested.emit(eid))
-        button_row.addWidget(archive_btn)
+        if is_archived:
+            archive_label = QLabel("В архиве")
+            archive_label.setStyleSheet("color: #888; font-style: italic;")
+            button_row.addWidget(archive_label)
+        else:
+            archive_btn: QPushButton = styled_button("В архив")
+            archive_btn.clicked.connect(
+                lambda _=False, eid=entry.entry_id: self.archive_requested.emit(eid)
+            )
+            button_row.addWidget(archive_btn)
         layout.addLayout(button_row)
 
         return card
@@ -196,8 +203,12 @@ class StickyNotesBoard(QWidget):
                 or term in (entry.body or "").lower()
             ]
 
-        self._active_entries = [entry for archived, entry in self._entries if not archived]
-        self._archived_entries = [entry for archived, entry in self._entries if archived]
+        self._active_entries = [
+            (archived, entry) for archived, entry in self._entries if not archived
+        ]
+        self._archived_entries = [
+            (archived, entry) for archived, entry in self._entries if archived
+        ]
 
         if self._archived_entries:
             self._archive_toggle.setEnabled(True)
