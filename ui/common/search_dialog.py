@@ -1,10 +1,15 @@
+import html
+
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLineEdit,
     QPushButton,
+    QSplitter,
     QTableView,
+    QTextBrowser,
     QVBoxLayout,
 )
 
@@ -17,6 +22,7 @@ class SearchDialog(QDialog):
         self.items = [self._normalize_item(item) for item in items]
         self.filtered_items = list(self.items)
         self.selected_index = None
+        self._default_details_html = "<p><i>Выберите элемент, чтобы увидеть детали.</i></p>"
 
         self.model = QStandardItemModel(self)
         self.model.setHorizontalHeaderLabels(["Вариант", "Комментарий"])
@@ -35,6 +41,13 @@ class SearchDialog(QDialog):
         self.table_view.verticalHeader().setVisible(False)
         self.table_view.clicked.connect(self._on_row_selected)
         self.table_view.doubleClicked.connect(self.accept_current)
+        self.table_view.selectionModel().currentRowChanged.connect(
+            self._on_current_row_changed
+        )
+
+        self.detail_view = QTextBrowser(self)
+        self.detail_view.setOpenExternalLinks(True)
+        self.detail_view.setHtml(self._default_details_html)
 
         self.ok_button = QPushButton("OK", self)
         self.ok_button.clicked.connect(self.accept_current)
@@ -46,7 +59,12 @@ class SearchDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.search)
-        layout.addWidget(self.table_view)
+        splitter = QSplitter(Qt.Horizontal, self)
+        splitter.addWidget(self.table_view)
+        splitter.addWidget(self.detail_view)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+        layout.addWidget(splitter)
 
         button_row = QHBoxLayout()
         button_row.addWidget(self.first_button)
@@ -80,16 +98,49 @@ class SearchDialog(QDialog):
             first = self.model.index(0, 0)
             self.table_view.setCurrentIndex(first)
             self.table_view.selectRow(0)
+            self._apply_selection(first)
         else:
             self.selected_index = None
+            self._set_details_for_item(None)
 
     def _on_row_selected(self, index):
+        self._apply_selection(index)
+
+    def _on_current_row_changed(self, current, previous):
+        del previous
+        self._apply_selection(current)
+
+    def _apply_selection(self, index):
         if not index.isValid():
             self.selected_index = None
+            self._set_details_for_item(None)
             return
         row = index.row()
         if 0 <= row < len(self.filtered_items):
-            self.selected_index = self.filtered_items[row]["value"]
+            item = self.filtered_items[row]
+            self.selected_index = item["value"]
+            self._set_details_for_item(item)
+        else:
+            self.selected_index = None
+            self._set_details_for_item(None)
+
+    def _set_details_for_item(self, item):
+        if not item:
+            self.detail_view.setHtml(self._default_details_html)
+            return
+
+        details = item.get("details") or []
+        value = item.get("value")
+        if details:
+            items_html = "".join(
+                f"<li>{html.escape(str(reason))}</li>" for reason in details
+            )
+            content = f"<ul>{items_html}</ul>"
+        elif isinstance(value, dict) and value.get("type") == "manual":
+            content = "<p><i>Причин нет — ручной выбор</i></p>"
+        else:
+            content = "<p><i>Причины отсутствуют</i></p>"
+        self.detail_view.setHtml(content)
 
     def accept_current(self, index=None):
         if index is None:
@@ -117,8 +168,15 @@ class SearchDialog(QDialog):
             label = str(item.get("label", ""))
             description = str(item.get("description", ""))
             value = item.get("value", item.get("label"))
+            details = [str(detail) for detail in item.get("details", [])]
         else:
             label = str(item)
             description = ""
             value = item
-        return {"label": label, "description": description, "value": value}
+            details = []
+        return {
+            "label": label,
+            "description": description,
+            "value": value,
+            "details": details,
+        }

@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QDialog
 
 from database.models import Client, Deal, Policy
 from services.policies.deal_matching import CandidateDeal
+from ui.common.search_dialog import SearchDialog
 from ui.views.policy_table_view import PolicyTableView
 
 
@@ -92,11 +93,48 @@ def test_link_deal_prefills_candidates(monkeypatch, in_memory_db, qapp):
     assert first_item["value"]["type"] == "candidate"
     assert first_item["label"].startswith("⭐ 0.85")
     assert "совпал телефон" in first_item["description"]
+    assert first_item["details"] == candidate.reasons
 
     manual_labels = [item["label"] for item in DummySearchDialog.last_items[1:]]
     assert any("Петров" in label for label in manual_labels)
+    manual_details = [item["details"] for item in DummySearchDialog.last_items[1:]]
+    assert all(details == [] for details in manual_details)
 
     assert updates == [
         (policy_one.id, candidate_deal.id),
         (policy_two.id, candidate_deal.id),
     ]
+
+
+def test_search_dialog_displays_candidate_details(qapp):
+    candidate_reasons = ["совпал телефон", "есть полис с VIN TEST123"]
+    items = [
+        {
+            "label": "⭐ 0.85 — Клиент Иванов",
+            "description": "; ".join(candidate_reasons),
+            "value": {"type": "candidate"},
+            "details": candidate_reasons,
+        },
+        {
+            "label": "Петров — ОСАГО",
+            "description": "",
+            "value": {"type": "manual"},
+            "details": [],
+        },
+    ]
+
+    dlg = SearchDialog(items)
+    try:
+        qapp.processEvents()
+        assert dlg.filtered_items[0]["details"] == candidate_reasons
+
+        candidate_text = dlg.detail_view.toPlainText()
+        assert "совпал телефон" in candidate_text
+        assert "есть полис с VIN TEST123" in candidate_text
+
+        dlg.table_view.selectRow(1)
+        qapp.processEvents()
+        manual_text = dlg.detail_view.toPlainText()
+        assert "Причин нет — ручной выбор" in manual_text
+    finally:
+        dlg.close()
