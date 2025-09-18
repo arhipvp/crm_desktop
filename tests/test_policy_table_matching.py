@@ -75,16 +75,20 @@ def test_link_deal_prefills_candidates(monkeypatch, in_memory_db, qapp):
         lambda: [policy_one, policy_two],
     )
 
-    candidate = CandidateDeal(
-        deal_id=candidate_deal.id,
-        deal=candidate_deal,
-        score=0.85,
-        reasons=["совпал телефон", "есть полис с VIN TEST123"],
-    )
+    def fake_candidates(policy, limit=10):
+        del policy, limit
+        return [
+            CandidateDeal(
+                deal_id=candidate_deal.id,
+                deal=candidate_deal,
+                score=0.85,
+                reasons=["совпал телефон", "есть полис с VIN TEST123"],
+            )
+        ]
 
     monkeypatch.setattr(
         "services.policies.find_candidate_deals",
-        lambda policy, limit=10: [candidate],
+        fake_candidates,
     )
     monkeypatch.setattr(
         "services.deal_service.get_all_deals",
@@ -105,11 +109,16 @@ def test_link_deal_prefills_candidates(monkeypatch, in_memory_db, qapp):
     assert DummySearchDialog.last_items is not None
     first_item = DummySearchDialog.last_items[0]
     assert first_item["value"]["type"] == "candidate"
-    assert first_item["score"] == candidate.score
+    assert first_item["score"] == 0.85 * 2
     assert first_item["title"] == "Иванов"
     assert first_item["subtitle"] == "КАСКО"
     assert "совпал телефон" in first_item["comment"]
-    assert first_item["details"] == candidate.reasons
+    assert "⚠️" not in first_item["comment"]
+    assert len(first_item["details"]) == 2
+    assert all(detail.startswith("Полис ") for detail in first_item["details"])
+    assert any("P-001" in detail for detail in first_item["details"])
+    assert any("P-002" in detail for detail in first_item["details"])
+    assert first_item["value"]["unsupported_policy_ids"] == []
 
     manual_labels = [item["title"] for item in DummySearchDialog.last_items[1:]]
     assert any("Петров" in label for label in manual_labels)
@@ -120,6 +129,105 @@ def test_link_deal_prefills_candidates(monkeypatch, in_memory_db, qapp):
         (policy_one.id, candidate_deal.id),
         (policy_two.id, candidate_deal.id),
     ]
+
+
+def test_link_deal_conflicting_candidates_require_confirmation(
+    monkeypatch, in_memory_db, qapp
+):
+    monkeypatch.setattr(PolicyTableView, "load_data", lambda self: None)
+
+    client = Client.create(name="Иванов")
+
+    deal_a = Deal.create(
+        client=client,
+        description="Сделка A",
+        start_date=dt.date(2024, 4, 1),
+    )
+    deal_b = Deal.create(
+        client=client,
+        description="Сделка B",
+        start_date=dt.date(2024, 5, 1),
+    )
+
+    policy_a = Policy.create(
+        client=client,
+        policy_number="PA-001",
+        start_date=dt.date(2024, 4, 5),
+    )
+    policy_b = Policy.create(
+        client=client,
+        policy_number="PB-002",
+        start_date=dt.date(2024, 5, 10),
+    )
+
+    view = PolicyTableView()
+    monkeypatch.setattr(
+        view,
+        "get_selected_multiple",
+        lambda: [policy_a, policy_b],
+    )
+
+    def fake_candidates(policy, limit=10):
+        del limit
+        if policy.id == policy_a.id:
+            return [
+                CandidateDeal(
+                    deal_id=deal_a.id,
+                    deal=deal_a,
+                    score=0.9,
+                    reasons=["VIN совпал"],
+                )
+            ]
+        return [
+            CandidateDeal(
+                deal_id=deal_b.id,
+                deal=deal_b,
+                score=0.8,
+                reasons=["телефон клиента"],
+            )
+        ]
+
+    monkeypatch.setattr(
+        "services.policies.find_candidate_deals",
+        fake_candidates,
+    )
+    monkeypatch.setattr(
+        "services.deal_service.get_all_deals",
+        lambda: [deal_a, deal_b],
+    )
+
+    updates: list[tuple[int, int | None]] = []
+
+    def fake_update_policy(policy_obj, deal_id=None, **kwargs):
+        del kwargs
+        updates.append((policy_obj.id, deal_id))
+
+    monkeypatch.setattr("services.policies.update_policy", fake_update_policy)
+
+    confirm_messages: list[str] = []
+
+    def fake_confirm(message):
+        confirm_messages.append(message)
+        return False
+
+    monkeypatch.setattr("ui.views.policy_table_view.confirm", fake_confirm)
+
+    DummySearchDialog.auto_accept = True
+    DummySearchDialog.last_items = None
+    monkeypatch.setattr("ui.views.policy_table_view.SearchDialog", DummySearchDialog)
+
+    view._on_link_deal()
+
+    assert DummySearchDialog.last_items is not None
+    first_item = DummySearchDialog.last_items[0]
+    assert first_item["value"]["type"] == "candidate"
+    assert "⚠️" in first_item["comment"]
+    assert any("⚠️" in detail for detail in first_item["details"])
+    assert first_item["value"]["unsupported_policy_ids"] == [policy_b.id]
+
+    assert confirm_messages
+    assert "PB-002" in confirm_messages[0]
+    assert updates == []
 
 
 def test_link_deal_make_deal_button_triggers_callback(
