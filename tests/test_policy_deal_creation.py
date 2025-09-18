@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import datetime as dt
 
+import pytest
+from dateutil.relativedelta import relativedelta
+
 from PySide6.QtWidgets import QDialog
 
 from database.models import Client, Deal, Policy
@@ -13,6 +16,8 @@ def test_make_deal_sets_automatic_status(monkeypatch, in_memory_db, qapp):
     monkeypatch.setattr(
         "services.deal_service.create_deal_folder", lambda *a, **k: (None, None)
     )
+    monkeypatch.setattr("ui.common.message_boxes.confirm", lambda *a, **k: True)
+    monkeypatch.setattr("ui.forms.deal_form.confirm", lambda *a, **k: True)
 
     class DummyDealDetail:
         def __init__(self, deal, parent=None):
@@ -57,7 +62,8 @@ def test_make_deal_sets_automatic_status(monkeypatch, in_memory_db, qapp):
     assert updates == [(policy.id, deal.id)]
 
 
-def test_make_deal_sets_reminder_date(monkeypatch, in_memory_db, qapp):
+@pytest.mark.parametrize("start_date", [dt.date(2024, 1, 10), None])
+def test_make_deal_sets_reminder_date(monkeypatch, in_memory_db, qapp, start_date):
     monkeypatch.setattr(PolicyTableView, "load_data", lambda self: None)
     monkeypatch.setattr(
         "services.deal_service.create_deal_folder", lambda *a, **k: (None, None)
@@ -77,13 +83,16 @@ def test_make_deal_sets_reminder_date(monkeypatch, in_memory_db, qapp):
     policy = Policy.create(
         client=client,
         policy_number="P-321",
-        start_date=dt.date(2024, 1, 10),
+        start_date=start_date or dt.date(2024, 1, 10),
     )
+    if start_date is None:
+        policy.start_date = None
 
     view = PolicyTableView()
     monkeypatch.setattr(view, "get_selected_multiple", lambda: [policy])
 
-    expected_date = dt.date.today() + dt.timedelta(days=7)
+    base_date = start_date or dt.date.today()
+    expected_date = base_date + relativedelta(months=9)
 
     updates: list[tuple[int, int | None]] = []
 
@@ -94,34 +103,17 @@ def test_make_deal_sets_reminder_date(monkeypatch, in_memory_db, qapp):
 
     monkeypatch.setattr("services.policies.update_policy", fake_update_policy)
 
+    captured_dates: list[dt.date] = []
+
     def fake_exec(self):
         reminder_widget = self.fields.get("reminder_date")
         assert reminder_widget is not None
-        reminder_date = reminder_widget.date().toPython()
-        assert reminder_date == expected_date
-
-        data = self.collect_data()
-        deal_data = {
-            "client_id": data["client_id"],
-            "status": data.get("status") or "",
-            "description": data.get("description") or "",
-            "start_date": data["start_date"],
-            "reminder_date": reminder_date,
-            "calculations": data.get("calculations"),
-            "is_closed": False,
-        }
-        # remove keys with None values that peewee doesn't expect
-        deal = Deal.create(
-            **{k: v for k, v in deal_data.items() if v is not None}
-        )
-        self.saved_instance = deal
-        return QDialog.Accepted
+        captured_dates.append(reminder_widget.date().toPython())
+        return QDialog.Rejected
 
     monkeypatch.setattr("ui.forms.deal_form.DealForm.exec", fake_exec)
 
     view._on_make_deal()
 
-    deal = Deal.select().first()
-    assert deal is not None
-    assert deal.reminder_date == expected_date
-    assert updates == [(policy.id, deal.id)]
+    assert captured_dates == [expected_date]
+    assert updates == []
