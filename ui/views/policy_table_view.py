@@ -266,6 +266,7 @@ class PolicyTableView(BaseTableView):
                         "label": label,
                         "description": reasons,
                         "value": {"type": "candidate", "deal": deal},
+                        "details": list(candidate.reasons),
                     }
                 )
 
@@ -283,6 +284,7 @@ class PolicyTableView(BaseTableView):
                         "label": label,
                         "description": "",
                         "value": {"type": "manual", "deal": deal},
+                        "details": [],
                     }
                 )
 
