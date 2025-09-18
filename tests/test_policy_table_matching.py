@@ -37,6 +37,96 @@ class DummySearchDialog:
             self.closed = True
 
 
+def test_link_deal_auto_links_single_strict_candidate(
+    monkeypatch, in_memory_db, qapp
+):
+    del qapp
+    monkeypatch.setattr(PolicyTableView, "load_data", lambda self: None)
+
+    client = Client.create(name="Иванов")
+
+    deal = Deal.create(
+        client=client,
+        description="КАСКО",
+        start_date=dt.date(2024, 1, 1),
+    )
+
+    policy_one = Policy.create(
+        client=client,
+        policy_number="P-100",
+        start_date=dt.date(2024, 1, 5),
+    )
+
+    policy_two = Policy.create(
+        client=client,
+        policy_number="P-200",
+        start_date=dt.date(2024, 1, 10),
+    )
+
+    view = PolicyTableView()
+    monkeypatch.setattr(
+        view,
+        "get_selected_multiple",
+        lambda: [policy_one, policy_two],
+    )
+
+    def fake_candidates(policy, limit=10):
+        del policy, limit
+        return [
+            CandidateDeal(
+                deal_id=deal.id,
+                deal=deal,
+                score=1.0,
+                reasons=["VIN совпал"],
+                is_strict=True,
+            )
+        ]
+
+    monkeypatch.setattr(
+        "services.policies.find_candidate_deals",
+        fake_candidates,
+    )
+    monkeypatch.setattr(
+        "services.deal_service.get_all_deals",
+        lambda: [deal],
+    )
+
+    updates: list[tuple[int, int | None]] = []
+
+    def fake_update_policy(policy_obj, deal_id=None, **kwargs):
+        del kwargs
+        updates.append((policy_obj.id, deal_id))
+
+    monkeypatch.setattr("services.policies.update_policy", fake_update_policy)
+
+    info_messages: list[str] = []
+
+    def fake_show_info(message, title="Информация"):
+        del title
+        info_messages.append(message)
+
+    monkeypatch.setattr("ui.views.policy_table_view.show_info", fake_show_info)
+
+    refresh_calls: list[bool] = []
+    monkeypatch.setattr(view, "refresh", lambda: refresh_calls.append(True))
+
+    class FailingDialog:
+        def __init__(self, *args, **kwargs):  # pragma: no cover - defensive
+            raise AssertionError("SearchDialog должен быть пропущен для строгого совпадения")
+
+    monkeypatch.setattr("ui.views.policy_table_view.SearchDialog", FailingDialog)
+
+    view._on_link_deal()
+
+    assert updates == [
+        (policy_one.id, deal.id),
+        (policy_two.id, deal.id),
+    ]
+    assert refresh_calls == [True]
+    assert info_messages
+    assert "автомат" in info_messages[0].lower()
+
+
 def test_link_deal_prefills_candidates(monkeypatch, in_memory_db, qapp):
     monkeypatch.setattr(PolicyTableView, "load_data", lambda self: None)
     DummySearchDialog.auto_accept = True

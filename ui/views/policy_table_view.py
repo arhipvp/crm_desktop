@@ -6,13 +6,14 @@ from services.policies import (
     mark_policies_deleted,
     attach_premium,
 )
+from services.policies.deal_matching import CandidateDeal
 from PySide6.QtWidgets import QAbstractItemView, QMenu
 from PySide6.QtCore import Qt, QDate
 from services.folder_utils import copy_text_to_clipboard
 from ui.base.base_table_view import BaseTableView
 from ui.base.base_table_model import BaseTableModel
 from ui.base.table_controller import TableController
-from ui.common.message_boxes import confirm, show_error
+from ui.common.message_boxes import confirm, show_error, show_info
 from ui.common.search_dialog import SearchDialog
 from ui.forms.policy_form import PolicyForm
 from ui.views.policy_detail_view import PolicyDetailView
@@ -246,8 +247,28 @@ class PolicyTableView(BaseTableView):
             deals_by_id = {deal.id: deal for deal in deals}
 
             aggregated_candidates: dict[int, dict] = {}
+            strict_matches: dict[int, CandidateDeal] = {}
+            auto_link_possible = True
             for policy in policies:
                 policy_candidates = find_candidate_deals(policy, limit=5)
+                strict_candidates = [
+                    candidate
+                    for candidate in policy_candidates
+                    if getattr(candidate, "is_strict", False)
+                ]
+                if len(strict_candidates) == 1:
+                    strict_candidate = strict_candidates[0]
+                    deal_obj = strict_candidate.deal or deals_by_id.get(
+                        strict_candidate.deal_id
+                    )
+                    if deal_obj is None:
+                        auto_link_possible = False
+                    else:
+                        if strict_candidate.deal is None:
+                            strict_candidate.deal = deal_obj
+                        strict_matches[policy.id] = strict_candidate
+                else:
+                    auto_link_possible = False
                 for candidate in policy_candidates:
                     deal = candidate.deal or deals_by_id.get(candidate.deal_id)
                     if deal is None:
@@ -269,6 +290,28 @@ class PolicyTableView(BaseTableView):
                     for reason in policy_reasons:
                         if reason not in entry["combined_reasons"]:
                             entry["combined_reasons"].append(reason)
+
+            if (
+                auto_link_possible
+                and strict_matches
+                and len(strict_matches) == len(policies)
+            ):
+                unique_deal_ids = {candidate.deal_id for candidate in strict_matches.values()}
+                if len(unique_deal_ids) == 1:
+                    deal_id = unique_deal_ids.pop()
+                    deal = deals_by_id.get(deal_id)
+                    if deal is None and strict_matches:
+                        deal = next(iter(strict_matches.values())).deal
+                    if deal is not None:
+                        for policy in policies:
+                            update_policy(policy, deal_id=deal.id)
+                        self.refresh()
+                        deal_name = deal.description or f"ID {deal.id}"
+                        show_info(
+                            "Полисы автоматически привязаны к сделке "
+                            f'"{deal_name}"'
+                        )
+                        return
 
             candidate_items = []
             selected_policies = list(policies)
