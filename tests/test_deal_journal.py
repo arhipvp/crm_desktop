@@ -27,6 +27,20 @@ def test_parse_journal_splits_active_and_archive():
     assert rebuilt == text
 
 
+def test_parse_journal_keeps_dates_inside_body():
+    text = (
+        "[01.02.2024 10:00]: Новый контакт\n"
+        "Дополнительная информация\n"
+        "[05.02.2024 11:11] Это дата внутри текста\n"
+    )
+
+    active, archived = deal_journal.parse_journal(text)
+
+    assert len(active) == 1
+    assert not archived
+    assert "[05.02.2024 11:11] Это дата внутри текста" in active[0].body
+
+
 def test_entry_id_stable_after_dump():
     text = "[01.02.2024 10:00]: Привет мир\n"
 

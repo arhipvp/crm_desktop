@@ -10,7 +10,12 @@ from database.models import Deal
 from utils.time_utils import now_str
 
 ARCHIVE_MARKER = "\n\n===ARCHIVE===\n\n"
-_ENTRY_START_RE = re.compile(r"^\[\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}]", re.MULTILINE)
+_ENTRY_SEPARATOR_PATTERN = r"(?::|[ \t\u00a0][—–-][ \t\u00a0])"
+_ENTRY_START_RE = re.compile(
+    rf"^\[\d{{2}}\.\d{{2}}\.\d{{4}} \d{{2}}:\d{{2}}](?={_ENTRY_SEPARATOR_PATTERN})",
+    re.MULTILINE,
+)
+_ENTRY_SEPARATOR_RE = re.compile(rf"^{_ENTRY_SEPARATOR_PATTERN}")
 
 
 @dataclass(frozen=True)
@@ -108,11 +113,25 @@ def _parse_section(section: str) -> list[JournalEntry]:
     if not matches:
         return [_entry_from_raw(section)]
 
+    valid_matches: list[re.Match[str]] = []
+    for match in matches:
+        tail = section[match.end() :]
+        if not _ENTRY_SEPARATOR_RE.match(tail):
+            continue
+        valid_matches.append(match)
+
+    if not valid_matches:
+        return [_entry_from_raw(section)]
+
     entries: list[JournalEntry] = []
-    prefix = section[: matches[0].start()]
-    for idx, match in enumerate(matches):
+    prefix = section[: valid_matches[0].start()]
+    for idx, match in enumerate(valid_matches):
         start = match.start()
-        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(section)
+        end = (
+            valid_matches[idx + 1].start()
+            if idx + 1 < len(valid_matches)
+            else len(section)
+        )
         raw = section[start:end]
         if idx == 0 and prefix:
             raw = f"{prefix}{raw}"
