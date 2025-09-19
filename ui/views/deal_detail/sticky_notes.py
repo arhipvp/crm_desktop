@@ -28,6 +28,7 @@ class StickyNotesBoard(QWidget):
     """Виджет для отображения активных записей журнала сделки."""
 
     archive_requested = Signal(str)
+    restore_requested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -203,9 +204,29 @@ class StickyNotesBoard(QWidget):
         layout.addStretch()
         button_row.addStretch()
         if is_archived:
-            archive_label = QLabel("В архиве")
-            archive_label.setStyleSheet("color: #888; font-style: italic;")
-            button_row.addWidget(archive_label)
+            restore_btn = QToolButton()
+            restore_btn.setObjectName("stickyRestoreButton")
+            restore_btn.setText("↩")
+            restore_btn.setToolTip("Восстановить из архива")
+            restore_btn.setCursor(Qt.PointingHandCursor)
+            restore_btn.setAutoRaise(True)
+            restore_btn.setStyleSheet(
+                """
+                QToolButton#stickyRestoreButton {
+                    border: none;
+                    padding: 0;
+                    font-size: 14px;
+                }
+                QToolButton#stickyRestoreButton:hover {
+                    background-color: rgba(0, 0, 0, 0.05);
+                    border-radius: 6px;
+                }
+                """
+            )
+            restore_btn.clicked.connect(
+                lambda _=False, eid=entry.entry_id: self.restore_requested.emit(eid)
+            )
+            button_row.addWidget(restore_btn)
         else:
             archive_btn = QToolButton()
             archive_btn.setObjectName("stickyArchiveButton")
