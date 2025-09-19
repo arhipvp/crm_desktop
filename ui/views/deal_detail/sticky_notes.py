@@ -174,11 +174,11 @@ class StickyNotesBoard(QWidget):
             }
             """
         )
-        card.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        card.setFixedSize(self._card_size)
+        card.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
+        card.setFixedWidth(self._card_size.width())
 
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setContentsMargins(12, 10, 12, 10)
         layout.setSpacing(4)
 
         header = QLabel()
@@ -231,6 +231,18 @@ class StickyNotesBoard(QWidget):
             )
             button_row.addWidget(archive_btn)
         layout.addLayout(button_row)
+
+        tooltip_parts: list[str] = []
+        header_text = entry.header or "—"
+        tooltip_parts.append(
+            f"<b>{self._highlight_text(header_text)}</b>"
+        )
+        if entry.body:
+            tooltip_parts.append(self._highlight_text(entry.body))
+        card.setToolTip("<br/><br/>".join(tooltip_parts))
+        header.setToolTip(card.toolTip())
+        if entry.body:
+            body.setToolTip(card.toolTip())
 
         return card
 
