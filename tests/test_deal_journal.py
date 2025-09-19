@@ -91,3 +91,18 @@ def test_append_and_archive_operations_preserve_format(monkeypatch):
     # round-trip compatibility with existing text
     rebuilt = deal_journal.dump_journal(*deal_journal.parse_journal(deal.calculations))
     assert rebuilt == deal.calculations
+
+    restored_entry = deal_journal.restore_entry(deal, old_entry_id)
+    assert restored_entry is not None
+    assert restored_entry.entry_id == old_entry_id
+
+    active_final, archived_final = deal_journal.load_entries(deal)
+    assert len(active_final) == 2
+    assert not archived_final
+    assert active_final[0].entry_id == old_entry_id
+
+    rebuilt_after_restore = deal_journal.dump_journal(
+        *deal_journal.parse_journal(deal.calculations)
+    )
+    assert rebuilt_after_restore == deal.calculations
+    assert "===ARCHIVE===" not in deal.calculations

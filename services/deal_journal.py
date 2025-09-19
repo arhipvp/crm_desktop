@@ -87,6 +87,20 @@ def archive_entry(deal: Deal, entry_id: str) -> JournalEntry | None:
     return None
 
 
+def restore_entry(deal: Deal, entry_id: str) -> JournalEntry | None:
+    active, archived = load_entries(deal)
+    for idx, entry in enumerate(archived):
+        if entry.entry_id == entry_id:
+            restored_entry = archived.pop(idx)
+            active.insert(0, restored_entry)
+            new_text = dump_journal(active, archived)
+            with db.atomic():
+                deal.calculations = new_text
+                deal.save(only=[Deal.calculations])
+            return restored_entry
+    return None
+
+
 def format_for_display(text: str | None, *, active_only: bool = False) -> str:
     active, archived = parse_journal(text)
     entries: Iterable[JournalEntry]
