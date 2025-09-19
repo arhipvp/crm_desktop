@@ -4,12 +4,10 @@ import html
 import re
 from typing import Iterable, Sequence
 
-from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QResizeEvent
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -21,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from services import deal_journal
+from ui.widgets.flow_layout import FlowLayout
 from services.deal_journal import JournalEntry
 
 
@@ -55,10 +54,9 @@ class StickyNotesBoard(QWidget):
         self._container.setObjectName("stickyNotesContainer")
         self._scroll.setWidget(self._container)
 
-        self._container_layout = QGridLayout()
+        self._container_layout = FlowLayout()
         self._container_layout.setContentsMargins(0, 0, 0, 0)
-        self._container_layout.setHorizontalSpacing(12)
-        self._container_layout.setVerticalSpacing(12)
+        self._container_layout.setSpacing(12)
         self._container.setLayout(self._container_layout)
 
         self._all_entries: list[tuple[bool, JournalEntry]] = []
@@ -66,8 +64,7 @@ class StickyNotesBoard(QWidget):
         self._active_entries: list[tuple[bool, JournalEntry]] = []
         self._archived_entries: list[tuple[bool, JournalEntry]] = []
         self._search_term: str = ""
-        self._card_size = QSize(160, 160)
-        self._grid_columns: int = 1
+        self._card_width = 160
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
     def load_entries(self, deal) -> None:
@@ -92,14 +89,13 @@ class StickyNotesBoard(QWidget):
         self._apply_filter()
 
     def _rebuild(self) -> None:
-        self._update_grid_columns(trigger_rebuild=False)
-
         while self._container_layout.count():
             item = self._container_layout.takeAt(0)
             if item is None:
                 break
             widget = item.widget()
             if widget:
+                widget.setParent(None)
                 widget.deleteLater()
 
         show_archive = self._archive_toggle.isChecked() and bool(self._archived_entries)
@@ -111,39 +107,19 @@ class StickyNotesBoard(QWidget):
         else:
             sections.append((None, self._active_entries))
 
-        row = 0
-        col = 0
-
-        def advance_position() -> tuple[int, int]:
-            nonlocal row, col
-            current = (row, col)
-            col += 1
-            if col >= self._grid_columns:
-                col = 0
-                row += 1
-            return current
-
-        def place_widget(widget: QWidget, *, span_full_row: bool = False) -> None:
-            nonlocal row, col
-            if span_full_row or self._grid_columns == 1:
-                self._container_layout.addWidget(widget, row, 0, 1, self._grid_columns)
-                row += 1
-                col = 0
-            else:
-                pos_row, pos_col = advance_position()
-                self._container_layout.addWidget(widget, pos_row, pos_col)
-
         for title, entries in sections:
             if title:
                 header = QLabel(title)
                 header.setStyleSheet("font-weight: bold; color: #444;")
                 header.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                place_widget(header, span_full_row=True)
+                header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                header.setProperty("flow_fill_row", True)
+                self._container_layout.addWidget(header)
 
             if entries:
                 for is_archived, entry in entries:
                     card = self._create_card(entry, is_archived)
-                    place_widget(card)
+                    self._container_layout.addWidget(card)
             else:
                 placeholder_text = "Журнал пуст"
                 if self._search_term:
@@ -159,9 +135,9 @@ class StickyNotesBoard(QWidget):
                 placeholder.setAlignment(Qt.AlignCenter)
                 placeholder.setStyleSheet("color: #888; font-style: italic;")
                 placeholder.setTextInteractionFlags(Qt.TextSelectableByMouse)
-                place_widget(placeholder, span_full_row=True)
-
-        self._container_layout.setRowStretch(row, 1)
+                placeholder.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                placeholder.setProperty("flow_fill_row", True)
+                self._container_layout.addWidget(placeholder)
 
     def _create_card(self, entry: JournalEntry, is_archived: bool = False) -> QWidget:
         card = QFrame()
@@ -176,7 +152,7 @@ class StickyNotesBoard(QWidget):
             """
         )
         card.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
-        card.setFixedWidth(self._card_size.width())
+        card.setFixedWidth(self._card_width)
 
         layout = QVBoxLayout(card)
         layout.setContentsMargins(12, 10, 12, 10)
@@ -266,26 +242,6 @@ class StickyNotesBoard(QWidget):
             body.setToolTip(card.toolTip())
 
         return card
-
-    def resizeEvent(self, event: QResizeEvent) -> None:
-        super().resizeEvent(event)
-        self._update_grid_columns()
-
-    def _update_grid_columns(self, *, trigger_rebuild: bool = True) -> None:
-        spacing = self._container_layout.horizontalSpacing() or 0
-        available_width = self._scroll.viewport().width()
-        if available_width <= 0:
-            available_width = self.width()
-        card_width = self._card_size.width()
-        if card_width <= 0:
-            columns = 1
-        else:
-            columns = max(1, (available_width + spacing) // (card_width + spacing))
-
-        if columns != self._grid_columns:
-            self._grid_columns = columns
-            if trigger_rebuild and self._all_entries:
-                self._rebuild()
 
     def _on_search_changed(self, text: str) -> None:
         self._search_term = text.strip()
