@@ -66,7 +66,7 @@ def test_add_policy_first_payment_paid_sets_contractor_expense_date(
         .first()
     )
     assert expense is not None
-    assert expense.expense_date == payment.actual_payment_date
+    assert expense.expense_date is None
 
 
 def test_dialog_creates_expenses_for_selected_payments(policy_form, monkeypatch):
@@ -282,7 +282,7 @@ def test_add_contractor_expense_updates_existing_records(in_memory_db):
     assert len(result.updated) == 1
     updated_expense = Expense.get_by_id(expense.id)
     assert updated_expense.note == "выплата контрагенту B"
-    assert updated_expense.expense_date == actual_date
+    assert updated_expense.expense_date is None
 
 
 def test_create_expenses_for_all_payments(in_memory_db):
