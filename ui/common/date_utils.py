@@ -9,8 +9,10 @@ Fixed imports so they match PySide6 modules:
 
 from datetime import date
 
+from typing import Optional
+
 from PySide6.QtCore import QDate, QEvent, QPoint, Qt, QObject
-from PySide6.QtGui import QKeyEvent
+from PySide6.QtGui import QAction, QKeyEvent
 from PySide6.QtWidgets import QDateEdit, QLineEdit
 
 
@@ -66,14 +68,18 @@ class _OptionalDateEditHelper(QObject):
     def __init__(self, widget: QDateEdit):
         super().__init__(widget)
         self._widget = widget
+        self._line_edit: Optional[QLineEdit] = widget.lineEdit()
+        self._clear_action: Optional[QAction] = None
 
         widget.installEventFilter(self)
 
-        line_edit = widget.lineEdit()
-        if line_edit is not None:
-            line_edit.installEventFilter(self)
-            line_edit.setContextMenuPolicy(Qt.CustomContextMenu)
-            line_edit.customContextMenuRequested.connect(self._show_context_menu)
+        if self._line_edit is not None:
+            self._line_edit.installEventFilter(self)
+            self._line_edit.setClearButtonEnabled(True)
+            self._line_edit.textChanged.connect(self._handle_line_edit_text_changed)
+            self._line_edit.setContextMenuPolicy(Qt.CustomContextMenu)
+            self._line_edit.customContextMenuRequested.connect(self._show_context_menu)
+            self._hook_clear_button_action()
 
     # ------------------------------------------------------------------
     # Factory
@@ -90,7 +96,10 @@ class _OptionalDateEditHelper(QObject):
     # Event filter / menu
     # ------------------------------------------------------------------
     def eventFilter(self, obj, event):  # noqa: N802 (Qt signature)
-        if event.type() == QEvent.KeyPress and event.key() == Qt.Key_Delete:
+        if event.type() == QEvent.KeyPress and event.key() in (
+            Qt.Key_Delete,
+            Qt.Key_Backspace,
+        ):
             if event.modifiers() in (Qt.NoModifier, Qt.KeypadModifier):
                 clear_optional_date(self._widget)
                 event.accept()
@@ -98,11 +107,10 @@ class _OptionalDateEditHelper(QObject):
         return super().eventFilter(obj, event)
 
     def _show_context_menu(self, pos: QPoint) -> None:
-        line_edit = self._widget.lineEdit()
-        if line_edit is None:
+        if self._line_edit is None:
             return
 
-        menu = line_edit.createStandardContextMenu()
+        menu = self._line_edit.createStandardContextMenu()
         menu.addSeparator()
         action = menu.addAction("Очистить дату")
 
@@ -110,7 +118,39 @@ class _OptionalDateEditHelper(QObject):
             clear_optional_date(self._widget)
 
         action.triggered.connect(_clear)  # type: ignore[arg-type]
-        menu.exec(line_edit.mapToGlobal(pos))
+        menu.exec(self._line_edit.mapToGlobal(pos))
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    def _handle_line_edit_text_changed(self, text: str) -> None:
+        if text:
+            return
+        if self._widget.date() == self._widget.minimumDate():
+            return
+        clear_optional_date(self._widget)
+
+    def _hook_clear_button_action(self) -> None:
+        if self._line_edit is None:
+            return
+
+        action = self._find_clear_action(self._line_edit)
+        if action is None:
+            return
+
+        self._clear_action = action
+        self._clear_action.triggered.connect(self._on_clear_button_triggered)
+
+    @staticmethod
+    def _find_clear_action(line_edit: QLineEdit) -> Optional[QAction]:
+        # Qt создаёт действие "qt_edit_clear_action" для стандартной кнопки очистки.
+        for action in line_edit.actions():
+            if action.objectName() == "qt_edit_clear_action":
+                return action
+        return None
+
+    def _on_clear_button_triggered(self) -> None:
+        clear_optional_date(self._widget)
 
 
 def set_optional_date(widget, d): ...
