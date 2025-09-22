@@ -1,13 +1,24 @@
 import datetime
+import os
 from datetime import date
 from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import QDate
+from PySide6.QtWidgets import QApplication
 from database.models import Client, Deal, Policy, Task, Executor, DealExecutor, Payment
 from services.task_states import QUEUED
 from ui.views.deal_detail.actions import DealActionsMixin
 from ui.views.deal_detail.tabs import DealTabsMixin
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+    yield app
 
 
 @pytest.fixture
