@@ -168,11 +168,17 @@ def update_expense(expense: Expense, **kwargs):
 
     with db.atomic():
         updates: dict[str, object] = {}
+        nullable_fields = {"expense_date", "note"}
         for key, value in kwargs.items():
-            if key in allowed_fields and value not in ("", None):
-                if key == "amount":
-                    value = Decimal(str(value))
-                updates[key] = value
+            if key not in allowed_fields:
+                continue
+            if value == "":
+                continue
+            if value is None and key not in nullable_fields:
+                continue
+            if key == "amount" and value is not None:
+                value = Decimal(str(value))
+            updates[key] = value
 
         payment_obj = None
         if kwargs.get("payment") is not None or kwargs.get("payment_id") is not None:

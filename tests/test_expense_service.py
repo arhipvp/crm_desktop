@@ -1,11 +1,12 @@
 """Tests for :mod:`services.expense_service`."""
 
 from datetime import date, timedelta
+import logging
 
 import pytest
 
 from database.models import Expense, Income
-from services.expense_service import build_expense_query
+from services.expense_service import build_expense_query, update_expense
 
 
 def test_other_expense_total_excludes_current(in_memory_db, make_policy_with_payment):
@@ -94,4 +95,30 @@ def test_build_expense_query_ignores_date_range_when_excluding_paid(
     )
 
     assert [expense.id for expense in results] == [pending.id]
+
+
+def test_update_expense_allows_clearing_nullable_fields(
+    in_memory_db, make_policy_with_payment, caplog
+):
+    caplog.set_level(logging.INFO, logger="services.expense_service")
+    _, _, policy, payment = make_policy_with_payment()
+    expense = Expense.create(
+        payment=payment,
+        policy=policy,
+        amount=50,
+        expense_type="тест",
+        expense_date=date.today(),
+        note="Комментарий",
+    )
+
+    update_expense(expense, expense_date=None, note=None)
+
+    updated = Expense.get_by_id(expense.id)
+
+    assert updated.expense_date is None
+    assert updated.note is None
+
+    log_messages = [record.getMessage() for record in caplog.records]
+    assert any("'expense_date': None" in message for message in log_messages)
+    assert any("'note': None" in message for message in log_messages)
 
