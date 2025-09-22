@@ -380,7 +380,6 @@ def add_contractor_expense(
 
     with db.atomic():
         for payment in payment_objects:
-            actual_date = payment.actual_payment_date or payment.payment_date
             expenses = expenses_map.get(payment.id, [])
             if not expenses:
                 expense_kwargs = dict(
@@ -389,8 +388,6 @@ def add_contractor_expense(
                     expense_type="контрагент",
                     note=note_template,
                 )
-                if actual_date:
-                    expense_kwargs["expense_date"] = actual_date
 
                 created_expenses.append(add_expense(**expense_kwargs))
                 continue
@@ -400,11 +397,8 @@ def add_contractor_expense(
                 if expense.note != note_template:
                     expense.note = note_template
                     changed = True
-                if actual_date and expense.expense_date != actual_date:
-                    expense.expense_date = actual_date
-                    changed = True
                 if changed:
-                    expense.save(only=[Expense.note, Expense.expense_date])
+                    expense.save(only=[Expense.note])
                     updated_expenses.append(expense)
 
     return ContractorExpenseResult(created=created_expenses, updated=updated_expenses)
