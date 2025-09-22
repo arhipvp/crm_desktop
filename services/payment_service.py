@@ -356,10 +356,10 @@ def sync_policy_payments(policy: Policy, payments: list[dict] | None) -> None:
         key = (payment_date, amount)
         if existing[key]:
             payment = existing[key].pop(0)
-            if (
-                actual_payment_date is not None
-                and payment.actual_payment_date != actual_payment_date
-            ):
+            if actual_payment_date is None:
+                if payment.actual_payment_date is not None:
+                    update_payment(payment, actual_payment_date=None)
+            elif payment.actual_payment_date != actual_payment_date:
                 update_payment(payment, actual_payment_date=actual_payment_date)
         else:
             add_payment(
