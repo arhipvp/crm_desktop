@@ -4,7 +4,7 @@ import logging
 from decimal import Decimal
 from typing import Any
 
-from peewee import Field, JOIN, fn
+from peewee import Alias, Field, JOIN, fn
 
 from database.db import db
 from database.models import Client, Deal, Expense, Income, Payment, Policy
@@ -409,6 +409,9 @@ def build_expense_query(
                 field_obj = Expense.expense_date
         else:
             field_obj = order_by
+
+        if isinstance(field_obj, Alias):
+            field_obj = field_obj.unwrap()
 
         if field_obj is not None and hasattr(field_obj, "asc") and hasattr(field_obj, "desc"):
             order_expr = field_obj.desc() if order_dir == "desc" else field_obj.asc()
