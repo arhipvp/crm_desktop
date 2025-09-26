@@ -118,6 +118,13 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
 
         ex = es.get_executor_for_deal(self.instance.id)
         executor_name = ex.full_name if ex else "—"
+        if ex:
+            executor_label_text = f"Исполнитель: <b>{executor_name}</b>"
+        else:
+            executor_label_text = (
+                "Исполнитель: <span style='color:#d9534f; font-weight:bold'>"
+                "не назначен</span>"
+            )
 
         for text in [
             f"Полисов: <b>{cnt_policies}</b>",
@@ -125,7 +132,7 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             f"Доходов: <b>{cnt_income}</b>",
             f"Расходов: <b>{cnt_expense}</b>",
             f"Задач: <b>{cnt_tasks}</b>",
-            f"<span style='color:red; font-weight:bold'>Исполнитель: {executor_name}</span>",
+            executor_label_text,
         ]:
             lbl = QLabel(text)
             lbl.setTextFormat(Qt.RichText)
