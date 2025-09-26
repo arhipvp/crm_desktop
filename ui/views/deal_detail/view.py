@@ -10,11 +10,21 @@ from PySide6.QtWidgets import (
 )
 
 from services.task_crud import get_task_counts_by_deal_id
-from services.payment_service import get_payment_counts_by_deal_id
+from services.payment_service import (
+    get_payment_amounts_by_deal_id,
+    get_payment_counts_by_deal_id,
+)
 from services.policies import get_policy_counts_by_deal_id
-from services.income_service import get_income_counts_by_deal_id
-from services.expense_service import get_expense_counts_by_deal_id
+from services.income_service import (
+    get_income_amounts_by_deal_id,
+    get_income_counts_by_deal_id,
+)
+from services.expense_service import (
+    get_expense_amounts_by_deal_id,
+    get_expense_counts_by_deal_id,
+)
 from utils.screen_utils import get_scaled_size
+from utils.money import format_rub
 
 from .actions import DealActionsMixin
 from .tabs import DealTabsMixin
@@ -91,17 +101,22 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             if w:
                 w.deleteLater()
 
-        pol_open, pol_closed = get_policy_counts_by_deal_id(self.instance.id)
-        pay_open, pay_closed = get_payment_counts_by_deal_id(self.instance.id)
-        task_open, task_closed = get_task_counts_by_deal_id(self.instance.id)
-        inc_open, inc_closed = get_income_counts_by_deal_id(self.instance.id)
-        exp_open, exp_closed = get_expense_counts_by_deal_id(self.instance.id)
+        deal_id = self.instance.id
+        pol_open, pol_closed = get_policy_counts_by_deal_id(deal_id)
+        pay_open, pay_closed = get_payment_counts_by_deal_id(deal_id)
+        inc_open, inc_closed = get_income_counts_by_deal_id(deal_id)
+        exp_open, exp_closed = get_expense_counts_by_deal_id(deal_id)
+        task_open, task_closed = get_task_counts_by_deal_id(deal_id)
+
+        pay_expected, pay_received = get_payment_amounts_by_deal_id(deal_id)
+        inc_expected, inc_received = get_income_amounts_by_deal_id(deal_id)
+        exp_planned, exp_spent = get_expense_amounts_by_deal_id(deal_id)
 
         cnt_policies = pol_open + pol_closed
         cnt_payments = pay_open + pay_closed
-        cnt_tasks = task_open + task_closed
         cnt_income = inc_open + inc_closed
         cnt_expense = exp_open + exp_closed
+        cnt_tasks = task_open + task_closed
 
         self.cnt_policies_open = pol_open
         self.cnt_policies_closed = pol_closed
@@ -113,6 +128,21 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self.cnt_income_closed = inc_closed
         self.cnt_expense_open = exp_open
         self.cnt_expense_closed = exp_closed
+
+        payments_text = (
+            f"Платежи: <b>{cnt_payments}</b> — ожидается "
+            f"{format_rub(pay_expected)}, получено {format_rub(pay_received)}"
+        )
+        incomes_text = (
+            f"Доходы: <b>{cnt_income}</b> — ожидается "
+            f"{format_rub(inc_expected)}, получено {format_rub(inc_received)}"
+        )
+        expenses_text = (
+            f"Расходы: <b>{cnt_expense}</b> — запланировано "
+            f"{format_rub(exp_planned)}, списано {format_rub(exp_spent)}"
+        )
+        net_profit = inc_received - exp_spent
+        profit_text = f"Чистая прибыль: <b>{format_rub(net_profit)}</b>"
 
         from services import executor_service as es
 
@@ -128,9 +158,10 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
 
         for text in [
             f"Полисов: <b>{cnt_policies}</b>",
-            f"Платежей: <b>{cnt_payments}</b>",
-            f"Доходов: <b>{cnt_income}</b>",
-            f"Расходов: <b>{cnt_expense}</b>",
+            payments_text,
+            incomes_text,
+            expenses_text,
+            profit_text,
             f"Задач: <b>{cnt_tasks}</b>",
             executor_label_text,
         ]:

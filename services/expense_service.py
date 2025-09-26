@@ -9,7 +9,7 @@ from peewee import Alias, Field, JOIN, fn
 from database.db import db
 from database.models import Client, Deal, Expense, Income, Payment, Policy
 from services.payment_service import get_payment_by_id
-from services.query_utils import apply_search_and_filters
+from services.query_utils import apply_search_and_filters, sum_column
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,20 @@ def get_expense_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     open_count = base.where(Expense.expense_date.is_null(True)).count()
     closed_count = base.where(Expense.expense_date.is_null(False)).count()
     return open_count, closed_count
+
+
+def get_expense_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:
+    """Вернуть суммы запланированных и списанных расходов по сделке."""
+
+    base = (
+        Expense.active()
+        .join(Payment)
+        .join(Policy)
+        .where(Policy.deal_id == deal_id)
+    )
+    planned = sum_column(base.where(Expense.expense_date.is_null(True)), Expense.amount)
+    spent = sum_column(base.where(Expense.expense_date.is_null(False)), Expense.amount)
+    return planned, spent
 
 
 def get_expense_count_by_policy(policy_id: int) -> int:
