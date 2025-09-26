@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
@@ -9,6 +11,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QSizePolicy,
+    QSplitter,
     QTableView,
     QTabWidget,
     QVBoxLayout,
@@ -17,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from database.models import Expense, Income, Payment
 from services.folder_utils import open_folder
+from ui import settings as ui_settings
 from ui.base.base_table_model import BaseTableModel
 from ui.common.date_utils import format_date
 from ui.common.styled_widgets import styled_button
@@ -31,18 +36,55 @@ from ui.views.income_detail_view import IncomeDetailView
 class PaymentDetailView(QDialog):
     """Детальная карточка платежа с вложенными доходами / расходами."""
 
+    SETTINGS_KEY = "payment_detail_view"
+
     def __init__(self, payment: Payment, parent=None):
         super().__init__(parent)
         self.instance = payment
         self.setWindowTitle(f"Платёж #{payment.id} — {payment.amount:.2f} ₽")
-        size = get_scaled_size(900, 650)
+        size = get_scaled_size(1100, 720)
         self.resize(size)
-        self.setMinimumSize(640, 480)
+        self.setMinimumSize(800, 600)
 
         self.layout = QVBoxLayout(self)
 
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        self.layout.addWidget(self.splitter, stretch=1)
+
+        self.left_panel = QWidget()
+        self.left_panel.setMinimumWidth(260)
+        left_layout = QVBoxLayout(self.left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(12)
+
+        self.header_label = QLabel()
+        self.header_label.setStyleSheet("font-size: 20px; font-weight: bold;")
+        self.header_label.setWordWrap(True)
+        left_layout.addWidget(self.header_label)
+
+        self.kpi_container = QWidget()
+        self.kpi_layout = QHBoxLayout(self.kpi_container)
+        self.kpi_layout.setContentsMargins(0, 0, 0, 0)
+        self.kpi_layout.setSpacing(8)
+        left_layout.addWidget(self.kpi_container)
+
+        self.summary_widget = QWidget()
+        self.summary_layout = QFormLayout(self.summary_widget)
+        self.summary_layout.setLabelAlignment(Qt.AlignRight)
+        self.summary_layout.setHorizontalSpacing(12)
+        left_layout.addWidget(self.summary_widget, stretch=1)
+        left_layout.addStretch()
+
+        self.splitter.addWidget(self.left_panel)
+
+        self.tabs = QTabWidget()
+        self.tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.splitter.addWidget(self.tabs)
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 1)
+
         # ссылки на KPI-панель
-        self.kpi_layout: QHBoxLayout | None = None
         self._lbl_incomes: QLabel | None = None
         self._lbl_expenses: QLabel | None = None
 
@@ -50,10 +92,11 @@ class PaymentDetailView(QDialog):
         self._init_kpi_panel()
 
         # ───── Табы ─────
-        self.tabs = QTabWidget()
-        self.layout.addWidget(self.tabs, stretch=1)
         self._init_tabs()
         self._init_actions()
+
+        self._apply_default_splitter_sizes(size.width())
+        self._restore_splitter_state()
 
     # ------------------------------------------------------------------
     # KPI
@@ -62,27 +105,25 @@ class PaymentDetailView(QDialog):
         incomes_cnt = Income.select().where(Income.payment == self.instance).count()
         expenses_cnt = Expense.select().where(Expense.payment == self.instance).count()
 
-        if self.kpi_layout:
-            # обновляем существующие значения
-            if self._lbl_incomes:
-                self._lbl_incomes.setText(f"Доходов: <b>{incomes_cnt}</b>")
-            if self._lbl_expenses:
-                self._lbl_expenses.setText(f"Расходов: <b>{expenses_cnt}</b>")
-            return
+        while self.kpi_layout.count():
+            item = self.kpi_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
 
-        layout = QHBoxLayout()
         self._lbl_incomes = QLabel(f"Доходов: <b>{incomes_cnt}</b>")
         self._lbl_expenses = QLabel(f"Расходов: <b>{expenses_cnt}</b>")
-        layout.addWidget(self._lbl_incomes)
-        layout.addWidget(self._lbl_expenses)
-        layout.addStretch()
-        self.layout.addLayout(layout)
-        self.kpi_layout = layout
+        for lbl in (self._lbl_incomes, self._lbl_expenses):
+            lbl.setTextFormat(Qt.RichText)
+            self.kpi_layout.addWidget(lbl)
+        self.kpi_layout.addStretch()
 
     # ------------------------------------------------------------------
     # Tabs
     # ------------------------------------------------------------------
     def _init_tabs(self):
+        self._populate_summary()
+
         # очистка
         while self.tabs.count():
             w = self.tabs.widget(0)
@@ -157,6 +198,58 @@ class PaymentDetailView(QDialog):
             folder_btn.setDisabled(True)
 
         self.layout.addLayout(row)
+
+    def closeEvent(self, event):
+        self._save_splitter_state()
+        super().closeEvent(event)
+
+    def _populate_summary(self) -> None:
+        policy = self.instance.policy
+        policy_text = (
+            f"id={policy.id} №{policy.policy_number}" if policy else "—"
+        )
+        rows = [
+            ("ID", str(self.instance.id)),
+            ("Полис", policy_text),
+            ("Сумма", f"{self.instance.amount:.2f} ₽"),
+            ("Плановая дата", format_date(self.instance.payment_date)),
+            (
+                "Фактическая дата",
+                format_date(self.instance.actual_payment_date),
+            ),
+        ]
+
+        while self.summary_layout.rowCount():
+            self.summary_layout.removeRow(0)
+
+        self.header_label.setText(f"Платёж #{self.instance.id}")
+
+        for label, value in rows:
+            widget = QLabel(value)
+            widget.setTextFormat(Qt.RichText)
+            widget.setWordWrap(True)
+            self.summary_layout.addRow(f"{label}:", widget)
+
+    def _apply_default_splitter_sizes(self, total_width: int | None = None) -> None:
+        total = total_width or self.width() or 1
+        left = int(total * 0.35)
+        right = max(1, total - left)
+        self.splitter.setSizes([left, right])
+
+    def _restore_splitter_state(self) -> None:
+        state = ui_settings.get_window_settings(self.SETTINGS_KEY).get("splitter_state")
+        if state:
+            try:
+                self.splitter.restoreState(base64.b64decode(state))
+                return
+            except Exception:
+                pass
+        self._apply_default_splitter_sizes()
+
+    def _save_splitter_state(self) -> None:
+        st = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        st["splitter_state"] = base64.b64encode(self.splitter.saveState()).decode("ascii")
+        ui_settings.set_window_settings(self.SETTINGS_KEY, st)
 
     # ------------------------------------------------------------------
     # Slots

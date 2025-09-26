@@ -5,8 +5,10 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QSizePolicy,
+    QSplitter,
     QTabWidget,
     QVBoxLayout,
+    QWidget,
 )
 
 from services.task_crud import get_task_counts_by_deal_id
@@ -49,6 +51,15 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self.layout = QVBoxLayout(self)
         self._shortcuts: list[QShortcut] = []
 
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        self.layout.addWidget(self.splitter, stretch=1)
+
+        self.left_panel = QWidget()
+        left_layout = QVBoxLayout(self.left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(12)
+
         status = self.instance.status or "Без статуса"
         color_map = {"Закрыта": "#d9534f", "Активна": "#5cb85c"}
         color = color_map.get(status, "#6c757d")
@@ -58,22 +69,33 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         )
         header.setTextFormat(Qt.RichText)
         header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.layout.addWidget(header)
+        header.setWordWrap(True)
+        left_layout.addWidget(header)
 
-        self.kpi_layout = QHBoxLayout()
-        self.layout.addLayout(self.kpi_layout)
+        self.kpi_container = QWidget()
+        self.kpi_layout = QHBoxLayout(self.kpi_container)
+        self.kpi_layout.setContentsMargins(0, 0, 0, 0)
+        self.kpi_layout.setSpacing(8)
+        left_layout.addWidget(self.kpi_container)
         self._init_kpi_panel()
 
         info_panel = self._create_info_panel()
-        self.layout.addWidget(info_panel)
+        left_layout.addWidget(info_panel, stretch=1)
+        left_layout.addStretch()
+
+        self.splitter.addWidget(self.left_panel)
 
         self.tabs = QTabWidget()
-        self.layout.addWidget(self.tabs, stretch=1)
+        self.tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.splitter.addWidget(self.tabs)
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 1)
         self._init_tabs()
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
         self._init_actions()
         self._register_shortcuts()
+        self._apply_default_splitter_sizes(size.width())
         self._load_settings()
 
     def _on_tab_changed(self, index: int) -> None:
@@ -200,3 +222,9 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
                 self.task_tab_idx,
                 f"Задачи {self.cnt_tasks_open} ({self.cnt_tasks_closed})",
             )
+
+    def _apply_default_splitter_sizes(self, total_width: int | None = None) -> None:
+        total = total_width or self.width() or 1
+        left = int(total * 0.35)
+        right = max(1, total - left)
+        self.splitter.setSizes([left, right])

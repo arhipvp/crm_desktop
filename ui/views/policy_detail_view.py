@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import base64
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
     QHeaderView,
+    QHBoxLayout,
     QLabel,
+    QSplitter,
     QTabWidget,
+    QTableView,
     QTextEdit,
     QVBoxLayout,
     QWidget,
-    QHBoxLayout,
-    QTableView,
+    QSizePolicy,
 )
 
 from database.models import Expense, Income, Payment, Policy
@@ -21,6 +25,7 @@ from services.folder_utils import open_folder
 from services.payment_service import get_payments_by_policy_id
 from services.income_service import build_income_query
 from services.expense_service import build_expense_query
+from ui import settings as ui_settings
 from ui.base.base_table_model import BaseTableModel
 from ui.common.date_utils import format_date
 from ui.common.styled_widgets import styled_button
@@ -42,35 +47,75 @@ class PolicyDetailView(QDialog):
         • Расходы
     """
 
+    SETTINGS_KEY = "policy_detail_view"
+
     def __init__(self, policy: Policy, parent=None):
         super().__init__(parent)
         self.instance = policy
         self.setWindowTitle(
             f"Полис id={policy.id} №{policy.policy_number or ''}"
         )
-        size = get_scaled_size(1000, 700)
+        size = get_scaled_size(1100, 720)
         self.resize(size)
-        self.setMinimumSize(640, 480)
+        self.setMinimumSize(800, 600)
 
         self.layout = QVBoxLayout(self)
 
-        # ───────────────────── KPI панель ──────────────────────
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        self.layout.addWidget(self.splitter, stretch=1)
+
+        self.left_panel = QWidget()
+        self.left_panel.setMinimumWidth(260)
+        left_layout = QVBoxLayout(self.left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(12)
+
+        self.header_label = QLabel()
+        self.header_label.setStyleSheet("font-size: 20px; font-weight: bold;")
+        self.header_label.setWordWrap(True)
+        left_layout.addWidget(self.header_label)
+
+        self.kpi_container = QWidget()
+        self.kpi_layout = QHBoxLayout(self.kpi_container)
+        self.kpi_layout.setContentsMargins(0, 0, 0, 0)
+        self.kpi_layout.setSpacing(8)
+        left_layout.addWidget(self.kpi_container)
         self._init_kpi_panel()
 
-        # ───────────────────── Вкладки ─────────────────────────
+        self.summary_widget = QWidget()
+        self.summary_layout = QFormLayout(self.summary_widget)
+        self.summary_layout.setLabelAlignment(Qt.AlignRight)
+        self.summary_layout.setHorizontalSpacing(12)
+        left_layout.addWidget(self.summary_widget, stretch=1)
+        left_layout.addStretch()
+
+        self.splitter.addWidget(self.left_panel)
+
         self.tabs = QTabWidget()
-        self.layout.addWidget(self.tabs, stretch=1)
+        self.tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.splitter.addWidget(self.tabs)
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 1)
         self._init_tabs()
 
         # ───────────────────── Кнопки действий ─────────────────
         self._init_actions()
+
+        self._apply_default_splitter_sizes(size.width())
+        self._restore_splitter_state()
 
     # ---------------------------------------------------------------------
     # UI helpers
     # ---------------------------------------------------------------------
     def _init_kpi_panel(self):
         """Короткая статистика сверху окна."""
-        kpi = QHBoxLayout()
+        while self.kpi_layout.count():
+            item = self.kpi_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
         cnt_payments = get_payments_by_policy_id(self.instance.id).count()
         cnt_incomes = (
             build_income_query()
@@ -80,13 +125,24 @@ class PolicyDetailView(QDialog):
         cnt_expenses = (
             build_expense_query().where(Expense.policy == self.instance.id).count()
         )
-        kpi.addWidget(QLabel(f"Платежей: <b>{cnt_payments}</b>"))
-        kpi.addWidget(QLabel(f"Доходов: <b>{cnt_incomes}</b>"))
-        kpi.addWidget(QLabel(f"Расходов: <b>{cnt_expenses}</b>"))
-        kpi.addStretch()
-        self.layout.addLayout(kpi)
+        for text in [
+            f"Платежей: <b>{cnt_payments}</b>",
+            f"Доходов: <b>{cnt_incomes}</b>",
+            f"Расходов: <b>{cnt_expenses}</b>",
+        ]:
+            lbl = QLabel(text)
+            lbl.setTextFormat(Qt.RichText)
+            self.kpi_layout.addWidget(lbl)
+        self.kpi_layout.addStretch()
 
     def _init_tabs(self):
+        self._populate_summary()
+
+        while self.tabs.count():
+            w = self.tabs.widget(0)
+            self.tabs.removeTab(0)
+            w.deleteLater()
+
         # ——— Информация ————————————————————————————
         info = QWidget()
         form = QFormLayout(info)
@@ -145,6 +201,61 @@ class PolicyDetailView(QDialog):
             btn_folder.clicked.connect(self._open_folder)
             row.addWidget(btn_folder)
         self.layout.addLayout(row)
+
+    def closeEvent(self, event):
+        self._save_splitter_state()
+        super().closeEvent(event)
+
+    def _populate_summary(self) -> None:
+        rows = [
+            ("ID", str(self.instance.id)),
+            ("Клиент", self.instance.client.name),
+        ]
+        if self.instance.deal:
+            rows.append(("Сделка", str(self.instance.deal.description)))
+        rows.extend(
+            [
+                ("Номер", self.instance.policy_number or "—"),
+                ("Компания", self.instance.insurance_company or "—"),
+                ("Тип", self.instance.insurance_type or "—"),
+                ("Старт", format_date(self.instance.start_date)),
+                ("Окончание", format_date(self.instance.end_date)),
+            ]
+        )
+
+        while self.summary_layout.rowCount():
+            self.summary_layout.removeRow(0)
+
+        title = self.instance.policy_number or "Без номера"
+        client_name = self.instance.client.name
+        self.header_label.setText(f"Полис {title} — {client_name}")
+
+        for label, value in rows:
+            widget = QLabel(value)
+            widget.setTextFormat(Qt.RichText)
+            widget.setWordWrap(True)
+            self.summary_layout.addRow(f"{label}:", widget)
+
+    def _apply_default_splitter_sizes(self, total_width: int | None = None) -> None:
+        total = total_width or self.width() or 1
+        left = int(total * 0.35)
+        right = max(1, total - left)
+        self.splitter.setSizes([left, right])
+
+    def _restore_splitter_state(self) -> None:
+        state = ui_settings.get_window_settings(self.SETTINGS_KEY).get("splitter_state")
+        if state:
+            try:
+                self.splitter.restoreState(base64.b64decode(state))
+                return
+            except Exception:
+                pass
+        self._apply_default_splitter_sizes()
+
+    def _save_splitter_state(self) -> None:
+        st = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        st["splitter_state"] = base64.b64encode(self.splitter.saveState()).decode("ascii")
+        ui_settings.set_window_settings(self.SETTINGS_KEY, st)
 
     # ------------------------------------------------------------------
     # Slots / callbacks
