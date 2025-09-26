@@ -7,11 +7,12 @@ from datetime import date
 import pytest
 from PySide6.QtCore import Qt
 
-from database.models import Payment, Policy
+from database.models import Client, Deal, Payment, Policy
 from ui import settings as ui_settings
 from ui.base.base_table_view import BaseTableView
 from ui.common.multi_filter_proxy import ColumnFilterState
 from ui.views.payment_table_view import PaymentTableView
+from ui.views.deal_table_view import DealTableView
 from ui.views import payment_table_view as payment_table_view_module
 from ui.common.date_utils import get_date_or_none
 
@@ -153,5 +154,37 @@ def test_date_filter_resets_to_minimum(qapp):
 
     assert view.get_date_filter() is None
     assert get_date_or_none(view.date_from) is None
+
+    view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_deal_table_show_deleted_filter(qapp, in_memory_db):
+    """Чекбокс «Показывать удалённые» добавляет записи в выборку."""
+
+    ui_settings._CACHE = None
+
+    client = Client.create(name="Client")
+    Deal.create(client=client, description="Active", start_date=date.today())
+    Deal.create(
+        client=client,
+        description="Deleted",
+        start_date=date.today(),
+        is_deleted=True,
+    )
+
+    view = DealTableView()
+    qapp.processEvents()
+
+    show_deleted_box = view.checkboxes["Показывать удалённые"]
+    show_deleted_box.setChecked(True)
+    qapp.processEvents()
+
+    filters = view.get_filters()
+    assert filters["show_deleted"] is True
+
+    descriptions = {deal.description for deal in view.model.objects}
+    assert {"Active", "Deleted"} <= descriptions
+    assert any(deal.is_deleted for deal in view.model.objects)
 
     view.deleteLater()
