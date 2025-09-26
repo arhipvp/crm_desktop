@@ -470,7 +470,12 @@ def build_deal_query(
     query = apply_deal_filters(query, search_text, column_filters)
 
     if not show_closed:
-        query = query.where(Deal.is_closed == False)
+        if show_deleted:
+            query = query.where(
+                (Deal.is_closed == False) | (Deal.is_deleted == True)
+            )
+        else:
+            query = query.where(Deal.is_closed == False)
 
     return query
 

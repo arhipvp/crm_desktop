@@ -172,9 +172,21 @@ def test_deal_table_show_deleted_filter(qapp, in_memory_db):
         start_date=date.today(),
         is_deleted=True,
     )
+    Deal.create(
+        client=client,
+        description="ClosedDeleted",
+        start_date=date.today(),
+        is_deleted=True,
+        is_closed=True,
+    )
 
     view = DealTableView()
     qapp.processEvents()
+
+    descriptions = {deal.description for deal in view.model.objects}
+    assert "Deleted" not in descriptions
+    assert "ClosedDeleted" not in descriptions
+    assert all(not deal.is_deleted for deal in view.model.objects)
 
     show_deleted_box = view.checkboxes["Показывать удалённые"]
     show_deleted_box.setChecked(True)
@@ -184,7 +196,8 @@ def test_deal_table_show_deleted_filter(qapp, in_memory_db):
     assert filters["show_deleted"] is True
 
     descriptions = {deal.description for deal in view.model.objects}
-    assert {"Active", "Deleted"} <= descriptions
+    assert {"Active", "Deleted", "ClosedDeleted"} <= descriptions
     assert any(deal.is_deleted for deal in view.model.objects)
+    assert any(deal.is_deleted and deal.is_closed for deal in view.model.objects)
 
     view.deleteLater()
