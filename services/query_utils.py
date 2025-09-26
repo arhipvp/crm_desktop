@@ -1,8 +1,9 @@
 """Utility helpers for building filtered Peewee queries."""
 
-from typing import Iterable, Iterator
+from decimal import Decimal
+from typing import Any, Iterable, Iterator
 
-from peewee import Field, Model, ModelSelect, Node
+from peewee import Field, Model, ModelSelect, Node, fn
 from playhouse.shortcuts import Cast
 
 
@@ -105,3 +106,15 @@ def apply_search_and_filters(
     query = apply_field_filters(query, field_filters)
     query = apply_column_filters(query, name_filters, model)
     return query
+
+
+def sum_column(query: ModelSelect, field: Field) -> Decimal:
+    """Вернуть сумму значений ``field`` для переданного запроса."""
+
+    aggregate = query.clone().select(fn.COALESCE(fn.SUM(field), 0))
+    value: Any | None = aggregate.scalar()
+    if value is None:
+        return Decimal("0")
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
