@@ -37,12 +37,12 @@ class DealForm(BaseEditForm):
         row_widget = QWidget()
         row_layout = QHBoxLayout(row_widget)
         row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.addWidget(self.client_combo)
+        row_layout.addWidget(self.client_combo, 1)
         row_layout.addWidget(self.btn_add_client)
 
         # вместо стандартного client_id
         self.fields["client_id"] = self.client_combo
-        self.form_layout.insertRow(0, "Клиент:", row_widget)
+        self.form_layout.insertRow(0, "Клиент", row_widget)
 
         # Скрываем поля с путями к папкам
         for fld in ("drive_folder_path", "drive_folder_link"):

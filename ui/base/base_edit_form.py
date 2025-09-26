@@ -22,20 +22,76 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
     QDialog,
-    QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QScrollArea,
     QVBoxLayout,
+    QWidget,
 )
 
 from ui.common.date_utils import TypableDateEdit, configure_optional_date_edit
 from ui.common.message_boxes import confirm
 from ui.common.styled_widgets import styled_button
 from services.validators import normalize_number
+from utils.screen_utils import get_scaled_size
 
 logger = logging.getLogger(__name__)
+
+
+class TwoColumnFormLayout:
+    """Менеджер строк, раскладывающий поля формы по двум колонкам."""
+
+    def __init__(self, container: QWidget):
+        self.container = container
+        self.grid = QGridLayout(container)
+        self.grid.setContentsMargins(0, 0, 0, 0)
+        self.grid.setColumnStretch(1, 1)
+        self.grid.setColumnStretch(3, 1)
+        self.grid.setHorizontalSpacing(24)
+        self.rows: list[tuple[QWidget, QWidget]] = []
+
+    def _normalize_label(self, label: QLabel | str | QWidget) -> QWidget:
+        if isinstance(label, QWidget):
+            return label
+
+        text = str(label)
+        if text and not text.endswith(":"):
+            text = text + ":"
+        widget = QLabel(text, parent=self.container)
+        return widget
+
+    def _refresh_layout(self) -> None:
+        while self.grid.count():
+            item = self.grid.takeAt(0)
+            if widget := item.widget():
+                widget.setParent(self.container)
+
+        column_rows = [0, 0]
+        for index, (label, field) in enumerate(self.rows):
+            column = index % 2
+            row = column_rows[column]
+            base_col = column * 2
+            self.grid.addWidget(label, row, base_col)
+            self.grid.addWidget(field, row, base_col + 1)
+            column_rows[column] += 1
+
+    def addRow(self, label: QLabel | str | QWidget, field: QWidget) -> None:
+        label_widget = self._normalize_label(label)
+        self.rows.append((label_widget, field))
+        self._refresh_layout()
+
+    def insertRow(
+        self, position: int, label: QLabel | str | QWidget, field: QWidget
+    ) -> None:
+        label_widget = self._normalize_label(label)
+        if position < 0:
+            position = 0
+        position = min(position, len(self.rows))
+        self.rows.insert(position, (label_widget, field))
+        self._refresh_layout()
 
 
 class BaseEditForm(QDialog):
@@ -56,12 +112,17 @@ class BaseEditForm(QDialog):
         self.setWindowTitle(
             f"Редактировать {entity_name}" if instance else f"Добавить {entity_name}"
         )
-        self.setMinimumWidth(420)
+        self.setMinimumWidth(640)
 
         # ── layout ──
         self.layout = QVBoxLayout(self)
-        self.form_layout = QFormLayout()
-        self.layout.addLayout(self.form_layout)
+        self.scroll_area = QScrollArea(self)
+        self.scroll_area.setWidgetResizable(True)
+        self.layout.addWidget(self.scroll_area)
+
+        self.form_widget = QWidget()
+        self.scroll_area.setWidget(self.form_widget)
+        self.form_layout = TwoColumnFormLayout(self.form_widget)
 
         # build widgets
         self.build_form()
@@ -71,6 +132,7 @@ class BaseEditForm(QDialog):
         # Размеры формы определяем по содержимому
         self.adjustSize()
         self.setMinimumHeight(self.height())
+        self.resize(get_scaled_size(960, 720))
         self._dirty = False
 
     # ------------------------------------------------------------------
@@ -155,7 +217,7 @@ class BaseEditForm(QDialog):
                 continue
 
             self.fields[field_name] = widget
-            self.form_layout.addRow(QLabel(self._prettify(field_name)), widget)
+            self.form_layout.addRow(self._prettify(field_name), widget)
 
             if isinstance(widget, QLineEdit):
                 widget.textChanged.connect(self._mark_dirty)
