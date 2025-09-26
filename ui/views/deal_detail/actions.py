@@ -136,6 +136,13 @@ class DealActionsMixin:
         idx = st.get("tab_index")
         if idx is not None and 0 <= int(idx) < self.tabs.count():
             self.tabs.setCurrentIndex(int(idx))
+        split = st.get("splitter_state")
+        if split and hasattr(self, "splitter"):
+            try:
+                self.splitter.restoreState(base64.b64decode(split))
+            except Exception:
+                if hasattr(self, "_apply_default_splitter_sizes"):
+                    self._apply_default_splitter_sizes()
 
     def _save_settings(self):
         """Сохраняет текущие параметры окна."""
@@ -143,6 +150,10 @@ class DealActionsMixin:
             "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
             "tab_index": self.tabs.currentIndex(),
         }
+        if hasattr(self, "splitter"):
+            st["splitter_state"] = base64.b64encode(self.splitter.saveState()).decode(
+                "ascii"
+            )
         ui_settings.set_window_settings(self.SETTINGS_KEY, st)
 
     def _accept_with_settings(self) -> None:
