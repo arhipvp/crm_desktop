@@ -138,6 +138,11 @@ class DealActionsMixin:
         }
         ui_settings.set_window_settings(self.SETTINGS_KEY, st)
 
+    def _accept_with_settings(self) -> None:
+        """Finalize the dialog ensuring the current UI state is persisted."""
+        self._save_settings()
+        super().accept()
+
     def closeEvent(self, event):
         status = self.status_edit.text().strip()
         reminder = (
@@ -406,7 +411,7 @@ class DealActionsMixin:
 
     def _on_save_and_close(self):
         self._on_inline_save()
-        self.accept()
+        self._accept_with_settings()
 
     def _on_refresh(self):
         try:
@@ -541,7 +546,7 @@ class DealActionsMixin:
                 for t in tasks:
                     mark_done(t.id)
                 self._init_tabs()
-            self.accept()
+            self._accept_with_settings()
 
     def _collect_upcoming_events(self) -> list[tuple[str, date]]:
         today = date.today()
