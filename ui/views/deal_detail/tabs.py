@@ -223,9 +223,9 @@ class DealTabsMixin:
         # ---------- Платежи ---------------------------------------
         pay_tab = QWidget()
         pay_l = QVBoxLayout(pay_tab)
-        btn_pay = styled_button("➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+Shift+N")
+        btn_pay = styled_button("➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+Shift+P")
         btn_pay.clicked.connect(self._on_add_payment)
-        self._add_shortcut("Ctrl+Shift+N", self._on_add_payment)
+        self._add_shortcut("Ctrl+Shift+P", self._on_add_payment)
         pay_l.addWidget(btn_pay, alignment=Qt.AlignLeft)
         pay_view = PaymentTableView(
             parent=self, deal_id=self.instance.id, can_restore=False
