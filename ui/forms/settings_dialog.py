@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QHBoxLayout,
     QFileDialog,
+    QCheckBox,
 )
 
 from ui import settings as ui_settings
@@ -42,6 +43,9 @@ class SettingsDialog(QDialog):
         self.root_folder_id = QLineEdit()
         form.addRow("ID корневой папки:", self.root_folder_id)
 
+        self.open_main_window_maximized = QCheckBox("Открывать главное окно на весь экран")
+        layout.addWidget(self.open_main_window_maximized)
+
         btns = QHBoxLayout()
         save = QPushButton("Сохранить")
         cancel = QPushButton("Отмена")
@@ -60,6 +64,10 @@ class SettingsDialog(QDialog):
         self.drive_path.setText(st.get("google_drive_local_root", ""))
         self.credentials_path.setText(st.get("google_credentials", ""))
         self.root_folder_id.setText(st.get("google_root_folder_id", ""))
+        window_settings = ui_settings.get_window_settings("MainWindow")
+        self.open_main_window_maximized.setChecked(
+            bool(window_settings.get("open_maximized"))
+        )
 
     # --------------------------------------------------------------
     def save(self) -> None:
@@ -69,6 +77,9 @@ class SettingsDialog(QDialog):
             "google_root_folder_id": self.root_folder_id.text().strip(),
         }
         ui_settings.set_app_settings(data)
+        window_settings = ui_settings.get_window_settings("MainWindow")
+        window_settings["open_maximized"] = self.open_main_window_maximized.isChecked()
+        ui_settings.set_window_settings("MainWindow", window_settings)
         self.accept()
 
     # --------------------------------------------------------------
