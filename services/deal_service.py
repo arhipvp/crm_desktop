@@ -247,8 +247,13 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
         updates: dict = {
             key: kwargs[key]
             for key in allowed_fields
-            if key in kwargs and kwargs[key] not in ("", None)
+            if key in kwargs
+            and key != "closed_reason"
+            and kwargs[key] not in ("", None)
         }
+
+        if "closed_reason" in kwargs:
+            updates["closed_reason"] = kwargs["closed_reason"] or None
 
         # Смена клиента
         if "client_id" in updates:
