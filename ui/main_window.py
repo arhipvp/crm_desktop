@@ -1,6 +1,7 @@
 import base64
 import logging
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QMainWindow,
@@ -30,7 +31,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CRM Desktop")
-        size = get_scaled_size(1300, 850)
+        size = get_scaled_size(1600, 960, ratio=0.95)
         self.resize(size)
         self.setMinimumSize(800, 600)
 
@@ -84,6 +85,10 @@ class MainWindow(QMainWindow):
         idx = st.get("last_tab")
         if idx is not None and 0 <= int(idx) < self.tab_widget.count():
             self.tab_widget.setCurrentIndex(int(idx))
+        if st.get("open_maximized"):
+            self.setWindowState(self.windowState() | Qt.WindowMaximized)
+        else:
+            self.setWindowState(self.windowState() & ~Qt.WindowMaximized)
 
     def show_count(self, count: int):
         self.status_bar.showMessage(f"Записей: {count}")
@@ -133,9 +138,12 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def closeEvent(self, event):
-        st = {
-            "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
-            "last_tab": self.tab_widget.currentIndex(),
-        }
+        st = ui_settings.get_window_settings("MainWindow")
+        st.update(
+            {
+                "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
+                "last_tab": self.tab_widget.currentIndex(),
+            }
+        )
         ui_settings.set_window_settings("MainWindow", st)
         super().closeEvent(event)
