@@ -31,25 +31,7 @@ from .sticky_notes import StickyNotesBoard
 
 
 class DealTabsMixin:
-    def _init_tabs(self):
-        current = self.tabs.currentIndex()
-        # удаляем старые вкладки
-        while self.tabs.count():
-            w = self.tabs.widget(0)
-            self.tabs.removeTab(0)
-            w.deleteLater()
-
-        # ---------- Главная вкладка ---------------------------------
-        deal_tab = QWidget()
-        deal_layout = QVBoxLayout(deal_tab)
-        deal_layout.setContentsMargins(0, 0, 0, 0)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        container = QWidget()
-        container_layout = QVBoxLayout(container)
-        container_layout.setContentsMargins(0, 0, 0, 0)
-
+    def _create_info_panel(self) -> CollapsibleWidget:
         info_panel = CollapsibleWidget("Основная информация")
         form = QFormLayout()
         form.setVerticalSpacing(2)
@@ -63,23 +45,24 @@ class DealTabsMixin:
             lbl.setTextFormat(Qt.RichText)
             return lbl
 
-        form.addRow("ID:", tight_label(str(self.instance.id)))
-        client_html = f"<b>{self.instance.client.name}</b>"
-        note = self.instance.client.note
-        if note:
-            client_html += f" <span style='color:red'>{note}</span>"
-        form.addRow("Клиент:", tight_label(client_html))
-        form.addRow("Телефон:", tight_label(self.instance.client.phone or "—"))
+        self.id_label = tight_label("")
+        form.addRow("ID:", self.id_label)
 
-        start_label = tight_label(format_date(self.instance.start_date))
-        form.addRow("Старт:", start_label)
+        self.client_label = tight_label("")
+        form.addRow("Клиент:", self.client_label)
 
-        self.status_edit = QLineEdit(self.instance.status or "")
+        self.phone_label = tight_label("")
+        form.addRow("Телефон:", self.phone_label)
+
+        self.start_label = tight_label("")
+        form.addRow("Старт:", self.start_label)
+
+        self.status_edit = QLineEdit()
         status_completer = QCompleter(get_distinct_statuses())
         self.status_edit.setCompleter(status_completer)
         form.addRow("Статус:", self.status_edit)
 
-        self.desc_edit = QTextEdit(self.instance.description)
+        self.desc_edit = QTextEdit()
         self.desc_edit.setFixedHeight(60)
         self.desc_edit.setReadOnly(True)
         form.addRow("Описание:", self.desc_edit)
@@ -101,7 +84,56 @@ class DealTabsMixin:
         form.addRow("Напоминание:", reminder_row)
 
         info_panel.setContentLayout(form)
-        container_layout.addWidget(info_panel)
+        self.info_panel = info_panel
+        self._refresh_info_panel()
+        return info_panel
+
+    def _refresh_info_panel(self) -> None:
+        if not hasattr(self, "status_edit"):
+            return
+
+        self.id_label.setText(str(self.instance.id))
+
+        client_html = f"<b>{self.instance.client.name}</b>"
+        note = self.instance.client.note
+        if note:
+            client_html += f" <span style='color:red'>{note}</span>"
+        self.client_label.setText(client_html)
+
+        self.phone_label.setText(self.instance.client.phone or "—")
+        self.start_label.setText(format_date(self.instance.start_date))
+
+        self.status_edit.setText(self.instance.status or "")
+
+        description = self.instance.description or ""
+        self.desc_edit.setPlainText(description)
+
+        reminder = getattr(self.instance, "reminder_date", None)
+        if reminder:
+            qdate = QDate(reminder.year, reminder.month, reminder.day)
+            self.reminder_date.setDate(qdate)
+        else:
+            self.reminder_date.clear()
+
+    def _init_tabs(self):
+        self._refresh_info_panel()
+        current = self.tabs.currentIndex()
+        # удаляем старые вкладки
+        while self.tabs.count():
+            w = self.tabs.widget(0)
+            self.tabs.removeTab(0)
+            w.deleteLater()
+
+        # ---------- Главная вкладка ---------------------------------
+        deal_tab = QWidget()
+        deal_layout = QVBoxLayout(deal_tab)
+        deal_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
 
         journal_panel = CollapsibleWidget("Журнал")
         journal_form = QFormLayout()

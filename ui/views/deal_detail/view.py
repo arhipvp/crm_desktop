@@ -54,6 +54,9 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self.layout.addLayout(self.kpi_layout)
         self._init_kpi_panel()
 
+        info_panel = self._create_info_panel()
+        self.layout.addWidget(info_panel)
+
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs, stretch=1)
         self._init_tabs()
