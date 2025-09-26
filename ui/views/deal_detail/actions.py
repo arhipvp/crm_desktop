@@ -97,6 +97,13 @@ class DealActionsMixin:
             btn_delay.clicked.connect(self._on_delay_to_event)
             self._add_shortcut("Ctrl+Shift+N", self._on_delay_to_event)
             box.addWidget(btn_delay)
+        else:
+            btn_reopen = styled_button(
+                "🔓 Восстановить сделку", shortcut="Ctrl+Shift+O"
+            )
+            btn_reopen.clicked.connect(self._on_reopen_deal)
+            self._add_shortcut("Ctrl+Shift+O", self._on_reopen_deal)
+            box.addWidget(btn_reopen)
         self.layout.addLayout(box)
         if not self.instance.is_closed:
             btn_close = styled_button("🔒 Закрыть сделку", shortcut="Ctrl+Shift+L")
@@ -490,6 +497,17 @@ class DealActionsMixin:
 
             self.close()
             DealDetailView(self.instance).exec()
+
+    def _on_reopen_deal(self):
+        if not confirm("Восстановить сделку?"):
+            return
+
+        update_deal(self.instance, is_closed=False, closed_reason=None)
+        show_info("Сделка восстановлена.")
+        from .view import DealDetailView
+
+        self.close()
+        DealDetailView(self.instance).exec()
 
     def _on_import_policy_json(self):
         dlg = ImportPolicyJsonForm(
