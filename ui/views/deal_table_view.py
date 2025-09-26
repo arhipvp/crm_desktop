@@ -208,17 +208,37 @@ class DealTableView(BaseTableView):
             pass
 
     def get_filters(self) -> dict:
-        """
-        Собираем все фильтры:
-         - текстовый поиск
-         - флаг 'Показывать удалённые' из BaseTableView
-        """
-        filters = super().get_filters()
-        filters.update(
-            {
-                "show_closed": self.is_checked("Показать закрытые"),
-            }
-        )
+        """Собирает фильтры, используемые для загрузки сделок."""
+
+        filters = {
+            "search_text": self.get_search_text(),
+            "show_deleted": self.is_checked("Показывать удалённые"),
+            "show_closed": self.is_checked("Показать закрытые"),
+        }
+
+        header = self.table.horizontalHeader()
+        column_filters: dict = {}
+        for logical, state in self._column_filters.items():
+            visual = header.visualIndex(logical)
+            if visual < 0:
+                continue
+            logical_index = header.logicalIndex(visual)
+            if logical_index < 0 or header.isSectionHidden(logical_index):
+                continue
+            field = self.COLUMN_FIELD_MAP.get(logical_index)
+            if not field:
+                continue
+            backend_value = state.backend_value() if state else None
+            if backend_value is None:
+                continue
+            column_filters[field] = backend_value
+
+        filters["column_filters"] = column_filters
+
+        date_range = self.get_date_filter()
+        if date_range:
+            filters.update(date_range)
+
         return filters
 
     def load_data(self):
