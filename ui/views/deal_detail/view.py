@@ -1,9 +1,12 @@
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QShortcut
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QSizePolicy,
     QSplitter,
     QTabWidget,
@@ -30,6 +33,7 @@ from utils.money import format_rub
 
 from .actions import DealActionsMixin
 from .tabs import DealTabsMixin
+from .widgets import DealFilesPanel
 
 
 class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
@@ -79,6 +83,14 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self.kpi_layout.setSpacing(8)
         left_layout.addWidget(self.kpi_container)
         self._init_kpi_panel()
+
+        self.files_panel = DealFilesPanel(self.left_panel)
+        left_layout.addWidget(self.files_panel)
+
+        self.create_folder_button = QPushButton("Создать/привязать")
+        self.create_folder_button.clicked.connect(self._on_create_folder_clicked)
+        left_layout.addWidget(self.create_folder_button)
+        self._update_files_panel()
 
         info_panel = self._create_info_panel()
         left_layout.addWidget(info_panel, stretch=1)
@@ -258,3 +270,23 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         left = int(total * 0.35)
         right = max(1, total - left)
         self.splitter.setSizes([left, right])
+
+    def _update_files_panel(self) -> None:
+        """Обновить панель файлов и кнопку создания папки."""
+
+        path = getattr(self.instance, "drive_folder_path", None)
+        self.files_panel.set_folder(path)
+        has_local_folder = bool(path and Path(path).is_dir())
+        self.create_folder_button.setVisible(not has_local_folder)
+
+    def _on_create_folder_clicked(self) -> None:
+        """Создать или привязать локальную папку сделки."""
+
+        self._ensure_local_folder()
+
+    def _ensure_local_folder(self) -> str | None:  # type: ignore[override]
+        """Ensure local folder exists and refresh related UI."""
+
+        path = super()._ensure_local_folder()
+        self._update_files_panel()
+        return path
