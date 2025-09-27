@@ -43,6 +43,8 @@ class DealTabsMixin:
             lbl.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
             lbl.setMinimumHeight(1)
             lbl.setTextFormat(Qt.RichText)
+            lbl.setWordWrap(True)
+            lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
             return lbl
 
         self.id_label = tight_label("")
