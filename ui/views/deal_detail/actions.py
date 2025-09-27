@@ -271,6 +271,8 @@ class DealActionsMixin:
                 self.instance.save(
                     only=[Deal.drive_folder_path, Deal.drive_folder_link]
                 )
+                if hasattr(self, "files_panel"):
+                    self.files_panel.set_folder(self.instance.drive_folder_path)
                 path = new_path or link
             else:
                 return
@@ -319,6 +321,8 @@ class DealActionsMixin:
                 dlg.setValue(i)
         finally:
             dlg.close()
+        if hasattr(self, "files_panel"):
+            self.files_panel.set_folder(dest)
 
     def dragEnterEvent(self, event):  # noqa: D401 - Qt override
         """Qt drag enter handler."""
@@ -424,6 +428,8 @@ class DealActionsMixin:
             self.notes_board.load_entries(self.instance)
             if new_calc_part:
                 self.calc_table.refresh()
+            if hasattr(self, "files_panel"):
+                self.files_panel.set_folder(self.instance.drive_folder_path)
         except Exception as e:
             show_error(str(e))
 
