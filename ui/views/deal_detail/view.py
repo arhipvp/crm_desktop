@@ -59,6 +59,7 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         left_layout = QVBoxLayout(self.left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(12)
+        self.net_profit_label: QLabel | None = None
 
         status = self.instance.status or "Без статуса"
         color_map = {"Закрыта": "#d9534f", "Активна": "#5cb85c"}
@@ -122,6 +123,7 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             w = item.widget()
             if w:
                 w.deleteLater()
+        self.net_profit_label = None
 
         deal_id = self.instance.id
         pol_open, pol_closed = get_policy_counts_by_deal_id(deal_id)
@@ -164,7 +166,11 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             f"{format_rub(exp_planned)}, списано {format_rub(exp_spent)}"
         )
         net_profit = inc_received - exp_spent
-        profit_text = f"Чистая прибыль: <b>{format_rub(net_profit)}</b>"
+        self.net_profit_label = QLabel(
+            f"Чистая прибыль: <b>{format_rub(net_profit)}</b>"
+        )
+        self.net_profit_label.setTextFormat(Qt.RichText)
+        self._apply_net_profit_style(net_profit)
 
         from services import executor_service as es
 
@@ -183,7 +189,15 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             payments_text,
             incomes_text,
             expenses_text,
-            profit_text,
+        ]:
+            lbl = QLabel(text)
+            lbl.setTextFormat(Qt.RichText)
+            self.kpi_layout.addWidget(lbl)
+
+        if self.net_profit_label:
+            self.kpi_layout.addWidget(self.net_profit_label)
+
+        for text in [
             f"Задач: <b>{cnt_tasks}</b>",
             executor_label_text,
         ]:
@@ -194,6 +208,22 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
 
         if hasattr(self, "tabs"):
             self._update_tab_titles()
+
+    def _apply_net_profit_style(self, net_profit: float | int) -> None:
+        """Update the appearance of the net profit label based on value."""
+        if not self.net_profit_label:
+            return
+
+        if net_profit > 0:
+            color = "#28a745"
+        elif net_profit < 0:
+            color = "#dc3545"
+        else:
+            color = "#6c757d"
+
+        self.net_profit_label.setStyleSheet(
+            f"color: {color}; font-weight: 600;"
+        )
 
     def _update_tab_titles(self) -> None:
         """Обновить заголовки вкладок с актуальными счётчиками."""
