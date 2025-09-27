@@ -63,7 +63,9 @@ class DealTabsMixin:
         form.addRow("Статус:", self.status_edit)
 
         self.desc_edit = QTextEdit()
-        self.desc_edit.setFixedHeight(60)
+        self.desc_edit.setMinimumHeight(60)
+        self.desc_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.desc_edit.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.desc_edit.setReadOnly(True)
         form.addRow("Описание:", self.desc_edit)
 
