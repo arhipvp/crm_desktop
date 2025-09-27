@@ -1,7 +1,14 @@
 from pathlib import Path
 
 from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt, QUrl
-from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
+from PySide6.QtGui import (
+    QAction,
+    QDesktopServices,
+    QDragEnterEvent,
+    QDragMoveEvent,
+    QDropEvent,
+    QKeySequence,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileSystemModel,
@@ -14,12 +21,76 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QStackedLayout,
-    QToolBar,
     QTreeView,
+    QToolBar,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
+
+
+class DealFilesTreeView(QTreeView):
+    """Расширенный QTreeView с поддержкой DnD и защитой корневой папки."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._root_path: Path | None = None
+
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDragDropMode(QAbstractItemView.DragDrop)
+        self.setDefaultDropAction(Qt.MoveAction)
+
+    def set_root_path(self, path: str | None) -> None:
+        self._root_path = Path(path) if path else None
+
+    # --- DnD helpers -------------------------------------------------
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:  # noqa: N802 (Qt style)
+        if self._is_dragging_root(event):
+            event.ignore()
+            return
+        super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event: QDragMoveEvent) -> None:  # noqa: N802
+        if self._is_dragging_root(event):
+            event.ignore()
+            return
+        event.setDropAction(Qt.MoveAction)
+        super().dragMoveEvent(event)
+
+    def dropEvent(self, event: QDropEvent) -> None:  # noqa: N802
+        if self._is_dragging_root(event):
+            event.ignore()
+            return
+        event.setDropAction(Qt.MoveAction)
+        super().dropEvent(event)
+
+    def startDrag(self, supported_actions: Qt.DropActions) -> None:  # noqa: N802
+        index = self.currentIndex()
+        if index.isValid() and self._is_root_index(index):
+            return
+        super().startDrag(supported_actions)
+
+    # --- Internal helpers -------------------------------------------
+    def _is_dragging_root(self, event: QDragEnterEvent | QDragMoveEvent | QDropEvent) -> bool:
+        if not self._root_path or not event.mimeData():
+            return False
+
+        for url in event.mimeData().urls():
+            if url.isLocalFile() and Path(url.toLocalFile()) == self._root_path:
+                return True
+        return False
+
+    def _is_root_index(self, index: QModelIndex) -> bool:
+        if not index.isValid() or not self._root_path:
+            return False
+
+        model = self.model()
+        if not isinstance(model, QFileSystemModel):
+            return False
+
+        return Path(model.filePath(index)) == self._root_path
 
 from services.folder_utils import create_directory, delete_path, open_folder, rename_path
 
@@ -62,7 +133,7 @@ class DealFilesPanel(CollapsibleWidget):
         self._model = QFileSystemModel(self)
         self._model.setReadOnly(False)
 
-        self._tree = QTreeView()
+        self._tree = DealFilesTreeView()
         self._tree.setModel(self._model)
         self._tree.setHeaderHidden(False)
         self._tree.hide()
@@ -152,6 +223,7 @@ class DealFilesPanel(CollapsibleWidget):
 
         if self._folder_path and Path(self._folder_path).is_dir():
             index = self._model.setRootPath(self._folder_path)
+            self._tree.set_root_path(self._folder_path)
             self._tree.setRootIndex(index)
             selection_model = self._tree.selectionModel()
             if selection_model is not None:
@@ -164,6 +236,7 @@ class DealFilesPanel(CollapsibleWidget):
             self._tree.show()
         else:
             self._model.setRootPath("")
+            self._tree.set_root_path(None)
             self._path_label.setText("Папка не выбрана")
             self._open_button.setEnabled(False)
             self._stack.setCurrentWidget(self._placeholder)
