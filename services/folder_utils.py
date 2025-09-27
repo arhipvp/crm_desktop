@@ -420,6 +420,89 @@ def _msg(text: str, parent: Optional["QWidget"]) -> None:
     QMessageBox.information(parent, "Информация", text)
 
 
+def create_directory(
+    path: str | Path, *, parent: Optional["QWidget"] = None
+) -> Path | None:
+    """Создать каталог и вернуть его путь при успехе."""
+
+    directory = Path(path)
+    if directory.exists():
+        _msg("Такая папка уже существует.", parent)
+        return None
+
+    try:
+        directory.mkdir(parents=True, exist_ok=False)
+    except PermissionError:
+        _msg("Нет прав для создания папки.", parent)
+        return None
+    except OSError as exc:  # noqa: BLE001
+        logger.exception("Не удалось создать папку %s", directory)
+        _msg(f"Не удалось создать папку:\n{exc}", parent)
+        return None
+
+    return directory
+
+
+def rename_path(
+    source: str | Path,
+    new_name: str,
+    *,
+    parent: Optional["QWidget"] = None,
+) -> Path | None:
+    """Переименовать файл или каталог и вернуть новый путь."""
+
+    src_path = Path(source)
+    if not src_path.exists():
+        _msg("Объект не найден.", parent)
+        return None
+
+    name = new_name.strip()
+    if not name:
+        _msg("Имя не может быть пустым.", parent)
+        return None
+
+    dst_path = src_path.with_name(name)
+    if dst_path.exists():
+        _msg("Объект с таким именем уже существует.", parent)
+        return None
+
+    try:
+        src_path.rename(dst_path)
+    except PermissionError:
+        _msg("Нет прав для переименования.", parent)
+        return None
+    except OSError as exc:  # noqa: BLE001
+        logger.exception("Не удалось переименовать %s в %s", src_path, dst_path)
+        _msg(f"Не удалось переименовать объект:\n{exc}", parent)
+        return None
+
+    return dst_path
+
+
+def delete_path(path: str | Path, *, parent: Optional["QWidget"] = None) -> bool:
+    """Удалить файл или каталог."""
+
+    target = Path(path)
+    if not target.exists():
+        _msg("Объект уже удалён или недоступен.", parent)
+        return False
+
+    try:
+        if target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+    except PermissionError:
+        _msg("Нет прав для удаления.", parent)
+        return False
+    except OSError as exc:  # noqa: BLE001
+        logger.exception("Не удалось удалить %s", target)
+        _msg(f"Не удалось удалить объект:\n{exc}", parent)
+        return False
+
+    return True
+
+
 def rename_client_folder(old_name: str, new_name: str, drive_link: str | None):
     """Переименовывает папку клиента локально и на Google Drive.
 
