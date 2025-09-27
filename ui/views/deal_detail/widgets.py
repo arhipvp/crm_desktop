@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt, QUrl
+from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFileSystemModel,
@@ -67,12 +67,11 @@ class DealFilesPanel(CollapsibleWidget):
         self._tree.setHeaderHidden(False)
         self._tree.hide()
         self._tree.setEditTriggers(
-            QAbstractItemView.EditKeyPressed
-            | QAbstractItemView.SelectedClicked
-            | QAbstractItemView.DoubleClicked
+            QAbstractItemView.EditKeyPressed | QAbstractItemView.SelectedClicked
         )
         self._tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._on_context_menu)
+        self._tree.doubleClicked.connect(self._on_open_selected)
 
         self._create_action = QAction("Создать папку", self)
         self._create_action.setShortcut(QKeySequence(Qt.CTRL | Qt.SHIFT | Qt.Key_N))
@@ -180,9 +179,24 @@ class DealFilesPanel(CollapsibleWidget):
 
         open_folder(self._folder_path, parent=self)
 
-    def _on_open_selected(self) -> None:
-        path = self._current_selection_path()
+    def _on_open_selected(self, index: QModelIndex | None = None) -> None:
+        if index is not None and index.isValid():
+            path = Path(self._model.filePath(index))
+        else:
+            path = self._current_selection_path()
         if path is None:
+            return
+
+        if path.is_file():
+            try:
+                if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path))):
+                    raise RuntimeError("Не удалось открыть файл системным приложением.")
+            except Exception as error:
+                QMessageBox.critical(
+                    self,
+                    "Открытие файла",
+                    f"Не удалось открыть файл '{path.name}':\n{error}",
+                )
             return
 
         target = path if path.is_dir() else path.parent
