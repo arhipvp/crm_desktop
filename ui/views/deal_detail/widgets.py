@@ -253,6 +253,9 @@ class DealFilesPanel(CollapsibleWidget):
         open_folder(self._folder_path, parent=self)
 
     def _on_open_selected(self, index: QModelIndex | None = None) -> None:
+        if not isinstance(index, QModelIndex):
+            index = None
+
         if index is not None and index.isValid():
             path = Path(self._model.filePath(index))
         else:
