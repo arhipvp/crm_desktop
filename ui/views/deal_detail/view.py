@@ -189,7 +189,10 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         ex = es.get_executor_for_deal(self.instance.id)
         executor_name = ex.full_name if ex else "—"
         if ex:
-            executor_label_text = f"Исполнитель: <b>{executor_name}</b>"
+            executor_label_text = (
+                "Исполнитель: <span style='color:#d9534f;font-weight:bold'>"
+                f"{executor_name}</span>"
+            )
         else:
             executor_label_text = (
                 "Исполнитель: <span style='color:#d9534f; font-weight:bold'>"
