@@ -55,6 +55,7 @@ class PolicyForm(BaseEditForm):
     """
 
     EXTRA_HIDDEN = {"deal", "renewed_to"}
+    form_columns = 1
 
     def __init__(
         self,

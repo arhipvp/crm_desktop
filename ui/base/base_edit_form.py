@@ -42,16 +42,21 @@ logger = logging.getLogger(__name__)
 
 
 class TwoColumnFormLayout:
-    """Менеджер строк, раскладывающий поля формы по двум колонкам."""
+    """Менеджер строк, раскладывающий поля формы по заданному числу колонок."""
 
-    def __init__(self, container: QWidget):
+    def __init__(self, container: QWidget, *, columns: int = 2):
         self.container = container
+        self.columns = max(1, columns)
         self.grid = QGridLayout(container)
         self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setColumnStretch(1, 1)
-        self.grid.setColumnStretch(3, 1)
         self.grid.setHorizontalSpacing(24)
         self.rows: list[tuple[QWidget, QWidget]] = []
+        self._configure_columns()
+
+    def _configure_columns(self) -> None:
+        for column in range(self.columns * 2):
+            stretch = 1 if column % 2 else 0
+            self.grid.setColumnStretch(column, stretch)
 
     def _normalize_label(self, label: QLabel | str | QWidget) -> QWidget:
         if isinstance(label, QWidget):
@@ -69,9 +74,9 @@ class TwoColumnFormLayout:
             if widget := item.widget():
                 widget.setParent(self.container)
 
-        column_rows = [0, 0]
+        column_rows = [0] * self.columns
         for index, (label, field) in enumerate(self.rows):
-            column = index % 2
+            column = index % self.columns
             row = column_rows[column]
             base_col = column * 2
             self.grid.addWidget(label, row, base_col)
@@ -98,6 +103,7 @@ class BaseEditForm(QDialog):
     """Универсальная форма создания/редактирования, строится по Peewee‑модели."""
 
     EXTRA_HIDDEN: set[str] = set()
+    form_columns: int = 2
 
     def __init__(
         self, instance=None, model_class=None, entity_name="объект", parent=None
@@ -128,7 +134,9 @@ class BaseEditForm(QDialog):
         self.form_body_layout.setSpacing(16)
 
         self.form_fields_widget = QWidget(self.form_widget)
-        self.form_layout = TwoColumnFormLayout(self.form_fields_widget)
+        self.form_layout = TwoColumnFormLayout(
+            self.form_fields_widget, columns=self.form_columns
+        )
         self.form_body_layout.addWidget(self.form_fields_widget)
 
         self.form_sections_layout = QVBoxLayout()
