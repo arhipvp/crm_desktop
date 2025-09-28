@@ -122,7 +122,20 @@ class BaseEditForm(QDialog):
 
         self.form_widget = QWidget()
         self.scroll_area.setWidget(self.form_widget)
-        self.form_layout = TwoColumnFormLayout(self.form_widget)
+
+        self.form_body_layout = QVBoxLayout(self.form_widget)
+        self.form_body_layout.setContentsMargins(0, 0, 0, 0)
+        self.form_body_layout.setSpacing(16)
+
+        self.form_fields_widget = QWidget(self.form_widget)
+        self.form_layout = TwoColumnFormLayout(self.form_fields_widget)
+        self.form_body_layout.addWidget(self.form_fields_widget)
+
+        self.form_sections_layout = QVBoxLayout()
+        self.form_sections_layout.setContentsMargins(0, 0, 0, 0)
+        self.form_sections_layout.setSpacing(16)
+        self.form_body_layout.addLayout(self.form_sections_layout)
+        self.form_body_layout.addStretch(1)
 
         # build widgets
         self.build_form()
@@ -168,6 +181,11 @@ class BaseEditForm(QDialog):
     # ------------------------------------------------------------------
     # Build form
     # ------------------------------------------------------------------
+    def add_section_widget(self, widget: QWidget) -> None:
+        """Добавляет полноширинный блок в нижнюю часть формы."""
+
+        self.form_sections_layout.addWidget(widget)
+
     def build_form(self):
         """Строит виджеты для всех полей модели."""
         self.build_custom_fields()  # кастомные поля до автогенерации

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QDateEdit,
     QCheckBox,
     QMessageBox,
+    QHeaderView,
 )
 
 from services.folder_utils import open_folder
@@ -412,6 +413,10 @@ class PolicyForm(BaseEditForm):
             "Оплачен",
             "",
         ])
+        self.payments_table.verticalHeader().setVisible(False)
+        header = self.payments_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        self.payments_table.setMaximumHeight(240)
         self.payments_table.itemChanged.connect(self.on_payment_item_changed)
         vbox.addWidget(self.payments_table)
 
@@ -446,7 +451,7 @@ class PolicyForm(BaseEditForm):
         hlayout.addWidget(btn)
         vbox.addLayout(hlayout)
 
-        self.layout.addWidget(group)
+        self.add_section_widget(group)
 
     def add_payment_row(self, pay: dict) -> None:
         dt = pay.get("payment_date")
