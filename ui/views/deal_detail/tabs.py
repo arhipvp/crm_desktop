@@ -130,8 +130,8 @@ class DealTabsMixin:
 
         if hasattr(self, "_tab_action_factories"):
             self._tab_action_factories.clear()
-        if hasattr(self, "set_action_widgets"):
-            self.set_action_widgets([])
+        if hasattr(self, "_rebuild_tab_actions"):
+            self._rebuild_tab_actions()
 
         # ---------- Главная вкладка ---------------------------------
         deal_tab = QWidget()
@@ -315,7 +315,8 @@ class DealTabsMixin:
         self.register_tab_actions(self.task_tab_idx, [btn_add_task])
 
         self.tabs.setCurrentIndex(min(current, self.tabs.count() - 1))
-        self._apply_tab_actions(self.tabs.currentIndex())
+        if hasattr(self, "_rebuild_tab_actions"):
+            self._rebuild_tab_actions(self.tabs.currentIndex())
 
     def _on_archive_note(self, entry_id: str) -> None:
         archived = deal_journal.archive_entry(self.instance, entry_id)
