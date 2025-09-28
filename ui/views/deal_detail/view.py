@@ -58,7 +58,8 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self._tab_action_factories: dict[
             int, Callable[[], Sequence[QWidget]]
         ] = {}
-        self._current_action_widgets: list[QWidget] = []
+        self._static_action_widgets: list[QWidget] = []
+        self._tab_action_widgets: list[QWidget] = []
 
         self.splitter = QSplitter(Qt.Horizontal)
         self.splitter.setChildrenCollapsible(False)
@@ -102,11 +103,11 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self.primary_actions_layout.setSpacing(6)
 
         self.action_bar_container = QWidget(actions_panel)
-        self.action_bar_container.setVisible(False)
         self.action_bar_layout = QHBoxLayout(self.action_bar_container)
         self.action_bar_layout.setContentsMargins(0, 0, 0, 0)
         self.action_bar_layout.setSpacing(8)
         self.action_bar_layout.addStretch()
+        self.action_bar_container.setVisible(False)
 
         self.primary_actions_layout.addWidget(self.action_bar_container)
         actions_panel.setContentLayout(self.primary_actions_layout)
@@ -176,25 +177,72 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
 
         self._tab_action_factories[tab_index] = factory
         if self.tabs.currentIndex() == tab_index:
-            self._apply_tab_actions(tab_index)
+            self._rebuild_tab_actions(tab_index)
 
     def _apply_tab_actions(self, tab_index: int) -> None:
-        factory = self._tab_action_factories.get(tab_index)
-        widgets = factory() if factory else []
-        self.set_action_widgets(widgets)
+        self._rebuild_tab_actions(tab_index)
 
-    def set_action_widgets(self, widgets: Sequence[QWidget]) -> None:
-        while self._current_action_widgets:
-            widget = self._current_action_widgets.pop()
-            self.action_bar_layout.removeWidget(widget)
+    def _rebuild_tab_actions(self, tab_index: int | None = None) -> None:
+        layout = getattr(self, "primary_actions_layout", None)
+        if layout is None:
+            return
+
+        container = getattr(self, "action_bar_container", None)
+
+        # keep only widgets that are still part of the layout
+        self._tab_action_widgets = [
+            widget
+            for widget in self._tab_action_widgets
+            if widget is not None and layout.indexOf(widget) != -1
+        ]
+
+        while self._tab_action_widgets:
+            widget = self._tab_action_widgets.pop()
+            layout.removeWidget(widget)
             widget.setParent(None)
 
-        for widget in widgets:
-            insert_pos = max(0, self.action_bar_layout.count() - 1)
-            self.action_bar_layout.insertWidget(insert_pos, widget)
-            self._current_action_widgets.append(widget)
+        if not self._static_action_widgets or any(
+            (layout.indexOf(widget) == -1)
+            for widget in self._static_action_widgets
+            if widget is not None
+        ):
+            self._static_action_widgets.clear()
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                widget = item.widget()
+                if widget is not None and widget is not container:
+                    self._static_action_widgets.append(widget)
 
-        self.action_bar_container.setVisible(bool(self._current_action_widgets))
+        target_index = tab_index
+        if target_index is None and hasattr(self, "tabs"):
+            target_index = self.tabs.currentIndex()
+
+        factory = self._tab_action_factories.get(target_index) if target_index is not None else None
+        widgets = list(factory()) if factory else []
+
+        insert_pos = layout.count()
+        if container is not None:
+            container_idx = layout.indexOf(container)
+            if container_idx != -1:
+                insert_pos = container_idx
+        else:
+            last_static_idx = -1
+            for widget in self._static_action_widgets:
+                if widget is None:
+                    continue
+                idx = layout.indexOf(widget)
+                if idx > last_static_idx:
+                    last_static_idx = idx
+            if last_static_idx != -1:
+                insert_pos = last_static_idx + 1
+
+        for widget in widgets:
+            layout.insertWidget(insert_pos, widget)
+            self._tab_action_widgets.append(widget)
+            insert_pos += 1
+
+        if container is not None:
+            container.setVisible(bool(self._tab_action_widgets))
 
     def _init_kpi_panel(self):
         """(Re)populate the KPI panel without adding new duplicates."""
