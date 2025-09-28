@@ -168,8 +168,12 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
                 return list(_items)
 
         self._tab_action_factories[tab_index] = factory
-        if self.tabs.currentIndex() == tab_index:
-            self._rebuild_tab_actions(tab_index)
+        preferred_index: int | None = None
+        if hasattr(self, "tabs"):
+            preferred_index = self.tabs.currentIndex()
+        if preferred_index is None:
+            preferred_index = tab_index
+        self._rebuild_tab_actions(preferred_index)
 
     def _apply_tab_actions(self, tab_index: int) -> None:
         self._rebuild_tab_actions(tab_index)
@@ -208,14 +212,37 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         if target_index is None and hasattr(self, "tabs"):
             target_index = self.tabs.currentIndex()
 
-        factory = self._tab_action_factories.get(target_index) if target_index is not None else None
-        widgets = list(factory()) if factory else []
+        ordered_indices: list[int] = []
+        if (
+            target_index is not None
+            and target_index in self._tab_action_factories
+        ):
+            ordered_indices.append(target_index)
 
-        for widget in widgets:
-            if widget in self._static_action_widgets:
+        if hasattr(self, "tabs"):
+            for idx in range(self.tabs.count()):
+                if idx == target_index:
+                    continue
+                if idx in self._tab_action_factories:
+                    ordered_indices.append(idx)
+        seen_indices = set(ordered_indices)
+        for idx in self._tab_action_factories:
+            if idx not in seen_indices:
+                ordered_indices.append(idx)
+                seen_indices.add(idx)
+
+        new_widgets: list[QWidget] = []
+        for idx in ordered_indices:
+            factory = self._tab_action_factories.get(idx)
+            if not factory:
                 continue
-            layout.addWidget(widget)
-            self._tab_action_widgets.append(widget)
+            for widget in factory() or ():
+                if widget in static_widgets or widget in new_widgets:
+                    continue
+                layout.addWidget(widget)
+                new_widgets.append(widget)
+
+        self._tab_action_widgets = new_widgets
 
     def _init_kpi_panel(self):
         """(Re)populate the KPI panel without adding new duplicates."""
