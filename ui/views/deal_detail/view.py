@@ -55,7 +55,9 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
 
         self.layout = QVBoxLayout(self)
         self._shortcuts: list[QShortcut] = []
-        self._tab_actions: dict[int, list[QWidget]] = {}
+        self._tab_action_factories: dict[
+            int, Callable[[], Sequence[QWidget]]
+        ] = {}
         self._current_action_widgets: list[QWidget] = []
 
         self.splitter = QSplitter(Qt.Horizontal)
@@ -149,18 +151,27 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self._init_kpi_panel()
 
     def register_tab_actions(
-        self, tab_index: int, widgets: Sequence[QWidget] | Callable[[], Sequence[QWidget]]
+        self,
+        tab_index: int,
+        widgets: Sequence[QWidget] | Callable[[], Sequence[QWidget]],
     ) -> None:
         if callable(widgets):
-            widget_list = list(widgets())
+            factory = widgets
         else:
-            widget_list = list(widgets)
-        self._tab_actions[tab_index] = widget_list
+            frozen_widgets = tuple(widgets)
+
+            def factory(
+                _items: tuple[QWidget, ...] = frozen_widgets,
+            ) -> Sequence[QWidget]:
+                return list(_items)
+
+        self._tab_action_factories[tab_index] = factory
         if self.tabs.currentIndex() == tab_index:
-            self.set_action_widgets(widget_list)
+            self._apply_tab_actions(tab_index)
 
     def _apply_tab_actions(self, tab_index: int) -> None:
-        widgets = self._tab_actions.get(tab_index, [])
+        factory = self._tab_action_factories.get(tab_index)
+        widgets = factory() if factory else []
         self.set_action_widgets(widgets)
 
     def set_action_widgets(self, widgets: Sequence[QWidget]) -> None:

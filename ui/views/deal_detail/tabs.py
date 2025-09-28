@@ -128,8 +128,8 @@ class DealTabsMixin:
             self.tabs.removeTab(0)
             w.deleteLater()
 
-        if hasattr(self, "_tab_actions"):
-            self._tab_actions.clear()
+        if hasattr(self, "_tab_action_factories"):
+            self._tab_action_factories.clear()
         if hasattr(self, "set_action_widgets"):
             self.set_action_widgets([])
 
