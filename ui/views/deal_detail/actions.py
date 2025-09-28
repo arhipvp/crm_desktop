@@ -42,23 +42,42 @@ logger = logging.getLogger(__name__)
 
 class DealActionsMixin:
     def _init_actions(self):
-        box = QHBoxLayout()
-        box.setSpacing(6)
-        box.addStretch()
+        has_primary_layout = hasattr(self, "primary_actions_layout")
+        primary_layout = getattr(self, "primary_actions_layout", None)
+        action_bar_container = getattr(self, "action_bar_container", None)
+
+        if primary_layout is None:
+            primary_layout = QHBoxLayout()
+            primary_layout.setSpacing(6)
+            primary_layout.addStretch()
+            container_layout = getattr(self, "layout", None)
+            if container_layout is not None:
+                container_layout.addLayout(primary_layout)
+        else:
+            preserved_container = action_bar_container
+            while primary_layout.count():
+                item = primary_layout.takeAt(0)
+                widget = item.widget()
+                if widget and widget is not preserved_container:
+                    widget.setParent(None)
+
         btn_edit = styled_button("✏️ Редактировать", shortcut="Ctrl+E")
         btn_edit.clicked.connect(self._on_edit)
         self._add_shortcut("Ctrl+E", self._on_edit)
-        box.addWidget(btn_edit)
+        primary_layout.addWidget(btn_edit)
+
         btn_edit_client = styled_button(
             "📝 Клиент", tooltip="Редактировать клиента", shortcut="Ctrl+Shift+K"
         )
         btn_edit_client.clicked.connect(self._on_edit_client)
         self._add_shortcut("Ctrl+Shift+K", self._on_edit_client)
-        box.addWidget(btn_edit_client)
+        primary_layout.addWidget(btn_edit_client)
+
         btn_folder = styled_button("📂 Папка", shortcut="Ctrl+O")
         btn_folder.clicked.connect(self._open_folder)
         self._add_shortcut("Ctrl+O", self._open_folder)
-        box.addWidget(btn_folder)
+        primary_layout.addWidget(btn_folder)
+
         btn_copy = styled_button(
             "📋",
             tooltip="Скопировать путь к папке",
@@ -66,24 +85,27 @@ class DealActionsMixin:
         )
         btn_copy.clicked.connect(self._copy_folder_path)
         self._add_shortcut("Ctrl+Shift+C", self._copy_folder_path)
-        box.addWidget(btn_copy)
+        primary_layout.addWidget(btn_copy)
 
         self.btn_exec = styled_button("👤 Исполнитель", shortcut="Ctrl+Shift+E")
         self.btn_exec.clicked.connect(self._on_toggle_executor)
         self._add_shortcut("Ctrl+Shift+E", self._on_toggle_executor)
-        box.addWidget(self.btn_exec)
+        primary_layout.addWidget(self.btn_exec)
+
         btn_wa = styled_button("💬 WhatsApp", shortcut="Ctrl+Shift+W")
         btn_wa.clicked.connect(self._open_whatsapp)
         self._add_shortcut("Ctrl+Shift+W", self._open_whatsapp)
-        box.addWidget(btn_wa)
+        primary_layout.addWidget(btn_wa)
+
         btn_prev = styled_button("◀ Назад", shortcut="Alt+Left")
         btn_prev.clicked.connect(self._on_prev_deal)
         self._add_shortcut("Alt+Left", self._on_prev_deal)
-        box.addWidget(btn_prev)
+        primary_layout.addWidget(btn_prev)
+
         btn_next = styled_button("▶ Далее", shortcut="Alt+Right")
         btn_next.clicked.connect(self._on_next_deal)
         self._add_shortcut("Alt+Right", self._on_next_deal)
-        box.addWidget(btn_next)
+        primary_layout.addWidget(btn_next)
 
         has_prev = get_prev_deal(self.instance)
         has_next = get_next_deal(self.instance)
@@ -96,20 +118,25 @@ class DealActionsMixin:
             btn_delay = styled_button("⏳ Отложить", shortcut="Ctrl+Shift+N")
             btn_delay.clicked.connect(self._on_delay_to_event)
             self._add_shortcut("Ctrl+Shift+N", self._on_delay_to_event)
-            box.addWidget(btn_delay)
+            primary_layout.addWidget(btn_delay)
         else:
             btn_reopen = styled_button(
                 "🔓 Восстановить сделку", shortcut="Ctrl+Shift+O"
             )
             btn_reopen.clicked.connect(self._on_reopen_deal)
             self._add_shortcut("Ctrl+Shift+O", self._on_reopen_deal)
-            box.addWidget(btn_reopen)
-        self.layout.addLayout(box)
+            primary_layout.addWidget(btn_reopen)
+
         if not self.instance.is_closed:
             btn_close = styled_button("🔒 Закрыть сделку", shortcut="Ctrl+Shift+L")
             btn_close.clicked.connect(self._on_close_deal)
             self._add_shortcut("Ctrl+Shift+L", self._on_close_deal)
-            box.addWidget(btn_close)
+            primary_layout.addWidget(btn_close)
+
+        if has_primary_layout:
+            primary_layout.addStretch()
+            if action_bar_container is not None:
+                primary_layout.addWidget(action_bar_container)
 
         self._update_exec_button()
 
@@ -146,20 +173,33 @@ class DealActionsMixin:
 
     def _save_settings(self):
         """Сохраняет текущие параметры окна."""
-        st = {
-            "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
-            "tab_index": self.tabs.currentIndex(),
-        }
+        st: dict[str, object] = {}
+        if hasattr(self, "saveGeometry"):
+            try:
+                geometry = self.saveGeometry()
+            except AttributeError:
+                geometry = None
+            if geometry is not None:
+                st["geometry"] = base64.b64encode(geometry).decode("ascii")
+        if hasattr(self, "tabs"):
+            try:
+                st["tab_index"] = self.tabs.currentIndex()
+            except AttributeError:
+                pass
         if hasattr(self, "splitter"):
             st["splitter_state"] = base64.b64encode(self.splitter.saveState()).decode(
                 "ascii"
             )
-        ui_settings.set_window_settings(self.SETTINGS_KEY, st)
+        if st:
+            ui_settings.set_window_settings(self.SETTINGS_KEY, st)
 
     def _accept_with_settings(self) -> None:
         """Finalize the dialog ensuring the current UI state is persisted."""
         self._save_settings()
-        super().accept()
+        try:
+            super().accept()
+        except AttributeError:
+            pass
 
     def closeEvent(self, event):
         status = self.status_edit.text().strip()

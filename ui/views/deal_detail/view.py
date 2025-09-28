@@ -34,7 +34,7 @@ from utils.money import format_rub
 
 from .actions import DealActionsMixin
 from .tabs import DealTabsMixin
-from .widgets import DealFilesPanel
+from .widgets import CollapsibleWidget, DealFilesPanel
 
 
 class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
@@ -95,6 +95,22 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self.create_folder_button = QPushButton("Создать/привязать")
         self.create_folder_button.clicked.connect(self._on_create_folder_clicked)
         left_layout.addWidget(self.create_folder_button)
+
+        actions_panel = CollapsibleWidget("Действия", self.left_panel)
+        self.primary_actions_layout = QHBoxLayout()
+        self.primary_actions_layout.setContentsMargins(0, 0, 0, 0)
+        self.primary_actions_layout.setSpacing(6)
+
+        self.action_bar_container = QWidget(actions_panel)
+        self.action_bar_container.setVisible(False)
+        self.action_bar_layout = QHBoxLayout(self.action_bar_container)
+        self.action_bar_layout.setContentsMargins(0, 0, 0, 0)
+        self.action_bar_layout.setSpacing(8)
+        self.action_bar_layout.addStretch()
+
+        self.primary_actions_layout.addWidget(self.action_bar_container)
+        actions_panel.setContentLayout(self.primary_actions_layout)
+        left_layout.addWidget(actions_panel)
         self._update_files_panel()
 
         info_panel = self._create_info_panel()
@@ -108,13 +124,6 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(12)
 
-        self.action_bar_container = QWidget(self.right_panel)
-        self.action_bar_container.setVisible(False)
-        self.action_bar_layout = QHBoxLayout(self.action_bar_container)
-        self.action_bar_layout.setContentsMargins(0, 0, 0, 0)
-        self.action_bar_layout.setSpacing(8)
-        self.action_bar_layout.addStretch()
-        right_layout.addWidget(self.action_bar_container)
 
         self.tabs = QTabWidget()
         self.tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
