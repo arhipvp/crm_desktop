@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import math
 
@@ -82,6 +84,7 @@ class BaseTableView(QWidget):
 
     row_double_clicked = Signal(object)  # объект строки по двойному клику
     data_loaded = Signal(int)  # сигнал о загрузке данных (количество)
+    action_widget_changed = Signal(object)
 
     # Соответствие индекса столбца полю модели или строковому пути.
     # Значение ``None`` скрывает фильтр.
@@ -223,7 +226,10 @@ class BaseTableView(QWidget):
         QShortcut("Ctrl+F", self, activated=self.focus_search)
 
         # Кнопки
-        self.button_row = QHBoxLayout()
+        self.button_widget = QWidget(self.left_panel)
+        self.button_row = QHBoxLayout(self.button_widget)
+        self.button_row.setContentsMargins(0, 0, 0, 0)
+        self.button_row.setSpacing(6)
 
         self.add_btn = styled_button("Добавить", icon="➕", role="primary", shortcut="Ctrl+N")
         self.add_btn.clicked.connect(self.add_new)
@@ -254,7 +260,7 @@ class BaseTableView(QWidget):
         self.button_row.addWidget(self.select_all_btn)
 
         self.button_row.addStretch()
-        self.left_layout.addLayout(self.button_row)
+        self.left_layout.addWidget(self.button_widget)
 
         # Таблица
         self.table = QTableView()
@@ -290,6 +296,8 @@ class BaseTableView(QWidget):
         self.paginator = Paginator(on_prev=self.prev_page, on_next=self.next_page, per_page=self.per_page)
         self.paginator.per_page_changed.connect(self._on_per_page_changed)
         self.left_layout.addWidget(self.paginator)
+
+        self._emit_action_widget_changed()
 
     def apply_saved_filters(self) -> None:
         """Переустанавливает сохранённые фильтры столбцов в прокси-модель."""
@@ -373,13 +381,18 @@ class BaseTableView(QWidget):
         if self.controller:
             self.controller.set_model_class_and_items(model_class, items, total_count)
 
+    def get_action_widget(self) -> QWidget | None:
+        return self.button_widget
+
     def load_data(self):
         if self.controller:
             self.controller.load_data()
+        self._emit_action_widget_changed()
 
     def refresh(self):
         if self.controller:
             self.controller.refresh()
+        self._emit_action_widget_changed()
 
     def on_filter_changed(self, *args, **kwargs):
         if self.controller:
@@ -388,14 +401,20 @@ class BaseTableView(QWidget):
     def next_page(self):
         if self.controller:
             self.controller.next_page()
+        self._emit_action_widget_changed()
 
     def prev_page(self):
         if self.controller:
             self.controller.prev_page()
+        self._emit_action_widget_changed()
 
     def _on_per_page_changed(self, per_page: int):
         if self.controller:
             self.controller._on_per_page_changed(per_page)
+        self._emit_action_widget_changed()
+
+    def _emit_action_widget_changed(self) -> None:
+        self.action_widget_changed.emit(self.get_action_widget())
 
     def _on_reset_filters(self):
         if self.controller:
