@@ -269,15 +269,19 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             )
 
     def _apply_default_splitter_sizes(self, total_width: int | None = None) -> None:
-        total = total_width or self.width() or 1
+        total = max(total_width or self.width() or 1, 1)
         size_hint = self.left_panel.sizeHint().width() or 0
         min_width = max(1, self.left_panel.minimumSizeHint().width())
-        fraction_width = int(total * 0.25)
+        fraction_width = max(1, int(total * 0.22))
 
-        preferred_left = size_hint if size_hint else fraction_width
-        left = min(preferred_left, fraction_width) if preferred_left else fraction_width
+        if size_hint:
+            left = min(size_hint, fraction_width)
+        else:
+            left = fraction_width
+
         left = max(min_width, left)
-        left = min(left, max(1, total - 1))
+        if left >= total:
+            left = max(1, total - 1)
 
         right = max(1, total - left)
         self.splitter.setSizes([left, right])
