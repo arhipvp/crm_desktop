@@ -329,9 +329,11 @@ class DealFilesPanel(CollapsibleWidget):
         self._refresh_model(created)
 
     def _on_rename_selected(self) -> None:
-        path = self._current_selection_path()
-        if path is None or self._is_root_path(path):
+        paths = self._selected_paths()
+        if len(paths) != 1:
             return
+
+        path = paths[0]
 
         new_name, accepted = QInputDialog.getText(
             self, "Переименовать", "Новое имя:", text=path.name
@@ -346,22 +348,53 @@ class DealFilesPanel(CollapsibleWidget):
         self._refresh_model(renamed)
 
     def _on_delete_selected(self) -> None:
-        path = self._current_selection_path()
-        if path is None or self._is_root_path(path):
+        paths = self._selected_paths()
+        if not paths:
             return
+
+        count = len(paths)
+        if count == 1:
+            question = f"Удалить '{paths[0].name}'?"
+        else:
+            question = f"Удалить {count} {self._format_objects_word(count)}?"
 
         answer = QMessageBox.question(
             self,
             "Удаление",
-            f"Удалить '{path.name}'?",
+            question,
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
         if answer != QMessageBox.Yes:
             return
 
-        if delete_path(path, parent=self):
-            self._refresh_model(path.parent if path.parent.exists() else None)
+        deleted_any = False
+        parents_for_focus: list[Path] = []
+
+        deletion_paths = sorted(
+            paths, key=lambda path: (-len(path.parts), str(path))
+        )
+
+        for path in deletion_paths:
+            if delete_path(path, parent=self):
+                deleted_any = True
+                parents_for_focus.append(path.parent)
+
+        if not deleted_any:
+            return
+
+        focus_path: Path | None = None
+        for parent in parents_for_focus:
+            focus_path = self._nearest_existing_folder(parent)
+            if focus_path is not None:
+                break
+
+        if focus_path is None and self._folder_path:
+            root_path = Path(self._folder_path)
+            if root_path.exists():
+                focus_path = root_path
+
+        self._refresh_model(focus_path)
 
     def _on_context_menu(self, point) -> None:
         self._update_actions_state()
@@ -391,6 +424,27 @@ class DealFilesPanel(CollapsibleWidget):
 
         return None
 
+    def _selected_paths(self) -> list[Path]:
+        selection_model = self._tree.selectionModel()
+        if selection_model is None:
+            return []
+
+        paths: list[Path] = []
+        seen: set[Path] = set()
+
+        for index in selection_model.selectedRows(0):
+            if not index.isValid():
+                continue
+
+            path = Path(self._model.filePath(index))
+            if not path.exists() or self._is_root_path(path) or path in seen:
+                continue
+
+            seen.add(path)
+            paths.append(path)
+
+        return paths
+
     def _target_directory_for_creation(self) -> Path | None:
         path = self._current_selection_path()
         if path is None:
@@ -415,13 +469,33 @@ class DealFilesPanel(CollapsibleWidget):
     def _is_root_path(self, path: Path) -> bool:
         return bool(self._folder_path) and Path(self._folder_path) == path
 
+    def _nearest_existing_folder(self, start: Path | None) -> Path | None:
+        current = start
+        while current is not None:
+            if current.exists() and current.is_dir():
+                return current
+
+            parent = current.parent
+            if parent == current:
+                break
+            current = parent
+
+        return None
+
+    def _format_objects_word(self, count: int) -> str:
+        if count % 10 == 1 and count % 100 != 11:
+            return "объект"
+        if count % 10 in {2, 3, 4} and count % 100 not in {12, 13, 14}:
+            return "объекта"
+        return "объектов"
+
     def _update_actions_state(self) -> None:
         has_root = bool(self._folder_path)
         path = self._current_selection_path()
         is_valid = path is not None and path.exists()
-        is_root = bool(path and self._is_root_path(path))
+        selected_paths = self._selected_paths()
 
         self._create_action.setEnabled(has_root)
         self._open_action.setEnabled(is_valid)
-        self._rename_action.setEnabled(is_valid and not is_root)
-        self._delete_action.setEnabled(is_valid and not is_root)
+        self._rename_action.setEnabled(len(selected_paths) == 1)
+        self._delete_action.setEnabled(bool(selected_paths))
