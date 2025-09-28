@@ -1,3 +1,4 @@
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -54,6 +55,8 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
 
         self.layout = QVBoxLayout(self)
         self._shortcuts: list[QShortcut] = []
+        self._tab_actions: dict[int, list[QWidget]] = {}
+        self._current_action_widgets: list[QWidget] = []
 
         self.splitter = QSplitter(Qt.Horizontal)
         self.splitter.setChildrenCollapsible(False)
@@ -98,9 +101,24 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
 
         self.splitter.addWidget(self.left_panel)
 
+        self.right_panel = QWidget()
+        right_layout = QVBoxLayout(self.right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(12)
+
+        self.action_bar_container = QWidget(self.right_panel)
+        self.action_bar_container.setVisible(False)
+        self.action_bar_layout = QHBoxLayout(self.action_bar_container)
+        self.action_bar_layout.setContentsMargins(0, 0, 0, 0)
+        self.action_bar_layout.setSpacing(8)
+        self.action_bar_layout.addStretch()
+        right_layout.addWidget(self.action_bar_container)
+
         self.tabs = QTabWidget()
         self.tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.splitter.addWidget(self.tabs)
+        right_layout.addWidget(self.tabs, 1)
+
+        self.splitter.addWidget(self.right_panel)
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)
         self._init_tabs()
@@ -113,6 +131,8 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
 
     def _on_tab_changed(self, index: int) -> None:
         """Refresh data when switching between tabs."""
+        self._apply_tab_actions(index)
+
         if index == getattr(self, "policy_tab_idx", None) and hasattr(self, "pol_view"):
             self.pol_view.refresh()
         elif index == getattr(self, "payment_tab_idx", None) and hasattr(self, "pay_view"):
@@ -127,6 +147,34 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             return
 
         self._init_kpi_panel()
+
+    def register_tab_actions(
+        self, tab_index: int, widgets: Sequence[QWidget] | Callable[[], Sequence[QWidget]]
+    ) -> None:
+        if callable(widgets):
+            widget_list = list(widgets())
+        else:
+            widget_list = list(widgets)
+        self._tab_actions[tab_index] = widget_list
+        if self.tabs.currentIndex() == tab_index:
+            self.set_action_widgets(widget_list)
+
+    def _apply_tab_actions(self, tab_index: int) -> None:
+        widgets = self._tab_actions.get(tab_index, [])
+        self.set_action_widgets(widgets)
+
+    def set_action_widgets(self, widgets: Sequence[QWidget]) -> None:
+        while self._current_action_widgets:
+            widget = self._current_action_widgets.pop()
+            self.action_bar_layout.removeWidget(widget)
+            widget.setParent(None)
+
+        for widget in widgets:
+            insert_pos = max(0, self.action_bar_layout.count() - 1)
+            self.action_bar_layout.insertWidget(insert_pos, widget)
+            self._current_action_widgets.append(widget)
+
+        self.action_bar_container.setVisible(bool(self._current_action_widgets))
 
     def _init_kpi_panel(self):
         """(Re)populate the KPI panel without adding new duplicates."""

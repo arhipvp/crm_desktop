@@ -128,6 +128,11 @@ class DealTabsMixin:
             self.tabs.removeTab(0)
             w.deleteLater()
 
+        if hasattr(self, "_tab_actions"):
+            self._tab_actions.clear()
+        if hasattr(self, "set_action_widgets"):
+            self.set_action_widgets([])
+
         # ---------- Главная вкладка ---------------------------------
         deal_tab = QWidget()
         deal_layout = QVBoxLayout(deal_tab)
@@ -182,38 +187,30 @@ class DealTabsMixin:
         btn_save = styled_button("💾 Сохранить изменения", shortcut="Ctrl+Enter")
         btn_save.clicked.connect(self._on_inline_save)
         self._add_shortcut("Ctrl+Enter", self._on_inline_save)
-        btn_save_close = styled_button("💾 Сохранить и закрыть", shortcut="Ctrl+Shift+Enter")
+        btn_save_close = styled_button(
+            "💾 Сохранить и закрыть", shortcut="Ctrl+Shift+Enter"
+        )
         btn_save_close.clicked.connect(self._on_save_and_close)
         btn_refresh = styled_button("🔄 Обновить", shortcut="F5")
         btn_refresh.clicked.connect(self._on_refresh)
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
-        btn_row.addWidget(btn_save)
-        btn_row.addWidget(btn_save_close)
-        btn_row.addWidget(btn_refresh)
-        deal_layout.addLayout(btn_row)
 
-        self.tabs.addTab(deal_tab, "Сделка")
+        self.deal_tab_idx = self.tabs.addTab(deal_tab, "Сделка")
+        self.register_tab_actions(
+            self.deal_tab_idx, [btn_save, btn_save_close, btn_refresh]
+        )
 
         # ---------- Полисы -----------------------------------------
         pol_tab = QWidget()
         pol_l = QVBoxLayout(pol_tab)
-        hlayout = QHBoxLayout()
         btn_pol = styled_button("➕ Полис", tooltip="Добавить полис", shortcut="Ctrl+N")
         btn_pol.clicked.connect(self._on_add_policy)
         self._add_shortcut("Ctrl+N", self._on_add_policy)
-        hlayout.addWidget(btn_pol)
         btn_import = styled_button("📥 Импорт из JSON", tooltip="Импорт полиса по данным")
         btn_import.clicked.connect(self._on_import_policy_json)
-        hlayout.addWidget(btn_import)
         btn_ai = styled_button("🤖 Обработать с ИИ", tooltip="Распознать файлы полисов")
         btn_ai.clicked.connect(self._on_process_policies_ai)
-        hlayout.addWidget(btn_ai)
         btn_ai_text = styled_button("🤖 Из текста", tooltip="Распознать текст полиса")
         btn_ai_text.clicked.connect(self._on_process_policy_text_ai)
-        hlayout.addWidget(btn_ai_text)
-        hlayout.addStretch()
-        pol_l.addLayout(hlayout)
         pol_view = PolicyTableView(parent=self, deal_id=self.instance.id)
         pol_view.load_data()
         pol_l.addWidget(pol_view)
@@ -223,6 +220,10 @@ class DealTabsMixin:
         self.policy_tab_idx = self.tabs.addTab(
             pol_tab, f"Полисы {pol_open} ({pol_closed})"
         )
+        self.register_tab_actions(
+            self.policy_tab_idx,
+            [btn_pol, btn_import, btn_ai, btn_ai_text],
+        )
 
         # ---------- Платежи ---------------------------------------
         pay_tab = QWidget()
@@ -230,7 +231,6 @@ class DealTabsMixin:
         btn_pay = styled_button("➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+Shift+P")
         btn_pay.clicked.connect(self._on_add_payment)
         self._add_shortcut("Ctrl+Shift+P", self._on_add_payment)
-        pay_l.addWidget(btn_pay, alignment=Qt.AlignLeft)
         pay_view = PaymentTableView(
             parent=self, deal_id=self.instance.id, can_restore=False
         )
@@ -242,6 +242,7 @@ class DealTabsMixin:
         self.payment_tab_idx = self.tabs.addTab(
             pay_tab, f"Платежи {pay_open} ({pay_closed})"
         )
+        self.register_tab_actions(self.payment_tab_idx, [btn_pay])
 
         # ---------- Доходы ---------------------------------------
         income_tab = QWidget()
@@ -256,7 +257,6 @@ class DealTabsMixin:
         btn_income.setEnabled(has_payments)
         if not has_payments:
             btn_income.setToolTip("Нет доступных платежей для привязки")
-        income_layout.addWidget(btn_income, alignment=Qt.AlignLeft)
         income_view = IncomeTableView(parent=self, deal_id=self.instance.id)
         income_view.load_data()
         income_layout.addWidget(income_view)
@@ -266,6 +266,7 @@ class DealTabsMixin:
         self.income_tab_idx = self.tabs.addTab(
             income_tab, f"Доходы {inc_open} ({inc_closed})"
         )
+        self.register_tab_actions(self.income_tab_idx, [btn_income])
 
         # ---------- Расходы --------------------------------------
         expense_tab = QWidget()
@@ -273,7 +274,6 @@ class DealTabsMixin:
         btn_expense = styled_button("➕ Расход", tooltip="Добавить расход", shortcut="Ctrl+Alt+X")
         btn_expense.clicked.connect(self._on_add_expense)
         self._add_shortcut("Ctrl+Alt+X", self._on_add_expense)
-        expense_layout.addWidget(btn_expense, alignment=Qt.AlignLeft)
         expense_view = ExpenseTableView(parent=self, deal_id=self.instance.id)
         expense_view.load_data()
         expense_layout.addWidget(expense_view)
@@ -283,6 +283,7 @@ class DealTabsMixin:
         self.expense_tab_idx = self.tabs.addTab(
             expense_tab, f"Расходы {exp_open} ({exp_closed})"
         )
+        self.register_tab_actions(self.expense_tab_idx, [btn_expense])
 
         # ---------- Задачи ---------------------------------------
         task_tab = QWidget()
@@ -292,7 +293,6 @@ class DealTabsMixin:
         )
         btn_add_task.clicked.connect(self._on_add_task)
         self._add_shortcut("Ctrl+Alt+T", self._on_add_task)
-        vbox.addWidget(btn_add_task, alignment=Qt.AlignLeft)
 
         task_view = TaskTableView(
             parent=self,
@@ -312,8 +312,10 @@ class DealTabsMixin:
         self.task_tab_idx = self.tabs.addTab(
             task_tab, f"Задачи {task_open} ({task_closed})"
         )
+        self.register_tab_actions(self.task_tab_idx, [btn_add_task])
 
         self.tabs.setCurrentIndex(min(current, self.tabs.count() - 1))
+        self._apply_tab_actions(self.tabs.currentIndex())
 
     def _on_archive_note(self, entry_id: str) -> None:
         archived = deal_journal.archive_entry(self.instance, entry_id)
