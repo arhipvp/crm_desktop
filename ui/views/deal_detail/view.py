@@ -31,6 +31,7 @@ from services.expense_service import (
 )
 from utils.screen_utils import get_scaled_size
 from utils.money import format_rub
+from ui.widgets.flow_layout import FlowLayout
 
 from .actions import DealActionsMixin
 from .tabs import DealTabsMixin
@@ -98,18 +99,9 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         left_layout.addWidget(self.create_folder_button)
 
         actions_panel = CollapsibleWidget("Действия", self.left_panel)
-        self.primary_actions_layout = QHBoxLayout()
+        self.primary_actions_layout = FlowLayout()
         self.primary_actions_layout.setContentsMargins(0, 0, 0, 0)
         self.primary_actions_layout.setSpacing(6)
-
-        self.action_bar_container = QWidget(actions_panel)
-        self.action_bar_layout = QHBoxLayout(self.action_bar_container)
-        self.action_bar_layout.setContentsMargins(0, 0, 0, 0)
-        self.action_bar_layout.setSpacing(8)
-        self.action_bar_layout.addStretch()
-        self.action_bar_container.setVisible(False)
-
-        self.primary_actions_layout.addWidget(self.action_bar_container)
         actions_panel.setContentLayout(self.primary_actions_layout)
         left_layout.addWidget(actions_panel)
         self._update_files_panel()
@@ -187,8 +179,6 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         if layout is None:
             return
 
-        container = getattr(self, "action_bar_container", None)
-
         # keep only widgets that are still part of the layout
         self._tab_action_widgets = [
             widget
@@ -196,22 +186,17 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             if widget is not None and layout.indexOf(widget) != -1
         ]
 
-        while self._tab_action_widgets:
-            widget = self._tab_action_widgets.pop()
-            layout.removeWidget(widget)
+        for widget in list(self._tab_action_widgets):
+            idx = layout.indexOf(widget)
+            if idx != -1:
+                item = layout.takeAt(idx)
+                if item is not None:
+                    removed = item.widget()
+                    if removed is not None:
+                        removed.setParent(None)
+                        continue
             widget.setParent(None)
-
-        if not self._static_action_widgets or any(
-            (layout.indexOf(widget) == -1)
-            for widget in self._static_action_widgets
-            if widget is not None
-        ):
-            self._static_action_widgets.clear()
-            for i in range(layout.count()):
-                item = layout.itemAt(i)
-                widget = item.widget()
-                if widget is not None and widget is not container:
-                    self._static_action_widgets.append(widget)
+        self._tab_action_widgets.clear()
 
         target_index = tab_index
         if target_index is None and hasattr(self, "tabs"):
@@ -220,29 +205,11 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         factory = self._tab_action_factories.get(target_index) if target_index is not None else None
         widgets = list(factory()) if factory else []
 
-        insert_pos = layout.count()
-        if container is not None:
-            container_idx = layout.indexOf(container)
-            if container_idx != -1:
-                insert_pos = container_idx
-        else:
-            last_static_idx = -1
-            for widget in self._static_action_widgets:
-                if widget is None:
-                    continue
-                idx = layout.indexOf(widget)
-                if idx > last_static_idx:
-                    last_static_idx = idx
-            if last_static_idx != -1:
-                insert_pos = last_static_idx + 1
-
         for widget in widgets:
-            layout.insertWidget(insert_pos, widget)
+            if widget in self._static_action_widgets:
+                continue
+            layout.addWidget(widget)
             self._tab_action_widgets.append(widget)
-            insert_pos += 1
-
-        if container is not None:
-            container.setVisible(bool(self._tab_action_widgets))
 
     def _init_kpi_panel(self):
         """(Re)populate the KPI panel without adding new duplicates."""
