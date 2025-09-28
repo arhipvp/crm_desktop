@@ -49,11 +49,19 @@ class TwoColumnFormLayout:
         self.columns = max(1, columns)
         self.grid = QGridLayout(container)
         self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setHorizontalSpacing(24)
+        if self.columns == 1:
+            self.grid.setHorizontalSpacing(12)
+            self.grid.setVerticalSpacing(12)
+        else:
+            self.grid.setHorizontalSpacing(24)
         self.rows: list[tuple[QWidget, QWidget]] = []
         self._configure_columns()
 
     def _configure_columns(self) -> None:
+        if self.columns == 1:
+            self.grid.setColumnStretch(0, 1)
+            return
+
         for column in range(self.columns * 2):
             stretch = 1 if column % 2 else 0
             self.grid.setColumnStretch(column, stretch)
@@ -78,9 +86,14 @@ class TwoColumnFormLayout:
         for index, (label, field) in enumerate(self.rows):
             column = index % self.columns
             row = column_rows[column]
-            base_col = column * 2
-            self.grid.addWidget(label, row, base_col)
-            self.grid.addWidget(field, row, base_col + 1)
+            if self.columns == 1:
+                base_row = row * 2
+                self.grid.addWidget(label, base_row, 0)
+                self.grid.addWidget(field, base_row + 1, 0)
+            else:
+                base_col = column * 2
+                self.grid.addWidget(label, row, base_col)
+                self.grid.addWidget(field, row, base_col + 1)
             column_rows[column] += 1
 
     def addRow(self, label: QLabel | str | QWidget, field: QWidget) -> None:
@@ -104,6 +117,10 @@ class BaseEditForm(QDialog):
 
     EXTRA_HIDDEN: set[str] = set()
     form_columns: int = 2
+    dialog_minimum_width: int | None = 640
+    dialog_minimum_size: tuple[int, int] | None = (720, 480)
+    dialog_target_size: tuple[int, int] | None = (900, 640)
+    dialog_target_ratio: float = 0.5
 
     def __init__(
         self, instance=None, model_class=None, entity_name="объект", parent=None
@@ -118,7 +135,8 @@ class BaseEditForm(QDialog):
         self.setWindowTitle(
             f"Редактировать {entity_name}" if instance else f"Добавить {entity_name}"
         )
-        self.setMinimumWidth(640)
+        if self.dialog_minimum_width is not None:
+            self.setMinimumWidth(self.dialog_minimum_width)
 
         # ── layout ──
         self.layout = QVBoxLayout(self)
@@ -153,9 +171,17 @@ class BaseEditForm(QDialog):
         # Размеры формы определяем по содержимому
         self.adjustSize()
         size_hint = self.sizeHint()
-        target = get_scaled_size(900, 640, ratio=0.5)
-        self.resize(size_hint.boundedTo(target))
-        self.setMinimumSize(720, 480)
+        if self.dialog_target_size is not None:
+            target = get_scaled_size(
+                self.dialog_target_size[0],
+                self.dialog_target_size[1],
+                ratio=self.dialog_target_ratio,
+            )
+            self.resize(size_hint.boundedTo(target))
+        else:
+            self.resize(size_hint)
+        if self.dialog_minimum_size is not None:
+            self.setMinimumSize(*self.dialog_minimum_size)
         self._dirty = False
 
     # ------------------------------------------------------------------
