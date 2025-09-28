@@ -139,6 +139,10 @@ class DealFilesPanel(CollapsibleWidget):
         self._tree = DealFilesTreeView()
         self._tree.setModel(self._model)
         self._tree.setSortingEnabled(True)
+        header = self._tree.header()
+        if header is not None:
+            header.setSectionsClickable(True)
+            header.setSortIndicatorShown(True)
         self._tree.sortByColumn(0, Qt.AscendingOrder)
         self._tree.setHeaderHidden(False)
         self._tree.hide()
