@@ -66,6 +66,8 @@ class PolicyForm(BaseEditForm):
         first_payment_paid=False,
     ):
         self._auto_end_date = None  # будем хранить последнее автозаполненное значение
+        self.start_date_edit = None
+        self.end_date_edit = None
 
         self._forced_client = forced_client
         self._forced_deal = forced_deal
@@ -167,20 +169,23 @@ class PolicyForm(BaseEditForm):
         self.first_payment_checkbox.setChecked(self._first_payment_paid)
         self.form_layout.addRow("", self.first_payment_checkbox)
 
-        self.start_date_edit = self.fields.get("start_date")
-        self.end_date_edit = self.fields.get("end_date")
-
-        if self.start_date_edit and self.end_date_edit:
-            self.start_date_edit.dateChanged.connect(self.on_start_date_changed)
-            # Если start_date уже выбран — сразу установить правильный end_date
-            qd = self.start_date_edit.date()
-            if qd.isValid():
-                self.on_start_date_changed(qd)
-
         # обновляем список сделок при смене клиента
         self.client_combo.currentIndexChanged.connect(self.on_client_changed)
 
         self._build_payments_section()
+
+    def update_context(self):
+        self.start_date_edit = self.fields.get("start_date")
+        self.end_date_edit = self.fields.get("end_date")
+
+        if not self.start_date_edit:
+            return
+
+        self.start_date_edit.dateChanged.connect(self.on_start_date_changed)
+
+        qd = self.start_date_edit.date()
+        if qd.isValid():
+            self.on_start_date_changed(qd)
 
     # ---------- сбор данных ----------
     def collect_data(self) -> dict:
