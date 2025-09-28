@@ -131,8 +131,10 @@ class BaseEditForm(QDialog):
         self._create_button_panel()
         # Размеры формы определяем по содержимому
         self.adjustSize()
-        self.setMinimumHeight(self.height())
-        self.resize(get_scaled_size(960, 720))
+        size_hint = self.sizeHint()
+        target = get_scaled_size(900, 640, ratio=0.5)
+        self.resize(size_hint.boundedTo(target))
+        self.setMinimumSize(720, 480)
         self._dirty = False
 
     # ------------------------------------------------------------------
