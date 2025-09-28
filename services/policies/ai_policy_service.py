@@ -220,7 +220,12 @@ class AiPolicyError(ValueError):
         self.transcript = transcript
 
 
-def _chat(messages: List[dict], progress_cb: Callable[[str, str], None] | None = None) -> str:
+def _chat(
+    messages: List[dict],
+    progress_cb: Callable[[str, str], None] | None = None,
+    *,
+    cancel_cb: Callable[[], bool] | None = None,
+) -> str:
     api_key = settings.openai_api_key
     if not api_key:
         raise ValueError("OPENAI_API_KEY не задан")
@@ -231,7 +236,13 @@ def _chat(messages: List[dict], progress_cb: Callable[[str, str], None] | None =
     tools = [{"type": "function", "function": POLICY_FUNCTION}]
     tool_choice = {"type": "function", "function": {"name": POLICY_FUNCTION["name"]}}
 
+    def _check_cancel() -> None:
+        if cancel_cb and cancel_cb():
+            logger.info("Отмена запроса к OpenAI по инициативе пользователя")
+            raise InterruptedError("Запрос к OpenAI отменен")
+
     if progress_cb:
+        _check_cancel()
         stream = client.chat.completions.create(
             model=model,
             messages=messages,
@@ -241,18 +252,24 @@ def _chat(messages: List[dict], progress_cb: Callable[[str, str], None] | None =
             tool_choice=tool_choice,
         )
         parts: List[str] = []
-        for chunk in stream:
-            delta = chunk.choices[0].delta if chunk.choices else None
-            tool_calls = delta.tool_calls if delta else None
-            if not tool_calls:
-                continue
-            func = tool_calls[0].function if tool_calls else None
-            if not func:
-                continue
-            part = func.arguments or ""
-            if part:
-                parts.append(part)
-                progress_cb("assistant", part)
+        try:
+            for chunk in stream:
+                _check_cancel()
+                delta = chunk.choices[0].delta if chunk.choices else None
+                tool_calls = delta.tool_calls if delta else None
+                if not tool_calls:
+                    continue
+                func = tool_calls[0].function if tool_calls else None
+                if not func:
+                    continue
+                part = func.arguments or ""
+                if part:
+                    parts.append(part)
+                    progress_cb("assistant", part)
+        finally:
+            close_method = getattr(stream, "close", None)
+            if callable(close_method):
+                close_method()
         return "".join(parts)
 
     resp = client.chat.completions.create(
@@ -270,22 +287,31 @@ def recognize_policy_interactive(
     *,
     messages: List[dict] | None = None,
     progress_cb: Callable[[str, str], None] | None = None,
+    cancel_cb: Callable[[], bool] | None = None,
 ) -> Tuple[dict, str, List[dict]]:
     """Распознать полис и вернуть JSON, транскрипт и сообщения.
 
     Если передан параметр ``messages``, диалог продолжается с них.
     """
+    def _check_cancel() -> None:
+        if cancel_cb and cancel_cb():
+            logger.info("Распознавание полиса отменено пользователем")
+            raise InterruptedError("Распознавание полиса отменено")
+
     if messages is None:
         messages = [
             {"role": "system", "content": _get_prompt()},
             {"role": "user", "content": text[:16000]},
         ]
+    _check_cancel()
     if progress_cb:
         for m in messages:
+            _check_cancel()
             progress_cb(m["role"], m["content"])
 
     for attempt in range(MAX_ATTEMPTS):
-        answer = _chat(messages, progress_cb)
+        _check_cancel()
+        answer = _chat(messages, progress_cb, cancel_cb=cancel_cb)
         messages.append({"role": "assistant", "content": answer})
         try:
             data = json.loads(answer)
@@ -297,6 +323,7 @@ def recognize_policy_interactive(
                     f"Не удалось разобрать JSON: {exc}", messages, transcript
                 ) from exc
             if progress_cb:
+                _check_cancel()
                 progress_cb("user", REMINDER)
             messages.append({"role": "user", "content": REMINDER})
             continue
@@ -308,9 +335,11 @@ def recognize_policy_interactive(
                     f"Ошибка валидации схемы: {exc.message}", messages, transcript
                 ) from exc
             if progress_cb:
+                _check_cancel()
                 progress_cb("user", REMINDER)
             messages.append({"role": "user", "content": REMINDER})
             continue
+        _check_cancel()
         transcript = _log_conversation("text", messages)
         return data, transcript, messages
 

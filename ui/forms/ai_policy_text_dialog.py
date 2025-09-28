@@ -1,15 +1,17 @@
-from PySide6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QTextEdit,
-    QPushButton,
-    QHBoxLayout,
-    QMessageBox,
-    QLineEdit,
-)
+import json
+import logging
+
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QTextCursor
-import json
+from PySide6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+)
 
 from services.policies.ai_policy_service import (
     recognize_policy_interactive,
@@ -17,6 +19,9 @@ from services.policies.ai_policy_service import (
     _get_prompt,
 )
 from ui.forms.import_policy_json_form import ImportPolicyJsonForm
+
+
+logger = logging.getLogger(__name__)
 
 
 class _Worker(QThread):
@@ -30,13 +35,25 @@ class _Worker(QThread):
 
     def run(self):
         def cb(role, part):
+            if self.isInterruptionRequested():
+                raise InterruptedError("Распознавание отменено пользователем")
             self.progress.emit(role, part)
 
+        def cancel_cb():
+            return self.isInterruptionRequested()
+
         try:
+            if self.isInterruptionRequested():
+                raise InterruptedError("Распознавание отменено пользователем")
             data, transcript, messages = recognize_policy_interactive(
-                "", messages=self._messages, progress_cb=cb
+                "",
+                messages=self._messages,
+                progress_cb=cb,
+                cancel_cb=cancel_cb,
             )
             self.finished.emit(data, messages, transcript)
+        except InterruptedError:
+            logger.info("Распознавание полиса отменено пользователем")
         except AiPolicyError as exc:
             self.failed.emit(str(exc), exc.messages, exc.transcript)
         except Exception as exc:  # pragma: no cover - network errors
@@ -128,7 +145,11 @@ class AiPolicyTextDialog(QDialog):
         if wait and worker.isRunning():
             worker.requestInterruption()
             worker.quit()
-            worker.wait()
+            if not worker.wait(5000):
+                logger.warning("Поток распознавания не завершился вовремя, завершаем принудительно")
+                worker.terminate()
+                if not worker.wait(2000):
+                    logger.error("Не удалось завершить поток распознавания")
 
         if not worker.isRunning():
             worker.deleteLater()
