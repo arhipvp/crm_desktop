@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from ui.common.combo_helpers import create_fk_combobox
-
 """ui/base/base_edit_form.py – универсальная форма CRUD.
 
 Изменения:
@@ -11,12 +9,15 @@ from ui.common.combo_helpers import create_fk_combobox
 • Обычные обязательные даты остались на `TypableDateEdit`.
 • Код автосохранения/валидаторов не трогался.
 """
-import logging
+
+import base64
+import binascii
 import datetime as dt
+import logging
 
 import peewee
 from peewee import BooleanField, DateField, ForeignKeyField
-from PySide6.QtCore import QDate, QDateTime
+from PySide6.QtCore import QDate, QDateTime, QByteArray
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -32,6 +33,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui import settings as ui_settings
+from ui.common.combo_helpers import create_fk_combobox
 from ui.common.date_utils import TypableDateEdit, configure_optional_date_edit
 from ui.common.message_boxes import confirm
 from ui.common.styled_widgets import styled_button
@@ -131,6 +134,7 @@ class BaseEditForm(QDialog):
         self.entity_name = entity_name
         self.fields: dict[str, object] = {}
         self._dirty = False
+        self._settings_key = f"Form.{self.__class__.__name__}"
 
         self.setWindowTitle(
             f"Редактировать {entity_name}" if instance else f"Добавить {entity_name}"
@@ -182,6 +186,8 @@ class BaseEditForm(QDialog):
             self.resize(size_hint)
         if self.dialog_minimum_size is not None:
             self.setMinimumSize(*self.dialog_minimum_size)
+
+        self._restore_window_geometry()
         self._dirty = False
 
     # ------------------------------------------------------------------
@@ -210,6 +216,7 @@ class BaseEditForm(QDialog):
             if not confirm("Есть несохранённые изменения. Закрыть без сохранения?"):
                 event.ignore()
                 return
+        self._save_window_geometry()
         super().closeEvent(event)
 
     # ------------------------------------------------------------------
@@ -425,3 +432,41 @@ class BaseEditForm(QDialog):
     def build_custom_fields(self):
         """Потомки могут добавить дополнительные виджеты до автогенерации."""
         pass
+
+    def _restore_window_geometry(self) -> None:
+        settings = ui_settings.get_window_settings(self._settings_key)
+        geometry_b64 = settings.get("geometry")
+        if not geometry_b64:
+            return
+        try:
+            geometry_bytes = base64.b64decode(geometry_b64)
+        except (ValueError, binascii.Error, TypeError):
+            logger.warning(
+                "Некорректные сохранённые размеры формы %s", self._settings_key
+            )
+            return
+        if not geometry_bytes:
+            return
+        try:
+            restored = self.restoreGeometry(QByteArray(geometry_bytes))
+        except Exception:
+            logger.exception(
+                "Не удалось восстановить геометрию формы %s", self._settings_key
+            )
+            return
+        if not restored:
+            logger.warning(
+                "Не удалось применить сохранённые размеры формы %s", self._settings_key
+            )
+
+    def _save_window_geometry(self) -> None:
+        try:
+            geometry = base64.b64encode(bytes(self.saveGeometry())).decode("ascii")
+        except Exception:
+            logger.exception(
+                "Не удалось сохранить геометрию формы %s", self._settings_key
+            )
+            return
+        settings = ui_settings.get_window_settings(self._settings_key)
+        settings["geometry"] = geometry
+        ui_settings.set_window_settings(self._settings_key, settings)
