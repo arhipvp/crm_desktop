@@ -150,6 +150,19 @@ class DealActionsMixin:
 
         self._update_exec_button()
 
+        tabs = getattr(self, "tabs", None)
+        current_index = None
+        if tabs is not None and hasattr(tabs, "currentIndex"):
+            try:
+                current_index = tabs.currentIndex()
+            except Exception:
+                current_index = None
+
+        if current_index is not None:
+            self._rebuild_tab_actions(current_index)
+        else:
+            self._rebuild_tab_actions()
+
     def _add_shortcut(self, seq: str, callback):
         sc = QShortcut(QKeySequence(seq), self)
         sc.setContext(Qt.WidgetWithChildrenShortcut)

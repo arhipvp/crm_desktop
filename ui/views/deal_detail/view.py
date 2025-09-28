@@ -179,14 +179,20 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         if layout is None:
             return
 
+        static_widgets = set(getattr(self, "_static_action_widgets", ()))
+
         # keep only widgets that are still part of the layout
         self._tab_action_widgets = [
             widget
             for widget in self._tab_action_widgets
-            if widget is not None and layout.indexOf(widget) != -1
+            if widget is not None
+            and widget not in static_widgets
+            and layout.indexOf(widget) != -1
         ]
 
         for widget in list(self._tab_action_widgets):
+            if widget in static_widgets:
+                continue
             idx = layout.indexOf(widget)
             if idx != -1:
                 item = layout.takeAt(idx)
