@@ -42,14 +42,12 @@ logger = logging.getLogger(__name__)
 
 class DealActionsMixin:
     def _init_actions(self):
-        has_primary_layout = hasattr(self, "primary_actions_layout")
         primary_layout = getattr(self, "primary_actions_layout", None)
         action_bar_container = getattr(self, "action_bar_container", None)
 
         if primary_layout is None:
             primary_layout = QHBoxLayout()
             primary_layout.setSpacing(6)
-            primary_layout.addStretch()
             container_layout = getattr(self, "layout", None)
             if container_layout is not None:
                 container_layout.addLayout(primary_layout)
@@ -133,10 +131,9 @@ class DealActionsMixin:
             self._add_shortcut("Ctrl+Shift+L", self._on_close_deal)
             primary_layout.addWidget(btn_close)
 
-        if has_primary_layout:
-            primary_layout.addStretch()
-            if action_bar_container is not None:
-                primary_layout.addWidget(action_bar_container)
+        primary_layout.addStretch()
+        if action_bar_container is not None:
+            primary_layout.addWidget(action_bar_container)
 
         self._update_exec_button()
 
