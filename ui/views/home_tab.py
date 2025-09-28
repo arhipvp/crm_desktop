@@ -218,5 +218,3 @@ class HomeTab(QWidget):
         self.reminder_chart.setChart(chart)
         self.reminder_chart.setRenderHint(QPainter.Antialiasing)
 
-    def get_action_widget(self) -> QWidget | None:
-        return None

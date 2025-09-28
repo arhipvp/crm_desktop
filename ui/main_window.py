@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QStatusBar,
     QVBoxLayout,
-    QWidget,
 )
 from utils.screen_utils import get_scaled_size
 
@@ -16,7 +15,6 @@ from ui import settings as ui_settings
 
 from ui.forms.import_policy_json_form import ImportPolicyJsonForm
 from ui.main_menu import MainMenu
-from ui.widgets.action_bar import ActionBar
 from ui.views.client_table_view import ClientTableView
 from ui.views.deal_table_view import DealTableView
 from ui.views.finance_tab import FinanceTab
@@ -44,26 +42,14 @@ class MainWindow(QMainWindow):
         self.menu_bar = MainMenu(self)
         self.setMenuBar(self.menu_bar)
 
-        self._action_widget_source = None
-        self._action_widget_signal = None
-
         self.init_tabs()
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
         self._load_settings()
 
     def init_tabs(self):
-        central = QWidget(self)
-        layout = QVBoxLayout(central)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-        self.action_bar = ActionBar(central)
-        layout.addWidget(self.action_bar)
-
-        self.tab_widget = QTabWidget(central)
-        layout.addWidget(self.tab_widget)
-        self.setCentralWidget(central)
+        self.tab_widget = QTabWidget(self)
+        self.setCentralWidget(self.tab_widget)
         self.home_tab = HomeTab()
         self.client_tab = ClientTableView()
         self.deal_tab = DealTableView()
@@ -88,8 +74,6 @@ class MainWindow(QMainWindow):
             if hasattr(tab, "data_loaded"):
                 tab.data_loaded.connect(self.show_count)
 
-        self._update_action_bar(self.tab_widget.currentWidget())
-
     def _load_settings(self):
         st = ui_settings.get_window_settings("MainWindow")
         geom = st.get("geometry")
@@ -111,7 +95,6 @@ class MainWindow(QMainWindow):
 
     def on_tab_changed(self, index: int):
         widget = self.tab_widget.widget(index)
-        self._update_action_bar(widget)
         if widget is self.home_tab:
             self.home_tab.update_stats()
             self.status_bar.clearMessage()
@@ -153,40 +136,6 @@ class MainWindow(QMainWindow):
 
         dlg = AiConsultantDialog(self)
         dlg.exec()
-
-    def _update_action_bar(self, widget: QWidget | None) -> None:
-        if self._action_widget_signal is not None:
-            try:
-                self._action_widget_signal.disconnect(self._on_action_widget_changed)
-            except (TypeError, RuntimeError):
-                pass
-        self._action_widget_source = None
-        self._action_widget_signal = None
-
-        action_widget = None
-        if widget is not None:
-            getter = getattr(widget, "get_action_widget", None)
-            if callable(getter):
-                action_widget = getter()
-
-            signal = getattr(widget, "action_widget_changed", None)
-            if signal is not None:
-                try:
-                    signal.connect(self._on_action_widget_changed)
-                    self._action_widget_source = widget
-                    self._action_widget_signal = signal
-                except (TypeError, RuntimeError):
-                    self._action_widget_source = None
-                    self._action_widget_signal = None
-
-        self.action_bar.set_widget(action_widget)
-
-    def _on_action_widget_changed(self, widget: QWidget | None) -> None:
-        if widget is None and self._action_widget_source is not None:
-            getter = getattr(self._action_widget_source, "get_action_widget", None)
-            if callable(getter):
-                widget = getter()
-        self.action_bar.set_widget(widget)
 
     def closeEvent(self, event):
         st = ui_settings.get_window_settings("MainWindow")
