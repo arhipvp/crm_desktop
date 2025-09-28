@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QInputDialog, QProgressDialog
+from PySide6.QtWidgets import QDialog, QInputDialog, QProgressDialog
 
 from database.models import Deal
 from services.deal_service import (
@@ -43,67 +43,82 @@ logger = logging.getLogger(__name__)
 class DealActionsMixin:
     def _init_actions(self):
         primary_layout = getattr(self, "primary_actions_layout", None)
-        action_bar_container = getattr(self, "action_bar_container", None)
 
         if primary_layout is None:
-            primary_layout = QHBoxLayout()
-            primary_layout.setSpacing(6)
-            container_layout = getattr(self, "layout", None)
-            if container_layout is not None:
-                container_layout.addLayout(primary_layout)
-        else:
-            preserved_container = action_bar_container
-            while primary_layout.count():
-                item = primary_layout.takeAt(0)
-                widget = item.widget()
-                if widget and widget is not preserved_container:
-                    widget.setParent(None)
+            return
 
-        btn_edit = styled_button("✏️ Редактировать", shortcut="Ctrl+E")
+        while primary_layout.count():
+            item = primary_layout.takeAt(0)
+            if item is None:
+                break
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+
+        self._tab_action_widgets.clear()
+        static_widgets: list = []
+
+        def register_static_button(button):
+            button.setProperty("flow_fill_row", False)
+            primary_layout.addWidget(button)
+            static_widgets.append(button)
+            return button
+
+        btn_edit = register_static_button(
+            styled_button("✏️ Редактировать", shortcut="Ctrl+E")
+        )
         btn_edit.clicked.connect(self._on_edit)
         self._add_shortcut("Ctrl+E", self._on_edit)
-        primary_layout.addWidget(btn_edit)
 
-        btn_edit_client = styled_button(
-            "📝 Клиент", tooltip="Редактировать клиента", shortcut="Ctrl+Shift+K"
+        btn_edit_client = register_static_button(
+            styled_button(
+                "📝 Клиент",
+                tooltip="Редактировать клиента",
+                shortcut="Ctrl+Shift+K",
+            )
         )
         btn_edit_client.clicked.connect(self._on_edit_client)
         self._add_shortcut("Ctrl+Shift+K", self._on_edit_client)
-        primary_layout.addWidget(btn_edit_client)
 
-        btn_folder = styled_button("📂 Папка", shortcut="Ctrl+O")
+        btn_folder = register_static_button(
+            styled_button("📂 Папка", shortcut="Ctrl+O")
+        )
         btn_folder.clicked.connect(self._open_folder)
         self._add_shortcut("Ctrl+O", self._open_folder)
-        primary_layout.addWidget(btn_folder)
 
-        btn_copy = styled_button(
-            "📋",
-            tooltip="Скопировать путь к папке",
-            shortcut="Ctrl+Shift+C",
+        btn_copy = register_static_button(
+            styled_button(
+                "📋",
+                tooltip="Скопировать путь к папке",
+                shortcut="Ctrl+Shift+C",
+            )
         )
         btn_copy.clicked.connect(self._copy_folder_path)
         self._add_shortcut("Ctrl+Shift+C", self._copy_folder_path)
-        primary_layout.addWidget(btn_copy)
 
-        self.btn_exec = styled_button("👤 Исполнитель", shortcut="Ctrl+Shift+E")
+        self.btn_exec = register_static_button(
+            styled_button("👤 Исполнитель", shortcut="Ctrl+Shift+E")
+        )
         self.btn_exec.clicked.connect(self._on_toggle_executor)
         self._add_shortcut("Ctrl+Shift+E", self._on_toggle_executor)
-        primary_layout.addWidget(self.btn_exec)
 
-        btn_wa = styled_button("💬 WhatsApp", shortcut="Ctrl+Shift+W")
+        btn_wa = register_static_button(
+            styled_button("💬 WhatsApp", shortcut="Ctrl+Shift+W")
+        )
         btn_wa.clicked.connect(self._open_whatsapp)
         self._add_shortcut("Ctrl+Shift+W", self._open_whatsapp)
-        primary_layout.addWidget(btn_wa)
 
-        btn_prev = styled_button("◀ Назад", shortcut="Alt+Left")
+        btn_prev = register_static_button(
+            styled_button("◀ Назад", shortcut="Alt+Left")
+        )
         btn_prev.clicked.connect(self._on_prev_deal)
         self._add_shortcut("Alt+Left", self._on_prev_deal)
-        primary_layout.addWidget(btn_prev)
 
-        btn_next = styled_button("▶ Далее", shortcut="Alt+Right")
+        btn_next = register_static_button(
+            styled_button("▶ Далее", shortcut="Alt+Right")
+        )
         btn_next.clicked.connect(self._on_next_deal)
         self._add_shortcut("Alt+Right", self._on_next_deal)
-        primary_layout.addWidget(btn_next)
 
         has_prev = get_prev_deal(self.instance)
         has_next = get_next_deal(self.instance)
@@ -113,27 +128,25 @@ class DealActionsMixin:
         self.btn_next = btn_next
 
         if not self.instance.is_closed:
-            btn_delay = styled_button("⏳ Отложить", shortcut="Ctrl+Shift+N")
+            btn_delay = register_static_button(
+                styled_button("⏳ Отложить", shortcut="Ctrl+Shift+N")
+            )
             btn_delay.clicked.connect(self._on_delay_to_event)
             self._add_shortcut("Ctrl+Shift+N", self._on_delay_to_event)
-            primary_layout.addWidget(btn_delay)
         else:
-            btn_reopen = styled_button(
-                "🔓 Восстановить сделку", shortcut="Ctrl+Shift+O"
+            btn_reopen = register_static_button(
+                styled_button("🔓 Восстановить сделку", shortcut="Ctrl+Shift+O")
             )
             btn_reopen.clicked.connect(self._on_reopen_deal)
             self._add_shortcut("Ctrl+Shift+O", self._on_reopen_deal)
-            primary_layout.addWidget(btn_reopen)
 
         if not self.instance.is_closed:
-            btn_close = styled_button("🔒 Закрыть сделку", shortcut="Ctrl+Shift+L")
+            btn_close = register_static_button(
+                styled_button("🔒 Закрыть сделку", shortcut="Ctrl+Shift+L")
+            )
             btn_close.clicked.connect(self._on_close_deal)
             self._add_shortcut("Ctrl+Shift+L", self._on_close_deal)
-            primary_layout.addWidget(btn_close)
-
-        primary_layout.addStretch()
-        if action_bar_container is not None:
-            primary_layout.addWidget(action_bar_container)
+        self._static_action_widgets = static_widgets
 
         self._update_exec_button()
 

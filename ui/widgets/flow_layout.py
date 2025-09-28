@@ -94,8 +94,11 @@ class FlowLayout(QLayout):
         widget = item.widget()
         if widget is None:
             return False
-        if widget.property("flow_fill_row") is True:
+        fill_property = widget.property("flow_fill_row")
+        if fill_property is True:
             return True
+        if fill_property is False:
+            return False
         policy = widget.sizePolicy().horizontalPolicy()
         return policy in (QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
 

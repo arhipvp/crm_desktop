@@ -31,6 +31,11 @@ from .sticky_notes import StickyNotesBoard
 
 
 class DealTabsMixin:
+    @staticmethod
+    def _mark_flow_button(button):
+        button.setProperty("flow_fill_row", False)
+        return button
+
     def _create_info_panel(self) -> CollapsibleWidget:
         info_panel = CollapsibleWidget("Основная информация")
         form = QFormLayout()
@@ -82,7 +87,7 @@ class DealTabsMixin:
             ("+3 дня", 3),
             ("+5 дней", 5),
         ]:
-            btn = styled_button(text)
+            btn = self._mark_flow_button(styled_button(text))
             btn.clicked.connect(lambda _, d=days: self._postpone_reminder(d))
             reminder_layout.addWidget(btn)
         form.addRow("Напоминание:", reminder_row)
@@ -159,7 +164,9 @@ class DealTabsMixin:
         self.notes_board.set_entries(active_entries, archived_entries)
         journal_form.addRow("Заметки:", self.notes_board)
 
-        self.btn_exec_task = styled_button("📤 Новая задача исполнителю")
+        self.btn_exec_task = self._mark_flow_button(
+            styled_button("📤 Новая задача исполнителю")
+        )
         self.btn_exec_task.clicked.connect(self._on_new_exec_task)
 
         j_layout = QVBoxLayout()
@@ -170,7 +177,9 @@ class DealTabsMixin:
 
         calc_panel = CollapsibleWidget("Расчёты")
         calc_layout = QVBoxLayout()
-        btn_calc = styled_button("➕ Запись", tooltip="Добавить расчёт", shortcut="Ctrl+Shift+A")
+        btn_calc = self._mark_flow_button(
+            styled_button("➕ Запись", tooltip="Добавить расчёт", shortcut="Ctrl+Shift+A")
+        )
         btn_calc.clicked.connect(self._on_add_calculation)
         self._add_shortcut("Ctrl+Shift+A", self._on_add_calculation)
         calc_layout.addWidget(btn_calc, alignment=Qt.AlignLeft)
@@ -184,14 +193,20 @@ class DealTabsMixin:
         scroll.setWidget(container)
         deal_layout.addWidget(scroll, 1)
 
-        btn_save = styled_button("💾 Сохранить изменения", shortcut="Ctrl+Enter")
+        btn_save = self._mark_flow_button(
+            styled_button("💾 Сохранить изменения", shortcut="Ctrl+Enter")
+        )
         btn_save.clicked.connect(self._on_inline_save)
         self._add_shortcut("Ctrl+Enter", self._on_inline_save)
-        btn_save_close = styled_button(
-            "💾 Сохранить и закрыть", shortcut="Ctrl+Shift+Enter"
+        btn_save_close = self._mark_flow_button(
+            styled_button(
+                "💾 Сохранить и закрыть", shortcut="Ctrl+Shift+Enter"
+            )
         )
         btn_save_close.clicked.connect(self._on_save_and_close)
-        btn_refresh = styled_button("🔄 Обновить", shortcut="F5")
+        btn_refresh = self._mark_flow_button(
+            styled_button("🔄 Обновить", shortcut="F5")
+        )
         btn_refresh.clicked.connect(self._on_refresh)
 
         self.deal_tab_idx = self.tabs.addTab(deal_tab, "Сделка")
@@ -202,14 +217,22 @@ class DealTabsMixin:
         # ---------- Полисы -----------------------------------------
         pol_tab = QWidget()
         pol_l = QVBoxLayout(pol_tab)
-        btn_pol = styled_button("➕ Полис", tooltip="Добавить полис", shortcut="Ctrl+N")
+        btn_pol = self._mark_flow_button(
+            styled_button("➕ Полис", tooltip="Добавить полис", shortcut="Ctrl+N")
+        )
         btn_pol.clicked.connect(self._on_add_policy)
         self._add_shortcut("Ctrl+N", self._on_add_policy)
-        btn_import = styled_button("📥 Импорт из JSON", tooltip="Импорт полиса по данным")
+        btn_import = self._mark_flow_button(
+            styled_button("📥 Импорт из JSON", tooltip="Импорт полиса по данным")
+        )
         btn_import.clicked.connect(self._on_import_policy_json)
-        btn_ai = styled_button("🤖 Обработать с ИИ", tooltip="Распознать файлы полисов")
+        btn_ai = self._mark_flow_button(
+            styled_button("🤖 Обработать с ИИ", tooltip="Распознать файлы полисов")
+        )
         btn_ai.clicked.connect(self._on_process_policies_ai)
-        btn_ai_text = styled_button("🤖 Из текста", tooltip="Распознать текст полиса")
+        btn_ai_text = self._mark_flow_button(
+            styled_button("🤖 Из текста", tooltip="Распознать текст полиса")
+        )
         btn_ai_text.clicked.connect(self._on_process_policy_text_ai)
         pol_view = PolicyTableView(parent=self, deal_id=self.instance.id)
         pol_view.load_data()
@@ -228,7 +251,9 @@ class DealTabsMixin:
         # ---------- Платежи ---------------------------------------
         pay_tab = QWidget()
         pay_l = QVBoxLayout(pay_tab)
-        btn_pay = styled_button("➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+Shift+P")
+        btn_pay = self._mark_flow_button(
+            styled_button("➕ Платёж", tooltip="Добавить платёж", shortcut="Ctrl+Shift+P")
+        )
         btn_pay.clicked.connect(self._on_add_payment)
         self._add_shortcut("Ctrl+Shift+P", self._on_add_payment)
         pay_view = PaymentTableView(
@@ -247,7 +272,9 @@ class DealTabsMixin:
         # ---------- Доходы ---------------------------------------
         income_tab = QWidget()
         income_layout = QVBoxLayout(income_tab)
-        btn_income = styled_button("➕ Доход", tooltip="Добавить доход", shortcut="Ctrl+Alt+I")
+        btn_income = self._mark_flow_button(
+            styled_button("➕ Доход", tooltip="Добавить доход", shortcut="Ctrl+Alt+I")
+        )
         btn_income.clicked.connect(self._on_add_income)
         self._add_shortcut("Ctrl+Alt+I", self._on_add_income)
         has_payments = (
@@ -271,7 +298,9 @@ class DealTabsMixin:
         # ---------- Расходы --------------------------------------
         expense_tab = QWidget()
         expense_layout = QVBoxLayout(expense_tab)
-        btn_expense = styled_button("➕ Расход", tooltip="Добавить расход", shortcut="Ctrl+Alt+X")
+        btn_expense = self._mark_flow_button(
+            styled_button("➕ Расход", tooltip="Добавить расход", shortcut="Ctrl+Alt+X")
+        )
         btn_expense.clicked.connect(self._on_add_expense)
         self._add_shortcut("Ctrl+Alt+X", self._on_add_expense)
         expense_view = ExpenseTableView(parent=self, deal_id=self.instance.id)
@@ -288,8 +317,10 @@ class DealTabsMixin:
         # ---------- Задачи ---------------------------------------
         task_tab = QWidget()
         vbox = QVBoxLayout(task_tab)
-        btn_add_task = styled_button(
-            "➕ Задача", tooltip="Добавить задачу", shortcut="Ctrl+Alt+T"
+        btn_add_task = self._mark_flow_button(
+            styled_button(
+                "➕ Задача", tooltip="Добавить задачу", shortcut="Ctrl+Alt+T"
+            )
         )
         btn_add_task.clicked.connect(self._on_add_task)
         self._add_shortcut("Ctrl+Alt+T", self._on_add_task)
