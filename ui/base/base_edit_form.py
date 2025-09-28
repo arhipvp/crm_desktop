@@ -42,16 +42,29 @@ logger = logging.getLogger(__name__)
 
 
 class TwoColumnFormLayout:
-    """Менеджер строк, раскладывающий поля формы по двум колонкам."""
+    """Менеджер строк, раскладывающий поля формы по колонкам."""
 
-    def __init__(self, container: QWidget):
+    def __init__(self, container: QWidget, columns: int = 2):
         self.container = container
+        self.columns = max(1, columns)
         self.grid = QGridLayout(container)
         self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setColumnStretch(1, 1)
-        self.grid.setColumnStretch(3, 1)
-        self.grid.setHorizontalSpacing(24)
+        self._configure_columns()
         self.rows: list[tuple[QWidget, QWidget]] = []
+
+    def _configure_columns(self) -> None:
+        """Настраивает сетку под заданное количество колонок."""
+
+        spacing = 24 if self.columns > 1 else 12
+        self.grid.setHorizontalSpacing(spacing)
+        self.grid.setVerticalSpacing(16 if self.columns > 1 else 12)
+
+        for index in range(self.columns):
+            # Столбец с полем растягиваем, с подписью — оставляем фиксированным.
+            label_column = index * 2
+            field_column = label_column + 1
+            self.grid.setColumnStretch(label_column, 0)
+            self.grid.setColumnStretch(field_column, 1)
 
     def _normalize_label(self, label: QLabel | str | QWidget) -> QWidget:
         if isinstance(label, QWidget):
@@ -69,9 +82,9 @@ class TwoColumnFormLayout:
             if widget := item.widget():
                 widget.setParent(self.container)
 
-        column_rows = [0, 0]
+        column_rows = [0] * self.columns
         for index, (label, field) in enumerate(self.rows):
-            column = index % 2
+            column = index % self.columns
             row = column_rows[column]
             base_col = column * 2
             self.grid.addWidget(label, row, base_col)
@@ -98,6 +111,11 @@ class BaseEditForm(QDialog):
     """Универсальная форма создания/редактирования, строится по Peewee‑модели."""
 
     EXTRA_HIDDEN: set[str] = set()
+    form_columns: int = 2
+    form_minimum_width: int = 640
+    form_minimum_size: tuple[int, int] = (720, 480)
+    form_target_size: tuple[int, int] = (900, 640)
+    form_target_ratio: float = 0.5
 
     def __init__(
         self, instance=None, model_class=None, entity_name="объект", parent=None
@@ -112,7 +130,7 @@ class BaseEditForm(QDialog):
         self.setWindowTitle(
             f"Редактировать {entity_name}" if instance else f"Добавить {entity_name}"
         )
-        self.setMinimumWidth(640)
+        self.setMinimumWidth(self.form_minimum_width)
 
         # ── layout ──
         self.layout = QVBoxLayout(self)
@@ -128,7 +146,9 @@ class BaseEditForm(QDialog):
         self.form_body_layout.setSpacing(16)
 
         self.form_fields_widget = QWidget(self.form_widget)
-        self.form_layout = TwoColumnFormLayout(self.form_fields_widget)
+        self.form_layout = TwoColumnFormLayout(
+            self.form_fields_widget, columns=self.form_columns
+        )
         self.form_body_layout.addWidget(self.form_fields_widget)
 
         self.form_sections_layout = QVBoxLayout()
@@ -145,9 +165,13 @@ class BaseEditForm(QDialog):
         # Размеры формы определяем по содержимому
         self.adjustSize()
         size_hint = self.sizeHint()
-        target = get_scaled_size(900, 640, ratio=0.5)
+        target = get_scaled_size(
+            self.form_target_size[0],
+            self.form_target_size[1],
+            ratio=self.form_target_ratio,
+        )
         self.resize(size_hint.boundedTo(target))
-        self.setMinimumSize(720, 480)
+        self.setMinimumSize(*self.form_minimum_size)
         self._dirty = False
 
     # ------------------------------------------------------------------

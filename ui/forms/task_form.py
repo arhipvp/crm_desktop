@@ -19,6 +19,10 @@ class TaskForm(BaseEditForm):
         "tg_chat_id",
         "tg_message_id",
     }
+    form_columns = 1
+    form_minimum_width = 480
+    form_minimum_size = (520, 420)
+    form_target_size = (720, 520)
 
     def __init__(self, task=None, parent=None, forced_deal=None, forced_policy=None):
         self._forced_deal = forced_deal
@@ -31,7 +35,7 @@ class TaskForm(BaseEditForm):
         # 1) Сделка (всегда одно место!)
         self.deal_combo = create_deal_combobox()
         self.fields["deal_id"] = self.deal_combo
-        self.form_layout.insertRow(2, QLabel("Сделка:"), self.deal_combo)
+        self.form_layout.addRow(QLabel("Сделка:"), self.deal_combo)
 
         # 2) Полис (фильтрация если known deal)
         if self._forced_deal is not None and self.instance is None:
@@ -45,7 +49,7 @@ class TaskForm(BaseEditForm):
         else:
             self.policy_combo = create_policy_combobox()
         self.fields["policy_id"] = self.policy_combo
-        self.form_layout.insertRow(3, QLabel("Полис:"), self.policy_combo)
+        self.form_layout.addRow(QLabel("Полис:"), self.policy_combo)
         self.policy_combo.setCurrentIndex(-1)  # ничего не выбрано
 
         if self._forced_policy is not None and self.instance is None:
@@ -58,7 +62,7 @@ class TaskForm(BaseEditForm):
         # 3) Чекбокс "Выполнено"
         self.done_cb = QCheckBox()
         self.fields["is_done"] = self.done_cb
-        self.form_layout.insertRow(5, QLabel("Выполнено:"), self.done_cb)
+        self.form_layout.addRow(QLabel("Выполнено:"), self.done_cb)
 
     def save_data(self):
         data = self.collect_data()
