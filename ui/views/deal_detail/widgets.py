@@ -41,6 +41,9 @@ class DealFilesTreeView(QTreeView):
         self.setDropIndicatorShown(True)
         self.setDragDropMode(QAbstractItemView.DragDrop)
         self.setDefaultDropAction(Qt.MoveAction)
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setAllColumnsShowFocus(True)
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
     def set_root_path(self, path: str | None) -> None:
         self._root_path = Path(path) if path else None
