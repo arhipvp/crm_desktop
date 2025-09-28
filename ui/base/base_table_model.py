@@ -1,5 +1,6 @@
 import datetime
 import logging
+import numbers
 
 logger = logging.getLogger(__name__)
 
@@ -114,14 +115,52 @@ class BaseTableModel(QAbstractTableModel):
 
         obj = self.objects[index.row()]
         field = self.fields[index.column()]
-        setattr(obj, field.name, value)
+        original_value = getattr(obj, field.name)
+        new_value = value
+
+        if isinstance(new_value, str) and new_value == "":
+            if field.null:
+                new_value = None
+            elif isinstance(field, ForeignKeyField):
+                logger.warning(
+                    "⚠️ Пустое значение недопустимо для обязательного поля %s.%s",
+                    type(obj).__name__,
+                    field.name,
+                )
+                return False
+
+        if isinstance(field, ForeignKeyField):
+            if new_value is None:
+                if not field.null:
+                    logger.warning(
+                        "⚠️ None недопустимо для обязательного поля %s.%s",
+                        type(obj).__name__,
+                        field.name,
+                    )
+                    return False
+            elif isinstance(new_value, field.rel_model):
+                pass
+            elif isinstance(new_value, numbers.Integral):
+                pass
+            else:
+                logger.warning(
+                    "⚠️ Недопустимый тип %s для поля %s.%s",
+                    type(new_value).__name__,
+                    type(obj).__name__,
+                    field.name,
+                )
+                return False
 
         try:
+            setattr(obj, field.name, new_value)
             obj.save()
             self.dataChanged.emit(index, index, [Qt.DisplayRole])
             return True
         except Exception as e:
-            logger.error(
+            setattr(obj, field.name, original_value)
+            if hasattr(obj, "_dirty"):
+                obj._dirty.discard(field.name)
+            logger.warning(
                 "❌ Ошибка сохранения %s.%s: %s", type(obj).__name__, field.name, e
             )
             return False
