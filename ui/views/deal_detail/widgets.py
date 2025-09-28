@@ -126,7 +126,8 @@ class CollapsibleWidget(QWidget):
         self.toggle.clicked.connect(self._on_toggled)
 
         self.content = QWidget()
-        self.content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.content.updateGeometry()
 
         layout = QVBoxLayout(self)
         layout.setSpacing(0)
