@@ -40,7 +40,6 @@ class DealFilesTreeView(QTreeView):
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
         self.setDragDropMode(QAbstractItemView.DragDrop)
-        self.setDefaultDropAction(Qt.MoveAction)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setAllColumnsShowFocus(True)
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
@@ -59,14 +58,16 @@ class DealFilesTreeView(QTreeView):
         if self._is_dragging_root(event):
             event.ignore()
             return
-        event.setDropAction(Qt.MoveAction)
+        action = self._resolve_drop_action(event)
+        event.setDropAction(action)
         super().dragMoveEvent(event)
 
     def dropEvent(self, event: QDropEvent) -> None:  # noqa: N802
         if self._is_dragging_root(event):
             event.ignore()
             return
-        event.setDropAction(Qt.MoveAction)
+        action = self._resolve_drop_action(event)
+        event.setDropAction(action)
         super().dropEvent(event)
 
     def startDrag(self, supported_actions: Qt.DropActions) -> None:  # noqa: N802
@@ -94,6 +95,21 @@ class DealFilesTreeView(QTreeView):
             return False
 
         return Path(model.filePath(index)) == self._root_path
+
+    def _resolve_drop_action(
+        self, event: QDragEnterEvent | QDragMoveEvent | QDropEvent
+    ) -> Qt.DropAction:
+        modifiers = event.keyboardModifiers()
+        possible_actions = event.possibleActions()
+
+        if modifiers & Qt.ControlModifier and possible_actions & Qt.CopyAction:
+            return Qt.CopyAction
+
+        source = event.source()
+        if source is self and possible_actions & Qt.MoveAction:
+            return Qt.MoveAction
+
+        return event.proposedAction()
 
 from services.folder_utils import create_directory, delete_path, open_folder, rename_path
 
