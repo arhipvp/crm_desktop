@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QDialog, QInputDialog, QProgressDialog
+from PySide6.QtWidgets import QDialog, QInputDialog, QMessageBox, QProgressDialog
 
 from database.models import Deal
 from services.deal_service import (
@@ -603,6 +603,7 @@ class DealActionsMixin:
         from ui.forms.ai_policy_files_dialog import AiPolicyFilesDialog
 
         initial_files: list[Path] = []
+        skipped_items: list[tuple[Path, str]] = []
         panel = getattr(self, "files_panel", None)
         getter = getattr(panel, "selected_files", None)
         if callable(getter):
@@ -612,20 +613,44 @@ class DealActionsMixin:
                 selected = []
 
             for path in selected:
+                resolved_path = Path(path)
                 try:
-                    if not path.exists() or not path.is_file():
+                    if not resolved_path.exists():
+                        skipped_items.append((resolved_path, "файл не найден"))
                         continue
-                    if path.stat().st_size == 0:
+                    if resolved_path.is_dir():
+                        skipped_items.append((resolved_path, "нельзя обработать каталог"))
+                        continue
+                    if not resolved_path.is_file():
+                        skipped_items.append((resolved_path, "недопустимый тип объекта"))
+                        continue
+                    try:
+                        size = resolved_path.stat().st_size
+                    except OSError:
+                        skipped_items.append((resolved_path, "нет доступа"))
+                        continue
+                    if size == 0:
+                        skipped_items.append((resolved_path, "файл пустой"))
                         continue
                 except OSError:
+                    skipped_items.append((resolved_path, "нет доступа"))
                     continue
-                initial_files.append(path)
+                initial_files.append(resolved_path)
+
+        if skipped_items:
+            lines = [f"{path}: {reason}" for path, reason in skipped_items]
+            QMessageBox.information(
+                self,
+                "Пропущенные элементы",
+                "Не удалось использовать следующие элементы:\n" + "\n".join(lines),
+            )
 
         dlg = AiPolicyFilesDialog(
             parent=self,
             forced_client=self.instance.client,
             forced_deal=self.instance,
             initial_files=initial_files,
+            skipped_items=skipped_items,
         )
         if dlg.exec():
             self._init_kpi_panel()
