@@ -1,3 +1,4 @@
+import base64
 from datetime import date
 
 from PySide6.QtWidgets import (
@@ -16,7 +17,7 @@ from PySide6.QtWidgets import (
     QDateEdit,
 )
 from PySide6.QtGui import QColor
-from PySide6.QtCore import Qt, QDate
+from PySide6.QtCore import Qt, QDate, QByteArray
 import peewee
 
 from services.clients import get_client_by_id
@@ -35,9 +36,12 @@ from ui.common.date_utils import (
 )
 
 from database.models import Policy, Payment
+from ui import settings as ui_settings
 
 
 class PolicyMergeDialog(QDialog):
+    SETTINGS_KEY = "policy_merge_dialog"
+
     def __init__(
         self,
         existing: Policy,
@@ -168,6 +172,8 @@ class PolicyMergeDialog(QDialog):
         btns.addWidget(self.merge_btn)
         btns.addWidget(cancel)
         layout.addLayout(btns)
+
+        self._restore_geometry()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -455,3 +461,42 @@ class PolicyMergeDialog(QDialog):
                 data[field] = text
 
         return data
+
+    # ------------------------------------------------------------------
+    # Qt overrides
+    # ------------------------------------------------------------------
+
+    def accept(self) -> None:  # type: ignore[override]
+        self._save_geometry()
+        super().accept()
+
+    def reject(self) -> None:  # type: ignore[override]
+        self._save_geometry()
+        super().reject()
+
+    def closeEvent(self, event):  # type: ignore[override]
+        self._save_geometry()
+        super().closeEvent(event)
+
+    # ------------------------------------------------------------------
+    # Geometry helpers
+    # ------------------------------------------------------------------
+
+    def _restore_geometry(self) -> None:
+        try:
+            geometry_b64 = ui_settings.get_window_settings(self.SETTINGS_KEY).get("geometry")
+            if geometry_b64:
+                geometry_bytes = base64.b64decode(geometry_b64)
+                self.restoreGeometry(QByteArray(geometry_bytes))
+        except Exception:  # pragma: no cover - восстановление необязательно
+            pass
+
+    def _save_geometry(self) -> None:
+        try:
+            geometry = bytes(self.saveGeometry())
+            geometry_b64 = base64.b64encode(geometry).decode("ascii")
+            settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+            settings["geometry"] = geometry_b64
+            ui_settings.set_window_settings(self.SETTINGS_KEY, settings)
+        except Exception:  # pragma: no cover - сохранение не критично
+            pass
