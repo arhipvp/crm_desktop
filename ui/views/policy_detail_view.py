@@ -316,8 +316,6 @@ class PolicyDetailView(QDialog):
 
     def _on_add_payment(self):
         form = PaymentForm(parent=self, forced_policy=self.instance)
-        if form.exec():
-            self._init_tabs()
         # если форма поддерживает префилл полиса
         if hasattr(form, "fields") and "policy_id" in form.fields:
             combo = form.fields["policy_id"]
@@ -325,7 +323,8 @@ class PolicyDetailView(QDialog):
                 idx = combo.findData(self.instance.id)
                 if idx >= 0:
                     combo.setCurrentIndex(idx)
-        if form.exec():
+        accepted = form.exec()
+        if accepted:
             self._init_kpi_panel()
             self._init_tabs()
 
