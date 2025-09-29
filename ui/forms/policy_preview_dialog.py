@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import logging
+
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -10,7 +13,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ui import settings as ui_settings
 from ui.forms.policy_form import PolicyForm
+
+
+logger = logging.getLogger(__name__)
+
+
+SETTINGS_KEY = "policy_preview_dialog"
 
 
 class PolicyPreviewDialog(QDialog):
@@ -118,6 +128,8 @@ class PolicyPreviewDialog(QDialog):
         self.form.accepted.connect(self._on_form_accepted)
         self.form.rejected.connect(self.reject)
 
+        self._restore_geometry()
+
     # ------------------------------------------------------------------
     def _create_policy(self):
         self.form.save()
@@ -134,3 +146,43 @@ class PolicyPreviewDialog(QDialog):
         self.saved_instance = getattr(self.form, "saved_instance", None)
         if self.saved_instance:
             self.accept()
+
+    def closeEvent(self, event):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().closeEvent(event)
+
+    def accept(self):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().accept()
+
+    def reject(self):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().reject()
+
+    def _restore_geometry(self) -> None:
+        try:
+            settings = ui_settings.get_window_settings(SETTINGS_KEY)
+            geometry = settings.get("geometry")
+            if geometry:
+                restored = self.restoreGeometry(base64.b64decode(geometry))
+                if not restored:
+                    logger.warning(
+                        "Не удалось применить сохранённую геометрию окна %s",
+                        SETTINGS_KEY,
+                    )
+        except Exception:  # pragma: no cover - only logging
+            logger.exception(
+                "Не удалось восстановить геометрию окна %s", SETTINGS_KEY
+            )
+
+    def _save_geometry(self) -> None:
+        try:
+            geometry_bytes = bytes(self.saveGeometry())
+            geometry = base64.b64encode(geometry_bytes).decode("ascii")
+            settings = ui_settings.get_window_settings(SETTINGS_KEY)
+            settings["geometry"] = geometry
+            ui_settings.set_window_settings(SETTINGS_KEY, settings)
+        except Exception:  # pragma: no cover - only logging
+            logger.exception(
+                "Не удалось сохранить геометрию окна %s", SETTINGS_KEY
+            )
