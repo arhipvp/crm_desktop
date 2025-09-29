@@ -98,7 +98,7 @@ class TaskTableView(BaseTableView):
         *,
         deal_id: int | None = None,
         autoload: bool = True,
-        resizable_columns: bool = False,
+        resizable_columns: bool = True,
     ) -> None:
         checkbox_map = {
             "Показывать удалённые": self.on_filter_changed,
@@ -404,7 +404,9 @@ class TaskTableView(BaseTableView):
         header = self.table.horizontalHeader()
         if self.resizable_columns:
             header.setSectionResizeMode(QHeaderView.Interactive)
+            header.setStretchLastSection(True)
         else:
+            header.setStretchLastSection(False)
             header.setSectionResizeMode(0, QHeaderView.Stretch)
             for col in range(1, header.count()):
                 header.setSectionResizeMode(col, QHeaderView.ResizeToContents)

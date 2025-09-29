@@ -329,7 +329,7 @@ class DealTabsMixin:
             parent=self,
             deal_id=self.instance.id,
             autoload=False,
-            resizable_columns=True,
+            resizable_columns=False,
         )
         task_view.data_loaded.connect(self._adjust_task_columns)
         vbox.addWidget(task_view)
