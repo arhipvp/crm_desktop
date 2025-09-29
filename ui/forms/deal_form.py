@@ -16,6 +16,7 @@ from services.clients import get_all_clients
 
 class DealForm(BaseEditForm):
     EXTRA_HIDDEN = {"is_closed", "closed_reason"}
+    form_columns = 1
 
     def __init__(self, deal=None, parent=None):
         super().__init__(
