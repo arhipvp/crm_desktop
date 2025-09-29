@@ -446,6 +446,19 @@ class DealFilesPanel(CollapsibleWidget):
 
         return paths
 
+    def selected_files(self) -> list[Path]:
+        """Вернуть список файлов из текущего выделения."""
+
+        files: list[Path] = []
+        for path in self._selected_paths():
+            try:
+                if path.is_file():
+                    files.append(path)
+            except OSError:
+                continue
+
+        return files
+
     def _target_directory_for_creation(self) -> Path | None:
         path = self._current_selection_path()
         if path is None:

@@ -1,6 +1,7 @@
 import json as _json
 import logging
 from pathlib import Path
+from typing import Iterable
 
 from PySide6.QtCore import QThread, Qt, Signal
 from PySide6.QtGui import QTextCursor
@@ -68,7 +69,14 @@ class _Worker(QThread):
 class AiPolicyFilesDialog(QDialog):
     """Диалог для распознавания полиса из одного или нескольких файлов."""
 
-    def __init__(self, parent=None, *, forced_client=None, forced_deal=None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        forced_client=None,
+        forced_deal=None,
+        initial_files: Iterable[Path] | None = None,
+    ):
         super().__init__(parent)
         self.forced_client = forced_client
         self.forced_deal = forced_deal
@@ -110,6 +118,11 @@ class AiPolicyFilesDialog(QDialog):
         self.files: list[Path] = []
         self._messages: list[dict] = []
         self._worker: _Worker | None = None
+
+        if initial_files:
+            self._add_files(initial_files)
+
+        self._update_process_button_state()
 
     # ------------------------------------------------------------------
     def _append(self, role: str, text: str):
@@ -158,6 +171,7 @@ class AiPolicyFilesDialog(QDialog):
         self.process_btn.setEnabled(True)
         self.input_edit.setVisible(False)
         self.process_btn.setText("Распознать")
+        self._update_process_button_state()
 
         msg = QMessageBox(self)
         msg.setWindowTitle("Диалог с ИИ")
@@ -197,6 +211,7 @@ class AiPolicyFilesDialog(QDialog):
         self.process_btn.setEnabled(True)
         self.input_edit.setVisible(True)
         self.process_btn.setText("Отправить")
+        self._update_process_button_state()
         if error:
             QMessageBox.warning(self, "Ошибка", error)
 
@@ -207,13 +222,49 @@ class AiPolicyFilesDialog(QDialog):
 
     def dropEvent(self, event):  # noqa: D401 - Qt override
         urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
-        for url in urls:
-            path = Path(url.toLocalFile())
-            if path not in self.files:
-                self.files.append(path)
-                self.list_widget.addItem(str(path))
+        added = False
         if urls:
+            added = self._add_files(Path(url.toLocalFile()) for url in urls)
+        if added:
             event.acceptProposedAction()
+        self._update_process_button_state()
+
+    def _add_files(self, paths: Iterable[Path]) -> bool:
+        added = False
+        existing = {p for p in self.files}
+
+        for original in paths:
+            try:
+                resolved = Path(original).resolve(strict=True)
+            except (FileNotFoundError, OSError):
+                continue
+
+            try:
+                if not resolved.is_file():
+                    continue
+            except OSError:
+                continue
+
+            if resolved in existing:
+                continue
+
+            existing.add(resolved)
+            self.files.append(resolved)
+            self.list_widget.addItem(str(resolved))
+            added = True
+
+        return added
+
+    def _update_process_button_state(self) -> None:
+        if self._worker and self._worker.isRunning():
+            self.process_btn.setEnabled(False)
+            return
+
+        if self.process_btn.text() == "Отправить":
+            self.process_btn.setEnabled(True)
+            return
+
+        self.process_btn.setEnabled(bool(self.files))
 
     # ------------------------------------------------------------------
     def on_process(self):
