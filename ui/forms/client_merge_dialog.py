@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import base64
 from typing import Any, Sequence
 
-from PySide6.QtCore import Qt, QSignalBlocker
+from PySide6.QtCore import Qt, QSignalBlocker, QByteArray
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -20,10 +21,13 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.message_boxes import show_error
+from ui import settings as ui_settings
 
 
 class ClientMergeDialog(QDialog):
     """Диалог объединения клиентов с выбором основного и итоговых значений."""
+
+    SETTINGS_KEY = "client_merge_dialog"
 
     _FIELDS: tuple[tuple[str, str], ...] = (
         ("name", "Имя"),
@@ -100,6 +104,14 @@ class ClientMergeDialog(QDialog):
         self._connect_highlight_handlers()
         self._on_primary_changed()
 
+        geometry_b64 = ui_settings.get_window_settings(self.SETTINGS_KEY).get("geometry")
+        if geometry_b64:
+            try:
+                geometry_bytes = base64.b64decode(geometry_b64)
+                self.restoreGeometry(QByteArray(geometry_bytes))
+            except Exception:  # pragma: no cover - восстановление необязательно
+                pass
+
     # ------------------------------------------------------------------
     # Публичные геттеры
     # ------------------------------------------------------------------
@@ -152,7 +164,16 @@ class ClientMergeDialog(QDialog):
             show_error("Имя клиента обязательно")
             return
 
+        self._save_geometry()
         super().accept()
+
+    def reject(self) -> None:  # type: ignore[override]
+        self._save_geometry()
+        super().reject()
+
+    def closeEvent(self, event):  # type: ignore[override]
+        self._save_geometry()
+        super().closeEvent(event)
 
     # ------------------------------------------------------------------
     # Внутренняя логика
@@ -317,4 +338,15 @@ class ClientMergeDialog(QDialog):
         if is_deleted is None:
             return True
         return not bool(is_deleted)
+
+    def _save_geometry(self) -> None:
+        try:
+            geometry = self.saveGeometry()
+            geometry_b64 = base64.b64encode(bytes(geometry)).decode("ascii")
+            ui_settings.set_window_settings(
+                self.SETTINGS_KEY,
+                {"geometry": geometry_b64},
+            )
+        except Exception:  # pragma: no cover - сохранение необязательно
+            pass
 
