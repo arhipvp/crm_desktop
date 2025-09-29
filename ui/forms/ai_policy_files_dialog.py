@@ -1,7 +1,7 @@
 import json as _json
 import logging
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from PySide6.QtCore import QThread, Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
@@ -76,6 +76,7 @@ class AiPolicyFilesDialog(QDialog):
         forced_client=None,
         forced_deal=None,
         initial_files: Iterable[Path] | None = None,
+        skipped_items: Sequence[tuple[Path, str]] | None = None,
     ):
         super().__init__(parent)
         self.forced_client = forced_client
@@ -93,6 +94,11 @@ class AiPolicyFilesDialog(QDialog):
 
         self.list_widget = QListWidget(self)
         layout.addWidget(self.list_widget)
+
+        self.skipped_label = QLabel(self)
+        self.skipped_label.setWordWrap(True)
+        self.skipped_label.setVisible(False)
+        layout.addWidget(self.skipped_label)
 
         self.conv_edit = QTextEdit(self)
         self.conv_edit.setReadOnly(True)
@@ -119,6 +125,7 @@ class AiPolicyFilesDialog(QDialog):
         layout.addLayout(btns)
 
         self.files: list[Path] = []
+        self._skipped_items: list[tuple[Path, str]] = []
         self._messages: list[dict] = []
         self._worker: _Worker | None = None
 
@@ -130,6 +137,9 @@ class AiPolicyFilesDialog(QDialog):
 
         if initial_files:
             self._add_files(initial_files)
+
+        if skipped_items:
+            self._register_skipped_items(skipped_items)
 
         self._update_process_button_state()
 
@@ -256,31 +266,42 @@ class AiPolicyFilesDialog(QDialog):
     def _add_files(self, paths: Iterable[Path]) -> bool:
         added = False
         existing = {p for p in self.files}
-        rejected: list[str] = []
+        rejected_messages: list[str] = []
+        rejected_items: list[tuple[Path, str]] = []
 
         for original in paths:
             try:
                 resolved = Path(original).resolve(strict=True)
             except (FileNotFoundError, OSError):
-                rejected.append(f"{original}: файл не найден")
+                msg = "файл не найден"
+                rejected_messages.append(f"{original}: {msg}")
+                rejected_items.append((Path(original), msg))
                 continue
 
             try:
                 if not resolved.is_file():
-                    rejected.append(f"{resolved}: можно добавить только файлы")
+                    msg = "можно добавить только файлы"
+                    rejected_messages.append(f"{resolved}: {msg}")
+                    rejected_items.append((resolved, msg))
                     continue
 
                 size = resolved.stat().st_size
             except OSError:
-                rejected.append(f"{resolved}: не удалось прочитать файл")
+                msg = "не удалось прочитать файл"
+                rejected_messages.append(f"{resolved}: {msg}")
+                rejected_items.append((resolved, msg))
                 continue
 
             if size == 0:
-                rejected.append(f"{resolved}: файл пустой")
+                msg = "файл пустой"
+                rejected_messages.append(f"{resolved}: {msg}")
+                rejected_items.append((resolved, msg))
                 continue
 
             if resolved in existing:
-                rejected.append(f"{resolved}: файл уже добавлен")
+                msg = "файл уже добавлен"
+                rejected_messages.append(f"{resolved}: {msg}")
+                rejected_items.append((resolved, msg))
                 continue
 
             existing.add(resolved)
@@ -288,14 +309,37 @@ class AiPolicyFilesDialog(QDialog):
             self.list_widget.addItem(str(resolved))
             added = True
 
-        if rejected:
+        if rejected_messages:
             QMessageBox.information(
                 self,
                 "Файл не добавлен",
-                "\n".join(rejected),
+                "\n".join(rejected_messages),
             )
+            self._register_skipped_items(rejected_items)
 
         return added
+
+    def _register_skipped_items(
+        self, items: Sequence[tuple[Path, str]]
+    ) -> None:
+        if not items:
+            return
+
+        for path, reason in items:
+            self._skipped_items.append((Path(path), reason))
+        self._update_skipped_label()
+
+    def _update_skipped_label(self) -> None:
+        if not self._skipped_items:
+            self.skipped_label.clear()
+            self.skipped_label.setVisible(False)
+            return
+
+        lines = [f"{path}: {reason}" for path, reason in self._skipped_items]
+        self.skipped_label.setText(
+            "Не удалось использовать некоторые элементы:\n" + "\n".join(lines)
+        )
+        self.skipped_label.setVisible(True)
 
     def _update_process_button_state(self) -> None:
         if self._worker and self._worker.isRunning():
