@@ -1,3 +1,5 @@
+import base64
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -7,7 +9,12 @@ from PySide6.QtWidgets import (
     QPushButton,
     QHBoxLayout,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QByteArray, Qt
+
+from ui import settings as ui_settings
+
+
+SETTINGS_KEY = "income_update_dialog"
 
 
 class IncomeUpdateDialog(QDialog):
@@ -47,7 +54,38 @@ class IncomeUpdateDialog(QDialog):
         btns.addWidget(update_btn)
         layout.addLayout(btns)
 
+        self._restore_geometry()
+
     # ------------------------------------------------------------------
     def _set_choice(self, choice: str):
         self.choice = choice
         self.accept()
+
+    def accept(self):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().accept()
+
+    def reject(self):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().reject()
+
+    def closeEvent(self, event):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().closeEvent(event)
+
+    def _restore_geometry(self) -> None:
+        settings = ui_settings.get_window_settings(SETTINGS_KEY)
+        geometry_b64 = settings.get("geometry")
+        if not geometry_b64:
+            return
+        try:
+            geometry_bytes = base64.b64decode(geometry_b64.encode("ascii"))
+        except Exception:  # pragma: no cover - защита от повреждённых данных
+            return
+        self.restoreGeometry(QByteArray(geometry_bytes))
+
+    def _save_geometry(self) -> None:
+        geometry = base64.b64encode(bytes(self.saveGeometry())).decode("ascii")
+        settings = ui_settings.get_window_settings(SETTINGS_KEY)
+        settings["geometry"] = geometry
+        ui_settings.set_window_settings(SETTINGS_KEY, settings)
