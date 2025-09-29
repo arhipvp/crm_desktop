@@ -329,7 +329,9 @@ class PaymentDetailView(QDialog):
         model = BaseTableModel(items, model_cls)
         table.setModel(model)
         table.setSortingEnabled(True)
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        table.resizeColumnsToContents()
         table.doubleClicked.connect(
             lambda idx: detail_cls(model.get_item(idx.row()), parent=self).exec()
         )
