@@ -8,6 +8,8 @@ from PySide6.QtGui import (
     QDragMoveEvent,
     QDropEvent,
     QKeySequence,
+    QColor,
+    QPalette,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -43,6 +45,41 @@ class DealFilesTreeView(QTreeView):
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setAllColumnsShowFocus(True)
         self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.setAlternatingRowColors(True)
+        self.setMouseTracking(True)
+
+        palette = self.palette()
+        active_highlight = QColor("#2B6CB0")
+        inactive_highlight = QColor("#2C5282")
+        highlight_text = QColor("#FFFFFF")
+        palette.setColor(QPalette.Active, QPalette.Highlight, active_highlight)
+        palette.setColor(QPalette.Active, QPalette.HighlightedText, highlight_text)
+        palette.setColor(QPalette.Inactive, QPalette.Highlight, inactive_highlight)
+        palette.setColor(QPalette.Inactive, QPalette.HighlightedText, highlight_text)
+        palette.setColor(QPalette.Disabled, QPalette.Highlight, inactive_highlight)
+        palette.setColor(QPalette.Disabled, QPalette.HighlightedText, highlight_text)
+        self.setPalette(palette)
+
+        self.setStyleSheet(
+            """
+            QTreeView {
+                selection-background-color: #2B6CB0;
+                selection-color: #FFFFFF;
+                alternate-background-color: palette(alternate-base);
+            }
+            QTreeView::item:selected:active {
+                background-color: #2B6CB0;
+                color: #FFFFFF;
+            }
+            QTreeView::item:selected:!active {
+                background-color: #2C5282;
+                color: #FFFFFF;
+            }
+            QTreeView::item:hover {
+                background-color: rgba(66, 153, 225, 51);
+            }
+            """
+        )
 
     def set_root_path(self, path: str | None) -> None:
         self._root_path = Path(path) if path else None
