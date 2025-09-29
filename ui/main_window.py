@@ -1,7 +1,7 @@
 import base64
 import logging
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QByteArray
 from PySide6.QtWidgets import (
     QDialog,
     QMainWindow,
@@ -25,6 +25,9 @@ from ui.views.executor_table_view import ExecutorTableView
 
 
 logger = logging.getLogger(__name__)
+
+
+EXECUTOR_DIALOG_SETTINGS_KEY = "executor_dialog"
 
 
 class MainWindow(QMainWindow):
@@ -118,7 +121,21 @@ class MainWindow(QMainWindow):
         view = ExecutorTableView()
         layout.addWidget(view)
         dlg.resize(get_scaled_size(600, 400))
-        dlg.exec()
+        st = ui_settings.get_window_settings(EXECUTOR_DIALOG_SETTINGS_KEY)
+        geometry = st.get("geometry")
+        if geometry:
+            try:
+                dlg.restoreGeometry(QByteArray(base64.b64decode(geometry)))
+            except Exception:
+                logger.exception("Не удалось восстановить геометрию диалога исполнителей")
+
+        try:
+            dlg.exec()
+        finally:
+            geometry_bytes = bytes(dlg.saveGeometry())
+            encoded_geometry = base64.b64encode(geometry_bytes).decode("ascii")
+            st.update({"geometry": encoded_geometry})
+            ui_settings.set_window_settings(EXECUTOR_DIALOG_SETTINGS_KEY, st)
 
     def open_settings(self):
         from ui.forms.settings_dialog import SettingsDialog
