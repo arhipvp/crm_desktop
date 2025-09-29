@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -12,6 +14,9 @@ from PySide6.QtWidgets import (
 )
 
 from ui import settings as ui_settings
+
+
+SETTINGS_KEY = "settings_dialog"
 
 
 class SettingsDialog(QDialog):
@@ -57,6 +62,7 @@ class SettingsDialog(QDialog):
         layout.addLayout(btns)
 
         self.load()
+        self._restore_geometry()
 
     # --------------------------------------------------------------
     def load(self) -> None:
@@ -87,3 +93,34 @@ class SettingsDialog(QDialog):
         path = QFileDialog.getExistingDirectory(self, "Выберите каталог")
         if path:
             self.drive_path.setText(path)
+
+    # --------------------------------------------------------------
+    def _restore_geometry(self) -> None:
+        window_settings = ui_settings.get_window_settings(SETTINGS_KEY)
+        geometry = window_settings.get("geometry")
+        if geometry:
+            try:
+                self.restoreGeometry(base64.b64decode(geometry))
+            except (ValueError, TypeError):
+                pass
+
+    # --------------------------------------------------------------
+    def _save_geometry(self) -> None:
+        window_settings = ui_settings.get_window_settings(SETTINGS_KEY)
+        window_settings["geometry"] = base64.b64encode(self.saveGeometry()).decode("ascii")
+        ui_settings.set_window_settings(SETTINGS_KEY, window_settings)
+
+    # --------------------------------------------------------------
+    def accept(self) -> None:
+        self._save_geometry()
+        super().accept()
+
+    # --------------------------------------------------------------
+    def reject(self) -> None:
+        self._save_geometry()
+        super().reject()
+
+    # --------------------------------------------------------------
+    def closeEvent(self, event) -> None:
+        self._save_geometry()
+        super().closeEvent(event)
