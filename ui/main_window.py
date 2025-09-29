@@ -1,12 +1,12 @@
 import base64
 import logging
 
-from PySide6.QtCore import Qt, QByteArray
+from PySide6.QtCore import QByteArray, Qt
 from PySide6.QtWidgets import (
     QDialog,
     QMainWindow,
-    QTabWidget,
     QStatusBar,
+    QTabWidget,
     QVBoxLayout,
 )
 from utils.screen_utils import get_scaled_size
@@ -116,26 +116,30 @@ class MainWindow(QMainWindow):
 
     def open_executors(self):
         dlg = QDialog(self)
+        dlg.setWindowFlag(Qt.WindowMinMaxButtonsHint, True)
         dlg.setWindowTitle("Исполнители")
         layout = QVBoxLayout(dlg)
         view = ExecutorTableView()
         layout.addWidget(view)
         dlg.resize(get_scaled_size(600, 400))
-        st = ui_settings.get_window_settings(EXECUTOR_DIALOG_SETTINGS_KEY)
-        geometry = st.get("geometry")
+        geometry = (
+            ui_settings.get_window_settings(EXECUTOR_DIALOG_SETTINGS_KEY).get("geometry")
+        )
         if geometry:
             try:
-                dlg.restoreGeometry(QByteArray(base64.b64decode(geometry)))
+                decoded_geometry = base64.b64decode(geometry)
+                dlg.restoreGeometry(QByteArray(decoded_geometry))
             except Exception:
-                logger.exception("Не удалось восстановить геометрию диалога исполнителей")
+                logger.exception(
+                    "Не удалось восстановить геометрию диалога исполнителей"
+                )
 
-        try:
-            dlg.exec()
-        finally:
-            geometry_bytes = bytes(dlg.saveGeometry())
-            encoded_geometry = base64.b64encode(geometry_bytes).decode("ascii")
-            st.update({"geometry": encoded_geometry})
-            ui_settings.set_window_settings(EXECUTOR_DIALOG_SETTINGS_KEY, st)
+        dlg.exec()
+        geometry_bytes = bytes(dlg.saveGeometry())
+        encoded_geometry = base64.b64encode(geometry_bytes).decode("ascii")
+        ui_settings.set_window_settings(
+            EXECUTOR_DIALOG_SETTINGS_KEY, {"geometry": encoded_geometry}
+        )
 
     def open_settings(self):
         from ui.forms.settings_dialog import SettingsDialog
