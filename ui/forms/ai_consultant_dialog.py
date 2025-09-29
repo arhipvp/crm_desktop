@@ -1,3 +1,6 @@
+import base64
+
+from PySide6.QtCore import QByteArray
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -9,10 +12,16 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 
+import ui.settings
+
 from services.ai_consultant_service import ask_consultant
 
 
+SETTINGS_KEY = "ai_consultant_dialog"
+
+
 class AiConsultantDialog(QDialog):
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("AI-консультант")
@@ -38,6 +47,8 @@ class AiConsultantDialog(QDialog):
         btns.addWidget(close_btn)
         layout.addLayout(btns)
 
+        self._restore_geometry()
+
     def on_ask(self):
         question = self.question_edit.text().strip()
         if not question:
@@ -52,3 +63,30 @@ class AiConsultantDialog(QDialog):
             return
         self.answer_edit.setPlainText(answer)
         self.ask_btn.setEnabled(True)
+
+    def accept(self):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().accept()
+
+    def reject(self):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().reject()
+
+    def closeEvent(self, event):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().closeEvent(event)
+
+    def _restore_geometry(self) -> None:
+        settings = ui.settings.get_window_settings(SETTINGS_KEY)
+        geometry = settings.get("geometry")
+        if geometry:
+            geometry_bytes = QByteArray.fromBase64(geometry.encode("ascii"))
+            if not geometry_bytes.isEmpty():
+                self.restoreGeometry(geometry_bytes)
+
+    def _save_geometry(self) -> None:
+        geometry_bytes = bytes(self.saveGeometry())
+        geometry = base64.b64encode(geometry_bytes).decode("ascii")
+        settings = ui.settings.get_window_settings(SETTINGS_KEY)
+        settings["geometry"] = geometry
+        ui.settings.set_window_settings(SETTINGS_KEY, settings)
