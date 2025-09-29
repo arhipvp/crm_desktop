@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import base64
+import binascii
+import logging
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QByteArray
 from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
@@ -31,6 +33,9 @@ from ui.forms.income_form import IncomeForm
 from ui.forms.payment_form import PaymentForm
 from ui.views.expense_detail_view import ExpenseDetailView
 from ui.views.income_detail_view import IncomeDetailView
+
+
+logger = logging.getLogger(__name__)
 
 
 class PaymentDetailView(QDialog):
@@ -95,7 +100,8 @@ class PaymentDetailView(QDialog):
         self._init_tabs()
         self._init_actions()
 
-        self._apply_default_splitter_sizes(size.width())
+        self._restore_window_geometry()
+        self._apply_default_splitter_sizes(self.width())
         self._restore_splitter_state()
 
     # ------------------------------------------------------------------
@@ -200,6 +206,7 @@ class PaymentDetailView(QDialog):
         self.layout.addLayout(row)
 
     def closeEvent(self, event):
+        self._save_window_geometry()
         self._save_splitter_state()
         super().closeEvent(event)
 
@@ -248,8 +255,48 @@ class PaymentDetailView(QDialog):
 
     def _save_splitter_state(self) -> None:
         st = ui_settings.get_window_settings(self.SETTINGS_KEY)
-        st["splitter_state"] = base64.b64encode(self.splitter.saveState()).decode("ascii")
+        st["splitter_state"] = base64.b64encode(bytes(self.splitter.saveState())).decode(
+            "ascii"
+        )
         ui_settings.set_window_settings(self.SETTINGS_KEY, st)
+
+    def _restore_window_geometry(self) -> None:
+        settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        geometry_b64 = settings.get("geometry")
+        if not geometry_b64:
+            return
+        try:
+            geometry_bytes = base64.b64decode(geometry_b64)
+        except (ValueError, binascii.Error, TypeError):
+            logger.warning(
+                "Некорректные сохранённые размеры окна %s", self.SETTINGS_KEY
+            )
+            return
+        if not geometry_bytes:
+            return
+        try:
+            restored = self.restoreGeometry(QByteArray(geometry_bytes))
+        except Exception:
+            logger.exception(
+                "Не удалось восстановить геометрию окна %s", self.SETTINGS_KEY
+            )
+            return
+        if not restored:
+            logger.warning(
+                "Не удалось применить сохранённую геометрию окна %s", self.SETTINGS_KEY
+            )
+
+    def _save_window_geometry(self) -> None:
+        try:
+            geometry = base64.b64encode(bytes(self.saveGeometry())).decode("ascii")
+        except Exception:
+            logger.exception(
+                "Не удалось сохранить геометрию окна %s", self.SETTINGS_KEY
+            )
+            return
+        settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        settings["geometry"] = geometry
+        ui_settings.set_window_settings(self.SETTINGS_KEY, settings)
 
     # ------------------------------------------------------------------
     # Slots

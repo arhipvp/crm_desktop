@@ -1,6 +1,8 @@
 import base64
+import binascii
+import logging
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QByteArray
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -16,6 +18,9 @@ from PySide6.QtWidgets import (
 from ui import settings as ui_settings
 from ui.common.styled_widgets import styled_button
 from utils.screen_utils import get_scaled_size
+
+
+logger = logging.getLogger(__name__)
 
 
 class BaseDetailView(QDialog):
@@ -90,7 +95,8 @@ class BaseDetailView(QDialog):
         btns.addWidget(self.delete_btn)
         self.layout.addLayout(btns)
 
-        self._apply_default_splitter_sizes(size.width())
+        self._restore_window_geometry()
+        self._apply_default_splitter_sizes(self.width())
         self._restore_splitter_state()
 
     def get_title(self) -> str:
@@ -143,6 +149,7 @@ class BaseDetailView(QDialog):
         self.tabs.addTab(widget, title)
 
     def closeEvent(self, event):
+        self._save_window_geometry()
         self._save_splitter_state()
         super().closeEvent(event)
 
@@ -170,8 +177,46 @@ class BaseDetailView(QDialog):
         if not key:
             return
         st = ui_settings.get_window_settings(key)
-        st["splitter_state"] = base64.b64encode(self.splitter.saveState()).decode("ascii")
+        st["splitter_state"] = base64.b64encode(bytes(self.splitter.saveState())).decode(
+            "ascii"
+        )
         ui_settings.set_window_settings(key, st)
+
+    def _restore_window_geometry(self) -> None:
+        key = self.get_settings_key()
+        if not key:
+            return
+        settings = ui_settings.get_window_settings(key)
+        geometry_b64 = settings.get("geometry")
+        if not geometry_b64:
+            return
+        try:
+            geometry_bytes = base64.b64decode(geometry_b64)
+        except (ValueError, binascii.Error, TypeError):
+            logger.warning("Некорректные сохранённые размеры окна %s", key)
+            return
+        if not geometry_bytes:
+            return
+        try:
+            restored = self.restoreGeometry(QByteArray(geometry_bytes))
+        except Exception:
+            logger.exception("Не удалось восстановить геометрию окна %s", key)
+            return
+        if not restored:
+            logger.warning("Не удалось применить сохранённую геометрию окна %s", key)
+
+    def _save_window_geometry(self) -> None:
+        key = self.get_settings_key()
+        if not key:
+            return
+        try:
+            geometry = base64.b64encode(bytes(self.saveGeometry())).decode("ascii")
+        except Exception:
+            logger.exception("Не удалось сохранить геометрию окна %s", key)
+            return
+        settings = ui_settings.get_window_settings(key)
+        settings["geometry"] = geometry
+        ui_settings.set_window_settings(key, settings)
 
     def get_settings_key(self) -> str | None:
         return self.SETTINGS_KEY or type(self).__name__
