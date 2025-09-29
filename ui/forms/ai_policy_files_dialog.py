@@ -256,26 +256,44 @@ class AiPolicyFilesDialog(QDialog):
     def _add_files(self, paths: Iterable[Path]) -> bool:
         added = False
         existing = {p for p in self.files}
+        rejected: list[str] = []
 
         for original in paths:
             try:
                 resolved = Path(original).resolve(strict=True)
             except (FileNotFoundError, OSError):
+                rejected.append(f"{original}: файл не найден")
                 continue
 
             try:
                 if not resolved.is_file():
+                    rejected.append(f"{resolved}: можно добавить только файлы")
                     continue
+
+                size = resolved.stat().st_size
             except OSError:
+                rejected.append(f"{resolved}: не удалось прочитать файл")
+                continue
+
+            if size == 0:
+                rejected.append(f"{resolved}: файл пустой")
                 continue
 
             if resolved in existing:
+                rejected.append(f"{resolved}: файл уже добавлен")
                 continue
 
             existing.add(resolved)
             self.files.append(resolved)
             self.list_widget.addItem(str(resolved))
             added = True
+
+        if rejected:
+            QMessageBox.information(
+                self,
+                "Файл не добавлен",
+                "\n".join(rejected),
+            )
 
         return added
 
