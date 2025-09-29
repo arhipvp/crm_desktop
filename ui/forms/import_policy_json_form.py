@@ -1,7 +1,9 @@
 # ui/forms/import_policy_json_form.py
 
+import base64
 import json
 from datetime import datetime
+from PySide6.QtCore import QByteArray
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -14,6 +16,10 @@ from PySide6.QtWidgets import (
 
 from services.clients import get_all_clients, add_client
 from ui.forms.policy_form import PolicyForm
+from ui import settings as ui_settings
+
+
+SETTINGS_KEY = "import_policy_json_form"
 
 
 class ImportPolicyJsonForm(QDialog):
@@ -45,6 +51,8 @@ class ImportPolicyJsonForm(QDialog):
         btn_layout.addWidget(btn_import)
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout)
+
+        self._restore_geometry()
 
     def on_import_clicked(self):
         text = self.text_edit.toPlainText().strip()
@@ -173,3 +181,51 @@ class ImportPolicyJsonForm(QDialog):
         if form.exec():
             self.imported_policy = getattr(form, "saved_instance", None)
             self.accept()
+
+    # ------------------------------------------------------------------
+    # Qt overrides
+    # ------------------------------------------------------------------
+
+    def accept(self):  # type: ignore[override]
+        self._save_geometry()
+        super().accept()
+
+    def reject(self):  # type: ignore[override]
+        self._save_geometry()
+        super().reject()
+
+    def closeEvent(self, event):  # type: ignore[override]
+        self._save_geometry()
+        super().closeEvent(event)
+
+    # ------------------------------------------------------------------
+    # Geometry persistence helpers
+    # ------------------------------------------------------------------
+
+    def _restore_geometry(self) -> None:
+        geometry_b64 = ui_settings.get_window_settings(SETTINGS_KEY).get("geometry")
+        if not geometry_b64:
+            return
+        try:
+            geometry_bytes = base64.b64decode(geometry_b64)
+        except Exception:  # pragma: no cover - восстановление необязательно
+            return
+        try:
+            self.restoreGeometry(QByteArray(geometry_bytes))
+        except Exception:  # pragma: no cover - восстановление необязательно
+            pass
+
+    def _save_geometry(self) -> None:
+        try:
+            geometry = self.saveGeometry()
+        except Exception:  # pragma: no cover - сохранение необязательно
+            return
+        if not geometry:
+            return
+        try:
+            geometry_b64 = base64.b64encode(bytes(geometry)).decode("ascii")
+        except Exception:  # pragma: no cover - сохранение необязательно
+            return
+        settings = ui_settings.get_window_settings(SETTINGS_KEY)
+        settings["geometry"] = geometry_b64
+        ui_settings.set_window_settings(SETTINGS_KEY, settings)
