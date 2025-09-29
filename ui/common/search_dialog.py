@@ -70,12 +70,11 @@ class SearchDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.search)
-        splitter = QSplitter(Qt.Horizontal, self)
-        splitter.addWidget(self.table_view)
-        splitter.addWidget(self.detail_view)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
-        layout.addWidget(splitter)
+        self.splitter = QSplitter(Qt.Horizontal, self)
+        self.splitter.addWidget(self.table_view)
+        self.splitter.addWidget(self.detail_view)
+        self._set_default_splitter_stretch()
+        layout.addWidget(self.splitter)
 
         button_row = QHBoxLayout()
         button_row.addWidget(self.first_button)
@@ -92,6 +91,17 @@ class SearchDialog(QDialog):
                 self.restoreGeometry(base64.b64decode(geom))
             except Exception:
                 pass
+
+        splitter_state = st.get("splitter_state")
+        if splitter_state:
+            try:
+                self.splitter.restoreState(base64.b64decode(splitter_state))
+            except Exception:
+                self._set_default_splitter_stretch()
+
+    def _set_default_splitter_stretch(self):
+        self.splitter.setStretchFactor(0, 3)
+        self.splitter.setStretchFactor(1, 2)
 
     def _on_make_deal_clicked(self):
         if self._make_deal_callback is None:
@@ -233,6 +243,9 @@ class SearchDialog(QDialog):
     def _save_geometry(self):
         st = {
             "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
+            "splitter_state": base64.b64encode(
+                self.splitter.saveState()
+            ).decode("ascii"),
         }
         ui_settings.set_window_settings("SearchDialog", st)
 
