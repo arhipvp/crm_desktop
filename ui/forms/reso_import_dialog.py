@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -14,6 +16,10 @@ from PySide6.QtWidgets import (
 from database.models import Policy
 from services.reso_table_service import load_reso_table, import_reso_payouts
 from services.validators import normalize_number
+from ui import settings as ui_settings
+
+
+SETTINGS_KEY = "reso_import_dialog"
 
 
 class ResoImportDialog(QDialog):
@@ -23,6 +29,7 @@ class ResoImportDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Импорт выплат RESO")
         self.resize(800, 500)
+        self._restore_geometry()
         self.path = path or ""
 
         layout = QVBoxLayout(self)
@@ -68,6 +75,22 @@ class ResoImportDialog(QDialog):
         layout.addLayout(btns)
 
         self.processed = 0
+
+    # ------------------------------------------------------------------
+    # Qt overrides
+    # ------------------------------------------------------------------
+
+    def closeEvent(self, event):  # type: ignore[override]
+        self._save_geometry()
+        super().closeEvent(event)
+
+    def accept(self):  # type: ignore[override]
+        self._save_geometry()
+        super().accept()
+
+    def reject(self):  # type: ignore[override]
+        self._save_geometry()
+        super().reject()
 
     # ------------------------------------------------------------------
     def _choose_file(self):
@@ -127,3 +150,26 @@ class ResoImportDialog(QDialog):
             return
         self.processed = import_reso_payouts(self.path, parent=self)
         self.accept()
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _restore_geometry(self) -> None:
+        geometry_b64 = ui_settings.get_window_settings(SETTINGS_KEY).get("geometry")
+        if not geometry_b64:
+            return
+        try:
+            self.restoreGeometry(base64.b64decode(geometry_b64))
+        except Exception:  # pragma: no cover - восстановление необязательно
+            pass
+
+    def _save_geometry(self) -> None:
+        try:
+            geometry_bytes = bytes(self.saveGeometry())
+        except Exception:  # pragma: no cover - сохранение необязательно
+            return
+        geometry_b64 = base64.b64encode(geometry_bytes).decode("ascii")
+        settings = ui_settings.get_window_settings(SETTINGS_KEY)
+        settings["geometry"] = geometry_b64
+        ui_settings.set_window_settings(SETTINGS_KEY, settings)
