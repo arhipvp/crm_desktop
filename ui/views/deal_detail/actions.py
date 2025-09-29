@@ -602,10 +602,30 @@ class DealActionsMixin:
     def _on_process_policies_ai(self):
         from ui.forms.ai_policy_files_dialog import AiPolicyFilesDialog
 
+        initial_files: list[Path] = []
+        panel = getattr(self, "files_panel", None)
+        getter = getattr(panel, "selected_files", None)
+        if callable(getter):
+            try:
+                selected = list(getter())
+            except Exception:  # pragma: no cover - defensive
+                selected = []
+
+            for path in selected:
+                try:
+                    if not path.exists() or not path.is_file():
+                        continue
+                    if path.stat().st_size == 0:
+                        continue
+                except OSError:
+                    continue
+                initial_files.append(path)
+
         dlg = AiPolicyFilesDialog(
             parent=self,
             forced_client=self.instance.client,
             forced_deal=self.instance,
+            initial_files=initial_files,
         )
         if dlg.exec():
             self._init_kpi_panel()
