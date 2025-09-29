@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import base64
+import binascii
+
 from datetime import date
 from dateutil.relativedelta import relativedelta
 
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, QByteArray
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -13,7 +16,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ui import settings as ui_settings
 from ui.common.date_utils import TypableDateEdit
+
+
+SETTINGS_KEY = "deal_next_event_dialog"
 
 
 class DealNextEventDialog(QDialog):
@@ -50,6 +57,8 @@ class DealNextEventDialog(QDialog):
         if events:
             self._on_event_changed()
 
+        self._restore_geometry()
+
     # ------------------------------------------------------------------
     def _on_event_changed(self):
         idx = self.combo.currentIndex()
@@ -62,4 +71,40 @@ class DealNextEventDialog(QDialog):
     def get_reminder_date(self) -> date:
         qd = self.date_edit.date()
         return qd.toPython()
+
+    # ------------------------------------------------------------------
+    def accept(self):
+        self._save_geometry()
+        super().accept()
+
+    # ------------------------------------------------------------------
+    def reject(self):
+        self._save_geometry()
+        super().reject()
+
+    # ------------------------------------------------------------------
+    def closeEvent(self, event):
+        self._save_geometry()
+        super().closeEvent(event)
+
+    # ------------------------------------------------------------------
+    def _restore_geometry(self):
+        settings = ui_settings.get_window_settings(SETTINGS_KEY)
+        geometry_b64 = settings.get("geometry") if isinstance(settings, dict) else None
+        if not geometry_b64:
+            return
+
+        try:
+            geometry_data = base64.b64decode(geometry_b64)
+        except (ValueError, binascii.Error, TypeError):
+            return
+
+        if geometry_data:
+            self.restoreGeometry(QByteArray(geometry_data))
+
+    # ------------------------------------------------------------------
+    def _save_geometry(self):
+        geometry = bytes(self.saveGeometry())
+        geometry_b64 = base64.b64encode(geometry).decode("ascii")
+        ui_settings.set_window_settings(SETTINGS_KEY, {"geometry": geometry_b64})
 
