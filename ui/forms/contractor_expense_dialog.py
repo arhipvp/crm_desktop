@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import Iterable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QByteArray
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from database.models import Expense, Payment, Policy
+from ui import settings as ui_settings
 
 
 @dataclass(slots=True)
@@ -30,6 +32,8 @@ class _PaymentRow:
 
 class ContractorExpenseDialog(QDialog):
     """Диалог выбора платежей для создания расходов контрагенту."""
+
+    SETTINGS_KEY = "contractor_expense_dialog"
 
     def __init__(self, policy: Policy, contractor_name: str, parent=None):
         super().__init__(parent)
@@ -83,6 +87,8 @@ class ContractorExpenseDialog(QDialog):
             empty_label = QLabel("У полиса нет активных платежей.")
             empty_label.setAlignment(Qt.AlignCenter)
             layout.addWidget(empty_label)
+
+        self._restore_geometry()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -174,4 +180,46 @@ class ContractorExpenseDialog(QDialog):
             if row.checkbox.isChecked():
                 selected_expenses.extend(row.expenses)
         return selected_expenses
+
+    # ------------------------------------------------------------------
+    # Qt overrides
+    # ------------------------------------------------------------------
+
+    def accept(self) -> None:  # type: ignore[override]
+        self._save_geometry()
+        super().accept()
+
+    def reject(self) -> None:  # type: ignore[override]
+        self._save_geometry()
+        super().reject()
+
+    def closeEvent(self, event):  # type: ignore[override]
+        self._save_geometry()
+        super().closeEvent(event)
+
+    # ------------------------------------------------------------------
+    # Persistence helpers
+    # ------------------------------------------------------------------
+
+    def _restore_geometry(self) -> None:
+        settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        geometry_b64 = settings.get("geometry")
+        if not geometry_b64:
+            return
+        try:
+            geometry_bytes = base64.b64decode(geometry_b64)
+            self.restoreGeometry(QByteArray(geometry_bytes))
+        except Exception:  # pragma: no cover - восстановление необязательно
+            pass
+
+    def _save_geometry(self) -> None:
+        try:
+            geometry_bytes = bytes(self.saveGeometry())
+            geometry_b64 = base64.b64encode(geometry_bytes).decode("ascii")
+        except Exception:  # pragma: no cover - сохранение необязательно
+            return
+
+        settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        settings["geometry"] = geometry_b64
+        ui_settings.set_window_settings(self.SETTINGS_KEY, settings)
 
