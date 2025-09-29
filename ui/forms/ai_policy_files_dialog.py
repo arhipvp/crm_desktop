@@ -135,13 +135,13 @@ class AiPolicyFilesDialog(QDialog):
 
     # ------------------------------------------------------------------
     def _append(self, role: str, text: str):
+        cursor = self.conv_edit.textCursor()
+        cursor.movePosition(QTextCursor.End)
         if role == "assistant":
-            cursor = self.conv_edit.textCursor()
-            cursor.movePosition(QTextCursor.End)
             cursor.insertText(text)
-            self.conv_edit.setTextCursor(cursor)
         else:
-            self.conv_edit.append(f"{role}: {text}")
+            cursor.insertText(f"{role}:\n{text}\n")
+        self.conv_edit.setTextCursor(cursor)
 
     def _start_worker(self):
         if self._worker:
@@ -307,7 +307,11 @@ class AiPolicyFilesDialog(QDialog):
             QMessageBox.warning(self, "Ошибка", "Добавьте файлы.")
             return
 
-        text = "\n".join(_read_text(str(p)) for p in self.files)
+        blocks = [
+            f"===== {path.name} =====\n{_read_text(str(path))}"
+            for path in self.files
+        ]
+        text = "\n\n".join(blocks)
         self.conv_edit.clear()
         self._messages = [
             {"role": "system", "content": _get_prompt()},
