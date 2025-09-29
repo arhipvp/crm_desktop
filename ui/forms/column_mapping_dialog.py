@@ -1,4 +1,12 @@
+import base64
+
+from PySide6.QtCore import QByteArray
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QComboBox, QPushButton, QHBoxLayout
+
+from ui import settings as ui_settings
+
+
+SETTINGS_KEY = "column_mapping_dialog"
 
 
 class ColumnMappingDialog(QDialog):
@@ -56,6 +64,8 @@ class ColumnMappingDialog(QDialog):
         btns.addWidget(cancel_btn)
         layout.addLayout(btns)
 
+        self._restore_geometry()
+
     def get_mapping(self) -> dict[str, str]:
         return {
             "policy_number": self.policy_cb.currentText(),
@@ -65,3 +75,32 @@ class ColumnMappingDialog(QDialog):
             "insurance_type": self.type_cb.currentText(),
             "sales_channel": self.channel_cb.currentText(),
         }
+
+    def accept(self):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().accept()
+
+    def reject(self):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().reject()
+
+    def closeEvent(self, event):  # noqa: D401 - Qt override
+        self._save_geometry()
+        super().closeEvent(event)
+
+    def _restore_geometry(self) -> None:
+        settings = ui_settings.get_window_settings(SETTINGS_KEY)
+        geometry_b64 = settings.get("geometry")
+        if not geometry_b64:
+            return
+        try:
+            geometry_bytes = base64.b64decode(geometry_b64.encode("ascii"))
+        except Exception:  # pragma: no cover - защита от повреждённых данных
+            return
+        self.restoreGeometry(QByteArray(geometry_bytes))
+
+    def _save_geometry(self) -> None:
+        geometry = base64.b64encode(bytes(self.saveGeometry())).decode("ascii")
+        settings = ui_settings.get_window_settings(SETTINGS_KEY)
+        settings["geometry"] = geometry
+        ui_settings.set_window_settings(SETTINGS_KEY, settings)
