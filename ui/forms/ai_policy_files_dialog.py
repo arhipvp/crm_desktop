@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Iterable
 
 from PySide6.QtCore import QThread, Qt, Signal
-from PySide6.QtGui import QTextCursor
+from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -106,11 +106,14 @@ class AiPolicyFilesDialog(QDialog):
         layout.addWidget(self.input_edit)
 
         btns = QHBoxLayout()
+        self.remove_btn = QPushButton("Удалить выбранные", self)
+        self.remove_btn.clicked.connect(self.on_remove_selected)
         self.process_btn = QPushButton("Распознать", self)
         self.process_btn.clicked.connect(self.on_process)
         cancel_btn = QPushButton("Отмена", self)
         cancel_btn.clicked.connect(self.reject)
         btns.addStretch()
+        btns.addWidget(self.remove_btn)
         btns.addWidget(self.process_btn)
         btns.addWidget(cancel_btn)
         layout.addLayout(btns)
@@ -118,6 +121,12 @@ class AiPolicyFilesDialog(QDialog):
         self.files: list[Path] = []
         self._messages: list[dict] = []
         self._worker: _Worker | None = None
+
+        self._delete_shortcuts: list[QShortcut] = []
+        for key in (Qt.Key_Delete, Qt.Key_Backspace):
+            shortcut = QShortcut(QKeySequence(key), self.list_widget)
+            shortcut.activated.connect(self.on_remove_selected)
+            self._delete_shortcuts.append(shortcut)
 
         if initial_files:
             self._add_files(initial_files)
@@ -163,6 +172,21 @@ class AiPolicyFilesDialog(QDialog):
         if not worker.isRunning():
             worker.deleteLater()
             self._worker = None
+
+    def on_remove_selected(self):
+        selected_rows = sorted(
+            {index.row() for index in self.list_widget.selectedIndexes()}, reverse=True
+        )
+        if not selected_rows:
+            return
+
+        for row in selected_rows:
+            if 0 <= row < self.list_widget.count():
+                self.list_widget.takeItem(row)
+                if 0 <= row < len(self.files):
+                    del self.files[row]
+
+        self._update_process_button_state()
 
     # ------------------------------------------------------------------
     def _on_finished(self, data, messages, transcript):
