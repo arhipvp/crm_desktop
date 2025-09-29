@@ -1,3 +1,7 @@
+import base64
+import binascii
+
+from PySide6.QtCore import QByteArray
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -10,6 +14,10 @@ from PySide6.QtWidgets import (
 
 from database.models import Client
 from services.validators import normalize_phone
+from ui import settings as ui_settings
+
+
+SETTINGS_KEY = "client_import_dialog"
 
 
 class ClientImportDialog(QDialog):
@@ -44,6 +52,8 @@ class ClientImportDialog(QDialog):
 
         self.client = None
 
+        self._restore_geometry()
+
     def _on_confirm(self):
         name = self.name_edit.text().strip()
         try:
@@ -65,3 +75,34 @@ class ClientImportDialog(QDialog):
             self.client.save()
 
         self.accept()
+
+    def accept(self):
+        self._save_geometry()
+        super().accept()
+
+    def reject(self):
+        self._save_geometry()
+        super().reject()
+
+    def closeEvent(self, event):
+        self._save_geometry()
+        super().closeEvent(event)
+
+    def _restore_geometry(self):
+        settings = ui_settings.get_window_settings(SETTINGS_KEY)
+        geometry_b64 = settings.get("geometry") if isinstance(settings, dict) else None
+        if not geometry_b64:
+            return
+
+        try:
+            geometry_data = base64.b64decode(geometry_b64)
+        except (ValueError, binascii.Error, TypeError):
+            return
+
+        if geometry_data:
+            self.restoreGeometry(QByteArray(geometry_data))
+
+    def _save_geometry(self):
+        geometry = bytes(self.saveGeometry())
+        geometry_b64 = base64.b64encode(geometry).decode("ascii")
+        ui_settings.set_window_settings(SETTINGS_KEY, {"geometry": geometry_b64})
