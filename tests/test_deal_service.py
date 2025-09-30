@@ -6,14 +6,9 @@ from database.models import Client, Deal, Policy
 from services.deal_service import add_deal_from_policy, get_open_deals, update_deal
 
 
-def test_add_deal_from_policy_sets_reminder_date(monkeypatch, in_memory_db):
-    monkeypatch.setattr(
-        "services.deal_service.create_deal_folder", lambda *a, **k: (None, None)
-    )
-    monkeypatch.setattr(
-        "services.folder_utils.move_policy_folder_to_deal", lambda *a, **k: None
-    )
-
+def test_add_deal_from_policy_sets_reminder_date(
+    in_memory_db, stub_drive_gateway
+):
     client = Client.create(name="Клиент")
     start_date = date(2024, 1, 15)
     policy = Policy.create(
@@ -22,7 +17,7 @@ def test_add_deal_from_policy_sets_reminder_date(monkeypatch, in_memory_db):
         start_date=start_date,
     )
 
-    deal = add_deal_from_policy(policy)
+    deal = add_deal_from_policy(policy, gateway=stub_drive_gateway)
 
     assert deal.reminder_date == start_date + relativedelta(months=9)
 

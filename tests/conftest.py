@@ -22,6 +22,16 @@ def qapp():
 
 
 @pytest.fixture
+def stub_drive_gateway(tmp_path):
+    return SimpleNamespace(local_root=tmp_path)
+
+
+@pytest.fixture
+def stub_app_context(stub_drive_gateway):
+    return SimpleNamespace(drive_gateway=stub_drive_gateway)
+
+
+@pytest.fixture
 def stub_client_app_service(monkeypatch):
     from services.clients.dto import ClientDetailsDTO
 

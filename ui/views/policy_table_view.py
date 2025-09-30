@@ -192,7 +192,7 @@ class PolicyTableView(BaseTableView):
             from ui.forms.deal_form import DealForm
 
             first = policy_models[0]
-            form = DealForm(parent=self)
+            form = DealForm(parent=self, context=self._context)
             if "reminder_date" in form.fields:
                 base_date = first.start_date or date.today()
                 reminder_date = base_date + relativedelta(months=9)
@@ -241,7 +241,7 @@ class PolicyTableView(BaseTableView):
                 update_policy(policy, deal_id=deal.id)
             self.refresh()
 
-            dlg = DealDetailView(deal, parent=self)
+            dlg = DealDetailView(deal, parent=self, context=self._context)
             dlg.exec()
         except Exception as e:  # noqa: BLE001
             show_error(str(e))
@@ -540,7 +540,7 @@ class PolicyTableView(BaseTableView):
             return
         from ui.views.deal_detail import DealDetailView
 
-        DealDetailView(deal, parent=self).exec()
+        DealDetailView(deal, parent=self, context=self._context).exec()
 
     def on_sort_changed(self, logical_index: int, order: Qt.SortOrder):
         field = self.COLUMN_FIELD_MAP.get(logical_index)

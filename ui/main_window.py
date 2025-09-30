@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
     def init_tabs(self):
         self.tab_widget = QTabWidget(self)
         self.setCentralWidget(self.tab_widget)
-        self.home_tab = HomeTab()
+        self.home_tab = HomeTab(context=self._context)
         self.client_tab = ClientTableView(parent=self, context=self._context)
         self.deal_tab = DealTableView(parent=self, context=self._context)
         self.policy_tab = PolicyTableView(parent=self, context=self._context)
