@@ -236,11 +236,17 @@ class AiPolicyFilesDialog(QDialog):
         )
         if dlg.exec():
             policy = getattr(dlg, "imported_policy", None)
-            if policy and policy.drive_folder_link:
+            dest = None
+            if policy:
+                dest = (
+                    getattr(policy, "drive_folder_link", None)
+                    or getattr(policy, "drive_folder_path", None)
+                )
+            if dest:
                 from services.folder_utils import move_file_to_folder
 
                 for src in self.files:
-                    move_file_to_folder(str(src), policy.drive_folder_link)
+                    move_file_to_folder(str(src), dest)
             self.accept()
         else:
             self.process_btn.setEnabled(True)
