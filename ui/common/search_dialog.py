@@ -28,6 +28,8 @@ class SearchDialog(QDialog):
         self._default_details_html = "<p><i>Выберите элемент, чтобы увидеть детали.</i></p>"
         self._make_deal_callback = make_deal_callback
 
+        st = ui_settings.get_window_settings("SearchDialog")
+
         self.model = QStandardItemModel(self)
         self.model.setHorizontalHeaderLabels(["Оценка", "Сделка", "Комментарий"])
         self.model.setSortRole(Qt.UserRole)
@@ -42,7 +44,8 @@ class SearchDialog(QDialog):
         self.table_view.setSelectionBehavior(QTableView.SelectRows)
         self.table_view.setSelectionMode(QTableView.SingleSelection)
         self.table_view.setEditTriggers(QTableView.NoEditTriggers)
-        self.table_view.horizontalHeader().setStretchLastSection(True)
+        header = self.table_view.horizontalHeader()
+        header.setStretchLastSection(True)
         self.table_view.verticalHeader().setVisible(False)
         self.table_view.setSortingEnabled(True)
         self.table_view.clicked.connect(self._on_row_selected)
@@ -50,6 +53,17 @@ class SearchDialog(QDialog):
         self.table_view.selectionModel().currentRowChanged.connect(
             self._on_current_row_changed
         )
+
+        column_widths = st.get("column_widths")
+        if isinstance(column_widths, dict):
+            for section, width in column_widths.items():
+                try:
+                    section_index = int(section)
+                    section_width = int(width)
+                except (TypeError, ValueError):
+                    continue
+                if 0 <= section_index < header.count() and section_width > 0:
+                    header.resizeSection(section_index, section_width)
 
         self.detail_view = QTextBrowser(self)
         self.detail_view.setOpenExternalLinks(True)
@@ -84,7 +98,7 @@ class SearchDialog(QDialog):
         button_row.addWidget(self.ok_button)
         layout.addLayout(button_row)
 
-        st = ui_settings.get_window_settings("SearchDialog")
+        # Используем сохранённые настройки окна (геометрию, ширины колонок и т.д.)
         geom = st.get("geometry")
         if geom:
             try:
@@ -241,11 +255,17 @@ class SearchDialog(QDialog):
             self.accept()
 
     def _save_geometry(self):
+        header = self.table_view.horizontalHeader()
+        column_widths = {
+            i: header.sectionSize(i)
+            for i in range(header.count())
+        }
         st = {
             "geometry": base64.b64encode(self.saveGeometry()).decode("ascii"),
             "splitter_state": base64.b64encode(
                 self.splitter.saveState()
             ).decode("ascii"),
+            "column_widths": column_widths,
         }
         ui_settings.set_window_settings("SearchDialog", st)
 
