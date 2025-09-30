@@ -219,6 +219,14 @@ class BaseEditForm(QDialog):
         self._save_window_geometry()
         super().closeEvent(event)
 
+    def accept(self) -> None:
+        self._save_window_geometry()
+        super().accept()
+
+    def reject(self) -> None:
+        self._save_window_geometry()
+        super().reject()
+
     # ------------------------------------------------------------------
     # Build form
     # ------------------------------------------------------------------
