@@ -33,6 +33,7 @@ from PySide6.QtCore import (
     QSortFilterProxyModel,
     QRegularExpression,
     QByteArray,
+    QTimer,
 )
 from PySide6.QtGui import QShortcut
 
@@ -162,7 +163,11 @@ class BaseTableView(QWidget):
         # --- мастер-детал макет ---
         self.outer_layout = QVBoxLayout(self)
         self.splitter = QSplitter()
-        self.splitter.splitterMoved.connect(lambda *_: self.save_table_settings())
+        self._save_settings_timer = QTimer(self)
+        self._save_settings_timer.setSingleShot(True)
+        self._save_settings_timer.setInterval(250)
+        self._save_settings_timer.timeout.connect(self.save_table_settings)
+        self.splitter.splitterMoved.connect(self._schedule_save_table_settings)
         self.left_panel = QWidget()
         self.left_layout = QVBoxLayout(self.left_panel)
         self.splitter.addWidget(self.left_panel)
@@ -281,8 +286,8 @@ class BaseTableView(QWidget):
         header.setSectionsMovable(True)
         header.setSectionsClickable(True)
         header.sortIndicatorChanged.connect(self._on_sort_indicator_changed)
-        header.sectionResized.connect(self._on_section_resized)
-        header.sectionMoved.connect(self._on_section_moved)
+        header.sectionResized.connect(self._schedule_save_table_settings)
+        header.sectionMoved.connect(self._schedule_save_table_settings)
         header.setContextMenuPolicy(Qt.CustomContextMenu)
         header.customContextMenuRequested.connect(self._on_header_section_clicked)
         self.table.setSelectionBehavior(QTableView.SelectRows)
@@ -1297,11 +1302,8 @@ class BaseTableView(QWidget):
         self.current_sort_order = order
         self.save_table_settings()
 
-    def _on_section_resized(self, *_):
-        self.save_table_settings()
-
-    def _on_section_moved(self, logical: int, old_visual: int, new_visual: int) -> None:
-        self.save_table_settings()
+    def _schedule_save_table_settings(self, *_):
+        self._save_settings_timer.start()
 
     def save_table_settings(self):
         """Сохраняет настройки сортировки и ширины колонок."""
