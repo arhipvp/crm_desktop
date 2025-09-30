@@ -30,6 +30,12 @@ def sanitize_drive_name(name: str) -> str:
     return cleaned.rstrip(" .")
 
 
+def _escape_drive_query_value(value: str) -> str:
+    """Экранировать значение для использования в строке запроса Google Drive."""
+
+    return value.replace("'", r"\'")
+
+
 @dataclass
 class DriveGateway:
     """Адаптер для работы с локальными каталогами и Google Drive."""
@@ -91,8 +97,9 @@ class DriveGateway:
 
         service = self._get_service()
         safe_name = sanitize_drive_name(folder_name)
+        escaped_name = _escape_drive_query_value(safe_name)
         query = (
-            f"'{parent}' in parents and name = '{safe_name}' and "
+            f"'{parent}' in parents and name = '{escaped_name}' and "
             "mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         )
         response = (
@@ -124,8 +131,9 @@ class DriveGateway:
 
         service = self._get_service()
         safe_name = sanitize_drive_name(folder_name)
+        escaped_name = _escape_drive_query_value(safe_name)
         query = (
-            f"'{parent}' in parents and name = '{safe_name}' and "
+            f"'{parent}' in parents and name = '{escaped_name}' and "
             "mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         )
         response = (
