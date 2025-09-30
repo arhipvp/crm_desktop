@@ -8,7 +8,7 @@ from datetime import date, datetime
 from typing import Any, Sequence
 from peewee import Model, ModelSelect, fn
 
-from database.models import Client, Deal, db
+from database.models import Client, Deal, Policy, db
 from services.container import get_drive_gateway
 from services.folder_utils import (
     create_client_drive_folder,
@@ -438,16 +438,23 @@ def merge_clients(
                     gateway=gateway,
                 )
                 policy.client = primary_client
+                fields_to_update = [Policy.client]
+                deal_changed = False
                 if (
                     policy.deal_id
                     and policy.deal.client_id != primary_client.id
                 ):
                     policy.deal = Deal.get_by_id(policy.deal_id)
-                if new_path and new_path != policy.drive_folder_link:
-                    policy.drive_folder_link = new_path
-                elif new_link and new_link != policy.drive_folder_link:
+                    deal_changed = True
+                if deal_changed:
+                    fields_to_update.append(Policy.deal)
+                if new_path and new_path != policy.drive_folder_path:
+                    policy.drive_folder_path = new_path
+                    fields_to_update.append(Policy.drive_folder_path)
+                if new_link and new_link != policy.drive_folder_link:
                     policy.drive_folder_link = new_link
-                policy.save()
+                    fields_to_update.append(Policy.drive_folder_link)
+                policy.save(only=fields_to_update)
                 logger.info(
                     "📄 Полис id=%s перенесён к клиенту id=%s",
                     policy.id,
