@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QApplication
 from config import Settings, get_settings
 from database.init import init_from_env
 from services import executor_service as es
-from core.app_context import get_app_context
+from core.app_context import get_app_context, init_app_context
 from ui.main_window import MainWindow
 from utils.logging_config import setup_logging
 
@@ -21,6 +21,8 @@ def main(settings: Settings | None = None) -> int:
     settings = settings or get_settings()
     if not settings.database_url:
         raise RuntimeError("DATABASE_URL не задан в .env")
+
+    init_app_context(settings)
 
     init_from_env(settings.database_url)
     setup_logging(settings)
