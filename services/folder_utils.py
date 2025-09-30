@@ -3,69 +3,23 @@
 from __future__ import annotations
 
 import logging
-
-# services/folder_utils.py
 import os
-from os import getenv
-import re
 import shutil
 import subprocess
 import sys
 import webbrowser
-from functools import lru_cache
-import time
 from pathlib import Path
 from typing import Optional, Tuple
-from urllib.parse import urlparse
 
-try:
-    from google.oauth2.service_account import Credentials
-    from googleapiclient.discovery import build
-    from googleapiclient.http import MediaFileUpload
-except Exception:  # noqa: BLE001
-    Credentials = None  # type: ignore[assignment]
-    build = lambda *a, **k: None  # type: ignore[assignment]
-    MediaFileUpload = None  # type: ignore[assignment]
-
-try:
-    from PySide6.QtWidgets import QApplication, QMessageBox
-except Exception:  # PySide6 может отсутствовать в тестах
-    QApplication = None  # type: ignore[assignment]
-    QMessageBox = None
+from infrastructure.drive_gateway import DriveGateway, sanitize_drive_name
 
 logger = logging.getLogger(__name__)
 
-SERVICE_ACCOUNT_FILE = getenv("GOOGLE_CREDENTIALS", "credentials.json")
-SCOPES = ["https://www.googleapis.com/auth/drive"]
-ROOT_FOLDER_ID = getenv(
-    "GOOGLE_ROOT_FOLDER_ID", "1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm"
-)  # ID папки в Google Drive
-GOOGLE_DRIVE_LOCAL_ROOT = Path(
-    getenv("GOOGLE_DRIVE_LOCAL_ROOT", r"G:\Мой диск\Клиенты")
-)
-
-
-@lru_cache(maxsize=1)
-def get_drive_service():
-    """Создать и закешировать сервис Google Drive.
-
-    Returns:
-        Resource: Клиент API Google Drive.
-    """
-    if Credentials is None:
-        raise RuntimeError("Google Drive libraries are not available")
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    return build("drive", "v3", credentials=creds)
-
 
 def sanitize_name(name: str) -> str:
-    """
-    Очищает имя от недопустимых символов для файловой системы:
-    Заменяет символы: < > : "  и пробельные/невидимые.
-    """
-    name = re.sub(r'[<>:"/\\|?*\n\r\t]', "_", name)  # заменяем все опасные символы
-    name = re.sub(r"\s{2,}", " ", name).strip()  # схлопываем пробелы
-    return name.rstrip(" .")  # убираем завершающие пробелы/точки
+    """Совместимый алиас для очистки имён путей."""
+
+    return sanitize_drive_name(name)
 
 
 def extract_folder_id(link: str | None) -> str | None:
@@ -90,6 +44,8 @@ def is_drive_link(link: str | None) -> bool:
     if "://" in link:
         return True
 
+    from urllib.parse import urlparse
+
     parsed = urlparse(link if "//" in link else f"//{link}", scheme="")
     host = (parsed.netloc or parsed.path).lower()
     if "google" in host:
@@ -98,238 +54,125 @@ def is_drive_link(link: str | None) -> bool:
     return False
 
 
-def create_drive_folder(folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> str:
-    folder_name = sanitize_name(folder_name)
-    service = get_drive_service()
-
-    query = f"'{parent_id}' in parents and name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-    response = (
-        service.files().list(q=query, fields="files(id)", spaces="drive").execute()
-    )
-    files = response.get("files", [])
-
-    if files:
-        folder_id = files[0]["id"]
-        return f"https://drive.google.com/drive/folders/{folder_id}"
-
-    metadata = {
-        "name": folder_name,
-        "mimeType": "application/vnd.google-apps.folder",
-        "parents": [parent_id],
-    }
-
-    folder = service.files().create(body=metadata, fields="id").execute()
-    return f"https://drive.google.com/drive/folders/{folder['id']}"
+def _resolve_base_path(
+    gateway: DriveGateway, base_path: str | os.PathLike[str] | None
+) -> Path:
+    return Path(base_path) if base_path is not None else gateway.local_root
 
 
-def find_drive_folder(folder_name: str, parent_id: str = ROOT_FOLDER_ID) -> str | None:
-    """Найти существующую папку в Google Drive и вернуть webViewLink."""
-    folder_name = sanitize_name(folder_name)
-    service = get_drive_service()
-
-    query = (
-        f"'{parent_id}' in parents and name = '{folder_name}' and "
-        "mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-    )
-    response = (
-        service.files()
-        .list(q=query, fields="files(id, webViewLink)", spaces="drive")
-        .execute()
-    )
-    files = response.get("files", [])
-    if files:
-        return files[0].get("webViewLink")
-    return None
+# ─────────────────────────── Работа с Google Drive ───────────────────────────
 
 
-def create_client_drive_folder(client_name: str) -> Tuple[str, Optional[str]]:
-    """Создать локальную папку клиента и вернуть её путь.
+def create_drive_folder(
+    folder_name: str,
+    *,
+    gateway: DriveGateway,
+    parent_id: str | None = None,
+) -> str:
+    """Создать папку на Google Drive и вернуть ссылку."""
 
-    Папка на Google Drive больше не создаётся автоматически. ``web_link``
-    всегда будет ``None``.
-    """
+    return gateway.create_drive_folder(folder_name, parent_id)
+
+
+def find_drive_folder(
+    folder_name: str,
+    *,
+    gateway: DriveGateway,
+    parent_id: str | None = None,
+) -> str | None:
+    """Найти папку на Google Drive и вернуть ссылку, если она существует."""
+
+    return gateway.find_drive_folder(folder_name, parent_id)
+
+
+def upload_to_drive(
+    local_path: str | os.PathLike[str],
+    drive_folder_id: str,
+    *,
+    gateway: DriveGateway,
+) -> str:
+    """Загрузить файл в указанную папку Google Drive и вернуть ссылку."""
+
+    return gateway.upload_file(Path(local_path), drive_folder_id)
+
+
+# ─────────────────────────── Локальные каталоги ─────────────────────────────
+
+
+def create_client_drive_folder(
+    client_name: str,
+    *,
+    gateway: DriveGateway,
+    base_path: str | os.PathLike[str] | None = None,
+) -> Tuple[str, Optional[str]]:
+    """Создать локальную папку клиента и вернуть путь."""
+
     safe_name = sanitize_name(client_name)
-    local_path = GOOGLE_DRIVE_LOCAL_ROOT / safe_name
+    root = _resolve_base_path(gateway, base_path)
+    local_path = root / safe_name
 
     if local_path.exists():
-        logger.info("Папка клиента уже существует")
+        logger.info("Папка клиента уже существует: %s", local_path)
     else:
-        try:
-            local_path.mkdir(parents=True, exist_ok=False)
-            logger.info("Папка клиента создана: %s", local_path)
-        except Exception:
-            logger.exception("Не удалось создать папку клиента локально")
+        local_path.mkdir(parents=True, exist_ok=True)
+        logger.info("Папка клиента создана: %s", local_path)
 
     return str(local_path), None
-
-
-def open_local_or_web(folder_link: str, folder_name: str = None, parent=None):
-    logger.debug(">>> [open_local_or_web] folder_link: %s", folder_link)
-
-    if not folder_link and not folder_name:
-        QMessageBox.warning(parent, "Ошибка", "Нет ссылки и нет имени папки.")
-        return
-
-    if not folder_name:
-        folder_name = "???"  # fallback имя
-
-    client_path = GOOGLE_DRIVE_LOCAL_ROOT / folder_name
-    logger.debug(">>> [search] checking client path: %s", client_path)
-
-    if client_path.is_dir():
-        # Если есть локальная папка клиента
-        for sub_path in client_path.iterdir():
-            if sub_path.is_dir() and (
-                sub_path.name == folder_name or sub_path.name.endswith(folder_name)
-            ):
-                logger.debug(">>> [match] found subfolder: %s", sub_path)
-                open_folder(str(sub_path), parent=parent)
-                return
-
-        # Или просто открыть саму папку клиента
-        logger.debug(">>> [fallback] opening client root folder: %s", client_path)
-        open_folder(str(client_path), parent=parent)
-        return
-
-    # Локальной папки нет
-    if QApplication is not None and QMessageBox is not None and QApplication.instance():
-        res = QMessageBox.question(
-            parent,
-            "Папка не найдена",
-            "Не удалось найти локальную папку. Привязать путь вручную?",
-            QMessageBox.Yes | QMessageBox.Cancel,
-        )
-        if res == QMessageBox.Yes:
-            try:
-                from PySide6.QtWidgets import QFileDialog
-
-                chosen = QFileDialog.getExistingDirectory(parent, "Укажите папку клиента")
-                if chosen:
-                    open_folder(chosen, parent=parent)
-            except Exception:
-                logger.exception("Ошибка выбора папки")
-        return
-
-    # Нет GUI или пользователь отменил → открываем ссылку, если есть
-    if folder_link:
-        logger.debug(">>> [fallback] opening web link: %s", folder_link)
-        webbrowser.open(folder_link)
-    else:
-        if QMessageBox is not None:
-            QMessageBox.warning(
-                parent, "Ошибка", f"Не удалось найти папку клиента: {folder_name}"
-            )
-        else:
-            logger.warning("Не удалось найти папку клиента: %s", folder_name)
 
 
 def create_deal_folder(
     client_name: str,
     deal_description: str,
     *,
-    client_drive_link: str | None,  # ← ссылка на ПАПКУ КЛИЕНТА
+    client_drive_link: str | None,
+    gateway: DriveGateway,
+    base_path: str | os.PathLike[str] | None = None,
 ) -> Tuple[str, Optional[str]]:
-    """Создать папку сделки только локально.
+    """Создать локальную папку сделки и вернуть путь."""
 
-    Папка на Google Drive больше не создаётся автоматически.
-
-    Returns
-    -------
-    Tuple[str, Optional[str]]
-        Путь к созданной локальной папке и ``None`` вместо ссылки.
-    """
-    # -------- название папки сделки
+    root = _resolve_base_path(gateway, base_path)
     deal_name = sanitize_name(f"Сделка - {deal_description}")
+    local_path = root / sanitize_name(client_name) / deal_name
 
-    # -------- локальный путь  G:\…\Клиенты\<Клиент>\Сделка - …
-    local_path = (
-        GOOGLE_DRIVE_LOCAL_ROOT
-        / sanitize_name(client_name)
-        / deal_name
-    )
-
-    logger.info("📂  Ожидаемый путь сделки: %s", local_path)
-
-    # -------- создаём локальную папку (как у полиса)
-    if local_path.is_dir():
+    if local_path.exists():
         logger.info("📂 Папка сделки уже существует: %s", local_path)
     else:
-        _msg(f"Папка сделки не найдена и будет создана:\n{local_path}", None)
-        try:
-            local_path.mkdir(parents=True, exist_ok=True)
-            logger.info("📁 Создана папка сделки: %s", local_path)
-        except Exception:
-            logger.exception("Не удалось создать папку сделки локально")
+        local_path.mkdir(parents=True, exist_ok=True)
+        logger.info("📁 Создана папка сделки: %s", local_path)
 
-    # -------- облако более не создаётся автоматически
     return str(local_path), None
 
 
 def create_policy_folder(
-    client_name: str, policy_number: str, deal_description: str = None
+    client_name: str,
+    policy_number: str,
+    deal_description: str | None = None,
+    *,
+    gateway: DriveGateway,
+    base_path: str | os.PathLike[str] | None = None,
 ) -> str:
-    """Создать папку для полиса внутри клиента или сделки."""
-    client_name = sanitize_name(client_name)
-    policy_name = sanitize_name(f"Полис - {policy_number}")
+    """Создать папку для полиса и вернуть её путь."""
 
+    root = _resolve_base_path(gateway, base_path)
+    client_root = root / sanitize_name(client_name)
     if deal_description:
-        deal_name = sanitize_name(f"Сделка - {deal_description}")
-        path = (
-            GOOGLE_DRIVE_LOCAL_ROOT / client_name / deal_name / policy_name
-        )
-    else:
-        path = GOOGLE_DRIVE_LOCAL_ROOT / client_name / policy_name
+        client_root /= sanitize_name(f"Сделка - {deal_description}")
+    path = client_root / sanitize_name(f"Полис - {policy_number}")
 
-    try:
-        path.mkdir(parents=True, exist_ok=True)
-        return str(path)
-    except Exception as e:
-        logger.error("❌ Не удалось создать папку клиента: %s", e)
-
-        return None
+    path.mkdir(parents=True, exist_ok=True)
+    return str(path)
 
 
-def upload_to_drive(local_path: str, drive_folder_id: str) -> str:
-    """
-    Загружает файл на Google Drive и возвращает ссылку.
-    """
-    from googleapiclient.http import MediaFileUpload
+def open_folder(path_or_url: str) -> None:
+    """Открыть локальную папку или URL."""
 
-    service = get_drive_service()  # ← вместо get_gdrive_credentials
-
-    file_metadata = {"name": Path(local_path).name, "parents": [drive_folder_id]}
-    media = MediaFileUpload(str(local_path), resumable=True)
-
-    uploaded = (
-        service.files()
-        .create(body=file_metadata, media_body=media, fields="id, webViewLink")
-        .execute()
-    )
-
-    logger.info("☁️ Загружен: %s", uploaded["webViewLink"])
-    return uploaded["webViewLink"]
-
-
-def open_folder(
-    path_or_url: str, *, parent: Optional["QWidget"] = None
-) -> None:  # noqa: N802 (keep API)
-    """Пытается открыть строку как локальный путь, иначе — как URL.
-
-    Parameters
-    ----------
-    path_or_url: str
-        Локальный путь к каталогу **или** web‑ссылка.
-    parent: QWidget | None
-        Родительский виджет для QMessageBox; может быть None вне Qt.
-    """
     if not path_or_url:
-        _msg("Папка не задана.", parent)
-        return
+        raise ValueError("Путь не задан.")
 
     path_or_url = path_or_url.strip()
     path = Path(path_or_url)
 
-    if path.is_dir():  # локальный каталог существует
+    if path.is_dir():
         try:
             if sys.platform.startswith("win"):
                 try:
@@ -346,198 +189,155 @@ def open_folder(
                                 window.Visible = True
                                 try:
                                     window.Focus()  # type: ignore[attr-defined]
-                                except Exception:
+                                except Exception:  # noqa: BLE001
                                     pass
                                 return
-                        except Exception:
+                        except Exception:  # noqa: BLE001
                             continue
                     shell.Open(str(path))
-                except Exception:
+                except Exception:  # noqa: BLE001
                     os.startfile(path)  # type: ignore[attr-defined]
             elif sys.platform.startswith("darwin"):
                 subprocess.Popen(["open", str(path)])
             else:
                 subprocess.Popen(["xdg-open", str(path)])
             return
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.exception("Не удалось открыть каталог %s", path)
-            _msg(f"Не удалось открыть каталог:\n{exc}", parent)
-            return
+            raise OSError(f"Не удалось открыть каталог: {exc}") from exc
 
-    # иначе трактуем как URL
     webbrowser.open(path_or_url)
 
 
-def copy_path_to_clipboard(
-    path_or_url: str, *, parent: Optional["QWidget"] = None
-) -> None:
+def copy_path_to_clipboard(path_or_url: str) -> None:
     """Копировать путь или ссылку в буфер обмена."""
+
     if not path_or_url:
-        _msg("Папка не задана.", parent)
-        return
-
-    path_or_url = path_or_url.strip()
+        raise ValueError("Путь не задан.")
 
     try:
         from PySide6.QtGui import QGuiApplication
-    except Exception:  # PySide6 может отсутствовать в тестах
-        logger.info("Буфер обмена недоступен")
-        return
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError("Буфер обмена недоступен") from exc
 
-    if QGuiApplication.instance() is None:
-        logger.info("Нет GUI-приложения для буфера обмена")
-        return
+    app = QGuiApplication.instance()
+    if app is None:
+        raise RuntimeError("Нет GUI-приложения для буфера обмена")
 
-    QGuiApplication.clipboard().setText(path_or_url)
-    _msg("Путь скопирован в буфер обмена.", parent)
+    app.clipboard().setText(path_or_url.strip())
 
 
-def copy_text_to_clipboard(text: str, *, parent: Optional["QWidget"] = None) -> None:
-    """Копирует произвольный текст в буфер обмена."""
+def copy_text_to_clipboard(text: str) -> None:
+    """Копировать текст в буфер обмена."""
+
     if not text:
-        _msg("Пустой текст.", parent)
-        return
+        raise ValueError("Пустой текст.")
 
     try:
         from PySide6.QtGui import QGuiApplication
-    except Exception:  # может отсутствовать в тестах
-        logger.info("Буфер обмена недоступен")
-        return
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError("Буфер обмена недоступен") from exc
 
-    if QGuiApplication.instance() is None:
-        logger.info("Нет GUI-приложения для буфера обмена")
-        return
+    app = QGuiApplication.instance()
+    if app is None:
+        raise RuntimeError("Нет GUI-приложения для буфера обмена")
 
-    QGuiApplication.clipboard().setText(text)
-    _msg("Текст скопирован в буфер обмена.", parent)
+    app.clipboard().setText(text)
 
 
-def _msg(text: str, parent: Optional["QWidget"]) -> None:
-    """Показывает информационное QMessageBox, если Qt доступен."""
-    if QMessageBox is None or QApplication is None or QApplication.instance() is None:
-        logger.debug("Сообщение: %s", text)
-        return
-    QMessageBox.information(parent, "Информация", text)
-
-
-def create_directory(
-    path: str | Path, *, parent: Optional["QWidget"] = None
-) -> Path | None:
-    """Создать каталог и вернуть его путь при успехе."""
+def create_directory(path: str | os.PathLike[str]) -> Path:
+    """Создать каталог и вернуть его путь."""
 
     directory = Path(path)
     if directory.exists():
-        _msg("Такая папка уже существует.", parent)
-        return None
+        raise FileExistsError("Такая папка уже существует.")
 
     try:
         directory.mkdir(parents=True, exist_ok=False)
-    except PermissionError:
-        _msg("Нет прав для создания папки.", parent)
-        return None
-    except OSError as exc:  # noqa: BLE001
+    except PermissionError as exc:
+        raise PermissionError("Нет прав для создания папки.") from exc
+    except OSError as exc:
         logger.exception("Не удалось создать папку %s", directory)
-        _msg(f"Не удалось создать папку:\n{exc}", parent)
-        return None
+        raise OSError(f"Не удалось создать папку: {exc}") from exc
 
     return directory
 
 
-def rename_path(
-    source: str | Path,
-    new_name: str,
-    *,
-    parent: Optional["QWidget"] = None,
-) -> Path | None:
+def rename_path(source: str | os.PathLike[str], new_name: str) -> Path:
     """Переименовать файл или каталог и вернуть новый путь."""
 
     src_path = Path(source)
     if not src_path.exists():
-        _msg("Объект не найден.", parent)
-        return None
+        raise FileNotFoundError("Объект не найден.")
 
     name = new_name.strip()
     if not name:
-        _msg("Имя не может быть пустым.", parent)
-        return None
+        raise ValueError("Имя не может быть пустым.")
 
     dst_path = src_path.with_name(name)
     if dst_path.exists():
-        _msg("Объект с таким именем уже существует.", parent)
-        return None
+        raise FileExistsError("Объект с таким именем уже существует.")
 
     try:
         src_path.rename(dst_path)
-    except PermissionError:
-        _msg("Нет прав для переименования.", parent)
-        return None
-    except OSError as exc:  # noqa: BLE001
+    except PermissionError as exc:
+        raise PermissionError("Нет прав для переименования.") from exc
+    except OSError as exc:
         logger.exception("Не удалось переименовать %s в %s", src_path, dst_path)
-        _msg(f"Не удалось переименовать объект:\n{exc}", parent)
-        return None
+        raise OSError(f"Не удалось переименовать объект: {exc}") from exc
 
     return dst_path
 
 
-def delete_path(path: str | Path, *, parent: Optional["QWidget"] = None) -> bool:
+def delete_path(path: str | os.PathLike[str]) -> None:
     """Удалить файл или каталог."""
 
     target = Path(path)
     if not target.exists():
-        _msg("Объект уже удалён или недоступен.", parent)
-        return False
+        raise FileNotFoundError("Объект уже удалён или недоступен.")
 
     try:
         if target.is_dir():
             shutil.rmtree(target)
         else:
             target.unlink()
-    except PermissionError:
-        _msg("Нет прав для удаления.", parent)
-        return False
-    except OSError as exc:  # noqa: BLE001
+    except PermissionError as exc:
+        raise PermissionError("Нет прав для удаления.") from exc
+    except OSError as exc:
         logger.exception("Не удалось удалить %s", target)
-        _msg(f"Не удалось удалить объект:\n{exc}", parent)
-        return False
-
-    return True
+        raise OSError(f"Не удалось удалить объект: {exc}") from exc
 
 
-def rename_client_folder(old_name: str, new_name: str, drive_link: str | None):
-    """Переименовывает папку клиента локально и на Google Drive.
+def rename_client_folder(
+    old_name: str,
+    new_name: str,
+    drive_link: str | None,
+    *,
+    gateway: DriveGateway,
+    base_path: str | os.PathLike[str] | None = None,
+) -> Tuple[str, str | None]:
+    """Переименовать папку клиента локально и на Google Drive."""
 
-    Возвращает кортеж:
-        (новый_локальный_путь, актуальная_web-ссылка_или_None)
-    """
-    # 1) локальный диск -------------------------------------------------
-    old_path = GOOGLE_DRIVE_LOCAL_ROOT / old_name
-    new_path = GOOGLE_DRIVE_LOCAL_ROOT / new_name
+    root = _resolve_base_path(gateway, base_path)
+    old_path = root / sanitize_name(old_name)
+    new_path = root / sanitize_name(new_name)
 
     try:
         if old_path.is_dir():
-            # если уже есть new_path, значит вручную переименовали — ничего не делаем
             if not new_path.is_dir():
                 old_path.rename(new_path)
         else:
-            # старой папки нет → просто создадим новую (чтобы не упасть)
             new_path.mkdir(parents=True, exist_ok=True)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.exception("Не удалось переименовать локальную папку клиента")
 
-    # 2) Google Drive ---------------------------------------------------
     if drive_link:
-        try:
-            service = get_drive_service()
-            file_id = extract_folder_id(drive_link)
-            if file_id:
-                service.files().update(
-                    fileId=file_id,
-                    body={"name": new_name},
-                    fields="id",  # ничего лишнего не запрашиваем
-                ).execute()
-            # ссылка вида .../folders/<id> остаётся валидной → можно вернуть как есть
-        except Exception:
-            logger.exception("Не удалось переименовать папку клиента на Drive")
+        file_id = extract_folder_id(drive_link)
+        if file_id:
+            try:
+                gateway.rename_drive_folder(file_id, new_name)
+            except Exception:  # noqa: BLE001
+                logger.exception("Не удалось переименовать папку клиента на Drive")
 
     return str(new_path), drive_link
 
@@ -548,23 +348,26 @@ def rename_deal_folder(
     new_client_name: str,
     new_description: str,
     drive_link: str | None,
-    current_path: str | None = None,
-) -> tuple[str, str | None]:
+    current_path: str | os.PathLike[str] | None = None,
+    *,
+    gateway: DriveGateway,
+    base_path: str | os.PathLike[str] | None = None,
+) -> Tuple[str, str | None]:
     """Переименовать или переместить папку сделки и вернуть новый путь."""
 
+    root = _resolve_base_path(gateway, base_path)
     default_old_path = (
-        GOOGLE_DRIVE_LOCAL_ROOT
+        root
         / sanitize_name(old_client_name)
         / sanitize_name(f"Сделка - {old_description}")
     )
-    # если передан фактический путь и он существует — используем его
     old_path = (
         Path(current_path)
         if current_path and Path(current_path).is_dir()
         else default_old_path
     )
     new_path = (
-        GOOGLE_DRIVE_LOCAL_ROOT
+        root
         / sanitize_name(new_client_name)
         / sanitize_name(f"Сделка - {new_description}")
     )
@@ -575,30 +378,21 @@ def rename_deal_folder(
             if not new_path.is_dir():
                 old_path.rename(new_path)
                 logger.info("📂 Папка сделки перемещена: %s → %s", old_path, new_path)
-            else:
-                logger.info("📂 Папка сделки уже в нужном месте: %s", new_path)
-        elif new_path.is_dir():
-            # папка уже в нужном месте (например, переименовали родителя)
-            logger.info("📂 Папка сделки уже в нужном месте: %s", new_path)
-        else:
-            _msg(f"Папка сделки не найдена: {old_path}\nСоздаю новую.", None)
+        elif not new_path.is_dir():
             new_path.mkdir(parents=True, exist_ok=True)
             logger.info("📁 Создана новая папка сделки: %s", new_path)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.exception("Не удалось переименовать локальную папку сделки")
 
     if drive_link:
-        try:
-            service = get_drive_service()
-            file_id = extract_folder_id(drive_link)
-            if file_id:
-                service.files().update(
-                    fileId=file_id,
-                    body={"name": sanitize_name(f"Сделка - {new_description}")},
-                    fields="id",
-                ).execute()
-        except Exception:
-            logger.exception("Не удалось переименовать папку сделки на Drive")
+        file_id = extract_folder_id(drive_link)
+        if file_id:
+            try:
+                gateway.rename_drive_folder(
+                    file_id, sanitize_name(f"Сделка - {new_description}")
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("Не удалось переименовать папку сделки на Drive")
 
     return str(new_path), drive_link
 
@@ -611,15 +405,19 @@ def rename_policy_folder(
     new_policy_number: str,
     new_deal_desc: str | None,
     drive_link: str | None,
-):
+    *,
+    gateway: DriveGateway,
+    base_path: str | os.PathLike[str] | None = None,
+) -> Tuple[str, str | None]:
     """Переименовать папку полиса."""
 
-    old_path = GOOGLE_DRIVE_LOCAL_ROOT / sanitize_name(old_client_name)
+    root = _resolve_base_path(gateway, base_path)
+    old_path = root / sanitize_name(old_client_name)
     if old_deal_desc:
         old_path /= sanitize_name(f"Сделка - {old_deal_desc}")
     old_path /= sanitize_name(f"Полис - {old_policy_number}")
 
-    new_path = GOOGLE_DRIVE_LOCAL_ROOT / sanitize_name(new_client_name)
+    new_path = root / sanitize_name(new_client_name)
     if new_deal_desc:
         new_path /= sanitize_name(f"Сделка - {new_deal_desc}")
     new_path /= sanitize_name(f"Полис - {new_policy_number}")
@@ -631,19 +429,16 @@ def rename_policy_folder(
                 old_path.rename(new_path)
         else:
             new_path.mkdir(parents=True, exist_ok=True)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.exception("Не удалось переименовать локальную папку полиса")
 
     file_id = extract_folder_id(drive_link) if is_drive_link(drive_link) else None
     if file_id:
         try:
-            service = get_drive_service()
-            service.files().update(
-                fileId=file_id,
-                body={"name": sanitize_name(f"Полис - {new_policy_number}")},
-                fields="id",
-            ).execute()
-        except Exception:
+            gateway.rename_drive_folder(
+                file_id, sanitize_name(f"Полис - {new_policy_number}")
+            )
+        except Exception:  # noqa: BLE001
             logger.exception("Не удалось переименовать папку полиса на Drive")
 
     return str(new_path), drive_link
@@ -653,72 +448,52 @@ def move_policy_folder_to_deal(
     policy_path: str | None,
     client_name: str,
     deal_description: str,
+    *,
+    gateway: DriveGateway,
+    base_path: str | os.PathLike[str] | None = None,
 ) -> str | None:
-    """Переместить папку полиса в папку сделки.
-
-    Parameters
-    ----------
-    policy_path: str | None
-        Текущий путь к папке полиса.
-    client_name: str
-        Имя клиента для формирования иерархии.
-    deal_description: str
-        Описание сделки.
-
-    Returns
-    -------
-    str | None
-        Новый путь к папке или ``None`` при ошибке.
-    """
+    """Переместить папку полиса в папку сделки."""
 
     if not policy_path:
         return None
 
+    root = _resolve_base_path(gateway, base_path)
     policy_name = Path(policy_path).name
-    client_name = sanitize_name(client_name)
-    deal_name = sanitize_name(f"Сделка - {deal_description}")
-    dest_dir = GOOGLE_DRIVE_LOCAL_ROOT / client_name / deal_name
+    dest_dir = (
+        root / sanitize_name(client_name) / sanitize_name(f"Сделка - {deal_description}")
+    )
     dest_dir.mkdir(parents=True, exist_ok=True)
     new_path = dest_dir / policy_name
 
     try:
         shutil.move(policy_path, new_path)
         logger.info("📁 Папка полиса перемещена: %s", new_path)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.exception("Не удалось переместить папку полиса")
         return None
 
     return str(new_path)
 
 
-def move_file_to_folder(file_path: str, folder_path: str) -> str | None:
-    """Переместить файл в указанную папку.
+def move_file_to_folder(
+    file_path: str | os.PathLike[str],
+    folder_path: str | os.PathLike[str],
+) -> str | None:
+    """Переместить файл в указанную папку."""
 
-    Parameters
-    ----------
-    file_path: str
-        Исходный путь к файлу.
-    folder_path: str
-        Назначение, куда переместить файл.
-
-    Returns
-    -------
-    str | None
-        Новый путь файла или ``None`` при ошибке.
-    """
-
-    if not file_path or not Path(file_path).is_file():
+    src = Path(file_path)
+    if not src.is_file():
         return None
 
     folder = Path(folder_path)
     folder.mkdir(parents=True, exist_ok=True)
-    dest = folder / Path(file_path).name
+    dest = folder / src.name
 
     try:
-        shutil.move(file_path, dest)
-        logger.info("📄 Файл полиса перемещён: %s", dest)
-    except Exception:
-        logger.exception("Не удалось переместить файл полиса")
+        shutil.move(str(src), dest)
+        logger.info("📄 Файл перемещён: %s", dest)
+    except Exception:  # noqa: BLE001
+        logger.exception("Не удалось переместить файл")
         return None
 
     return str(dest)

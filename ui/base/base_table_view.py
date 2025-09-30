@@ -602,7 +602,12 @@ class BaseTableView(QWidget):
             return
         path = getattr(obj, "drive_folder_path", None) or getattr(obj, "drive_folder_link", None)
         if path:
-            open_folder(path, parent=self)
+            try:
+                open_folder(path)
+            except Exception as exc:  # noqa: BLE001
+                from ui.common.message_boxes import show_error
+
+                show_error(str(exc))
 
     def open_selected_deal(self):
         """Открыть связанную сделку для выбранной строки."""
@@ -728,7 +733,15 @@ class BaseTableView(QWidget):
         act_open.triggered.connect(self._on_edit)
         act_delete.triggered.connect(self._on_delete)
         act_folder.triggered.connect(self.open_selected_folder)
-        act_copy.triggered.connect(lambda: copy_text_to_clipboard(text, parent=self))
+        def _copy_value() -> None:
+            try:
+                copy_text_to_clipboard(text)
+            except Exception as exc:  # noqa: BLE001
+                from ui.common.message_boxes import show_error
+
+                show_error(str(exc))
+
+        act_copy.triggered.connect(_copy_value)
         act_deal.triggered.connect(self.open_selected_deal)
         act_deal.setEnabled(bool(self.get_selected_deal()))
         act_folder.setEnabled(has_path)

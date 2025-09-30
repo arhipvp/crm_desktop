@@ -502,9 +502,13 @@ class PolicyTableView(BaseTableView):
         act_policy.triggered.connect(self.open_detail)
         act_delete.triggered.connect(self._on_delete)
         act_folder.triggered.connect(self.open_selected_folder)
-        act_copy.triggered.connect(
-            lambda: copy_text_to_clipboard(text, parent=self)
-        )
+        def _copy_value() -> None:
+            try:
+                copy_text_to_clipboard(text)
+            except Exception as exc:  # noqa: BLE001
+                show_error(str(exc))
+
+        act_copy.triggered.connect(_copy_value)
         act_deal.triggered.connect(self.open_selected_deal)
         act_deal.setEnabled(bool(self.get_selected_deal()))
         menu.exec(self.table.viewport().mapToGlobal(pos))

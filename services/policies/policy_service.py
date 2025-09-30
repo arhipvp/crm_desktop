@@ -14,6 +14,7 @@ from database.models import Client, Deal, Expense, Payment, Policy
 from services import executor_service as es
 from services.clients import get_client_by_id
 from services.deal_service import get_deal_by_id
+from services.container import get_drive_gateway
 from services.folder_utils import create_policy_folder, is_drive_link, open_folder
 from services.payment_service import (
     add_payment,
@@ -242,6 +243,7 @@ def mark_policy_deleted(policy_id: int):
             from services.folder_utils import rename_policy_folder
 
             new_number = f"{policy.policy_number} deleted"
+            gateway = get_drive_gateway()
             new_path, _ = rename_policy_folder(
                 policy.client.name,
                 policy.policy_number,
@@ -252,6 +254,7 @@ def mark_policy_deleted(policy_id: int):
                 policy.drive_folder_link
                 if is_drive_link(policy.drive_folder_link)
                 else None,
+                gateway=gateway,
             )
             policy.policy_number = new_number
             if new_path:
@@ -538,9 +541,13 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
 
     # ────────── Папка полиса ──────────
     deal_description = deal.description if deal else None
+    gateway = get_drive_gateway()
     try:
         folder_path = create_policy_folder(
-            client.name, policy.policy_number, deal_description
+            client.name,
+            policy.policy_number,
+            deal_description,
+            gateway=gateway,
         )
         if folder_path:
             policy.drive_folder_link = folder_path
@@ -763,6 +770,7 @@ def update_policy(
         try:
             from services.folder_utils import rename_policy_folder
 
+            gateway = get_drive_gateway()
             new_path, _ = rename_policy_folder(
                 old_client_name,
                 old_number,
@@ -773,6 +781,7 @@ def update_policy(
                 policy.drive_folder_link
                 if is_drive_link(policy.drive_folder_link)
                 else None,
+                gateway=gateway,
             )
             if new_path and new_path != policy.drive_folder_link:
                 policy.drive_folder_link = new_path

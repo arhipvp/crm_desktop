@@ -313,7 +313,10 @@ class DealFilesPanel(CollapsibleWidget):
         if not self._folder_path:
             return
 
-        open_folder(self._folder_path, parent=self)
+        try:
+            open_folder(self._folder_path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Открытие папки", str(exc))
 
     def _on_open_selected(self, index: QModelIndex | None = None) -> None:
         if not isinstance(index, QModelIndex):
@@ -342,7 +345,10 @@ class DealFilesPanel(CollapsibleWidget):
         if target is None:
             return
 
-        open_folder(str(target), parent=self)
+        try:
+            open_folder(str(target))
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Открытие папки", str(exc))
 
     def _on_create_folder(self) -> None:
         base_dir = self._target_directory_for_creation()
@@ -360,8 +366,16 @@ class DealFilesPanel(CollapsibleWidget):
             QMessageBox.warning(self, "Создание папки", "Имя не может быть пустым.")
             return
 
-        created = create_directory(base_dir / new_name, parent=self)
-        if created is None:
+        try:
+            created = create_directory(base_dir / new_name)
+        except FileExistsError as exc:
+            QMessageBox.warning(self, "Создание папки", str(exc))
+            return
+        except PermissionError as exc:
+            QMessageBox.critical(self, "Создание папки", str(exc))
+            return
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Создание папки", str(exc))
             return
 
         self._refresh_model(created)
@@ -379,8 +393,16 @@ class DealFilesPanel(CollapsibleWidget):
         if not accepted:
             return
 
-        renamed = rename_path(path, new_name, parent=self)
-        if renamed is None:
+        try:
+            renamed = rename_path(path, new_name)
+        except (FileNotFoundError, ValueError, FileExistsError) as exc:
+            QMessageBox.warning(self, "Переименование", str(exc))
+            return
+        except PermissionError as exc:
+            QMessageBox.critical(self, "Переименование", str(exc))
+            return
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Переименование", str(exc))
             return
 
         self._refresh_model(renamed)
@@ -414,9 +436,19 @@ class DealFilesPanel(CollapsibleWidget):
         )
 
         for path in deletion_paths:
-            if delete_path(path, parent=self):
-                deleted_any = True
-                parents_for_focus.append(path.parent)
+            try:
+                delete_path(path)
+            except FileNotFoundError as exc:
+                QMessageBox.warning(self, "Удаление", str(exc))
+                continue
+            except PermissionError as exc:
+                QMessageBox.critical(self, "Удаление", str(exc))
+                continue
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.critical(self, "Удаление", str(exc))
+                continue
+            deleted_any = True
+            parents_for_focus.append(path.parent)
 
         if not deleted_any:
             return

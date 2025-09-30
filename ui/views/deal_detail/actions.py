@@ -9,6 +9,7 @@ from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QDialog, QInputDialog, QMessageBox, QProgressDialog
 
 from database.models import Deal
+from services.container import get_drive_gateway
 from services.deal_service import (
     get_deal_by_id,
     get_next_deal,
@@ -324,10 +325,12 @@ class DealActionsMixin:
             from services.folder_utils import create_deal_folder
 
             if confirm("Папка не найдена. Создать новую?"):
+                gateway = get_drive_gateway()
                 new_path, link = create_deal_folder(
                     self.instance.client.name,
                     self.instance.description,
                     client_drive_link=self.instance.client.drive_folder_link,
+                    gateway=gateway,
                 )
                 self.instance.drive_folder_path = new_path
                 self.instance.drive_folder_link = link
@@ -340,13 +343,18 @@ class DealActionsMixin:
             else:
                 return
 
-        open_folder(path, parent=self)
+        try:
+            open_folder(path)
+        except Exception as exc:  # noqa: BLE001
+            show_error(str(exc))
 
     def _copy_folder_path(self):
-        copy_path_to_clipboard(
-            self.instance.drive_folder_path or self.instance.drive_folder_link,
-            parent=self,
-        )
+        try:
+            copy_path_to_clipboard(
+                self.instance.drive_folder_path or self.instance.drive_folder_link
+            )
+        except Exception as exc:  # noqa: BLE001
+            show_error(str(exc))
 
     def _ensure_local_folder(self) -> str | None:
         """Ensure local deal folder exists and return its path."""
@@ -358,10 +366,12 @@ class DealActionsMixin:
         from ui.common.message_boxes import confirm
 
         if confirm("Папка не найдена. Создать новую?"):
+            gateway = get_drive_gateway()
             new_path, link = create_deal_folder(
                 self.instance.client.name,
                 self.instance.description,
                 client_drive_link=self.instance.client.drive_folder_link,
+                gateway=gateway,
             )
             self.instance.drive_folder_path = new_path
             self.instance.drive_folder_link = link
@@ -380,7 +390,7 @@ class DealActionsMixin:
             for i, src in enumerate(files, 1):
                 if dlg.wasCanceled():
                     break
-                move_file_to_folder(src, dest)
+                    move_file_to_folder(src, dest)
                 dlg.setValue(i)
         finally:
             dlg.close()

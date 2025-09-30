@@ -84,7 +84,10 @@ class ClientTableView(BaseTableView):
         if not client:
             return
         path = client.drive_folder_path or client.drive_folder_link
-        open_folder(path, parent=self)
+        try:
+            open_folder(path)
+        except Exception as exc:  # noqa: BLE001
+            show_error(str(exc))
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
         """Обновляет параметры сортировки и перезагружает таблицу."""
