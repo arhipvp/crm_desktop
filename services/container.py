@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from core.app_context import AppContext, get_app_context
+from core.app_context import get_app_context
 from infrastructure.drive_gateway import DriveGateway
 from infrastructure.sheets_gateway import SheetsGateway
 from services.sheets_service import (
@@ -34,10 +34,7 @@ def get_sheets_sync_service() -> SheetsSyncService:
     return get_app_context().sheets_sync_service
 
 
-app_context: AppContext = get_app_context()
-
 __all__ = [
-    "app_context",
     "get_app_context",
     "get_drive_gateway",
     "get_sheets_gateway",
