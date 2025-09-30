@@ -115,6 +115,7 @@ import services.task_notifications as tn
 from services import executor_service as es
 from services.clients import client_service as cs
 from services import calculation_service as calc_s
+from services.container import get_sheets_sync_service
 from services.deal_service import get_deal_by_id
 
 es.ensure_executors_from_env()
@@ -156,8 +157,7 @@ def fmt_task(t: Task) -> str:
     if t.note:
         lines.append(f"\n📝 {t.note.strip()}")
 
-    from services.sheets_service import tasks_sheet_url
-    url = tasks_sheet_url()
+    url = get_sheets_sync_service().tasks_sheet_url()
     if url:
         lines.append(f"\n<a href=\"{url}\">📊 Таблица задач</a>")
 

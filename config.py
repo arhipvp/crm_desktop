@@ -26,6 +26,9 @@ class Settings:
     drive_root_folder_id: str | None = "1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm"
     drive_service_account_file: str = "credentials.json"
     google_drive_local_root: str = r"G:\\Мой диск\\Клиенты"
+    sheets_service_account_file: str = "credentials.json"
+    google_sheets_tasks_id: str | None = None
+    google_sheets_calculations_id: str | None = None
 
 
 @lru_cache()
@@ -60,4 +63,9 @@ def get_settings() -> Settings:
         google_drive_local_root=os.getenv(
             "GOOGLE_DRIVE_LOCAL_ROOT", r"G:\\Мой диск\\Клиенты"
         ),
+        sheets_service_account_file=os.getenv(
+            "GOOGLE_CREDENTIALS", "credentials.json"
+        ),
+        google_sheets_tasks_id=os.getenv("GOOGLE_SHEETS_TASKS_ID"),
+        google_sheets_calculations_id=os.getenv("GOOGLE_SHEETS_CALCULATIONS_ID"),
     )

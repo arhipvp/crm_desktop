@@ -1,225 +1,260 @@
-"""Работа с Google Sheets для синхронизации задач."""
+"""Сервисы синхронизации данных с Google Sheets."""
 
 from __future__ import annotations
 
-import os
 import logging
 import re
-from functools import lru_cache
+from dataclasses import dataclass
 from datetime import date
+from typing import Iterable
 
-try:
-    from google.oauth2.service_account import Credentials
-    from googleapiclient.discovery import build
-except Exception:  # noqa: BLE001
-    Credentials = None  # type: ignore[assignment]
-    build = lambda *a, **k: None  # type: ignore[assignment]
-
-from database.models import Task
+from config import Settings
+from database.db import db
+from database.models import DealCalculation, Task
+from infrastructure.sheets_gateway import SheetsGateway
+from services.calculation_service import add_calculation
 from services.task_crud import add_task, update_task
 from services.validators import normalize_company_name
 
 logger = logging.getLogger(__name__)
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_CREDENTIALS", "credentials.json")
-GOOGLE_SHEETS_TASKS_ID = os.getenv("GOOGLE_SHEETS_TASKS_ID")
-GOOGLE_SHEETS_CALCULATIONS_ID = os.getenv("GOOGLE_SHEETS_CALCULATIONS_ID")
+
+@dataclass(frozen=True)
+class TaskRow:
+    """Строка задачи из таблицы."""
+
+    title: str
+    due_date: date
+    note: str | None = None
 
 
-@lru_cache(maxsize=1)
-def get_service():
-    """Создать и кешировать клиент Google Sheets."""
-    if Credentials is None:
-        raise RuntimeError("Google Sheets libraries are not available")
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    return build("sheets", "v4", credentials=creds)
+@dataclass(frozen=True)
+class CalculationRow:
+    """Строка расчёта сделки из таблицы."""
+
+    deal_id: int
+    insurance_company: str | None
+    insurance_type: str | None
+    insured_amount: float | None
+    premium: float | None
+    deductible: float | None
+    note: str | None
 
 
-def read_sheet(spreadsheet_id: str, range_name: str) -> list[list[str]]:
-    """Получить диапазон значений из таблицы."""
-    service = get_service()
-    result = (
-        service.spreadsheets()
-        .values()
-        .get(spreadsheetId=spreadsheet_id, range=range_name)
-        .execute()
-    )
-    return result.get("values", [])
+class TaskRepository:
+    """Работа с задачами в базе данных."""
+
+    def find_by_title_and_due_date(self, title: str, due: date) -> Task | None:
+        return Task.get_or_none((Task.title == title) & (Task.due_date == due))
+
+    def create_task(self, row: TaskRow) -> Task:
+        with db.atomic():
+            return add_task(title=row.title, due_date=row.due_date, note=row.note)
+
+    def update_task_note(self, task: Task, note: str | None) -> Task:
+        with db.atomic():
+            return update_task(task, note=note)
 
 
-def append_rows(spreadsheet_id: str, range_name: str, rows: list[list[str]]) -> None:
-    """Добавить строки в таблицу."""
-    service = get_service()
-    service.spreadsheets().values().append(
-        spreadsheetId=spreadsheet_id,
-        range=range_name,
-        valueInputOption="USER_ENTERED",
-        body={"values": rows},
-    ).execute()
+class DealCalculationRepository:
+    """Работа с расчётами сделок."""
 
-
-def tasks_sheet_url() -> str | None:
-    """Ссылка на таблицу задач из переменной окружения."""
-    if not GOOGLE_SHEETS_TASKS_ID:
-        return None
-    return f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEETS_TASKS_ID}"
-
-
-def calculations_sheet_url() -> str | None:
-    """Ссылка на таблицу расчётов из переменной окружения."""
-    if not GOOGLE_SHEETS_CALCULATIONS_ID:
-        return None
-    return f"https://docs.google.com/spreadsheets/d/{GOOGLE_SHEETS_CALCULATIONS_ID}"
-
-
-def fetch_tasks() -> list[dict]:
-    """Считать задачи из таблицы и вернуть список словарей."""
-    if not GOOGLE_SHEETS_TASKS_ID:
-        return []
-    rows = read_sheet(GOOGLE_SHEETS_TASKS_ID, "A1:Z")
-    if not rows:
-        return []
-    headers = [h.strip().lower() for h in rows[0]]
-    data: list[dict] = []
-    for raw in rows[1:]:
-        item = {h: (raw[i] if i < len(raw) else "") for i, h in enumerate(headers)}
-        data.append(item)
-    return data
-
-
-def fetch_calculations() -> list[dict]:
-    """Считать расчёты из таблицы и вернуть список словарей."""
-    if not GOOGLE_SHEETS_CALCULATIONS_ID:
-        return []
-    rows = read_sheet(GOOGLE_SHEETS_CALCULATIONS_ID, "A1:Z")
-    if not rows:
-        return []
-    headers = [h.strip().lower() for h in rows[0]]
-    data: list[dict] = []
-    for raw in rows[1:]:
-        item = {h: (raw[i] if i < len(raw) else "") for i, h in enumerate(headers)}
-        data.append(item)
-    return data
-
-
-def clear_rows(spreadsheet_id: str, start: int, end: int) -> None:
-    """Очистить строки в указанном диапазоне (включительно)."""
-    service = get_service()
-    rng = f"A{start}:Z{end}"
-    service.spreadsheets().values().clear(
-        spreadsheetId=spreadsheet_id, range=rng, body={}
-    ).execute()
-
-
-def _parse_date(value: str) -> date | None:
-    value = value.strip()
-    if not value:
-        return None
-    try:
-        return date.fromisoformat(value)
-    except Exception:
-        try:
-            # формат dd.mm.yyyy
-            d, m, y = value.split(".")
-            return date(int(y), int(m), int(d))
-        except Exception:
-            return None
-
-
-def _to_float(value: str | None) -> float | None:
-    """Попытаться преобразовать строку в число."""
-    if value is None:
-        return None
-    cleaned = re.sub(r"\s+", "", value)
-    # извлечь первую группу цифр с возможной десятичной точкой
-    match = re.search(r"[-+]?\d*[\.,]?\d+", cleaned)
-    if not match:
-        return None
-    number = match.group(0).replace(",", ".")
-    try:
-        return float(number)
-    except Exception:
-        return None
-
-
-def sync_tasks_from_sheet() -> int:
-    """Синхронизировать задачи из Google Sheets с локальной БД."""
-    tasks = fetch_tasks()
-    added = 0
-    for item in tasks:
-        title = item.get("title") or item.get("задача") or item.get("task")
-        due = _parse_date(item.get("due_date", "")) or date.today()
-        note = item.get("note")
-        if not title:
-            continue
-        existing = Task.get_or_none((Task.title == title) & (Task.due_date == due))
-        if existing:
-            update_task(existing, note=note)
-        else:
-            add_task(title=title, due_date=due, note=note)
-            added += 1
-    return added
-
-
-def sync_calculations_from_sheet() -> int:
-    """Синхронизировать расчёты из Google Sheets с локальной БД."""
-    logger.debug("Начинаем синхронизацию расчётов")
-    if not GOOGLE_SHEETS_CALCULATIONS_ID:
-        logger.debug("GOOGLE_SHEETS_CALCULATIONS_ID не задан")
-        return 0
-    from services.calculation_service import add_calculation
-    from database.models import DealCalculation
-
-    rows = fetch_calculations()
-    logger.debug("Получено %s строк из листа", len(rows))
-    if not rows:
-        return 0
-    added = 0
-    for item in rows:
-        try:
-            deal_id = int(item.get("deal_id", 0))
-        except Exception:
-            continue
-        params = {
-            "insurance_company": normalize_company_name(
-                item.get("insurance_company", "")
-            )
-            if item.get("insurance_company")
-            else None,
-            "insurance_type": item.get("insurance_type"),
-            "insured_amount": _to_float(item.get("insured_amount")),
-            "premium": _to_float(item.get("premium")),
-            "deductible": _to_float(item.get("deductible")),
-            "note": item.get("note"),
-        }
-
-        # skip rows where all params are empty
-        if all(v is None or v == "" for v in params.values()):
-            continue
-
-        exists = (
+    def exists(self, row: CalculationRow) -> bool:
+        return (
             DealCalculation.select()
             .where(
-                (DealCalculation.deal_id == deal_id)
+                (DealCalculation.deal_id == row.deal_id)
                 & (DealCalculation.is_deleted == False)
-                & (DealCalculation.insurance_company == params["insurance_company"])
-                & (DealCalculation.insurance_type == params["insurance_type"])
-                & (DealCalculation.insured_amount == params["insured_amount"])
-                & (DealCalculation.premium == params["premium"])
-                & (DealCalculation.deductible == params["deductible"])
-                & (DealCalculation.note == params["note"])
+                & (DealCalculation.insurance_company == row.insurance_company)
+                & (DealCalculation.insurance_type == row.insurance_type)
+                & (DealCalculation.insured_amount == row.insured_amount)
+                & (DealCalculation.premium == row.premium)
+                & (DealCalculation.deductible == row.deductible)
+                & (DealCalculation.note == row.note)
             )
             .exists()
         )
-        if exists:
-            continue
-        try:
-            from database.db import db
-            with db.atomic():
-                add_calculation(deal_id, **params)
+
+    def add(self, row: CalculationRow) -> None:
+        with db.atomic():
+            add_calculation(
+                row.deal_id,
+                insurance_company=row.insurance_company,
+                insurance_type=row.insurance_type,
+                insured_amount=row.insured_amount,
+                premium=row.premium,
+                deductible=row.deductible,
+                note=row.note,
+            )
+
+
+class SheetsSyncService:
+    """Оркестратор синхронизации Google Sheets с локальной базой."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        gateway: SheetsGateway,
+        task_repository: TaskRepository,
+        calculation_repository: DealCalculationRepository,
+    ) -> None:
+        self._settings = settings
+        self._gateway = gateway
+        self._task_repository = task_repository
+        self._calculation_repository = calculation_repository
+
+    # ─────────────────────────── публичные методы ───────────────────────────
+
+    def tasks_sheet_url(self) -> str | None:
+        sheet_id = self._settings.google_sheets_tasks_id
+        if not sheet_id:
+            return None
+        return f"https://docs.google.com/spreadsheets/d/{sheet_id}"
+
+    def calculations_sheet_url(self) -> str | None:
+        sheet_id = self._settings.google_sheets_calculations_id
+        if not sheet_id:
+            return None
+        return f"https://docs.google.com/spreadsheets/d/{sheet_id}"
+
+    def fetch_tasks(self) -> list[dict[str, str]]:
+        sheet_id = self._settings.google_sheets_tasks_id
+        if not sheet_id:
+            return []
+        rows = self._gateway.read_sheet(sheet_id, "A1:Z")
+        return self._rows_to_dicts(rows)
+
+    def fetch_calculations(self) -> list[dict[str, str]]:
+        sheet_id = self._settings.google_sheets_calculations_id
+        if not sheet_id:
+            return []
+        rows = self._gateway.read_sheet(sheet_id, "A1:Z")
+        return self._rows_to_dicts(rows)
+
+    def sync_tasks(self) -> int:
+        added = 0
+        for row in self._iter_task_rows(self.fetch_tasks()):
+            existing = self._task_repository.find_by_title_and_due_date(
+                row.title, row.due_date
+            )
+            if existing:
+                self._task_repository.update_task_note(existing, row.note)
+                continue
+            self._task_repository.create_task(row)
             added += 1
-        except Exception:
-            logger.exception("Не удалось добавить расчёт для %s", deal_id)
-    logger.debug("Добавлено %s расчётов из листа", added)
-    return added
+        return added
+
+    def sync_calculations(self) -> int:
+        logger.debug("Начинаем синхронизацию расчётов из Google Sheets")
+        added = 0
+        for row in self._iter_calculation_rows(self.fetch_calculations()):
+            if self._calculation_repository.exists(row):
+                continue
+            try:
+                self._calculation_repository.add(row)
+                added += 1
+            except Exception:  # noqa: BLE001
+                logger.exception("Не удалось добавить расчёт для сделки %s", row.deal_id)
+        logger.debug("Добавлено %s расчётов из листа", added)
+        return added
+
+    # ─────────────────────────── внутренние методы ──────────────────────────
+
+    @staticmethod
+    def _rows_to_dicts(rows: list[list[str]]) -> list[dict[str, str]]:
+        if not rows:
+            return []
+        headers = [h.strip().lower() for h in rows[0]]
+        result: list[dict[str, str]] = []
+        for raw in rows[1:]:
+            item: dict[str, str] = {}
+            for index, header in enumerate(headers):
+                item[header] = raw[index] if index < len(raw) else ""
+            result.append(item)
+        return result
+
+    def _iter_task_rows(self, rows: Iterable[dict[str, str]]) -> Iterable[TaskRow]:
+        for item in rows:
+            title = item.get("title") or item.get("задача") or item.get("task")
+            if not title:
+                continue
+            due = self._parse_date(item.get("due_date", "")) or date.today()
+            note = item.get("note") or None
+            yield TaskRow(title=title, due_date=due, note=note)
+
+    def _iter_calculation_rows(
+        self, rows: Iterable[dict[str, str]]
+    ) -> Iterable[CalculationRow]:
+        for item in rows:
+            try:
+                deal_id = int(item.get("deal_id", 0))
+            except Exception:
+                continue
+
+            insurance_company_raw = item.get("insurance_company")
+            insurance_company = (
+                normalize_company_name(insurance_company_raw)
+                if insurance_company_raw
+                else None
+            )
+            row = CalculationRow(
+                deal_id=deal_id,
+                insurance_company=insurance_company,
+                insurance_type=item.get("insurance_type") or None,
+                insured_amount=self._to_float(item.get("insured_amount")),
+                premium=self._to_float(item.get("premium")),
+                deductible=self._to_float(item.get("deductible")),
+                note=item.get("note") or None,
+            )
+
+            if all(value in {None, ""} for value in (
+                row.insurance_company,
+                row.insurance_type,
+                row.insured_amount,
+                row.premium,
+                row.deductible,
+                row.note,
+            )):
+                continue
+
+            yield row
+
+    @staticmethod
+    def _parse_date(value: str | None) -> date | None:
+        if not value:
+            return None
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return date.fromisoformat(text)
+        except Exception:  # noqa: BLE001
+            try:
+                day, month, year = text.split(".")
+                return date(int(year), int(month), int(day))
+            except Exception:  # noqa: BLE001
+                return None
+
+    @staticmethod
+    def _to_float(value: str | None) -> float | None:
+        if value is None:
+            return None
+        cleaned = re.sub(r"\s+", "", value)
+        match = re.search(r"[-+]?\d*[\.,]?\d+", cleaned)
+        if not match:
+            return None
+        number = match.group(0).replace(",", ".")
+        try:
+            return float(number)
+        except Exception:  # noqa: BLE001
+            return None
+
+
+__all__ = [
+    "SheetsSyncService",
+    "TaskRepository",
+    "DealCalculationRepository",
+    "TaskRow",
+    "CalculationRow",
+]
+
