@@ -8,7 +8,8 @@ from typing import Any
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox, QProgressDialog
 
-from services.deal_service import mark_deal_deleted
+from database.models import Deal
+from services.deal_service import get_deal_by_id, mark_deal_deleted
 from ui.base.table_controller import TableController
 
 from .deal_app_service import DealAppService, deal_app_service
@@ -39,6 +40,11 @@ class DealTableController(TableController):
         gateway = getattr(context, "drive_gateway", None) if context else None
         for deal in deals:
             mark_deal_deleted(deal.id, gateway=gateway)
+
+    def load_deal(self, deal_id: int) -> Deal | None:
+        """Возвращает сделку по идентификатору или ``None``."""
+
+        return get_deal_by_id(deal_id)
 
     def get_statuses(self) -> list[str]:
         return list(self.service.get_statuses())
