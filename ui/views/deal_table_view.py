@@ -262,15 +262,41 @@ class DealTableView(BaseTableView):
                 dlg.exec()
 
     def edit_selected(self, _=None):
+        self.edit_selected_default()
+
+    def edit_selected_default(self) -> None:
         dto = self.get_selected()
         if not dto:
             return
+
         instance = self._load_deal_instance(dto.id)
         if instance is None:
             return
-        dlg = DealDetailView(instance, parent=self, context=self._context)
-        dlg.exec()
-        self.refresh()
+
+        if self.detail_view_class:
+            kwargs = {"parent": self}
+            if getattr(self, "_context", None) is not None:
+                kwargs["context"] = self._context
+            try:
+                dlg = self.detail_view_class(instance, **kwargs)
+            except TypeError:
+                kwargs.pop("context", None)
+                dlg = self.detail_view_class(instance, **kwargs)
+            dlg.exec()
+            self.refresh()
+            return
+
+        if self.form_class:
+            form_kwargs = {"parent": self}
+            if getattr(self, "_context", None) is not None:
+                form_kwargs["context"] = self._context
+            try:
+                form = self.form_class(instance, **form_kwargs)
+            except TypeError:
+                form_kwargs.pop("context", None)
+                form = self.form_class(instance, **form_kwargs)
+            if form.exec():
+                self.refresh()
 
     def open_detail(self, _=None):
         dto = self.get_selected()
