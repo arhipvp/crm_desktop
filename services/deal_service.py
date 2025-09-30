@@ -159,23 +159,27 @@ def add_deal_from_policy(policy: Policy) -> Deal:
         reminder_date=reminder_date,
     )
 
+    new_folder_path = None
     try:
         from services.folder_utils import move_policy_folder_to_deal
 
         gateway = get_drive_gateway()
-        new_path = move_policy_folder_to_deal(
+        new_folder_path = move_policy_folder_to_deal(
             policy.drive_folder_link,
             policy.client.name,
             deal.description,
             gateway=gateway,
         )
-        if new_path:
-            policy.drive_folder_link = new_path
+        if new_folder_path:
+            policy.drive_folder_path = new_folder_path
     except Exception:
         logger.exception("Не удалось переместить папку полиса")
 
     policy.deal = deal
-    policy.save()
+    fields_to_update = [Policy.deal]
+    if new_folder_path:
+        fields_to_update.append(Policy.drive_folder_path)
+    policy.save(only=fields_to_update)
     return deal
 
 
@@ -207,6 +211,7 @@ def add_deal_from_policies(policies: list[Policy]) -> Deal:
 
     gateway = get_drive_gateway()
     for policy in rest:
+        new_path = None
         try:
             new_path = move_policy_folder_to_deal(
                 policy.drive_folder_link,
@@ -215,11 +220,14 @@ def add_deal_from_policies(policies: list[Policy]) -> Deal:
                 gateway=gateway,
             )
             if new_path:
-                policy.drive_folder_link = new_path
+                policy.drive_folder_path = new_path
         except Exception:
             logger.exception("Не удалось переместить папку полиса")
         policy.deal = deal
-        policy.save()
+        fields_to_update = [Policy.deal]
+        if new_path:
+            fields_to_update.append(Policy.drive_folder_path)
+        policy.save(only=fields_to_update)
 
     return deal
 

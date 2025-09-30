@@ -244,7 +244,7 @@ def mark_policy_deleted(policy_id: int):
 
             new_number = f"{policy.policy_number} deleted"
             gateway = get_drive_gateway()
-            new_path, _ = rename_policy_folder(
+            new_path, new_link = rename_policy_folder(
                 policy.client.name,
                 policy.policy_number,
                 policy.deal.description if policy.deal_id else None,
@@ -257,11 +257,14 @@ def mark_policy_deleted(policy_id: int):
                 gateway=gateway,
             )
             policy.policy_number = new_number
-            if new_path:
-                policy.drive_folder_link = new_path
-            policy.save(
-                only=[Policy.policy_number, Policy.drive_folder_link, Policy.is_deleted]
-            )
+            fields_to_update = [Policy.policy_number, Policy.is_deleted]
+            if new_path and new_path != policy.drive_folder_path:
+                policy.drive_folder_path = new_path
+                fields_to_update.append(Policy.drive_folder_path)
+            if new_link and new_link != policy.drive_folder_link:
+                policy.drive_folder_link = new_link
+                fields_to_update.append(Policy.drive_folder_link)
+            policy.save(only=fields_to_update)
             logger.info(
                 "Полис id=%s №%s помечен удалённым",
                 policy.id,
@@ -550,8 +553,8 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
             gateway=gateway,
         )
         if folder_path:
-            policy.drive_folder_link = folder_path
-            policy.save()
+            policy.drive_folder_path = folder_path
+            policy.save(only=[Policy.drive_folder_path])
             logger.info(
                 "📁 Папка полиса id=%s №%s создана: %s",
                 policy.id,
@@ -771,7 +774,7 @@ def update_policy(
             from services.folder_utils import rename_policy_folder
 
             gateway = get_drive_gateway()
-            new_path, _ = rename_policy_folder(
+            new_path, new_link = rename_policy_folder(
                 old_client_name,
                 old_number,
                 old_deal_desc,
@@ -783,9 +786,15 @@ def update_policy(
                 else None,
                 gateway=gateway,
             )
-            if new_path and new_path != policy.drive_folder_link:
-                policy.drive_folder_link = new_path
-                policy.save(only=[Policy.drive_folder_link])
+            fields_to_update = []
+            if new_path and new_path != policy.drive_folder_path:
+                policy.drive_folder_path = new_path
+                fields_to_update.append(Policy.drive_folder_path)
+            if new_link and new_link != policy.drive_folder_link:
+                policy.drive_folder_link = new_link
+                fields_to_update.append(Policy.drive_folder_link)
+            if fields_to_update:
+                policy.save(only=fields_to_update)
         except Exception:
             logger.exception(
                 "Не удалось переименовать папку полиса id=%s №%s",
