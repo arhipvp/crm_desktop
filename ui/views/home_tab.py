@@ -16,6 +16,7 @@ from PySide6.QtCharts import (
     QValueAxis,
 )
 
+from core.app_context import AppContext, get_app_context
 from services.dashboard_service import (
     get_basic_stats,
     count_sent_tasks,
@@ -35,8 +36,9 @@ from ui.views.deal_detail import DealDetailView
 class HomeTab(QWidget):
     """Стартовая страница со сводной информацией."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, context: AppContext | None = None):
         super().__init__(parent)
+        self._context: AppContext | None = context
         layout = QVBoxLayout(self)
         title = QLabel("<h2>Добро пожаловать в CRM</h2>")
         layout.addWidget(title)
@@ -187,9 +189,18 @@ class HomeTab(QWidget):
     def open_deal_detail(self, item):
         deal = item.data(Qt.UserRole)
         if deal:
-            dlg = DealDetailView(deal, parent=self)
+            dlg = DealDetailView(
+                deal,
+                parent=self,
+                context=self._get_context(),
+            )
             dlg.exec()
             self.update_stats()
+
+    def _get_context(self) -> AppContext:
+        if self._context is None:
+            self._context = get_app_context()
+        return self._context
 
     def update_reminder_chart(self):
         counts = get_deal_reminder_counts()

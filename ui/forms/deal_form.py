@@ -4,6 +4,7 @@ from PySide6.QtCore import QDate
 
 from PySide6.QtWidgets import QHBoxLayout, QWidget
 
+from core.app_context import AppContext, get_app_context
 from database.models import Deal, DealStatus
 from services.deal_service import add_deal, update_deal
 from ui.base.base_edit_form import BaseEditForm
@@ -18,7 +19,8 @@ class DealForm(BaseEditForm):
     EXTRA_HIDDEN = {"is_closed", "closed_reason"}
     form_columns = 1
 
-    def __init__(self, deal=None, parent=None):
+    def __init__(self, deal=None, parent=None, *, context: AppContext | None = None):
+        self._context: AppContext | None = context or getattr(parent, "_context", None)
         super().__init__(
             instance=deal, model_class=Deal, entity_name="сделку", parent=parent
         )
@@ -72,6 +74,11 @@ class DealForm(BaseEditForm):
             saved_id = saved.id if saved else None
             self.refresh_client_combo(saved_id)
 
+    def _get_drive_gateway(self):
+        if self._context is None:
+            self._context = get_app_context()
+        return self._context.drive_gateway
+
     def collect_data(self):
         data = super().collect_data()
         # снимаем client_id из комбобокса
@@ -112,10 +119,17 @@ class DealForm(BaseEditForm):
             cmp = {k: v for k, v in data.items() if k != "journal_entry"}
             if all(getattr(self.instance, k) == v for k, v in cmp.items()) and "journal_entry" not in data:
                 return self.instance  # нет изменений
-            return update_deal(self.instance, **data)
+            return update_deal(
+                self.instance,
+                gateway=self._get_drive_gateway(),
+                **data,
+            )
 
         else:
             # при создании сделка всегда открыта
             data["is_closed"] = False
-            self.instance = add_deal(**data)
+            self.instance = add_deal(
+                gateway=self._get_drive_gateway(),
+                **data,
+            )
             return self.instance

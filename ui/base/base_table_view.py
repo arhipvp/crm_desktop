@@ -615,7 +615,9 @@ class BaseTableView(QWidget):
         if not deal:
             return
         from ui.views.deal_detail import DealDetailView
-        DealDetailView(deal, parent=self).exec()
+
+        context = getattr(self, "_context", None)
+        DealDetailView(deal, parent=self, context=context).exec()
 
     def export_csv(self, path: str | None = None, *, all_rows: bool = False, **_):
         """Экспорт объектов в CSV.

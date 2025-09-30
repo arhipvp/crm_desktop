@@ -15,6 +15,8 @@ from utils.time_utils import now_str
 
 from peewee import JOIN, ModelSelect, Model  # если ещё не импортирован
 
+from core.app_context import get_app_context
+from infrastructure.drive_gateway import DriveGateway
 from database.db import db
 from database.models import (
     Client,
@@ -26,7 +28,6 @@ from database.models import (
 )
 from services.clients import get_client_by_id
 from services.query_utils import apply_search_and_filters
-from services.container import get_drive_gateway
 from services.folder_utils import (
     create_deal_folder,
     find_drive_folder,
@@ -36,6 +37,10 @@ from services.folder_utils import (
 from services import deal_journal
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_gateway(gateway: DriveGateway | None) -> DriveGateway:
+    return gateway or get_app_context().drive_gateway
 
 # ──────────────────────────── Получение ─────────────────────────────
 
@@ -67,7 +72,7 @@ def get_distinct_statuses() -> list[str]:
 # ──────────────────────────── Добавление ─────────────────────────────
 
 
-def add_deal(**kwargs):
+def add_deal(*, gateway: DriveGateway | None = None, **kwargs):
     """Создаёт новую сделку.
 
     Обязательные поля: ``client_id``, ``start_date``, ``description``.
@@ -116,13 +121,13 @@ def add_deal(**kwargs):
         )
 
         # ───── создание папки сделки ─────
-        gateway = get_drive_gateway()
         try:
+            resolved_gateway = _resolve_gateway(gateway)
             local_path, web_link = create_deal_folder(
                 client.name,
                 deal.description,
                 client_drive_link=client.drive_folder_link,
-                gateway=gateway,
+                gateway=resolved_gateway,
             )
             logger.info("📁 Папка сделки создана: %s", local_path)
             if web_link:
@@ -136,7 +141,9 @@ def add_deal(**kwargs):
         return deal
 
 
-def add_deal_from_policy(policy: Policy) -> Deal:
+def add_deal_from_policy(
+    policy: Policy, *, gateway: DriveGateway | None = None
+) -> Deal:
     """Создаёт сделку на основе полиса и привязывает полис к ней."""
 
     parts = []
@@ -153,6 +160,7 @@ def add_deal_from_policy(policy: Policy) -> Deal:
     reminder_date = start_date + relativedelta(months=9)
 
     deal = add_deal(
+        gateway=gateway,
         client_id=policy.client_id,
         start_date=start_date,
         description=description,
@@ -163,12 +171,12 @@ def add_deal_from_policy(policy: Policy) -> Deal:
     try:
         from services.folder_utils import move_policy_folder_to_deal
 
-        gateway = get_drive_gateway()
+        resolved_gateway = _resolve_gateway(gateway)
         new_folder_path = move_policy_folder_to_deal(
             policy.drive_folder_link,
             policy.client.name,
             deal.description,
-            gateway=gateway,
+            gateway=resolved_gateway,
         )
         if new_folder_path:
             policy.drive_folder_path = new_folder_path
@@ -183,7 +191,9 @@ def add_deal_from_policy(policy: Policy) -> Deal:
     return deal
 
 
-def add_deal_from_policies(policies: list[Policy]) -> Deal:
+def add_deal_from_policies(
+    policies: list[Policy], *, gateway: DriveGateway | None = None
+) -> Deal:
     """Создаёт сделку и привязывает к ней несколько полисов.
 
     Первая политика используется для формирования описания сделки,
@@ -205,11 +215,11 @@ def add_deal_from_policies(policies: list[Policy]) -> Deal:
         raise ValueError("Нет полисов для создания сделки")
 
     first, *rest = policies
-    deal = add_deal_from_policy(first)
+    deal = add_deal_from_policy(first, gateway=gateway)
 
     from services.folder_utils import move_policy_folder_to_deal
 
-    gateway = get_drive_gateway()
+    resolved_gateway = _resolve_gateway(gateway)
     for policy in rest:
         new_path = None
         try:
@@ -217,7 +227,7 @@ def add_deal_from_policies(policies: list[Policy]) -> Deal:
                 policy.drive_folder_link,
                 policy.client.name,
                 deal.description,
-                gateway=gateway,
+                gateway=resolved_gateway,
             )
             if new_path:
                 policy.drive_folder_path = new_path
@@ -235,7 +245,13 @@ def add_deal_from_policies(policies: list[Policy]) -> Deal:
 # ──────────────────────────── Обновление ─────────────────────────────
 
 
-def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
+def update_deal(
+    deal: Deal,
+    *,
+    journal_entry: str | None = None,
+    gateway: DriveGateway | None = None,
+    **kwargs,
+):
     """Обновляет сделку.
 
     Параметр ``journal_entry`` добавляет запись в журнал ``Deal.calculations``.
@@ -314,7 +330,7 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
             try:
                 from services.folder_utils import rename_deal_folder
 
-                gateway = get_drive_gateway()
+                resolved_gateway = _resolve_gateway(gateway)
                 new_path, _ = rename_deal_folder(
                     old_client_name or "",
                     old_desc,
@@ -322,7 +338,7 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
                     new_desc,
                     deal.drive_folder_link,
                     deal.drive_folder_path,
-                    gateway=gateway,
+                    gateway=resolved_gateway,
                 )
                 if new_path and new_path != deal.drive_folder_path:
                     deal.drive_folder_path = new_path
@@ -347,7 +363,7 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
 # ──────────────────────────── Удаление ─────────────────────────────
 
 
-def mark_deal_deleted(deal_id: int):
+def mark_deal_deleted(deal_id: int, *, gateway: DriveGateway | None = None):
     with db.atomic():
         deal = Deal.get_or_none(Deal.id == deal_id)
         if deal:
@@ -355,7 +371,7 @@ def mark_deal_deleted(deal_id: int):
             try:
                 from services.folder_utils import rename_deal_folder
 
-                gateway = get_drive_gateway()
+                resolved_gateway = _resolve_gateway(gateway)
                 new_desc = f"{deal.description} deleted"
                 new_path, _ = rename_deal_folder(
                     deal.client.name,
@@ -364,7 +380,7 @@ def mark_deal_deleted(deal_id: int):
                     new_desc,
                     deal.drive_folder_link,
                     deal.drive_folder_path,
-                    gateway=gateway,
+                    gateway=resolved_gateway,
                 )
                 deal.description = new_desc
                 deal.drive_folder_path = new_path
@@ -541,7 +557,9 @@ def get_prev_deal(current_deal: Deal) -> Deal | None:
     )
 
 
-def refresh_deal_drive_link(deal: Deal) -> None:
+def refresh_deal_drive_link(
+    deal: Deal, *, gateway: DriveGateway | None = None
+) -> None:
     """Попытаться найти ссылку папки сделки на Google Drive."""
     if deal.drive_folder_link:
         return
@@ -551,12 +569,14 @@ def refresh_deal_drive_link(deal: Deal) -> None:
         return
 
     try:
-        gateway = get_drive_gateway()
+        resolved_gateway = _resolve_gateway(gateway)
         deal_name = sanitize_name(f"Сделка - {deal.description}")
         parent_id = extract_folder_id(client_link)
         if not parent_id:
             return
-        link = find_drive_folder(deal_name, gateway=gateway, parent_id=parent_id)
+        link = find_drive_folder(
+            deal_name, gateway=resolved_gateway, parent_id=parent_id
+        )
         if link:
             deal.drive_folder_link = link
             deal.save(only=[Deal.drive_folder_link])

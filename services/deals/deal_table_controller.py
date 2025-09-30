@@ -35,8 +35,10 @@ class DealTableController(TableController):
     # API, используемое представлением
     # ------------------------------------------------------------------
     def delete_deals(self, deals: list[DealRowDTO]) -> None:
+        context = getattr(self.view, "_context", None)
+        gateway = getattr(context, "drive_gateway", None) if context else None
         for deal in deals:
-            mark_deal_deleted(deal.id)
+            mark_deal_deleted(deal.id, gateway=gateway)
 
     def get_statuses(self) -> list[str]:
         return list(self.service.get_statuses())

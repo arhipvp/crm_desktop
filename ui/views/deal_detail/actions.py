@@ -9,7 +9,7 @@ from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QDialog, QInputDialog, QMessageBox, QProgressDialog
 
 from database.models import Deal
-from services.container import get_drive_gateway, get_sheets_sync_service
+from services.container import get_sheets_sync_service
 from services.deal_service import (
     get_deal_by_id,
     get_next_deal,
@@ -248,7 +248,7 @@ class DealActionsMixin:
         super().closeEvent(event)
 
     def _on_edit(self):
-        form = DealForm(self.instance, parent=self)
+        form = DealForm(self.instance, parent=self, context=self._get_context())
         if form.exec():
             self._init_kpi_panel()
             self._init_tabs()
@@ -325,7 +325,7 @@ class DealActionsMixin:
             from services.folder_utils import create_deal_folder
 
             if confirm("Папка не найдена. Создать новую?"):
-                gateway = get_drive_gateway()
+                gateway = self._get_drive_gateway()
                 new_path, link = create_deal_folder(
                     self.instance.client.name,
                     self.instance.description,
@@ -366,7 +366,7 @@ class DealActionsMixin:
         from ui.common.message_boxes import confirm
 
         if confirm("Папка не найдена. Создать новую?"):
-            gateway = get_drive_gateway()
+            gateway = self._get_drive_gateway()
             new_path, link = create_deal_folder(
                 self.instance.client.name,
                 self.instance.description,
@@ -496,6 +496,7 @@ class DealActionsMixin:
                 status=status or None,
                 reminder_date=reminder,
                 journal_entry=new_calc_part or None,
+                gateway=self._get_drive_gateway(),
             )
             self.calc_append.clear()
             self.notes_board.load_entries(self.instance)
@@ -554,7 +555,7 @@ class DealActionsMixin:
             from .view import DealDetailView
 
             self.close()
-            DealDetailView(prev).exec()
+            DealDetailView(prev, context=self._get_context()).exec()
 
     def _on_next_deal(self):
         next_ = get_next_deal(self.instance)
@@ -562,7 +563,7 @@ class DealActionsMixin:
             from .view import DealDetailView
 
             self.close()
-            DealDetailView(next_).exec()
+            DealDetailView(next_, context=self._get_context()).exec()
 
     def _on_add_expense(self):
         from ui.forms.expense_form import ExpenseForm
@@ -579,23 +580,33 @@ class DealActionsMixin:
             if not reason:
                 show_error("Причина обязательна.")
                 return
-            update_deal(self.instance, is_closed=True, closed_reason=reason)
+            update_deal(
+                self.instance,
+                is_closed=True,
+                closed_reason=reason,
+                gateway=self._get_drive_gateway(),
+            )
             show_info("Сделка успешно закрыта.")
             from .view import DealDetailView
 
             self.close()
-            DealDetailView(self.instance).exec()
+            DealDetailView(self.instance, context=self._get_context()).exec()
 
     def _on_reopen_deal(self):
         if not confirm("Восстановить сделку?"):
             return
 
-        update_deal(self.instance, is_closed=False, closed_reason=None)
+        update_deal(
+            self.instance,
+            is_closed=False,
+            closed_reason=None,
+            gateway=self._get_drive_gateway(),
+        )
         show_info("Сделка восстановлена.")
         from .view import DealDetailView
 
         self.close()
-        DealDetailView(self.instance).exec()
+        DealDetailView(self.instance, context=self._get_context()).exec()
 
     def _on_import_policy_json(self):
         dlg = ImportPolicyJsonForm(
@@ -688,7 +699,10 @@ class DealActionsMixin:
         if dlg.exec():
             reminder = dlg.get_reminder_date()
             update_deal(
-                self.instance, reminder_date=reminder, status=str(reminder.year)
+                self.instance,
+                reminder_date=reminder,
+                status=str(reminder.year),
+                gateway=self._get_drive_gateway(),
             )
             tasks = get_incomplete_tasks_by_deal(self.instance.id)
             if tasks and confirm(

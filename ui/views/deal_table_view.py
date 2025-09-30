@@ -236,6 +236,11 @@ class DealTableView(BaseTableView):
         except Exception as exc:  # noqa: BLE001
             show_error(str(exc))
 
+    def add_new(self):
+        form = DealForm(context=self._context)
+        if form.exec():
+            self.refresh()
+
     def duplicate_selected(self, _=None):
         dto = self.get_selected()
         if not dto:
@@ -243,7 +248,7 @@ class DealTableView(BaseTableView):
         instance = self._load_deal_instance(dto.id)
         if instance is None:
             return
-        form = DealForm()
+        form = DealForm(context=self._context)
         form.fill_from_obj(instance)
         if "is_closed" in form.fields:
             form.fields["is_closed"].setChecked(False)
@@ -252,7 +257,9 @@ class DealTableView(BaseTableView):
         if form.exec():
             self.refresh()
             if form.instance:
-                dlg = DealDetailView(form.instance, parent=self)
+                dlg = DealDetailView(
+                    form.instance, parent=self, context=self._context
+                )
                 dlg.exec()
 
     def edit_selected(self, _=None):
@@ -262,7 +269,7 @@ class DealTableView(BaseTableView):
         instance = self._load_deal_instance(dto.id)
         if instance is None:
             return
-        dlg = DealDetailView(instance, parent=self)
+        dlg = DealDetailView(instance, parent=self, context=self._context)
         dlg.exec()
         self.refresh()
 
@@ -273,7 +280,7 @@ class DealTableView(BaseTableView):
         instance = self._load_deal_instance(dto.id)
         if instance is None:
             return
-        dlg = DealDetailView(instance, parent=self)
+        dlg = DealDetailView(instance, parent=self, context=self._context)
         dlg.exec()
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder) -> None:

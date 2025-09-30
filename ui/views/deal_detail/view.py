@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.app_context import AppContext, get_app_context
 from services.task_crud import get_task_counts_by_deal_id
 from services.payment_service import (
     get_payment_amounts_by_deal_id,
@@ -41,10 +42,11 @@ from .widgets import CollapsibleWidget, DealFilesPanel
 class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
     SETTINGS_KEY = "deal_detail_view"
 
-    def __init__(self, deal, parent=None):
+    def __init__(self, deal, parent=None, *, context: AppContext | None = None):
         super().__init__(parent)
         self.setWindowFlag(Qt.WindowMinMaxButtonsHint, True)
         self.instance = deal
+        self._context: AppContext | None = context or getattr(parent, "_context", None)
         self.setAcceptDrops(True)
         self.setWindowTitle(
             f"Сделка #{deal.id} — {deal.client.name}: {deal.description}"
@@ -132,6 +134,14 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self._register_shortcuts()
         self._apply_default_splitter_sizes(size.width())
         self._load_settings()
+
+    def _get_context(self) -> AppContext:
+        if self._context is None:
+            self._context = get_app_context()
+        return self._context
+
+    def _get_drive_gateway(self):
+        return self._get_context().drive_gateway
 
     def _on_tab_changed(self, index: int) -> None:
         """Refresh data when switching between tabs."""

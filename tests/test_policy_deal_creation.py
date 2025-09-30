@@ -11,16 +11,15 @@ from database.models import Client, Deal, Policy
 from ui.views.policy_table_view import PolicyTableView
 
 
-def test_make_deal_sets_automatic_status(monkeypatch, in_memory_db, qapp):
+def test_make_deal_sets_automatic_status(
+    monkeypatch, in_memory_db, qapp, stub_app_context
+):
     monkeypatch.setattr(PolicyTableView, "load_data", lambda self: None)
-    monkeypatch.setattr(
-        "services.deal_service.create_deal_folder", lambda *a, **k: (None, None)
-    )
     monkeypatch.setattr("ui.common.message_boxes.confirm", lambda *a, **k: True)
     monkeypatch.setattr("ui.forms.deal_form.confirm", lambda *a, **k: True)
 
     class DummyDealDetail:
-        def __init__(self, deal, parent=None):
+        def __init__(self, deal, parent=None, *, context=None):
             self.deal = deal
             self.parent = parent
 
@@ -45,7 +44,7 @@ def test_make_deal_sets_automatic_status(monkeypatch, in_memory_db, qapp):
         start_date=dt.date(2024, 1, 15),
     )
 
-    view = PolicyTableView()
+    view = PolicyTableView(context=stub_app_context)
     monkeypatch.setattr(view, "get_selected_multiple", lambda: [policy])
 
     def fake_exec(self):
@@ -63,14 +62,13 @@ def test_make_deal_sets_automatic_status(monkeypatch, in_memory_db, qapp):
 
 
 @pytest.mark.parametrize("start_date", [dt.date(2024, 1, 10), None])
-def test_make_deal_sets_reminder_date(monkeypatch, in_memory_db, qapp, start_date):
+def test_make_deal_sets_reminder_date(
+    monkeypatch, in_memory_db, qapp, start_date, stub_app_context
+):
     monkeypatch.setattr(PolicyTableView, "load_data", lambda self: None)
-    monkeypatch.setattr(
-        "services.deal_service.create_deal_folder", lambda *a, **k: (None, None)
-    )
 
     class DummyDealDetail:
-        def __init__(self, deal, parent=None):
+        def __init__(self, deal, parent=None, *, context=None):
             self.deal = deal
             self.parent = parent
 
@@ -88,7 +86,7 @@ def test_make_deal_sets_reminder_date(monkeypatch, in_memory_db, qapp, start_dat
     if start_date is None:
         policy.start_date = None
 
-    view = PolicyTableView()
+    view = PolicyTableView(context=stub_app_context)
     monkeypatch.setattr(view, "get_selected_multiple", lambda: [policy])
 
     base_date = start_date or dt.date.today()
