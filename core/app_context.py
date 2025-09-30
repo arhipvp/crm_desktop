@@ -136,8 +136,9 @@ class AppContext:
 _app_context: AppContext | None = None
 
 
-def _build_default_context() -> AppContext:
-    settings = get_settings()
+def _create_context(
+    settings: Settings, overrides: dict[str, Any] | None = None
+) -> AppContext:
     return AppContext(
         settings=settings,
         drive_gateway_factory=DriveGateway,
@@ -150,7 +151,21 @@ def _build_default_context() -> AppContext:
         ),
         task_repository_factory=TaskRepository,
         deal_calculation_repository_factory=DealCalculationRepository,
+        overrides=overrides,
     )
+
+
+def _build_default_context() -> AppContext:
+    settings = get_settings()
+    return _create_context(settings)
+
+
+def init_app_context(settings: Settings, **overrides: Any) -> AppContext:
+    """Инициализировать глобальный контекст приложения."""
+
+    global _app_context
+    _app_context = _create_context(settings, overrides or None)
+    return _app_context
 
 
 def get_app_context() -> AppContext:
@@ -162,4 +177,4 @@ def get_app_context() -> AppContext:
     return _app_context
 
 
-__all__ = ["AppContext", "get_app_context"]
+__all__ = ["AppContext", "get_app_context", "init_app_context"]
