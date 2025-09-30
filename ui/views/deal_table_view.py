@@ -1,45 +1,49 @@
+"""Представление таблицы сделок, работающее через контроллер и DTO."""
+
+from __future__ import annotations
+
 import logging
+from typing import Iterable
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QShortcut
 from PySide6.QtWidgets import QAbstractItemView, QComboBox, QHBoxLayout, QLineEdit
 
 from core.app_context import AppContext
-from database.models import Client, Deal, DealStatus, Executor
 from services import deal_journal
-from services.deal_service import build_deal_query, get_deals_page, mark_deal_deleted
+from services.deal_service import get_deal_by_id
+from services.deals.deal_table_controller import DealTableController
+from services.deals.dto import DealRowDTO
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.deal_form import DealForm
 from ui.views.deal_detail import DealDetailView
 
-
 logger = logging.getLogger(__name__)
 
 
 class DealTableModel(BaseTableModel):
+    """Модель таблицы, работающая поверх DTO и не зависящая от Peewee."""
+
     def __init__(
         self,
-        objects,
-        model_class,
+        objects: Iterable[DealRowDTO],
         parent=None,
         *,
         deal_journal_module=deal_journal,
-    ):
-        super().__init__(objects, model_class, parent)
+    ) -> None:
+        super().__init__(list(objects), DealRowDTO, parent)
         self._deal_journal = deal_journal_module or deal_journal
+        self._all_objects = list(self.objects)
 
-        # сохраняем полный список объектов для последующей фильтрации
-        self._all_objects = list(objects)
-
-        # скрываем ссылку на папку и двигаем колонки закрытия в конец
+        # скрываем ссылку на папку и переносим поля закрытия в конец
         self.fields = [f for f in self.fields if f.name != "drive_folder_link"]
 
-        def move_to_end(field_name):
-            for i, f in enumerate(self.fields):
-                if f.name == field_name:
-                    self.fields.append(self.fields.pop(i))
+        def move_to_end(field_name: str) -> None:
+            for index, field in enumerate(self.fields):
+                if field.name == field_name:
+                    self.fields.append(self.fields.pop(index))
                     break
 
         move_to_end("is_closed")
@@ -49,30 +53,35 @@ class DealTableModel(BaseTableModel):
         self.virtual_fields = ["executor"]
         self.headers.append("Исполнитель")
 
-        # параметры быстрого фильтра
         self._quick_text = ""
         self._quick_status: str | None = None
 
-    def columnCount(self, parent=None):
+    def columnCount(self, parent=None):  # type: ignore[override]
         return len(self.fields) + len(self.virtual_fields)
 
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, role=Qt.DisplayRole):  # type: ignore[override]
         if not index.isValid():
             return None
-        obj = self.objects[index.row()]
+
+        obj: DealRowDTO = self.objects[index.row()]
         if role == Qt.FontRole and getattr(obj, "is_deleted", False):
             font = QFont()
             font.setStrikeOut(True)
             return font
-        if role == Qt.ForegroundRole and getattr(obj, "_executor", None):
+        if role == Qt.ForegroundRole and obj.executor is not None:
             return QColor("red")
-        col = index.column()
-        if col >= len(self.fields):
+
+        column = index.column()
+        if column >= len(self.fields):
             if role == Qt.DisplayRole:
-                ex = getattr(obj, "_executor", None)
-                return ex.full_name if ex else "—"
+                executor = obj.executor
+                return executor.full_name if executor else "—"
             return None
-        field = self.fields[col]
+
+        field = self.fields[column]
+        if field.name == "client" and role == Qt.DisplayRole:
+            return obj.client.name if obj.client else "—"
+
         if field.name == "calculations" and role in {Qt.DisplayRole, Qt.ToolTipRole}:
             formatted = self._deal_journal.format_for_display(
                 getattr(obj, field.name), active_only=True
@@ -80,9 +89,10 @@ class DealTableModel(BaseTableModel):
             if role == Qt.DisplayRole:
                 return self.shorten_text(formatted) if formatted else "—"
             return formatted or None
+
         return super().data(index, role)
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
+    def headerData(self, section, orientation, role=Qt.DisplayRole):  # type: ignore[override]
         if role != Qt.DisplayRole or orientation != Qt.Horizontal:
             return None
         if section < len(self.fields):
@@ -91,29 +101,18 @@ class DealTableModel(BaseTableModel):
 
     # --- Быстрый фильтр -------------------------------------------------
     def apply_quick_filter(self, text: str = "", status: str | None = None) -> None:
-        """Фильтрует ``self.objects`` по строке и статусу.
-
-        Parameters:
-            text: Подстрока для поиска в описании и имени клиента.
-            status: Статус сделки или ``None`` для всех.
-        """
-
         self._quick_text = text.lower()
         self._quick_status = status
 
-        def matches(obj) -> bool:
+        def matches(obj: DealRowDTO) -> bool:
             if self._quick_text:
                 haystack = " ".join(
-                    [
-                        getattr(obj.client, "name", ""),
-                        getattr(obj, "description", ""),
-                        getattr(obj, "status", ""),
-                    ]
+                    [obj.client.name, obj.description or "", obj.status or ""]
                 ).lower()
                 if self._quick_text not in haystack:
                     return False
             if self._quick_status:
-                if getattr(obj, "status", None) != self._quick_status:
+                if (obj.status or "") != self._quick_status:
                     return False
             return True
 
@@ -123,15 +122,15 @@ class DealTableModel(BaseTableModel):
 
 class DealTableView(BaseTableView):
     COLUMN_FIELD_MAP = {
-        0: Deal.reminder_date,
-        1: Client.name,
-        2: Deal.status,
-        3: Deal.description,
-        4: Deal.calculations,
-        5: Deal.start_date,
-        6: Deal.is_closed,
-        7: Deal.closed_reason,
-        8: Executor.full_name,
+        0: "reminder_date",
+        1: "client",
+        2: "status",
+        3: "description",
+        4: "calculations",
+        5: "start_date",
+        6: "is_closed",
+        7: "closed_reason",
+        8: "executor",
     }
 
     def __init__(
@@ -139,36 +138,33 @@ class DealTableView(BaseTableView):
         parent=None,
         *,
         context: AppContext | None = None,
-        get_deals_page_func=get_deals_page,
-        build_deal_query_func=build_deal_query,
-        mark_deal_deleted_func=mark_deal_deleted,
+        controller: DealTableController | None = None,
         deal_journal_module=deal_journal,
-    ):
+    ) -> None:
         self._context = context
-        self._get_deals_page = get_deals_page_func or get_deals_page
-        self._build_deal_query = build_deal_query_func or build_deal_query
-        self._mark_deal_deleted = mark_deal_deleted_func or mark_deal_deleted
         self._deal_journal = deal_journal_module or deal_journal
+        controller = controller or DealTableController(self)
+
         checkboxes = {
             "Показывать удалённые": self.on_filter_changed,
             "Показать закрытые": self.on_filter_changed,
         }
         super().__init__(
             parent=parent,
-            model_class=Deal,
             form_class=DealForm,
             detail_view_class=DealDetailView,
+            controller=controller,
             checkbox_map=checkboxes,
         )
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
-        # --- быстрый фильтр по строке и статусу -----------------------
+        # быстрый фильтр по строке и статусу
         self.quick_filter_edit = QLineEdit()
         self.quick_filter_edit.setPlaceholderText("Поиск...")
         self.status_filter = QComboBox()
         self.status_filter.addItem("Все", None)
-        for st in DealStatus:
-            self.status_filter.addItem(st.value, st.value)
+        for status in controller.get_statuses():
+            self.status_filter.addItem(status, status)
 
         quick_layout = QHBoxLayout()
         quick_layout.addWidget(self.quick_filter_edit)
@@ -179,10 +175,6 @@ class DealTableView(BaseTableView):
 
         self.quick_filter_edit.textChanged.connect(self.apply_quick_filter)
         self.status_filter.currentIndexChanged.connect(self.apply_quick_filter)
-
-        self.sort_field = "reminder_date"
-        self.sort_order = "asc"  # 'asc' or 'desc'
-        self.default_sort_field = "reminder_date"
 
         self.table.horizontalHeader().sortIndicatorChanged.connect(
             self.on_sort_changed
@@ -196,100 +188,18 @@ class DealTableView(BaseTableView):
 
         self.load_data()
 
-    # Ensure search/filters/pagination call our loader (not TableController)
-    def refresh(self):
-        self.load_data()
-
-    def on_filter_changed(self, *args, **kwargs):
-        self.page = 1
-        self.load_data()
-
-    def next_page(self):
-        self.page += 1
-        self.load_data()
-
-    def prev_page(self):
-        if self.page > 1:
-            self.page -= 1
-            self.load_data()
-
-    def _on_per_page_changed(self, per_page: int):
-        self.per_page = per_page
-        self.page = 1
-        try:
-            self.save_table_settings()
-        except Exception:
-            pass
-        self.load_data()
-
-    def _on_column_filter_changed(self, column: int, text: str):
-        self.on_filter_changed()
-        try:
-            self.save_table_settings()
-        except Exception:
-            pass
-
-    def get_filters(self) -> dict:
-        """Собирает фильтры, используемые для загрузки сделок."""
-
-        filters = {
-            "search_text": self.get_search_text(),
-            "show_deleted": self.is_checked("Показывать удалённые"),
-            "show_closed": self.is_checked("Показать закрытые"),
-        }
-
-        header = self.table.horizontalHeader()
-        column_filters: dict = {}
-        for logical, state in self._column_filters.items():
-            visual = header.visualIndex(logical)
-            if visual < 0:
-                continue
-            logical_index = header.logicalIndex(visual)
-            if logical_index < 0 or header.isSectionHidden(logical_index):
-                continue
-            field = self.COLUMN_FIELD_MAP.get(logical_index)
-            if not field:
-                continue
-            backend_value = state.backend_value() if state else None
-            if backend_value is None:
-                continue
-            column_filters[field] = backend_value
-
-        filters["column_filters"] = column_filters
-
-        date_range = self.get_date_filter()
-        if date_range:
-            filters.update(date_range)
-
-        return filters
-
-    def load_data(self):
-        filters = self.get_filters()
-        column_filters = filters.get("column_filters")
-        logger.debug("column_filters=%s", column_filters)
-
-        # Получаем имя поля сортировки (self.sort_field)
-        items = self._get_deals_page(
-            self.page,
-            self.per_page,
-            order_by=self.sort_field,
-            order_dir=self.sort_order,
-            **filters,
-        )
-        total = self._build_deal_query(**filters).count()
-        self.set_model_class_and_items(Deal, list(items), total_count=total)
-
-    def set_model_class_and_items(self, model_class, items, total_count=None):
-        self.model = DealTableModel(
-            items,
-            model_class,
-            deal_journal_module=self._deal_journal,
-        )
+    # ------------------------------------------------------------------
+    # Работа с моделью
+    # ------------------------------------------------------------------
+    def update_table(self, items: list[DealRowDTO], total_count: int | None) -> None:
+        self.model = DealTableModel(items, deal_journal_module=self._deal_journal)
         self.proxy.setSourceModel(self.model)
         self.table.setModel(self.proxy)
 
         try:
-            self.table.sortByColumn(self.current_sort_column, self.current_sort_order)
+            self.table.sortByColumn(
+                self.current_sort_column, self.current_sort_order
+            )
             self.table.resizeColumnsToContents()
         except NotImplementedError:
             pass
@@ -299,52 +209,42 @@ class DealTableView(BaseTableView):
             self.paginator.update(self.total_count, self.page, self.per_page)
             self.data_loaded.emit(self.total_count)
 
-        # какой столбец сейчас является полем сортировки?
-        col = self.get_column_index(self.sort_field)
-        order = Qt.DescendingOrder if self.sort_order == "desc" else Qt.AscendingOrder
-
-        # показываем пользователю правильный индикатор сортировки
-        self.table.horizontalHeader().setSortIndicator(col, order)
-        # и не даём базовому классу перезаписывать порядок
-
-        # применяем быстрый фильтр к новым данным
+        self.table.horizontalHeader().setSortIndicator(
+            self.current_sort_column, self.current_sort_order
+        )
         self.apply_quick_filter()
 
-    def get_selected(self):
+    # ------------------------------------------------------------------
+    # Работа с элементами управления
+    # ------------------------------------------------------------------
+    def get_selected(self) -> DealRowDTO | None:
         index = self.table.currentIndex()
         if not index.isValid():
             return None
-        return self.model.get_item(self._source_row(index))
+        source_row = self.proxy.mapToSource(index).row()
+        return self.model.get_item(source_row)
 
-    def get_selected_deal(self):
-        return self.get_selected()
-
-    def apply_quick_filter(self):
-        if not getattr(self, "model", None):
-            return
-        text = self.quick_filter_edit.text().strip()
-        status = self.status_filter.currentData()
-        self.model.apply_quick_filter(text, status)
-
-    def get_column_index(self, field_name: str) -> int:
-        if self.model and field_name == "executor":
-            return len(self.model.fields)
-        return super().get_column_index(field_name)
-
-    def add_new(self):
-        form = DealForm()
-        if form.exec():
-            self.refresh()
-            if form.instance:
-                dlg = DealDetailView(form.instance, parent=self)
-                dlg.exec()
-
-    def duplicate_selected(self, _=None):
+    def delete_selected(self) -> None:
         deal = self.get_selected()
         if not deal:
             return
+        if not confirm(f"Удалить сделку {deal.description}?"):
+            return
+        try:
+            self.controller.delete_deals([deal])
+            self.refresh()
+        except Exception as exc:  # noqa: BLE001
+            show_error(str(exc))
+
+    def duplicate_selected(self, _=None):
+        dto = self.get_selected()
+        if not dto:
+            return
+        instance = self._load_deal_instance(dto.id)
+        if instance is None:
+            return
         form = DealForm()
-        form.fill_from_obj(deal)
+        form.fill_from_obj(instance)
         if "is_closed" in form.fields:
             form.fields["is_closed"].setChecked(False)
         if "closed_reason" in form.fields:
@@ -356,39 +256,53 @@ class DealTableView(BaseTableView):
                 dlg.exec()
 
     def edit_selected(self, _=None):
-        deal = self.get_selected()
-        if deal:
-            dlg = DealDetailView(deal, parent=self)
-            dlg.exec()
-            self.refresh()  # обновить таблицу после возможных изменений
-
-    def delete_selected(self):
-        deal = self.get_selected()
-        if deal and confirm(f"Удалить сделку {deal.description}?"):
-            try:
-                self._mark_deal_deleted(deal.id)
-                self.refresh()
-            except Exception as e:
-                show_error(str(e))
+        dto = self.get_selected()
+        if not dto:
+            return
+        instance = self._load_deal_instance(dto.id)
+        if instance is None:
+            return
+        dlg = DealDetailView(instance, parent=self)
+        dlg.exec()
+        self.refresh()
 
     def open_detail(self, _=None):
-        deal = self.get_selected()
-        if deal:
-            dlg = DealDetailView(deal)
-            dlg.exec()
-
-    def on_sort_changed(self, column: int, order: Qt.SortOrder):
-        """Refresh data after the user changed sort order."""
-        if not self.model:
+        dto = self.get_selected()
+        if not dto:
             return
+        instance = self._load_deal_instance(dto.id)
+        if instance is None:
+            return
+        dlg = DealDetailView(instance, parent=self)
+        dlg.exec()
 
-        if column >= len(self.model.fields):
-            sort_field = "executor"
-        else:
-            sort_field = self.model.fields[column].name
-
+    def on_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
         self.current_sort_column = column
         self.current_sort_order = order
-        self.sort_field = sort_field
-        self.sort_order = "desc" if order == Qt.DescendingOrder else "asc"
         self.refresh()
+
+    def apply_quick_filter(self):  # type: ignore[override]
+        if not getattr(self, "model", None):
+            return
+        text = self.quick_filter_edit.text().strip()
+        status = self.status_filter.currentData()
+        self.model.apply_quick_filter(text, status)
+
+    def get_column_index(self, field_name: str) -> int:
+        if getattr(self, "model", None) and field_name == "executor":
+            return len(self.model.fields)
+        return super().get_column_index(field_name)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    def _load_deal_instance(self, deal_id: int):
+        try:
+            instance = get_deal_by_id(deal_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Не удалось получить сделку %s", deal_id)
+            show_error(str(exc))
+            return None
+        if instance is None:
+            show_error("Сделка не найдена")
+        return instance
