@@ -22,6 +22,70 @@ def qapp():
 
 
 @pytest.fixture
+def stub_client_app_service(monkeypatch):
+    from services.clients.dto import ClientDetailsDTO
+
+    class StubClientAppService:
+        def __init__(self):
+            self.similar: list = []
+            self.created_commands: list = []
+            self.updated_commands: list = []
+            self.deleted_ids: list = []
+            self.next_created: ClientDetailsDTO | None = None
+            self.next_updated: ClientDetailsDTO | None = None
+
+        def find_similar(self, _name: str):
+            return self.similar
+
+        def create(self, command):
+            self.created_commands.append(command)
+            if self.next_created is None:
+                raise AssertionError("next_created не установлен для create")
+            return self.next_created
+
+        def update(self, command):
+            self.updated_commands.append(command)
+            if self.next_updated is None:
+                raise AssertionError("next_updated не установлен для update")
+            return self.next_updated
+
+        def delete_many(self, client_ids):
+            self.deleted_ids.extend(client_ids)
+
+        # заглушки на случай вызовов, которые не нужны в конкретном тесте
+        def get_page(self, *args, **kwargs):
+            return []
+
+        def count(self, *args, **kwargs):
+            return 0
+
+        def get_detail(self, client_id: int):
+            if self.next_updated and self.next_updated.id == client_id:
+                return self.next_updated
+            if self.next_created and self.next_created.id == client_id:
+                return self.next_created
+            raise LookupError(f"Нет данных для клиента {client_id}")
+
+        def get_merge_candidates(self, *_args, **_kwargs):  # pragma: no cover - не используется
+            return []
+
+        def merge(self, *_args, **_kwargs):  # pragma: no cover - не используется
+            return None
+
+    stub = StubClientAppService()
+    targets = [
+        "services.clients.client_app_service.client_app_service",
+        "services.clients.client_table_controller.client_app_service",
+        "ui.forms.client_form.client_app_service",
+        "ui.views.client_table_view.client_app_service",
+        "ui.views.client_detail_view.client_app_service",
+    ]
+    for target in targets:
+        monkeypatch.setattr(target, stub, raising=False)
+    return stub
+
+
+@pytest.fixture
 def make_deal_with_executor():
     def _make_deal_with_executor(
         client_name: str = "C",
