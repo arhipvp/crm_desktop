@@ -9,6 +9,7 @@ from typing import Any, Sequence
 from peewee import Model, ModelSelect, fn
 
 from database.models import Client, Deal, db
+from services.container import get_drive_gateway
 from services.folder_utils import (
     create_client_drive_folder,
     rename_client_folder,
@@ -170,8 +171,11 @@ def add_client(**kwargs) -> Client:
     with db.atomic():
         client, _ = Client.get_or_create(name=name, defaults=clean_data)
 
+        gateway = get_drive_gateway()
         try:
-            folder_path, folder_link = create_client_drive_folder(name)
+            folder_path, folder_link = create_client_drive_folder(
+                name, gateway=gateway
+            )
             client.drive_folder_path = folder_path
             client.drive_folder_link = folder_link
             client.save()
@@ -241,8 +245,9 @@ def update_client(client: Client, **kwargs) -> Client:
     client.save()
 
     if old_name != new_name:
+        gateway = get_drive_gateway()
         new_path, new_link = rename_client_folder(
-            old_name, new_name, client.drive_folder_link
+            old_name, new_name, client.drive_folder_link, gateway=gateway
         )
         if new_path and new_path != client.drive_folder_path:
             client.drive_folder_path = new_path
@@ -262,6 +267,7 @@ def update_client(client: Client, **kwargs) -> Client:
                     deal.description,
                     deal.drive_folder_link,
                     deal.drive_folder_path,
+                    gateway=gateway,
                 )
                 if new_deal_path and new_deal_path != deal.drive_folder_path:
                     deal.drive_folder_path = new_deal_path
@@ -301,6 +307,7 @@ def merge_clients(
     duplicates = [clients_by_id[cid] for cid in unique_duplicates]
 
     with db.atomic():
+        gateway = get_drive_gateway()
         logger.info(
             "🔄 Начало объединения клиента id=%s с дубликатами %s",
             primary_client.id,
@@ -360,6 +367,7 @@ def merge_clients(
                     deal.description,
                     deal.drive_folder_link,
                     deal.drive_folder_path,
+                    gateway=gateway,
                 )
                 deal.client = primary_client
                 if new_path and new_path != deal.drive_folder_path:
@@ -386,6 +394,7 @@ def merge_clients(
                     policy.policy_number,
                     new_deal_desc,
                     policy.drive_folder_link,
+                    gateway=gateway,
                 )
                 policy.client = primary_client
                 if (
@@ -476,11 +485,13 @@ def mark_client_deleted(client_id: int):
     if client:
         client.soft_delete()
         try:
-            from services.folder_utils import rename_client_folder
-
             new_name = f"{client.name} deleted"
+            gateway = get_drive_gateway()
             new_path, new_link = rename_client_folder(
-                client.name, new_name, client.drive_folder_link
+                client.name,
+                new_name,
+                client.drive_folder_link,
+                gateway=gateway,
             )
             client.name = new_name
             client.drive_folder_path = new_path

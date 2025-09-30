@@ -26,12 +26,12 @@ from database.models import (
 )
 from services.clients import get_client_by_id
 from services.query_utils import apply_search_and_filters
+from services.container import get_drive_gateway
 from services.folder_utils import (
     create_deal_folder,
     find_drive_folder,
     sanitize_name,
     extract_folder_id,
-    Credentials,
 )
 from services import deal_journal
 
@@ -116,11 +116,13 @@ def add_deal(**kwargs):
         )
 
         # ───── создание папки сделки ─────
+        gateway = get_drive_gateway()
         try:
             local_path, web_link = create_deal_folder(
                 client.name,
                 deal.description,
                 client_drive_link=client.drive_folder_link,
+                gateway=gateway,
             )
             logger.info("📁 Папка сделки создана: %s", local_path)
             if web_link:
@@ -160,10 +162,12 @@ def add_deal_from_policy(policy: Policy) -> Deal:
     try:
         from services.folder_utils import move_policy_folder_to_deal
 
+        gateway = get_drive_gateway()
         new_path = move_policy_folder_to_deal(
             policy.drive_folder_link,
             policy.client.name,
             deal.description,
+            gateway=gateway,
         )
         if new_path:
             policy.drive_folder_link = new_path
@@ -201,12 +205,14 @@ def add_deal_from_policies(policies: list[Policy]) -> Deal:
 
     from services.folder_utils import move_policy_folder_to_deal
 
+    gateway = get_drive_gateway()
     for policy in rest:
         try:
             new_path = move_policy_folder_to_deal(
                 policy.drive_folder_link,
                 policy.client.name,
                 deal.description,
+                gateway=gateway,
             )
             if new_path:
                 policy.drive_folder_link = new_path
@@ -300,6 +306,7 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
             try:
                 from services.folder_utils import rename_deal_folder
 
+                gateway = get_drive_gateway()
                 new_path, _ = rename_deal_folder(
                     old_client_name or "",
                     old_desc,
@@ -307,6 +314,7 @@ def update_deal(deal: Deal, *, journal_entry: str | None = None, **kwargs):
                     new_desc,
                     deal.drive_folder_link,
                     deal.drive_folder_path,
+                    gateway=gateway,
                 )
                 if new_path and new_path != deal.drive_folder_path:
                     deal.drive_folder_path = new_path
@@ -339,6 +347,7 @@ def mark_deal_deleted(deal_id: int):
             try:
                 from services.folder_utils import rename_deal_folder
 
+                gateway = get_drive_gateway()
                 new_desc = f"{deal.description} deleted"
                 new_path, _ = rename_deal_folder(
                     deal.client.name,
@@ -347,6 +356,7 @@ def mark_deal_deleted(deal_id: int):
                     new_desc,
                     deal.drive_folder_link,
                     deal.drive_folder_path,
+                    gateway=gateway,
                 )
                 deal.description = new_desc
                 deal.drive_folder_path = new_path
@@ -529,15 +539,16 @@ def refresh_deal_drive_link(deal: Deal) -> None:
         return
 
     client_link = deal.client.drive_folder_link if deal.client else None
-    if not client_link or Credentials is None:
+    if not client_link:
         return
 
     try:
+        gateway = get_drive_gateway()
         deal_name = sanitize_name(f"Сделка - {deal.description}")
         parent_id = extract_folder_id(client_link)
         if not parent_id:
             return
-        link = find_drive_folder(deal_name, parent_id)
+        link = find_drive_folder(deal_name, gateway=gateway, parent_id=parent_id)
         if link:
             deal.drive_folder_link = link
             deal.save(only=[Deal.drive_folder_link])

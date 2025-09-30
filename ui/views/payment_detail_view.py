@@ -198,7 +198,13 @@ class PaymentDetailView(QDialog):
             pol = self.instance.policy
             pol_path = getattr(pol, "drive_folder_path", None) or pol.drive_folder_link
             if pol_path:
-                folder_btn.clicked.connect(lambda: open_folder(pol_path, parent=self))
+                def _open_policy_folder(path=pol_path):
+                    try:
+                        open_folder(path)
+                    except Exception as exc:  # noqa: BLE001
+                        QMessageBox.warning(self, "Открытие папки", str(exc))
+
+                folder_btn.clicked.connect(_open_policy_folder)
             else:
                 folder_btn.setDisabled(True)
         else:

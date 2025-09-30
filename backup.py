@@ -16,6 +16,7 @@ from peewee import PostgresqlDatabase
 
 from database.db import db
 from database.models import Client, Deal, Expense, Income, Payment, Policy, Task
+from services.container import get_drive_gateway
 from services.folder_utils import (
     create_drive_folder,
     extract_folder_id,
@@ -94,16 +95,17 @@ logger.info("✅ Excel-файл сохранён: %s", XLSX_PATH)
 # ───────────── Google Drive ─────────────
 logger.info("☁️ Загрузка в Google Drive…")
 
-folder_url = create_drive_folder(DRIVE_FOLDER_NAME)
+gateway = get_drive_gateway()
+folder_url = create_drive_folder(DRIVE_FOLDER_NAME, gateway=gateway)
 folder_id = extract_folder_id(folder_url)
 if not folder_id:
     raise RuntimeError("Не удалось получить ID папки для бэкапа")
 
 if SQL_PATH.exists():
-    upload_to_drive(str(SQL_PATH), folder_id)
+    upload_to_drive(str(SQL_PATH), folder_id, gateway=gateway)
 else:
     logger.warning("⚠️ SQL-файл не найден, пропускаем загрузку.")
 
-upload_to_drive(str(XLSX_PATH), folder_id)
+upload_to_drive(str(XLSX_PATH), folder_id, gateway=gateway)
 
 logger.info("✅ Готово: всё, что найдено, загружено в Google Drive.")

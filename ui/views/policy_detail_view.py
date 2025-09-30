@@ -346,11 +346,13 @@ class PolicyDetailView(QDialog):
             self._init_tabs()
 
     def _open_folder(self):
-        open_folder(
-            getattr(self.instance, "drive_folder_path", None)
-            or self.instance.drive_folder_link,
-            parent=self,
-        )
+        try:
+            open_folder(
+                getattr(self.instance, "drive_folder_path", None)
+                or self.instance.drive_folder_link,
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Открытие папки", str(exc))
 
     # ------------------------------------------------------------------
     # Utils

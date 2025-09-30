@@ -239,7 +239,10 @@ class AiPolicyTextDialog(QDialog):
                 dest = policy.drive_folder_link or policy.drive_folder_path
                 if dest:
                     move_file_to_folder(self.file_path, dest)
-                    open_folder(dest, parent=self)
+                    try:
+                        open_folder(dest)
+                    except Exception as exc:  # noqa: BLE001
+                        QMessageBox.warning(self, "Ошибка", str(exc))
             self.accept()
         else:
             self.process_btn.setEnabled(True)

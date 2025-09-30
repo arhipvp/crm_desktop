@@ -117,7 +117,10 @@ class PolicyForm(BaseEditForm):
             or getattr(self.instance, "drive_folder_link", None)
         )
         if path:
-            open_folder(path, parent=self)
+            try:
+                open_folder(path)
+            except Exception as exc:  # noqa: BLE001
+                show_error(str(exc))
 
     # ---------- построение формы ----------
     def build_custom_fields(self):
@@ -358,7 +361,10 @@ class PolicyForm(BaseEditForm):
                     or getattr(updated, "drive_folder_link", None)
                 )
                 if path:
-                    open_folder(path, parent=self)
+                    try:
+                        open_folder(path)
+                    except Exception as exc:  # noqa: BLE001
+                        show_error(str(exc))
                 self.accept()
         except ValueError as e:
             show_error(str(e))

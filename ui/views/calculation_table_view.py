@@ -211,7 +211,11 @@ class CalculationTableView(BaseTableView):
         if not calcs:
             return
         text = generate_offer_text(calcs)
-        copy_text_to_clipboard(text, parent=self)
+        try:
+            copy_text_to_clipboard(text)
+        except Exception as exc:  # noqa: BLE001
+            show_error(str(exc))
+            return
         try:
             from services.clients import format_phone_for_whatsapp, open_whatsapp
 

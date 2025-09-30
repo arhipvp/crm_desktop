@@ -77,6 +77,9 @@ def test_merge_clients_transfers_relations_and_updates_fields(monkeypatch):
         new_description,
         drive_link,
         current_path,
+        *,
+        gateway=None,
+        base_path=None,
     ):
         deal_rename_calls.append(
             (
@@ -98,6 +101,9 @@ def test_merge_clients_transfers_relations_and_updates_fields(monkeypatch):
         new_policy_number,
         new_deal_desc,
         drive_link,
+        *,
+        gateway=None,
+        base_path=None,
     ):
         policy_rename_calls.append(
             (
