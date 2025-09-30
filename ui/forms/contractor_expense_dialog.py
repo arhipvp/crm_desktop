@@ -204,13 +204,30 @@ class ContractorExpenseDialog(QDialog):
     def _restore_geometry(self) -> None:
         settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
         geometry_b64 = settings.get("geometry")
-        if not geometry_b64:
-            return
-        try:
-            geometry_bytes = base64.b64decode(geometry_b64)
-            self.restoreGeometry(QByteArray(geometry_bytes))
-        except Exception:  # pragma: no cover - восстановление необязательно
-            pass
+        if geometry_b64:
+            try:
+                geometry_bytes = base64.b64decode(geometry_b64)
+                self.restoreGeometry(QByteArray(geometry_bytes))
+            except Exception:  # pragma: no cover - восстановление необязательно
+                pass
+
+        header = self.table.horizontalHeader()
+        widths = settings.get("table_column_widths") if isinstance(settings, dict) else None
+        applied = False
+        if isinstance(widths, dict):
+            for section, size in widths.items():
+                try:
+                    section_index = int(section)
+                    section_size = int(size)
+                except (TypeError, ValueError):
+                    continue
+                if not (0 <= section_index < header.count()) or section_size <= 0:
+                    continue
+                header.resizeSection(section_index, section_size)
+                applied = True
+
+        if not applied:
+            self.table.resizeColumnsToContents()
 
     def _save_geometry(self) -> None:
         try:
@@ -221,5 +238,10 @@ class ContractorExpenseDialog(QDialog):
 
         settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
         settings["geometry"] = geometry_b64
+        header = self.table.horizontalHeader()
+        settings["table_column_widths"] = {
+            str(i): int(header.sectionSize(i))
+            for i in range(header.count())
+        }
         ui_settings.set_window_settings(self.SETTINGS_KEY, settings)
 
