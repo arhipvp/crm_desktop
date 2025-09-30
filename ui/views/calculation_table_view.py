@@ -13,6 +13,7 @@ from services.calculation_service import (
     generate_offer_text,
 )
 from services.folder_utils import copy_text_to_clipboard
+from services.container import get_sheets_sync_service
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.ru_headers import RU_HEADERS
@@ -131,9 +132,7 @@ class CalculationTableView(BaseTableView):
 
     def refresh(self):
         try:
-            from services.sheets_service import sync_calculations_from_sheet
-
-            sync_calculations_from_sheet()
+            get_sheets_sync_service().sync_calculations()
         except Exception:
             logger.debug("Ошибка синхронизации с Sheets", exc_info=True)
         self.load_data()

@@ -25,6 +25,7 @@ from services.task_crud import (
 )
 from services.task_queue import queue_task
 from services.task_notifications import notify_task
+from services.container import get_sheets_sync_service
 from ui.common.message_boxes import confirm, show_error
 from ui.base.base_table_view import BaseTableView
 from ui.common.delegates import StatusDelegate
@@ -243,9 +244,7 @@ class TaskTableView(BaseTableView):
 
     def refresh(self):
         try:
-            from services.sheets_service import sync_tasks_from_sheet
-
-            sync_tasks_from_sheet()
+            get_sheets_sync_service().sync_tasks()
         except Exception:
             logger.debug("Ошибка синхронизации с Sheets", exc_info=True)
 

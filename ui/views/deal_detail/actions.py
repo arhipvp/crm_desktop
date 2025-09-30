@@ -9,7 +9,7 @@ from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QDialog, QInputDialog, QMessageBox, QProgressDialog
 
 from database.models import Deal
-from services.container import get_drive_gateway
+from services.container import get_drive_gateway, get_sheets_sync_service
 from services.deal_service import (
     get_deal_by_id,
     get_next_deal,
@@ -512,9 +512,7 @@ class DealActionsMixin:
 
     def _on_refresh(self):
         try:
-            from services.sheets_service import sync_calculations_from_sheet
-
-            added = sync_calculations_from_sheet()
+            added = get_sheets_sync_service().sync_calculations()
             if added:
                 show_info(f"Добавлено расчётов: {added}")
         except Exception as e:  # noqa: BLE001
