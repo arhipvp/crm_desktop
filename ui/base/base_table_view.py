@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 import math
 
@@ -30,6 +32,7 @@ from PySide6.QtCore import (
     QDate,
     QSortFilterProxyModel,
     QRegularExpression,
+    QByteArray,
 )
 from PySide6.QtGui import QShortcut
 
@@ -159,6 +162,7 @@ class BaseTableView(QWidget):
         # --- мастер-детал макет ---
         self.outer_layout = QVBoxLayout(self)
         self.splitter = QSplitter()
+        self.splitter.splitterMoved.connect(lambda *_: self.save_table_settings())
         self.left_panel = QWidget()
         self.left_layout = QVBoxLayout(self.left_panel)
         self.splitter.addWidget(self.left_panel)
@@ -440,6 +444,7 @@ class BaseTableView(QWidget):
         self.splitter.addWidget(widget)
         self.splitter.setStretchFactor(0, 3)
         self.splitter.setStretchFactor(1, 2)
+        self.load_table_settings()
 
     def get_column_index(self, field_name: str) -> int:
         if not self.model:
@@ -1317,6 +1322,9 @@ class BaseTableView(QWidget):
             "column_filters": filters,
             "per_page": self.per_page,
         }
+        settings["splitter_state"] = base64.b64encode(
+            bytes(self.splitter.saveState())
+        ).decode("ascii")
         ui_settings.set_table_settings(self.settings_id, settings)
 
     def load_table_settings(self):
@@ -1324,7 +1332,22 @@ class BaseTableView(QWidget):
         header = self.table.horizontalHeader()
         saved = ui_settings.get_table_settings(self.settings_id)
         if not saved:
+            if self.splitter.count() > 1:
+                self.splitter.setStretchFactor(0, 3)
+                self.splitter.setStretchFactor(1, 2)
             return
+        splitter_restored = False
+        encoded_splitter = saved.get("splitter_state")
+        if encoded_splitter:
+            try:
+                decoded = base64.b64decode(encoded_splitter)
+            except (TypeError, ValueError, binascii.Error):
+                decoded = b""
+            if decoded:
+                splitter_restored = self.splitter.restoreState(QByteArray(decoded))
+        if not splitter_restored and self.splitter.count() > 1:
+            self.splitter.setStretchFactor(0, 3)
+            self.splitter.setStretchFactor(1, 2)
         column = saved.get("sort_column")
         order = saved.get("sort_order")
         if column is not None and order is not None:
