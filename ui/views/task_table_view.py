@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import logging
 
-logger = logging.getLogger(__name__)
-
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QMessageBox, QAbstractItemView, QHeaderView
+from PySide6.QtWidgets import QAbstractItemView, QHeaderView, QMessageBox
 
-from playhouse.shortcuts import prefetch
+from core.app_context import AppContext
 from database.models import (
     Client,
     Deal,
@@ -16,22 +14,19 @@ from database.models import (
     Policy,
     Task,
 )
-from ui.base.base_table_model import BaseTableModel
-from services.task_crud import (
-    build_task_query,
-    get_tasks_page,
-    update_task,
-    mark_task_deleted,
-)
-from services.task_queue import queue_task
+from playhouse.shortcuts import prefetch
+from services.task_crud import build_task_query, get_tasks_page, mark_task_deleted
 from services.task_notifications import notify_task
-from services.container import get_sheets_sync_service
-from ui.common.message_boxes import confirm, show_error
+from services.task_queue import queue_task
+from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.delegates import StatusDelegate
+from ui.common.message_boxes import confirm, show_error
 from ui.common.styled_widgets import styled_button
 from ui.forms.task_form import TaskForm
 from ui.views.task_detail_view import TaskDetailView
+
+logger = logging.getLogger(__name__)
 
 
 class TaskTableModel(BaseTableModel):
@@ -100,11 +95,32 @@ class TaskTableView(BaseTableView):
         deal_id: int | None = None,
         autoload: bool = True,
         resizable_columns: bool = True,
+        context: AppContext | None = None,
+        get_tasks_page_func=get_tasks_page,
+        build_task_query_func=build_task_query,
+        queue_task_func=queue_task,
+        notify_task_func=notify_task,
+        mark_task_deleted_func=mark_task_deleted,
+        sheets_sync_service=None,
     ) -> None:
         checkbox_map = {
             "Показывать удалённые": self.on_filter_changed,
             "Показывать выполненные": self.on_filter_changed,
         }
+        self._context = context
+        self._get_tasks_page = get_tasks_page_func or get_tasks_page
+        self._build_task_query = build_task_query_func or build_task_query
+        self._queue_task = queue_task_func or queue_task
+        self._notify_task = notify_task_func or notify_task
+        self._mark_task_deleted = mark_task_deleted_func or mark_task_deleted
+        if sheets_sync_service is not None:
+            self._sheets_sync_service = sheets_sync_service
+        elif context is not None:
+            self._sheets_sync_service = getattr(
+                context, "sheets_sync_service", None
+            )
+        else:
+            self._sheets_sync_service = None
         super().__init__(
             parent=parent,
             model_class=Task,
@@ -179,7 +195,7 @@ class TaskTableView(BaseTableView):
         sent, skipped = 0, 0
         for t in tasks:
             try:
-                queue_task(t.id)
+                self._queue_task(t.id)
                 sent += 1
             except Exception as exc:
                 skipped += 1
@@ -197,7 +213,7 @@ class TaskTableView(BaseTableView):
             return
         for t in tasks:
             try:
-                notify_task(t.id)
+                self._notify_task(t.id)
             except Exception as exc:
                 logger.debug("[notify_task] ошибка для %s: %s", t.id, exc)
         QMessageBox.information(self, "Напоминание", "Запрос отправлен")
@@ -217,7 +233,7 @@ class TaskTableView(BaseTableView):
         errors = 0
         for t in tasks:
             try:
-                mark_task_deleted(t.id)
+                self._mark_task_deleted(t.id)
             except Exception as exc:
                 errors += 1
                 logger.debug("[delete_task] ошибка для %s: %s", t.id, exc)
@@ -244,7 +260,8 @@ class TaskTableView(BaseTableView):
 
     def refresh(self):
         try:
-            get_sheets_sync_service().sync_tasks()
+            if self._sheets_sync_service is not None:
+                self._sheets_sync_service.sync_tasks()
         except Exception:
             logger.debug("Ошибка синхронизации с Sheets", exc_info=True)
 
@@ -293,12 +310,12 @@ class TaskTableView(BaseTableView):
         if self.deal_id:
             common_kwargs["deal_id"] = self.deal_id
 
-        items = get_tasks_page(
+        items = self._get_tasks_page(
             page=self.page,
             per_page=self.per_page,
             **common_kwargs,
         )
-        total = build_task_query(**common_kwargs).count()
+        total = self._build_task_query(**common_kwargs).count()
 
         items = list(prefetch(items, Deal, Client, Policy, DealExecutor, Executor))
         self.model = TaskTableModel(items, Task)

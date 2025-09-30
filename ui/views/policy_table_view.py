@@ -1,26 +1,28 @@
 from datetime import date
 
 from dateutil.relativedelta import relativedelta
-from database.models import Policy, Client, Deal
+from PySide6.QtCore import QDate, Qt
+from PySide6.QtWidgets import QAbstractItemView, QMenu
+
+from core.app_context import AppContext
+from database.models import Client, Deal, Policy
+from services.folder_utils import copy_text_to_clipboard
 from services.policies import (
+    attach_premium,
     build_policy_query,
     get_policies_page,
-    mark_policy_deleted,
     mark_policies_deleted,
-    attach_premium,
+    mark_policy_deleted,
 )
 from services.policies.deal_matching import CandidateDeal
-from PySide6.QtWidgets import QAbstractItemView, QMenu
-from PySide6.QtCore import Qt, QDate
-from services.folder_utils import copy_text_to_clipboard
-from ui.base.base_table_view import BaseTableView
 from ui.base.base_table_model import BaseTableModel
+from ui.base.base_table_view import BaseTableView
 from ui.base.table_controller import TableController
 from ui.common.message_boxes import confirm, show_error, show_info
 from ui.common.search_dialog import SearchDialog
+from ui.common.styled_widgets import styled_button
 from ui.forms.policy_form import PolicyForm
 from ui.views.policy_detail_view import PolicyDetailView
-from ui.common.styled_widgets import styled_button
 
 
 class PolicyTableView(BaseTableView):
@@ -43,8 +45,28 @@ class PolicyTableView(BaseTableView):
         15: None,  # premium
     }
 
-    def __init__(self, parent=None, deal_id=None, **kwargs):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        context: AppContext | None = None,
+        deal_id=None,
+        get_policies_page_func=get_policies_page,
+        build_policy_query_func=build_policy_query,
+        mark_policy_deleted_func=mark_policy_deleted,
+        mark_policies_deleted_func=mark_policies_deleted,
+        attach_premium_func=attach_premium,
+        **kwargs,
+    ):
+        self._context = context
         self.deal_id = deal_id
+        self._get_policies_page = get_policies_page_func or get_policies_page
+        self._build_policy_query = build_policy_query_func or build_policy_query
+        self._mark_policy_deleted = mark_policy_deleted_func or mark_policy_deleted
+        self._mark_policies_deleted = (
+            mark_policies_deleted_func or mark_policies_deleted
+        )
+        self._attach_premium = attach_premium_func or attach_premium
         checkbox_map = {
             "Показывать продленное": self.on_filter_changed,
             "Показывать только полисы без сделок": self.on_filter_changed,
@@ -52,20 +74,20 @@ class PolicyTableView(BaseTableView):
 
         def _get_page(page, per_page, **f):
             items = list(
-                get_policies_page(
+                self._get_policies_page(
                     page,
                     per_page,
                     **f,
                 )
             )
-            attach_premium(items)
+            self._attach_premium(items)
             return items
 
         controller = TableController(
             self,
             model_class=Policy,
             get_page_func=_get_page,
-            get_total_func=lambda **f: build_policy_query(**f).count(),
+            get_total_func=lambda **f: self._build_policy_query(**f).count(),
             filter_func=self._apply_filters,
         )
 
@@ -161,10 +183,10 @@ class PolicyTableView(BaseTableView):
         if confirm(message):
             try:
                 if len(policies) == 1:
-                    mark_policy_deleted(policies[0].id)
+                    self._mark_policy_deleted(policies[0].id)
                 else:
                     ids = [p.id for p in policies]
-                    mark_policies_deleted(ids)
+                    self._mark_policies_deleted(ids)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))

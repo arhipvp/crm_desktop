@@ -2,13 +2,13 @@ import logging
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QShortcut
-from PySide6.QtWidgets import QLineEdit, QComboBox, QHBoxLayout, QAbstractItemView
+from PySide6.QtWidgets import QAbstractItemView, QComboBox, QHBoxLayout, QLineEdit
 
-from ui.base.base_table_model import BaseTableModel
-
-from database.models import Deal, Client, Executor, DealStatus
-from services.deal_service import build_deal_query, get_deals_page, mark_deal_deleted
+from core.app_context import AppContext
+from database.models import Client, Deal, DealStatus, Executor
 from services import deal_journal
+from services.deal_service import build_deal_query, get_deals_page, mark_deal_deleted
+from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.deal_form import DealForm
@@ -19,8 +19,16 @@ logger = logging.getLogger(__name__)
 
 
 class DealTableModel(BaseTableModel):
-    def __init__(self, objects, model_class, parent=None):
+    def __init__(
+        self,
+        objects,
+        model_class,
+        parent=None,
+        *,
+        deal_journal_module=deal_journal,
+    ):
         super().__init__(objects, model_class, parent)
+        self._deal_journal = deal_journal_module or deal_journal
 
         # сохраняем полный список объектов для последующей фильтрации
         self._all_objects = list(objects)
@@ -66,7 +74,7 @@ class DealTableModel(BaseTableModel):
             return None
         field = self.fields[col]
         if field.name == "calculations" and role in {Qt.DisplayRole, Qt.ToolTipRole}:
-            formatted = deal_journal.format_for_display(
+            formatted = self._deal_journal.format_for_display(
                 getattr(obj, field.name), active_only=True
             )
             if role == Qt.DisplayRole:
@@ -126,7 +134,21 @@ class DealTableView(BaseTableView):
         8: Executor.full_name,
     }
 
-    def __init__(self, parent=None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        context: AppContext | None = None,
+        get_deals_page_func=get_deals_page,
+        build_deal_query_func=build_deal_query,
+        mark_deal_deleted_func=mark_deal_deleted,
+        deal_journal_module=deal_journal,
+    ):
+        self._context = context
+        self._get_deals_page = get_deals_page_func or get_deals_page
+        self._build_deal_query = build_deal_query_func or build_deal_query
+        self._mark_deal_deleted = mark_deal_deleted_func or mark_deal_deleted
+        self._deal_journal = deal_journal_module or deal_journal
         checkboxes = {
             "Показывать удалённые": self.on_filter_changed,
             "Показать закрытые": self.on_filter_changed,
@@ -247,18 +269,22 @@ class DealTableView(BaseTableView):
         logger.debug("column_filters=%s", column_filters)
 
         # Получаем имя поля сортировки (self.sort_field)
-        items = get_deals_page(
+        items = self._get_deals_page(
             self.page,
             self.per_page,
             order_by=self.sort_field,
             order_dir=self.sort_order,
             **filters,
         )
-        total = build_deal_query(**filters).count()
+        total = self._build_deal_query(**filters).count()
         self.set_model_class_and_items(Deal, list(items), total_count=total)
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
-        self.model = DealTableModel(items, model_class)
+        self.model = DealTableModel(
+            items,
+            model_class,
+            deal_journal_module=self._deal_journal,
+        )
         self.proxy.setSourceModel(self.model)
         self.table.setModel(self.proxy)
 
@@ -340,7 +366,7 @@ class DealTableView(BaseTableView):
         deal = self.get_selected()
         if deal and confirm(f"Удалить сделку {deal.description}?"):
             try:
-                mark_deal_deleted(deal.id)
+                self._mark_deal_deleted(deal.id)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))

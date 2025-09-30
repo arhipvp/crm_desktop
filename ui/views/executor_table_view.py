@@ -1,14 +1,16 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QAbstractItemView
-from ui.base.base_table_view import BaseTableView
+
+from core.app_context import AppContext
 from database.models import Executor
-from ui.forms.executor_form import ExecutorForm
 from services.executor_service import (
     build_executor_query,
     get_executors_page,
     update_executor,
 )
+from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error
+from ui.forms.executor_form import ExecutorForm
 
 
 class ExecutorTableView(BaseTableView):
@@ -18,7 +20,21 @@ class ExecutorTableView(BaseTableView):
         2: Executor.is_active,
     }
 
-    def __init__(self, parent=None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        context: AppContext | None = None,
+        get_executors_page_func=get_executors_page,
+        build_executor_query_func=build_executor_query,
+        update_executor_func=update_executor,
+    ):
+        self._context = context
+        self._get_executors_page = get_executors_page_func or get_executors_page
+        self._build_executor_query = (
+            build_executor_query_func or build_executor_query
+        )
+        self._update_executor = update_executor_func or update_executor
         self.order_by = Executor.full_name
         self.order_dir = "asc"
         self.default_sort_column = 0
@@ -91,14 +107,14 @@ class ExecutorTableView(BaseTableView):
 
     def load_data(self):
         filters = self.get_filters()
-        items = get_executors_page(
+        items = self._get_executors_page(
             self.page,
             self.per_page,
             order_by=self.order_by,
             order_dir=self.order_dir,
             **filters,
         )
-        total = build_executor_query(**filters).count()
+        total = self._build_executor_query(**filters).count()
         self.set_model_class_and_items(Executor, list(items), total_count=total)
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
@@ -122,7 +138,7 @@ class ExecutorTableView(BaseTableView):
         executor = self.get_selected()
         if executor and confirm(f"Деактивировать {executor.full_name}?"):
             try:
-                update_executor(executor, is_active=False)
+                self._update_executor(executor, is_active=False)
                 self.refresh()
             except Exception as e:
                 show_error(str(e))

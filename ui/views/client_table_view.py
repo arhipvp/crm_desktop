@@ -1,8 +1,9 @@
 # ui/views/client_table_view.py
 
-from PySide6.QtWidgets import QAbstractItemView
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QAbstractItemView
 
+from core.app_context import AppContext
 from services.clients.client_app_service import (
     ClientMergeError,
     ClientNotFoundError,
@@ -20,8 +21,18 @@ from ui.views.client_detail_view import ClientDetailView
 
 
 class ClientTableView(BaseTableView):
-    def __init__(self, parent=None):
-        controller = ClientTableController(self)
+    def __init__(
+        self,
+        parent=None,
+        *,
+        context: AppContext | None = None,
+        controller: ClientTableController | None = None,
+        service=client_app_service,
+    ):
+        self._context = context
+        controller = controller or ClientTableController(
+            self, service=service or client_app_service
+        )
         super().__init__(parent, form_class=ClientForm, controller=controller)
         # разрешаем выбор нескольких строк для массовых действий
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
