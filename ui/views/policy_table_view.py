@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QAbstractItemView, QMenu
 from core.app_context import AppContext
 from services.deal_service import get_all_deals, get_deal_by_id
 from services.folder_utils import copy_text_to_clipboard
-from services.policies import CandidateDeal, find_candidate_deals, get_policy_by_id, update_policy
+from services.policies import CandidateDeal, find_candidate_deals, update_policy
 from services.policies.policy_app_service import policy_app_service
 from services.policies.policy_table_controller import PolicyTableController
 from services.policies.dto import PolicyRowDTO
@@ -136,7 +136,8 @@ class PolicyTableView(BaseTableView):
         policy = self.get_selected()
         if not policy:
             return
-        instance = get_policy_by_id(policy.id)
+        instances = self.controller.get_policies_by_ids([policy.id])
+        instance = instances.get(policy.id)
         if instance is None:
             show_error("Полис не найден")
             return
@@ -167,14 +168,9 @@ class PolicyTableView(BaseTableView):
         self.refresh()
 
     def _load_policy_instances(self, policies: list[PolicyRowDTO]):
-        mapping = {}
-        missing: list[int] = []
-        for dto in policies:
-            policy = get_policy_by_id(dto.id)
-            if policy is None:
-                missing.append(dto.id)
-                continue
-            mapping[dto.id] = policy
+        ids = [dto.id for dto in policies]
+        mapping = self.controller.get_policies_by_ids(ids)
+        missing = [policy_id for policy_id in ids if policy_id not in mapping]
         return mapping, missing
 
     def _on_make_deal(self):
@@ -523,7 +519,8 @@ class PolicyTableView(BaseTableView):
         policy = self.get_selected()
         if not policy:
             return
-        instance = get_policy_by_id(policy.id)
+        instances = self.controller.get_policies_by_ids([policy.id])
+        instance = instances.get(policy.id)
         if instance is None:
             show_error("Полис не найден")
             return
