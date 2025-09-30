@@ -11,7 +11,6 @@ from PySide6.QtWidgets import QAbstractItemView, QComboBox, QHBoxLayout, QLineEd
 
 from core.app_context import AppContext
 from services import deal_journal
-from services.deal_service import get_deal_by_id
 from services.deals.deal_table_controller import DealTableController
 from services.deals.dto import DealRowDTO
 from ui.base.base_table_model import BaseTableModel
@@ -305,9 +304,9 @@ class DealTableView(BaseTableView):
     # ------------------------------------------------------------------
     def _load_deal_instance(self, deal_id: int):
         try:
-            instance = get_deal_by_id(deal_id)
+            instance = self.controller.load_deal(deal_id)
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Не удалось получить сделку %s", deal_id)
+            logger.exception("Не удалось загрузить сделку %s", deal_id)
             show_error(str(exc))
             return None
         if instance is None:
