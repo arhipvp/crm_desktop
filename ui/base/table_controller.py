@@ -37,7 +37,8 @@ class TableController:
         self.view.proxy.setSourceModel(self.view.model)
         self.view.table.setModel(self.view.proxy)
         self.view.apply_saved_filters()
-        self.view.save_table_settings()
+        if getattr(self.view, "_settings_loaded", False):
+            self.view.save_table_settings()
 
         try:
             self.view.table.sortByColumn(
@@ -54,7 +55,11 @@ class TableController:
             )
         self.view.data_loaded.emit(self.view.proxy.rowCount())
 
-        QTimer.singleShot(0, self.view.load_table_settings)
+        if not getattr(self.view, "_settings_loaded", False) and not getattr(
+            self.view, "_settings_restore_pending", False
+        ):
+            self.view._settings_restore_pending = True
+            QTimer.singleShot(0, self.view.load_table_settings)
 
     # --- Загрузка данных --------------------------------------------------
     def load_data(self):
