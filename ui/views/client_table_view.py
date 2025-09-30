@@ -3,8 +3,12 @@
 from PySide6.QtWidgets import QAbstractItemView
 from PySide6.QtCore import Qt
 
+from services.clients.client_app_service import (
+    ClientMergeError,
+    ClientNotFoundError,
+    client_app_service,
+)
 from services.clients.client_table_controller import ClientTableController
-from services.clients.client_service import get_client_by_id, merge_clients
 from services.clients.dto import ClientDTO
 from services.folder_utils import open_folder
 from ui.base.base_table_view import BaseTableView
@@ -69,10 +73,12 @@ class ClientTableView(BaseTableView):
                 show_error(str(e))
 
     def open_detail(self, client: ClientDTO):
-        full_client = get_client_by_id(client.id)
-        if not full_client:
+        try:
+            full_client = client_app_service.get_detail(client.id)
+        except ClientNotFoundError:
             show_error("Клиент не найден")
             return
+
         if self.use_inline_details:
             self.set_detail_widget(ClientDetailView(full_client, parent=self))
         else:
@@ -114,13 +120,11 @@ class ClientTableView(BaseTableView):
         if len(clients) < 2:
             return
 
-        full_clients = []
-        for client in clients:
-            full_client = get_client_by_id(client.id)
-            if not full_client:
-                show_error(f"Клиент с id={client.id} не найден")
-                return
-            full_clients.append(full_client)
+        try:
+            full_clients = client_app_service.get_merge_candidates([c.id for c in clients])
+        except ClientMergeError as exc:
+            show_error(str(exc))
+            return
 
         try:
             dialog = ClientMergeDialog(full_clients, parent=self)
@@ -136,8 +140,8 @@ class ClientTableView(BaseTableView):
         final_values = dialog.get_final_values()
 
         try:
-            merge_clients(primary_id, duplicate_ids, final_values)
-        except Exception as exc:
+            client_app_service.merge(primary_id, duplicate_ids, final_values)
+        except ClientMergeError as exc:
             show_error(str(exc))
             return
 

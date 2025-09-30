@@ -18,7 +18,12 @@ from services.folder_utils import (
 )
 from services.validators import normalize_phone, normalize_full_name
 from services.query_utils import apply_search_and_filters
-from .dto import ClientDTO
+from .dto import (
+    ClientCreateCommand,
+    ClientDTO,
+    ClientDetailsDTO,
+    ClientUpdateCommand,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +111,42 @@ def get_clients_page_dto(
         **filters,
     )
     return [ClientDTO.from_model(c) for c in clients]
+
+
+def get_client_detail_dto(client_id: int) -> ClientDetailsDTO | None:
+    """Получить подробную информацию о клиенте в виде DTO."""
+
+    client = Client.select().where(Client.id == client_id).get_or_none()
+    if not client:
+        return None
+    return ClientDetailsDTO.from_model(client)
+
+
+def create_client_from_command(command: ClientCreateCommand) -> ClientDetailsDTO:
+    """Создать клиента из команды и вернуть DTO."""
+
+    payload = command.to_payload()
+    client = add_client(**payload)
+    return ClientDetailsDTO.from_model(client)
+
+
+def update_client_from_command(command: ClientUpdateCommand) -> ClientDetailsDTO:
+    """Обновить клиента на основе команды."""
+
+    client = Client.get_or_none(Client.id == command.id)
+    if client is None:
+        raise Client.DoesNotExist(f"Клиент id={command.id} не найден")
+
+    payload = command.to_payload()
+    updated = update_client(client, **payload)
+    return ClientDetailsDTO.from_model(updated)
+
+
+def find_similar_clients_dto(name: str) -> list[ClientDTO]:
+    """Вернуть список похожих клиентов в виде DTO."""
+
+    similar = find_similar_clients(name)
+    return [ClientDTO.from_model(client) for client in similar]
 
 
 def find_similar_clients(name: str) -> list[Client]:
@@ -472,6 +513,56 @@ def merge_clients(
         )
 
     return primary_client
+
+
+def merge_clients_to_dto(
+    primary_id: int,
+    duplicate_ids: Sequence[int],
+    updates: dict | None = None,
+) -> ClientDetailsDTO:
+    """Объединить клиентов и вернуть результат в виде DTO."""
+
+    client = merge_clients(primary_id, duplicate_ids, updates)
+    return ClientDetailsDTO.from_model(client)
+
+
+def delete_clients_by_ids(client_ids: Sequence[int]) -> int:
+    """Удаляет клиентов по списку идентификаторов."""
+
+    ids = list(dict.fromkeys(client_ids))
+    if not ids:
+        return 0
+    with db.atomic():
+        if len(ids) == 1:
+            mark_client_deleted(ids[0])
+            return 1
+        return mark_clients_deleted(ids)
+
+
+def count_clients(**filters) -> int:
+    """Подсчитать количество клиентов с учётом фильтров."""
+
+    query = build_client_query(**filters)
+    return query.count()
+
+
+def get_clients_details_by_ids(client_ids: Sequence[int]) -> list[ClientDetailsDTO]:
+    """Загрузить DTO выбранных клиентов, сохранив порядок идентификаторов."""
+
+    if not client_ids:
+        return []
+    ids = list(dict.fromkeys(client_ids))
+    clients = (
+        Client.select()
+        .where(Client.id.in_(ids))
+        .order_by(Client.id)
+    )
+    clients_by_id = {client.id: client for client in clients}
+    return [
+        ClientDetailsDTO.from_model(clients_by_id[cid])
+        for cid in ids
+        if cid in clients_by_id
+    ]
 
 
 
