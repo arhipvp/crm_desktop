@@ -8,6 +8,8 @@
 приложения возникала ``ImportError``.
 """
 
+from .dto import PolicyClientInfo, PolicyDealInfo, PolicyRowDTO
+from .policy_app_service import PolicyAppService, policy_app_service
 from .policy_service import (
     add_policy,
     update_policy,
@@ -39,6 +41,11 @@ from .deal_matching import (
 )
 
 __all__ = [
+    "PolicyAppService",
+    "policy_app_service",
+    "PolicyRowDTO",
+    "PolicyClientInfo",
+    "PolicyDealInfo",
     "add_policy",
     "update_policy",
     "DuplicatePolicyError",

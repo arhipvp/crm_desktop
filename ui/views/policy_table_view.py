@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date
 
 from dateutil.relativedelta import relativedelta
@@ -5,19 +7,13 @@ from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import QAbstractItemView, QMenu
 
 from core.app_context import AppContext
-from database.models import Client, Deal, Policy
+from services.deal_service import get_all_deals, get_deal_by_id
 from services.folder_utils import copy_text_to_clipboard
-from services.policies import (
-    attach_premium,
-    build_policy_query,
-    get_policies_page,
-    mark_policies_deleted,
-    mark_policy_deleted,
-)
-from services.policies.deal_matching import CandidateDeal
-from ui.base.base_table_model import BaseTableModel
+from services.policies import CandidateDeal, find_candidate_deals, get_policy_by_id, update_policy
+from services.policies.policy_app_service import policy_app_service
+from services.policies.policy_table_controller import PolicyTableController
+from services.policies.dto import PolicyRowDTO
 from ui.base.base_table_view import BaseTableView
-from ui.base.table_controller import TableController
 from ui.common.message_boxes import confirm, show_error, show_info
 from ui.common.search_dialog import SearchDialog
 from ui.common.styled_widgets import styled_button
@@ -27,21 +23,21 @@ from ui.views.policy_detail_view import PolicyDetailView
 
 class PolicyTableView(BaseTableView):
     COLUMN_FIELD_MAP = {
-        0: Client.name,
-        1: Deal.description,
-        2: Policy.policy_number,
-        3: Policy.insurance_type,
-        4: Policy.insurance_company,
-        5: Policy.contractor,
-        6: Policy.sales_channel,
-        7: Policy.start_date,
-        8: Policy.end_date,
-        9: Policy.vehicle_brand,
-        10: Policy.vehicle_model,
-        11: Policy.vehicle_vin,
-        12: Policy.note,
+        0: "client_name",
+        1: "deal_description",
+        2: "policy_number",
+        3: "insurance_type",
+        4: "insurance_company",
+        5: "contractor",
+        6: "sales_channel",
+        7: "start_date",
+        8: "end_date",
+        9: "vehicle_brand",
+        10: "vehicle_model",
+        11: "vehicle_vin",
+        12: "note",
         13: None,  # drive_folder_link
-        14: Policy.renewed_to,
+        14: "renewed_to",
         15: None,  # premium
     }
 
@@ -51,46 +47,22 @@ class PolicyTableView(BaseTableView):
         *,
         context: AppContext | None = None,
         deal_id=None,
-        get_policies_page_func=get_policies_page,
-        build_policy_query_func=build_policy_query,
-        mark_policy_deleted_func=mark_policy_deleted,
-        mark_policies_deleted_func=mark_policies_deleted,
-        attach_premium_func=attach_premium,
+        controller: PolicyTableController | None = None,
+        service=policy_app_service,
         **kwargs,
     ):
         self._context = context
         self.deal_id = deal_id
-        self._get_policies_page = get_policies_page_func or get_policies_page
-        self._build_policy_query = build_policy_query_func or build_policy_query
-        self._mark_policy_deleted = mark_policy_deleted_func or mark_policy_deleted
-        self._mark_policies_deleted = (
-            mark_policies_deleted_func or mark_policies_deleted
-        )
-        self._attach_premium = attach_premium_func or attach_premium
+        service = service or policy_app_service
         checkbox_map = {
             "Показывать продленное": self.on_filter_changed,
             "Показывать только полисы без сделок": self.on_filter_changed,
         }
-
-        def _get_page(page, per_page, **f):
-            items = list(
-                self._get_policies_page(
-                    page,
-                    per_page,
-                    **f,
-                )
-            )
-            self._attach_premium(items)
-            return items
-
-        controller = TableController(
+        controller = controller or PolicyTableController(
             self,
-            model_class=Policy,
-            get_page_func=_get_page,
-            get_total_func=lambda **f: self._build_policy_query(**f).count(),
+            service=service,
             filter_func=self._apply_filters,
         )
-
         super().__init__(
             parent=parent,
             form_class=PolicyForm,
@@ -101,9 +73,7 @@ class PolicyTableView(BaseTableView):
         self.setAcceptDrops(True)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setSortingEnabled(True)
-        self.table.horizontalHeader().sortIndicatorChanged.connect(
-            self.on_sort_changed
-        )
+        self.table.horizontalHeader().sortIndicatorChanged.connect(self.on_sort_changed)
         self.table.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked
             | QAbstractItemView.EditTrigger.EditKeyPressed
@@ -140,25 +110,22 @@ class PolicyTableView(BaseTableView):
             filters["deal_id"] = self.deal_id
         return filters
 
-    def get_selected(self):
+    def get_selected(self) -> PolicyRowDTO | None:
         idx = self.table.currentIndex()
         if not idx.isValid():
             return None
-        # map index through proxy to account for sorting/filtering
         source_row = self.proxy.mapToSource(idx).row()
         return self.model.get_item(source_row)
 
-    def get_selected_multiple(self):
+    def get_selected_multiple(self) -> list[PolicyRowDTO]:
         indexes = self.table.selectionModel().selectedRows()
-        return [
-            self.model.get_item(self.proxy.mapToSource(i).row()) for i in indexes
-        ]
+        return [self.model.get_item(self.proxy.mapToSource(i).row()) for i in indexes]
 
     def get_selected_deal(self):
         policy = self.get_selected()
         if not policy:
             return None
-        return getattr(policy, "deal", None)
+        return policy.deal
 
     def add_new(self):
         form = PolicyForm()
@@ -167,10 +134,15 @@ class PolicyTableView(BaseTableView):
 
     def edit_selected(self, _=None):
         policy = self.get_selected()
-        if policy:
-            form = PolicyForm(policy)
-            if form.exec():
-                self.refresh()
+        if not policy:
+            return
+        instance = get_policy_by_id(policy.id)
+        if instance is None:
+            show_error("Полис не найден")
+            return
+        form = PolicyForm(instance)
+        if form.exec():
+            self.refresh()
 
     def delete_selected(self):
         policies = self.get_selected_multiple()
@@ -180,47 +152,58 @@ class PolicyTableView(BaseTableView):
             message = f"Удалить полис {policies[0].policy_number}?"
         else:
             message = f"Удалить {len(policies)} полис(ов)?"
-        if confirm(message):
-            try:
-                if len(policies) == 1:
-                    self._mark_policy_deleted(policies[0].id)
-                else:
-                    ids = [p.id for p in policies]
-                    self._mark_policies_deleted(ids)
-                self.refresh()
-            except Exception as e:
-                show_error(str(e))
+        if not confirm(message):
+            return
+        try:
+            deleted_ids = self.controller.delete_policies(policies)
+        except Exception as exc:  # noqa: BLE001
+            show_error(str(exc))
+            return
+        if not deleted_ids:
+            show_info("Полисы уже помечены удалёнными")
+            return
+        if len(deleted_ids) < len(policies):
+            show_info("Некоторые полисы уже были помечены удалёнными")
+        self.refresh()
+
+    def _load_policy_instances(self, policies: list[PolicyRowDTO]):
+        mapping = {}
+        missing: list[int] = []
+        for dto in policies:
+            policy = get_policy_by_id(dto.id)
+            if policy is None:
+                missing.append(dto.id)
+                continue
+            mapping[dto.id] = policy
+        return mapping, missing
 
     def _on_make_deal(self):
         policies = self.get_selected_multiple()
         if not policies:
             return
+        mapping, missing = self._load_policy_instances(policies)
+        if missing:
+            missing_str = ", ".join(map(str, missing))
+            show_error(f"Не найдены полисы с id: {missing_str}")
+            return
+        policy_models = [mapping[dto.id] for dto in policies]
         try:
-            from services.policies import update_policy
             from ui.views.deal_detail import DealDetailView
             from ui.forms.deal_form import DealForm
 
-            first = policies[0]
+            first = policy_models[0]
             form = DealForm(parent=self)
             if "reminder_date" in form.fields:
                 base_date = first.start_date or date.today()
                 reminder_date = base_date + relativedelta(months=9)
                 form.fields["reminder_date"].setDate(
-                    QDate(
-                        reminder_date.year,
-                        reminder_date.month,
-                        reminder_date.day,
-                    )
+                    QDate(reminder_date.year, reminder_date.month, reminder_date.day)
                 )
             form.refresh_client_combo(first.client_id)
 
             if first.start_date:
                 form.fields["start_date"].setDate(
-                    QDate(
-                        first.start_date.year,
-                        first.start_date.month,
-                        first.start_date.day,
-                    )
+                    QDate(first.start_date.year, first.start_date.month, first.start_date.day)
                 )
 
             parts: list[str] = []
@@ -234,14 +217,15 @@ class PolicyTableView(BaseTableView):
             description = " ".join(parts).strip() or f"Из полиса {first.policy_number}"
             form.fields["description"].setText(description)
 
-            policy_numbers = ", ".join(p.policy_number for p in policies if p.policy_number)
+            policy_numbers = ", ".join(
+                p.policy_number for p in policy_models if p.policy_number
+            )
             calc_text = (
                 "Автоматически сгенерированная сделка из полиса "
                 f"{policy_numbers}"
             )
             form.fields["calculations"].setText(calc_text)
 
-            # установка статуса, если есть поле
             status_widget = form.fields.get("status")
             if status_widget is not None and hasattr(status_widget, "setText"):
                 status_widget.setText("Автоматически созданная сделка")
@@ -253,23 +237,26 @@ class PolicyTableView(BaseTableView):
             if not deal:
                 return
 
-            for p in policies:
-                update_policy(p, deal_id=deal.id)
+            for policy in policy_models:
+                update_policy(policy, deal_id=deal.id)
             self.refresh()
 
             dlg = DealDetailView(deal, parent=self)
             dlg.exec()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             show_error(str(e))
 
     def _on_link_deal(self):
         policies = self.get_selected_multiple()
         if not policies:
             return
+        mapping, missing = self._load_policy_instances(policies)
+        if missing:
+            missing_str = ", ".join(map(str, missing))
+            show_error(f"Не найдены полисы с id: {missing_str}")
+            return
+        policy_models = [mapping[dto.id] for dto in policies]
         try:
-            from services.deal_service import get_all_deals
-            from services.policies import find_candidate_deals, update_policy
-
             deals = list(get_all_deals())
             if not deals:
                 show_error("Нет доступных сделок")
@@ -280,7 +267,7 @@ class PolicyTableView(BaseTableView):
             aggregated_candidates: dict[int, dict] = {}
             strict_matches: dict[int, CandidateDeal] = {}
             auto_link_possible = True
-            for policy in policies:
+            for policy in policy_models:
                 policy_candidates = find_candidate_deals(policy, limit=5)
                 strict_candidates = [
                     candidate
@@ -325,7 +312,7 @@ class PolicyTableView(BaseTableView):
             if (
                 auto_link_possible
                 and strict_matches
-                and len(strict_matches) == len(policies)
+                and len(strict_matches) == len(policy_models)
             ):
                 unique_deal_ids = {candidate.deal_id for candidate in strict_matches.values()}
                 if len(unique_deal_ids) == 1:
@@ -334,7 +321,7 @@ class PolicyTableView(BaseTableView):
                     if deal is None and strict_matches:
                         deal = next(iter(strict_matches.values())).deal
                     if deal is not None:
-                        for policy in policies:
+                        for policy in policy_models:
                             update_policy(policy, deal_id=deal.id)
                         self.refresh()
                         deal_name = deal.description or f"ID {deal.id}"
@@ -345,7 +332,7 @@ class PolicyTableView(BaseTableView):
                         return
 
             candidate_items = []
-            selected_policies = list(policies)
+            selected_policies = list(policy_models)
             for deal_id, entry in aggregated_candidates.items():
                 deal = entry["deal"]
                 if deal is None:
@@ -436,65 +423,61 @@ class PolicyTableView(BaseTableView):
                 parent=self,
                 make_deal_callback=lambda: self._on_make_deal(),
             )
-            if dlg.exec():
-                selected = dlg.selected_index
-                if not selected:
-                    return
-                deal = None
-                unsupported_policy_ids: list[int] = []
-                value_type = None
-                if isinstance(selected, dict):
-                    deal = selected.get("deal")
-                    unsupported_policy_ids = list(
-                        selected.get("unsupported_policy_ids") or []
+            if not dlg.exec():
+                return
+            selected = dlg.selected_index
+            if not selected:
+                return
+            deal = None
+            unsupported_policy_ids: list[int] = []
+            value_type = None
+            if isinstance(selected, dict):
+                deal = selected.get("deal")
+                unsupported_policy_ids = list(selected.get("unsupported_policy_ids") or [])
+                value_type = selected.get("type")
+            else:
+                if isinstance(selected, str):
+                    deal = next(
+                        (
+                            item["value"]["deal"]
+                            for item in dialog_items
+                            if selected
+                            in {
+                                item.get("title"),
+                                f"{item.get('title', '')} — {item.get('subtitle', '')}".strip(" —"),
+                            }
+                        ),
+                        None,
                     )
-                    value_type = selected.get("type")
-                else:
-                    if isinstance(selected, str):
-                        deal = next(
-                            (
-                                item["value"]["deal"]
-                                for item in dialog_items
-                                if selected
-                                in {
-                                    item.get("title"),
-                                    f"{item.get('title', '')} — {item.get('subtitle', '')}".strip(
-                                        " —"
-                                    ),
-                                }
-                            ),
-                            None,
-                        )
-                    elif hasattr(selected, "id"):
-                        deal = selected
-                if not deal:
+                elif hasattr(selected, "id"):
+                    deal = selected
+            if not deal:
+                return
+
+            unsupported_policies = [
+                policy
+                for policy in policy_models
+                if policy.id in set(unsupported_policy_ids)
+            ]
+            if value_type == "candidate" and unsupported_policies:
+                policy_labels = ", ".join(
+                    policy.policy_number or f"ID {policy.id}"
+                    for policy in unsupported_policies
+                )
+                message = (
+                    "Сделка не подтверждена для полисов: "
+                    f"{policy_labels}. Привязать все равно?"
+                )
+                if not confirm(message):
                     return
 
-                unsupported_policies = [
-                    policy
-                    for policy in policies
-                    if policy.id in set(unsupported_policy_ids)
-                ]
-                if value_type == "candidate" and unsupported_policies:
-                    policy_labels = ", ".join(
-                        policy.policy_number or f"ID {policy.id}"
-                        for policy in unsupported_policies
-                    )
-                    message = (
-                        "Сделка не подтверждена для полисов: "
-                        f"{policy_labels}. Привязать все равно?"
-                    )
-                    if not confirm(message):
-                        return
-
-                for p in policies:
-                    update_policy(p, deal_id=deal.id)
-                self.refresh()
-        except Exception as e:
+            for policy in policy_models:
+                update_policy(policy, deal_id=deal.id)
+            self.refresh()
+        except Exception as e:  # noqa: BLE001
             show_error(str(e))
 
     def _on_ai_import(self):
-        """Import policies using AI from one or multiple files."""
         from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
         from ui.forms.ai_policy_files_dialog import AiPolicyFilesDialog
 
@@ -524,6 +507,7 @@ class PolicyTableView(BaseTableView):
         act_policy.triggered.connect(self.open_detail)
         act_delete.triggered.connect(self._on_delete)
         act_folder.triggered.connect(self.open_selected_folder)
+
         def _copy_value() -> None:
             try:
                 copy_text_to_clipboard(text)
@@ -537,14 +521,26 @@ class PolicyTableView(BaseTableView):
 
     def open_detail(self, _=None):
         policy = self.get_selected()
-        if policy:
-            dlg = PolicyDetailView(policy)
-            dlg.exec()
+        if not policy:
+            return
+        instance = get_policy_by_id(policy.id)
+        if instance is None:
+            show_error("Полис не найден")
+            return
+        dlg = PolicyDetailView(instance, parent=self)
+        dlg.exec()
 
-    def set_model_class_and_items(self, model_class, items, total_count=None):
-        super().set_model_class_and_items(
-            model_class, items, total_count=total_count
-        )
+    def open_selected_deal(self):
+        policy = self.get_selected()
+        if not policy or not policy.deal_id:
+            return
+        deal = get_deal_by_id(policy.deal_id)
+        if deal is None:
+            show_error("Сделка не найдена")
+            return
+        from ui.views.deal_detail import DealDetailView
+
+        DealDetailView(deal, parent=self).exec()
 
     def on_sort_changed(self, logical_index: int, order: Qt.SortOrder):
         field = self.COLUMN_FIELD_MAP.get(logical_index)
@@ -571,60 +567,12 @@ class PolicyTableView(BaseTableView):
         if hasattr(self, "_orig_style"):
             self.setStyleSheet(self._orig_style)
 
-
-class PolicyTableModel(BaseTableModel):
-    def __init__(self, objects, model_class, parent=None):
-        super().__init__(objects, model_class, parent)
-        self.virtual_fields = ["premium"]
-        self.headers.append("Страховая премия")
-
-    def columnCount(self, parent=None):
-        return len(self.fields) + len(self.virtual_fields)
-
-    def data(self, index, role=Qt.DisplayRole):
-        if not index.isValid():
-            return None
-
-        obj = self.objects[index.row()]
-        col = index.column()
-
-        if col >= len(self.fields):
-            if role == Qt.DisplayRole:
-                return self.format_money(getattr(obj, "_premium", 0))
-            if role == Qt.UserRole:
-                return getattr(obj, "_premium", 0)
-            if role == Qt.TextAlignmentRole:
-                return Qt.AlignRight | Qt.AlignVCenter
-            return None
-
-        return super().data(index, role)
-
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
-        if role != Qt.DisplayRole or orientation != Qt.Horizontal:
-            return None
-
-        if section < len(self.fields):
-            return super().headerData(section, orientation, role)
-        return self.headers[-1]
-
-    def flags(self, index):
-        flags = super().flags(index)
-        if not index.isValid():
-            return flags
-        if index.column() >= len(self.fields):
-            return flags & ~Qt.ItemIsEditable
-        field = self.fields[index.column()]
-        if field.name != "policy_number":
-            return flags & ~Qt.ItemIsEditable
-        return flags
-
-    def setData(self, index, value, role=Qt.EditRole):  # pragma: no cover - read only
-        return False
-
     def dropEvent(self, event):  # noqa: D401 - Qt override
         urls = [u for u in event.mimeData().urls() if u.isLocalFile()]
-        if urls:
-            files = [u.toLocalFile() for u in urls]
+        if not urls:
+            return
+        files = [u.toLocalFile() for u in urls]
+        try:
             if len(files) == 1:
                 from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
 
@@ -633,17 +581,11 @@ class PolicyTableModel(BaseTableModel):
                     self.refresh()
             else:
                 from PySide6.QtWidgets import QMessageBox
-                import os
                 import json as _json
                 from services.policies.ai_policy_service import process_policy_bundle_with_ai
                 from ui.forms.import_policy_json_form import ImportPolicyJsonForm
-                from ui.common.message_boxes import show_error
 
-                try:
-                    data, conv = process_policy_bundle_with_ai(files)
-                except Exception as e:  # pragma: no cover - network errors
-                    show_error(str(e))
-                    return
+                data, conv = process_policy_bundle_with_ai(files)
 
                 msg = QMessageBox(self)
                 msg.setWindowTitle("Диалог с ИИ")
@@ -664,5 +606,8 @@ class PolicyTableModel(BaseTableModel):
                             move_file_to_folder(src, policy.drive_folder_link)
                     self.refresh()
             event.acceptProposedAction()
-        if hasattr(self, "_orig_style"):
-            self.setStyleSheet(self._orig_style)
+        except Exception as exc:  # noqa: BLE001
+            show_error(str(exc))
+        finally:
+            if hasattr(self, "_orig_style"):
+                self.setStyleSheet(self._orig_style)
