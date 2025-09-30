@@ -19,7 +19,9 @@ class PolicyTableController(TableController):
 
     def delete_policies(self, policies: list[PolicyRowDTO]) -> list[int]:
         ids = [policy.id for policy in policies]
-        return self.service.mark_deleted(ids)
+        context = getattr(self.view, "_context", None)
+        gateway = getattr(context, "drive_gateway", None) if context else None
+        return self.service.mark_deleted(ids, gateway=gateway)
 
     def _get_page(self, page: int, per_page: int, **filters):
         return self.service.get_page(page, per_page, **filters)

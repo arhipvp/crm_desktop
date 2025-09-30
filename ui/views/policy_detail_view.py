@@ -325,7 +325,9 @@ class PolicyDetailView(QDialog):
     # Slots / callbacks
     # ------------------------------------------------------------------
     def _on_edit(self):
-        form = PolicyForm(self.instance, parent=self)
+        form = PolicyForm(
+            self.instance, parent=self, context=getattr(self, "_context", None)
+        )
         if form.exec():
             # Перерисовать всё, если пользователь сохранил изменения
             self._init_kpi_panel()

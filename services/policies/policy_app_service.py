@@ -13,6 +13,7 @@ from services.policies.policy_service import (
     build_policy_query,
     mark_policies_deleted,
 )
+from infrastructure.drive_gateway import DriveGateway
 
 from .dto import PolicyRowDTO
 
@@ -80,7 +81,9 @@ class PolicyAppService:
         )
         return query.count()
 
-    def mark_deleted(self, policy_ids: Sequence[int]) -> list[int]:
+    def mark_deleted(
+        self, policy_ids: Sequence[int], *, gateway: DriveGateway | None = None
+    ) -> list[int]:
         if not policy_ids:
             return []
         active_ids = [
@@ -91,7 +94,7 @@ class PolicyAppService:
         if not active_ids:
             return []
         with db.atomic():
-            mark_policies_deleted(list(active_ids))
+            mark_policies_deleted(list(active_ids), gateway=gateway)
         return active_ids
 
     def _prepare_column_filters(self, column_filters):

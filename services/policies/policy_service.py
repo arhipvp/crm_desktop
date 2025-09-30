@@ -8,13 +8,14 @@ from typing import Any, Iterable
 
 from peewee import JOIN, Field, fn
 
+from core.app_context import get_app_context
 from database.db import db
 
 from database.models import Client, Deal, Expense, Payment, Policy
+from infrastructure.drive_gateway import DriveGateway
 from services import executor_service as es
 from services.clients import get_client_by_id
 from services.deal_service import get_deal_by_id
-from services.container import get_drive_gateway
 from services.folder_utils import create_policy_folder, is_drive_link, open_folder
 from services.payment_service import (
     add_payment,
@@ -27,6 +28,10 @@ from services.query_utils import apply_search_and_filters
 
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_gateway(gateway: DriveGateway | None) -> DriveGateway:
+    return gateway or get_app_context().drive_gateway
 
 # ─────────────────────────── Исключения ───────────────────────────
 
@@ -235,7 +240,9 @@ def get_policies_page(
     return query.offset(offset).limit(per_page)
 
 
-def mark_policy_deleted(policy_id: int):
+def mark_policy_deleted(
+    policy_id: int, *, gateway: DriveGateway | None = None
+) -> None:
     policy = Policy.get_or_none(Policy.id == policy_id)
     if policy:
         policy.soft_delete()
@@ -243,7 +250,7 @@ def mark_policy_deleted(policy_id: int):
             from services.folder_utils import rename_policy_folder
 
             new_number = f"{policy.policy_number} deleted"
-            gateway = get_drive_gateway()
+            resolved_gateway = _resolve_gateway(gateway)
             new_path, new_link = rename_policy_folder(
                 policy.client.name,
                 policy.policy_number,
@@ -254,7 +261,7 @@ def mark_policy_deleted(policy_id: int):
                 policy.drive_folder_link
                 if is_drive_link(policy.drive_folder_link)
                 else None,
-                gateway=gateway,
+                gateway=resolved_gateway,
             )
             policy.policy_number = new_number
             fields_to_update = [Policy.policy_number, Policy.is_deleted]
@@ -280,16 +287,19 @@ def mark_policy_deleted(policy_id: int):
         logger.warning("❗ Полис id=%s не найден для удаления", policy_id)
 
 
-def mark_policies_deleted(policy_ids: list[int]) -> int:
+def mark_policies_deleted(
+    policy_ids: list[int], *, gateway: DriveGateway | None = None
+) -> int:
     """Массово помечает полисы удалёнными."""
     if not policy_ids:
         return 0
 
     count = 0
+    resolved_gateway = _resolve_gateway(gateway) if policy_ids else None
     for pid in policy_ids:
         before = Policy.get_or_none(Policy.id == pid)
         if before and not before.is_deleted:
-            mark_policy_deleted(pid)
+            mark_policy_deleted(pid, gateway=resolved_gateway)
             count += 1
     logger.info("Полисов помечено удалёнными: %s", count)
     return count
@@ -413,7 +423,13 @@ def add_contractor_expense(
 # ─────────────────────────── Добавление ───────────────────────────
 
 
-def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
+def add_policy(
+    *,
+    payments=None,
+    first_payment_paid=False,
+    gateway: DriveGateway | None = None,
+    **kwargs,
+):
     """
     Создаёт новый полис с привязкой к клиенту и (опционально) сделке.
     Требует указать номер полиса и хотя бы один платёж (payments).
@@ -544,13 +560,13 @@ def add_policy(*, payments=None, first_payment_paid=False, **kwargs):
 
     # ────────── Папка полиса ──────────
     deal_description = deal.description if deal else None
-    gateway = get_drive_gateway()
     try:
+        resolved_gateway = _resolve_gateway(gateway)
         folder_path = create_policy_folder(
             client.name,
             policy.policy_number,
             deal_description,
-            gateway=gateway,
+            gateway=resolved_gateway,
         )
         if folder_path:
             policy.drive_folder_path = folder_path
@@ -585,6 +601,7 @@ def update_policy(
     *,
     first_payment_paid: bool = False,
     payments: list[dict] | None = None,
+    gateway: DriveGateway | None = None,
     **kwargs,
 ):
     """Обновить поля полиса и, при необходимости, добавить платежи.
@@ -773,7 +790,7 @@ def update_policy(
         try:
             from services.folder_utils import rename_policy_folder
 
-            gateway = get_drive_gateway()
+            resolved_gateway = _resolve_gateway(gateway)
             new_path, new_link = rename_policy_folder(
                 old_client_name,
                 old_number,
@@ -784,7 +801,7 @@ def update_policy(
                 policy.drive_folder_link
                 if is_drive_link(policy.drive_folder_link)
                 else None,
-                gateway=gateway,
+                gateway=resolved_gateway,
             )
             fields_to_update = []
             if new_path and new_path != policy.drive_folder_path:

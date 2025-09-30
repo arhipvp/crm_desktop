@@ -136,6 +136,7 @@ class ImportPolicyJsonForm(QDialog):
             forced_client=client,
             forced_deal=self._forced_deal,
             parent=self,
+            context=getattr(self, "_context", None),
         )
 
         # Заполняем поля из policy

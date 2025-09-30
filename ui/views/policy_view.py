@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
 )
 
+from core.app_context import AppContext
 from services.policies import get_policies_page
 from ui.widgets.policy_card import PolicyCard
 from ui.forms.policy_form import PolicyForm
@@ -15,8 +16,9 @@ from ui.common.paginator import Paginator
 
 
 class PolicyView(QWidget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None, *, context: AppContext | None = None):
+        super().__init__(parent)
+        self._context: AppContext | None = context or getattr(parent, "_context", None)
         self.layout = QVBoxLayout(self)
 
         # Параметры пагинации
@@ -102,6 +104,6 @@ class PolicyView(QWidget):
             self.load_policies()
 
     def add_policy(self):
-        form = PolicyForm()
+        form = PolicyForm(parent=self, context=self._context)
         if form.exec() == form.Accepted:
             self.load_policies()

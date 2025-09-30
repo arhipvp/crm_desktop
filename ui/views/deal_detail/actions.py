@@ -273,6 +273,7 @@ class DealActionsMixin:
             parent=self,
             forced_client=self.instance.client,
             forced_deal=self.instance,
+            context=self._get_context(),
         )
         if form.exec():
             self._init_kpi_panel()
