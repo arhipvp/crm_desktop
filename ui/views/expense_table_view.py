@@ -4,6 +4,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
 
+from core.app_context import AppContext
+
 from database.models import Client, Deal, Expense, Payment, Policy
 from services import expense_service
 from ui.base.base_table_model import BaseTableModel
@@ -143,7 +145,15 @@ class ExpenseTableView(BaseTableView):
         12: "expense_date",
     }
 
-    def __init__(self, parent=None, deal_id=None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        context: AppContext | None = None,
+        deal_id=None,
+        **kwargs,
+    ):
+        self._context = context
         checkbox_map = {
             "Показывать выплаченные": self.load_data,
         }
@@ -152,6 +162,7 @@ class ExpenseTableView(BaseTableView):
             parent=parent,
             checkbox_map=checkbox_map,
             date_filter_field="expense_date",
+            **kwargs,
         )
         self.model_class = Expense  # или Client, Policy и т.д.
         self.form_class = ExpenseForm  # соответствующая форма

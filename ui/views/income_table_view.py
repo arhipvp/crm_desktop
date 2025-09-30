@@ -3,6 +3,8 @@ from peewee import prefetch
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHeaderView, QAbstractItemView
 
+from core.app_context import AppContext
+
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
 from services.income_service import (
     build_income_query,
@@ -127,7 +129,15 @@ class IncomeTableView(BaseTableView):
         8: Income.received_date,
         9: Executor.full_name,
     }
-    def __init__(self, parent=None, deal_id=None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        context: AppContext | None = None,
+        deal_id=None,
+        **kwargs,
+    ):
+        self._context = context
         checkbox_map = {
             "Показывать выплаченные": self.load_data,
         }
@@ -138,6 +148,7 @@ class IncomeTableView(BaseTableView):
             entity_name="Доход",
             checkbox_map=checkbox_map,
             date_filter_field="received_date",
+            **kwargs,
         )
         self.deal_id = deal_id
         self.default_sort_column = 8
