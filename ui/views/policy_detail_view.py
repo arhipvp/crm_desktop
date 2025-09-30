@@ -103,6 +103,7 @@ class PolicyDetailView(QDialog):
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 1)
         self._init_tabs()
+        self._restore_tab_index()
 
         # ───────────────────── Кнопки действий ─────────────────
         self._init_actions()
@@ -211,6 +212,7 @@ class PolicyDetailView(QDialog):
     def closeEvent(self, event):
         self._save_window_geometry()
         self._save_splitter_state()
+        self._save_tab_index()
         super().closeEvent(event)
 
     def _populate_summary(self) -> None:
@@ -265,6 +267,21 @@ class PolicyDetailView(QDialog):
             "ascii"
         )
         ui_settings.set_window_settings(self.SETTINGS_KEY, st)
+
+    def _restore_tab_index(self) -> None:
+        settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        tab_index = settings.get("tab_index")
+        try:
+            tab_index = int(tab_index)
+        except (TypeError, ValueError):
+            return
+        if 0 <= tab_index < self.tabs.count():
+            self.tabs.setCurrentIndex(tab_index)
+
+    def _save_tab_index(self) -> None:
+        settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        settings["tab_index"] = self.tabs.currentIndex()
+        ui_settings.set_window_settings(self.SETTINGS_KEY, settings)
 
     def _restore_window_geometry(self) -> None:
         settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
