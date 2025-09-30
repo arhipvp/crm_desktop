@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
-
-from config import get_settings
+from core.app_context import AppContext, get_app_context
 from infrastructure.drive_gateway import DriveGateway
 from infrastructure.sheets_gateway import SheetsGateway
 from services.sheets_service import (
@@ -14,42 +12,33 @@ from services.sheets_service import (
 )
 
 
-@lru_cache()
 def get_drive_gateway() -> DriveGateway:
     """Получить синглтон-экземпляр адаптера Google Drive."""
 
-    settings = get_settings()
-    return DriveGateway(settings)
+    return get_app_context().drive_gateway
 
 
-@lru_cache()
 def get_sheets_gateway() -> SheetsGateway:
-    settings = get_settings()
-    return SheetsGateway(settings)
+    return get_app_context().sheets_gateway
 
 
-@lru_cache()
 def get_task_repository() -> TaskRepository:
-    return TaskRepository()
+    return get_app_context().task_repository
 
 
-@lru_cache()
 def get_deal_calculation_repository() -> DealCalculationRepository:
-    return DealCalculationRepository()
+    return get_app_context().deal_calculation_repository
 
 
-@lru_cache()
 def get_sheets_sync_service() -> SheetsSyncService:
-    settings = get_settings()
-    return SheetsSyncService(
-        settings=settings,
-        gateway=get_sheets_gateway(),
-        task_repository=get_task_repository(),
-        calculation_repository=get_deal_calculation_repository(),
-    )
+    return get_app_context().sheets_sync_service
 
+
+app_context: AppContext = get_app_context()
 
 __all__ = [
+    "app_context",
+    "get_app_context",
     "get_drive_gateway",
     "get_sheets_gateway",
     "get_task_repository",
