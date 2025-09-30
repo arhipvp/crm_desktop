@@ -1,29 +1,35 @@
 import logging
 import sys
 from pathlib import Path
+
 from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
 
-from config import get_settings
+from config import Settings, get_settings
 from database.init import init_from_env
 from services import executor_service as es
 from ui.main_window import MainWindow
 from utils.logging_config import setup_logging
 
-# ───── Инициализация базы данных и логирования ─────
-settings = get_settings()
-if not settings.database_url:
-    raise RuntimeError("DATABASE_URL не задан в .env")
-init_from_env(settings.database_url)
-setup_logging(settings)
-logger = logging.getLogger(__name__)
+__all__ = ["main"]
 
-if __name__ == "__main__":
+
+def main(settings: Settings | None = None) -> int:
+    """Запускает настольное приложение CRM."""
+
+    settings = settings or get_settings()
+    if not settings.database_url:
+        raise RuntimeError("DATABASE_URL не задан в .env")
+
+    init_from_env(settings.database_url)
+    setup_logging(settings)
+    logger = logging.getLogger(__name__)
+
     # ───── Проверка и подготовка окружения ─────
     es.ensure_executors_from_env(settings)
 
     # ───── GUI ─────
-    app = QApplication(sys.argv)
+    app = QApplication.instance() or QApplication(sys.argv)
 
     try:
         base_dir = Path(__file__).resolve().parent
@@ -39,4 +45,8 @@ if __name__ == "__main__":
 
     window = MainWindow()
     window.show()
-    sys.exit(app.exec())
+    return app.exec()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
