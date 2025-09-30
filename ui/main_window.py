@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
 )
+
+from core.app_context import AppContext, get_app_context
 from utils.screen_utils import get_scaled_size
 
 from ui import settings as ui_settings
@@ -17,11 +19,11 @@ from ui.forms.import_policy_json_form import ImportPolicyJsonForm
 from ui.main_menu import MainMenu
 from ui.views.client_table_view import ClientTableView
 from ui.views.deal_table_view import DealTableView
+from ui.views.executor_table_view import ExecutorTableView
 from ui.views.finance_tab import FinanceTab
+from ui.views.home_tab import HomeTab
 from ui.views.policy_table_view import PolicyTableView
 from ui.views.task_table_view import TaskTableView
-from ui.views.home_tab import HomeTab
-from ui.views.executor_table_view import ExecutorTableView
 
 
 logger = logging.getLogger(__name__)
@@ -31,8 +33,9 @@ EXECUTOR_DIALOG_SETTINGS_KEY = "executor_dialog"
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, *, context: AppContext | None = None):
         super().__init__()
+        self._context = context or get_app_context()
         self.setWindowTitle("CRM Desktop")
         size = get_scaled_size(1600, 960, ratio=0.95)
         self.resize(size)
@@ -54,11 +57,11 @@ class MainWindow(QMainWindow):
         self.tab_widget = QTabWidget(self)
         self.setCentralWidget(self.tab_widget)
         self.home_tab = HomeTab()
-        self.client_tab = ClientTableView()
-        self.deal_tab = DealTableView()
-        self.policy_tab = PolicyTableView()
-        self.finance_tab = FinanceTab()
-        self.task_tab = TaskTableView()
+        self.client_tab = ClientTableView(parent=self, context=self._context)
+        self.deal_tab = DealTableView(parent=self, context=self._context)
+        self.policy_tab = PolicyTableView(parent=self, context=self._context)
+        self.finance_tab = FinanceTab(parent=self, context=self._context)
+        self.task_tab = TaskTableView(parent=self, context=self._context)
 
         self.tab_widget.addTab(self.home_tab, "Главная")
         self.tab_widget.addTab(self.client_tab, "Клиенты")
@@ -119,7 +122,7 @@ class MainWindow(QMainWindow):
         dlg.setWindowFlag(Qt.WindowMinMaxButtonsHint, True)
         dlg.setWindowTitle("Исполнители")
         layout = QVBoxLayout(dlg)
-        view = ExecutorTableView()
+        view = ExecutorTableView(parent=dlg, context=self._context)
         layout.addWidget(view)
         dlg.resize(get_scaled_size(600, 400))
         geometry = (

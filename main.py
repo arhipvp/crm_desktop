@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication
 from config import Settings, get_settings
 from database.init import init_from_env
 from services import executor_service as es
+from core.app_context import get_app_context
 from ui.main_window import MainWindow
 from utils.logging_config import setup_logging
 
@@ -43,7 +44,9 @@ def main(settings: Settings | None = None) -> int:
     except OSError as e:
         logger.warning("Не удалось загрузить стиль: %s", e)
 
-    window = MainWindow()
+    context = get_app_context()
+
+    window = MainWindow(context=context)
     window.show()
     return app.exec()
 
