@@ -390,7 +390,7 @@ class DealActionsMixin:
             for i, src in enumerate(files, 1):
                 if dlg.wasCanceled():
                     break
-                    move_file_to_folder(src, dest)
+                move_file_to_folder(src, dest)
                 dlg.setValue(i)
         finally:
             dlg.close()
