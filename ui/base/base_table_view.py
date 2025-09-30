@@ -144,6 +144,9 @@ class BaseTableView(QWidget):
         self.use_inline_details = True
         self.detail_widget = None
         self.settings_id = type(self).__name__
+        self._settings_loaded = False
+        self._block_pending_restore = False
+        self._settings_restore_pending = False
 
         self.default_sort_column = 0
         self.default_sort_order = Qt.AscendingOrder
@@ -1298,6 +1301,8 @@ class BaseTableView(QWidget):
 
     def _on_sort_indicator_changed(self, column: int, order: Qt.SortOrder):
         """Сохраняет текущую сортировку таблицы."""
+        if not self._settings_loaded:
+            self._block_pending_restore = True
         self.current_sort_column = column
         self.current_sort_order = order
         self.save_table_settings()
@@ -1307,6 +1312,9 @@ class BaseTableView(QWidget):
 
     def save_table_settings(self):
         """Сохраняет настройки сортировки и ширины колонок."""
+        if not self._settings_loaded:
+            return
+
         header = self.table.horizontalHeader()
         widths = {i: header.sectionSize(i) for i in range(header.count())}
         hidden = [i for i in range(header.count()) if self.table.isColumnHidden(i)]
@@ -1331,12 +1339,14 @@ class BaseTableView(QWidget):
 
     def load_table_settings(self):
         """Применяет сохранённые настройки, если они есть."""
+        self._settings_restore_pending = False
         header = self.table.horizontalHeader()
         saved = ui_settings.get_table_settings(self.settings_id)
         if not saved:
             if self.splitter.count() > 1:
                 self.splitter.setStretchFactor(0, 3)
                 self.splitter.setStretchFactor(1, 2)
+            self._settings_loaded = True
             return
         splitter_restored = False
         encoded_splitter = saved.get("splitter_state")
@@ -1352,7 +1362,7 @@ class BaseTableView(QWidget):
             self.splitter.setStretchFactor(1, 2)
         column = saved.get("sort_column")
         order = saved.get("sort_order")
-        if column is not None and order is not None:
+        if not self._block_pending_restore and column is not None and order is not None:
             try:
                 header.setSortIndicator(int(column), Qt.SortOrder(order))
                 self.current_sort_column = int(column)
@@ -1424,6 +1434,8 @@ class BaseTableView(QWidget):
         self.paginator.update(self.total_count, self.page, self.per_page)
         if need_reload:
             self.load_data()
+        self._block_pending_restore = False
+        self._settings_loaded = True
 
     def closeEvent(self, event):
         self.save_table_settings()
