@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QGroupBox,
     QDateEdit,
+    QHeaderView,
 )
 from PySide6.QtGui import QColor
 from PySide6.QtCore import Qt, QDate, QByteArray
@@ -69,9 +70,16 @@ class PolicyMergeDialog(QDialog):
         self.show_only_changes_cb = QCheckBox("Показывать только изменения")
         self.show_only_changes_cb.toggled.connect(self._apply_filter)
         layout.addWidget(self.show_only_changes_cb)
+        window_settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(
             ["Поле", "Текущее", "Новое значение", "Итоговое"]
+        )
+        table_header = self.table.horizontalHeader()
+        table_header.setSectionResizeMode(QHeaderView.Interactive)
+        self._apply_widths_to_table(
+            self.table,
+            (window_settings or {}).get("table_column_widths"),
         )
         layout.addWidget(self.table)
 
@@ -158,10 +166,9 @@ class PolicyMergeDialog(QDialog):
         if hasattr(self, "client_combo"):
             self._on_client_changed()
 
-        self.table.resizeColumnsToContents()
         self._apply_filter()
 
-        self._build_payments_section(layout)
+        self._build_payments_section(layout, window_settings)
 
         btns = QHBoxLayout()
         self.merge_btn = QPushButton("Объединить")
@@ -174,6 +181,7 @@ class PolicyMergeDialog(QDialog):
         layout.addLayout(btns)
 
         self._restore_geometry()
+        self._apply_saved_column_widths()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -263,7 +271,9 @@ class PolicyMergeDialog(QDialog):
     # Payments
     # ------------------------------------------------------------------
 
-    def _build_payments_section(self, layout: QVBoxLayout) -> None:
+    def _build_payments_section(
+        self, layout: QVBoxLayout, window_settings: dict | None = None
+    ) -> None:
         group = QGroupBox("Платежи")
         vbox = QVBoxLayout(group)
         self.payments_table = QTableWidget(0, 4)
@@ -273,6 +283,14 @@ class PolicyMergeDialog(QDialog):
             "Оплачен",
             "",
         ])
+        payments_header = self.payments_table.horizontalHeader()
+        payments_header.setSectionResizeMode(QHeaderView.Interactive)
+        if window_settings is None:
+            window_settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        self._apply_widths_to_table(
+            self.payments_table,
+            (window_settings or {}).get("payments_column_widths"),
+        )
         vbox.addWidget(self.payments_table)
 
         # существующие платежи из БД
@@ -482,6 +500,42 @@ class PolicyMergeDialog(QDialog):
     # Geometry helpers
     # ------------------------------------------------------------------
 
+    def _apply_widths_to_table(self, table: QTableWidget, widths) -> bool:
+        if not isinstance(widths, dict):
+            return False
+        header = table.horizontalHeader()
+        applied = False
+        for section in range(table.columnCount()):
+            value = widths.get(str(section))
+            if value is None:
+                value = widths.get(section)
+            if value is None:
+                continue
+            try:
+                size = int(value)
+            except (TypeError, ValueError):
+                continue
+            if size <= 0:
+                continue
+            header.resizeSection(section, size)
+            applied = True
+        return applied
+
+    def _apply_saved_column_widths(self) -> None:
+        settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        table_applied = self._apply_widths_to_table(
+            self.table,
+            (settings or {}).get("table_column_widths"),
+        )
+        payments_applied = self._apply_widths_to_table(
+            self.payments_table,
+            (settings or {}).get("payments_column_widths"),
+        )
+        if not table_applied:
+            self.table.resizeColumnsToContents()
+        if not payments_applied:
+            self.payments_table.resizeColumnsToContents()
+
     def _restore_geometry(self) -> None:
         try:
             geometry_b64 = ui_settings.get_window_settings(self.SETTINGS_KEY).get("geometry")
@@ -497,6 +551,16 @@ class PolicyMergeDialog(QDialog):
             geometry_b64 = base64.b64encode(geometry).decode("ascii")
             settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
             settings["geometry"] = geometry_b64
+            table_header = self.table.horizontalHeader()
+            payments_header = self.payments_table.horizontalHeader()
+            settings["table_column_widths"] = {
+                str(i): int(table_header.sectionSize(i))
+                for i in range(self.table.columnCount())
+            }
+            settings["payments_column_widths"] = {
+                str(i): int(payments_header.sectionSize(i))
+                for i in range(self.payments_table.columnCount())
+            }
             ui_settings.set_window_settings(self.SETTINGS_KEY, settings)
         except Exception:  # pragma: no cover - сохранение не критично
             pass
