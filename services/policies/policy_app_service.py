@@ -97,6 +97,51 @@ class PolicyAppService:
             mark_policies_deleted(list(active_ids), gateway=gateway)
         return active_ids
 
+    def get_policies_by_ids(
+        self, policy_ids: Sequence[int], *, as_dto: bool = False
+    ) -> dict[int, Policy | PolicyRowDTO]:
+        """Получить полисы по списку идентификаторов за один запрос.
+
+        Args:
+            policy_ids: Последовательность идентификаторов полисов.
+            as_dto: Если ``True``, вернуть DTO вместо моделей.
+
+        Returns:
+            dict[int, Policy | PolicyRowDTO]: Словарь ``id -> полис``. Для
+            отсутствующих в базе идентификаторов значения отсутствуют.
+        """
+
+        if not policy_ids:
+            return {}
+
+        unique_ids: list[int] = []
+        seen: set[int] = set()
+        for policy_id in policy_ids:
+            if policy_id is None:
+                continue
+            try:
+                normalized = int(policy_id)
+            except (TypeError, ValueError):
+                continue
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            unique_ids.append(normalized)
+
+        if not unique_ids:
+            return {}
+
+        policies = list(Policy.active().where(Policy.id.in_(unique_ids)))
+        attach_premium(policies)
+
+        if as_dto:
+            return {
+                policy.id: PolicyRowDTO.from_model(policy)
+                for policy in policies
+            }
+
+        return {policy.id: policy for policy in policies}
+
     def _prepare_column_filters(self, column_filters):
         if not column_filters:
             return None
