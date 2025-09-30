@@ -128,7 +128,7 @@ class PolicyTableView(BaseTableView):
         return policy.deal
 
     def add_new(self):
-        form = PolicyForm()
+        form = PolicyForm(parent=self, context=self._context)
         if form.exec():
             self.refresh()
 
@@ -140,7 +140,7 @@ class PolicyTableView(BaseTableView):
         if instance is None:
             show_error("Полис не найден")
             return
-        form = PolicyForm(instance)
+        form = PolicyForm(instance, parent=self, context=self._context)
         if form.exec():
             self.refresh()
 

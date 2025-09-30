@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
 )
 
+from core.app_context import AppContext, get_app_context
 from services.folder_utils import open_folder
 from ui.common.styled_widgets import styled_button
 
@@ -65,6 +66,7 @@ class PolicyForm(BaseEditForm):
         forced_deal=None,  # Deal   | int | None
         parent=None,
         first_payment_paid=False,
+        context: AppContext | None = None,
     ):
         self._auto_end_date = None  # будем хранить последнее автозаполненное значение
         self.start_date_edit = None
@@ -74,11 +76,20 @@ class PolicyForm(BaseEditForm):
         self._forced_deal = forced_deal
         self._first_payment_paid = first_payment_paid
         self._draft_payments: list[dict] = []
+        self._context: AppContext | None = context or getattr(parent, "_context", None)
         super().__init__(
             instance=policy, model_class=Policy, entity_name="полис", parent=parent
         )
         # после построения формы применяем фильтрацию сделок по выбранному клиенту
         self.on_client_changed()
+
+    def _get_context(self) -> AppContext:
+        if self._context is None:
+            self._context = get_app_context()
+        return self._context
+
+    def _get_drive_gateway(self):
+        return self._get_context().drive_gateway
 
     def set_instance(self, instance):
         super().set_instance(instance)
@@ -281,11 +292,13 @@ class PolicyForm(BaseEditForm):
 
         # Платежи передаются сервису из чернового списка
         payments = self._draft_payments or None
+        gateway = self._get_drive_gateway()
         if self.instance:
             policy = update_policy(
                 self.instance,
                 payments=payments,
                 first_payment_paid=self.first_payment_checkbox.isChecked(),
+                gateway=gateway,
                 **data,
             )
         else:
@@ -294,6 +307,7 @@ class PolicyForm(BaseEditForm):
             policy = add_policy(
                 payments=payments,
                 first_payment_paid=self._first_payment_paid,
+                gateway=gateway,
                 **data,
             )
 
@@ -352,6 +366,7 @@ class PolicyForm(BaseEditForm):
                     e.existing_policy,
                     payments=merged_payments if merged_payments else None,
                     first_payment_paid=dlg.first_payment_checkbox.isChecked(),
+                    gateway=self._get_drive_gateway(),
                     **merged,
                 )
                 self.saved_instance = updated
