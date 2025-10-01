@@ -72,6 +72,8 @@ class DealAppService:
 
     def count(self, **filters) -> int:
         column_filters = self._convert_column_filters(filters.pop("column_filters", None))
+        filters.pop("order_by", None)
+        filters.pop("order_dir", None)
         query = self._build_query(column_filters=column_filters, **filters)
         return query.count()
 
