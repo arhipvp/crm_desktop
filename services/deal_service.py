@@ -465,6 +465,10 @@ def get_deals_page(
             .join(DealExecutor, JOIN.LEFT_OUTER, on=(DealExecutor.deal == Deal.id))
             .join(Executor, JOIN.LEFT_OUTER, on=(DealExecutor.executor == Executor.id))
         )
+        # Поле исполнителя участвует в ORDER BY, поэтому добавляем его в
+        # результирующий SELECT (PostgreSQL требует, чтобы такие столбцы были
+        # явно выбраны при использовании DISTINCT).
+        query = query.select(Deal, Client, Executor.full_name.alias("executor_order"))
         if order_dir == "desc":
             query = query.order_by(Executor.full_name.desc(), Deal.id.desc())
         else:
@@ -525,7 +529,10 @@ def build_deal_query(
 ) -> ModelSelect:
     """Базовый запрос сделок с фильтрами по статусам."""
     base = Deal.active() if not show_deleted else Deal.select()
-    query = base.join(Client)
+    # В выборку добавляем поля клиента, чтобы их можно было использовать
+    # в выражениях ORDER BY даже при DISTINCT-запросах (PostgreSQL требует,
+    # чтобы такие поля присутствовали в списке SELECT).
+    query = base.join(Client).select(Deal, Client)
 
     query = apply_deal_filters(query, search_text, column_filters)
 
