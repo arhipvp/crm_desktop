@@ -1,24 +1,98 @@
 from __future__ import annotations
 
 from datetime import date
+import logging
+from typing import Iterable
 
 from dateutil.relativedelta import relativedelta
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import QAbstractItemView, QMenu
 
 from core.app_context import AppContext
+from database.models import Policy
 from services.deal_service import get_all_deals, get_deal_by_id
 from services.folder_utils import copy_text_to_clipboard
 from services.policies import CandidateDeal, find_candidate_deals, update_policy
 from services.policies.policy_app_service import policy_app_service
 from services.policies.policy_table_controller import PolicyTableController
 from services.policies.dto import PolicyRowDTO
+from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
 from ui.common.message_boxes import confirm, show_error, show_info
 from ui.common.search_dialog import SearchDialog
 from ui.common.styled_widgets import styled_button
 from ui.forms.policy_form import PolicyForm
 from ui.views.policy_detail_view import PolicyDetailView
+
+
+logger = logging.getLogger(__name__)
+
+
+class PolicyTableModel(BaseTableModel):
+    """Модель таблицы полисов с поддержкой инлайн-редактирования."""
+
+    def __init__(
+        self,
+        controller: PolicyTableController,
+        objects: Iterable[PolicyRowDTO],
+        parent=None,
+    ) -> None:
+        super().__init__(list(objects), PolicyRowDTO, parent)
+        self._controller = controller
+
+    def flags(self, index):  # type: ignore[override]
+        base_flags = super().flags(index)
+        if not index.isValid():
+            return base_flags
+        field = self.fields[index.column()]
+        if getattr(field, "model", None) is Policy:
+            return base_flags
+        return base_flags & ~Qt.ItemIsEditable
+
+    def setData(self, index, value, role=Qt.EditRole):  # type: ignore[override]
+        if role != Qt.EditRole or not index.isValid():
+            return False
+
+        field = self.fields[index.column()]
+        if getattr(field, "model", None) is not Policy:
+            return False
+
+        try:
+            dto = self.objects[index.row()]
+        except IndexError:
+            return False
+
+        normalized = self._normalize_value(value)
+        try:
+            updated_dto = self._controller.update_policy_field(
+                dto.id, field.name, normalized
+            )
+        except Exception as exc:  # noqa: BLE001
+            show_error(str(exc))
+            logger.warning(
+                "❌ Не удалось обновить поле %s у полиса %s: %s",
+                field.name,
+                dto.id,
+                exc,
+            )
+            return False
+
+        self.objects[index.row()] = updated_dto
+        left = self.index(index.row(), 0)
+        right = self.index(index.row(), self.columnCount() - 1)
+        self.dataChanged.emit(left, right, [Qt.DisplayRole, Qt.EditRole, Qt.UserRole])
+        return True
+
+    def _normalize_value(self, value):
+        if isinstance(value, QDate):
+            if not value.isValid():
+                return None
+            return value.toPython()
+        if hasattr(value, "toPyDate"):
+            return value.toPyDate()
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
 
 class PolicyTableView(BaseTableView):
@@ -100,6 +174,11 @@ class PolicyTableView(BaseTableView):
         self.ai_btn.clicked.connect(self._on_ai_import)
 
         self.load_data()
+
+    def create_table_model(
+        self, items: Iterable[PolicyRowDTO], model_class
+    ) -> PolicyTableModel:
+        return PolicyTableModel(self.controller, list(items), parent=self.table)
 
     def _apply_filters(self, filters: dict) -> dict:
         filters.update(
