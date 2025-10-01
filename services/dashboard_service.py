@@ -1,8 +1,10 @@
 """Функции для получения сводной информации на дашборд."""
 
-from playhouse.shortcuts import prefetch
-from peewee import fn
 from datetime import date, timedelta
+from functools import lru_cache
+
+from peewee import ModelSelect, fn
+from playhouse.shortcuts import prefetch
 
 from database.models import Client, Deal, Policy, Task
 from .task_states import SENT
@@ -58,15 +60,17 @@ def get_upcoming_tasks(limit: int = 10) -> list[Task]:
         .order_by(Task.due_date.asc())
         .limit(limit)
     )
-    return list(prefetch(base, Deal, Policy, Client))
+    policy_query = _policy_dashboard_select()
+    return list(prefetch(base, Deal, policy_query, Client))
 
 
 def get_expiring_policies(limit: int = 10) -> list[Policy]:
     """Полисы, срок действия которых скоро заканчивается."""
     base = (
-        Policy.active()
+        _policy_dashboard_select()
         .where(
-            (Policy.end_date.is_null(False))
+            (Policy.is_deleted == False)
+            & (Policy.end_date.is_null(False))
             & (
                 Policy.renewed_to.is_null(True)
                 | (Policy.renewed_to == "")
@@ -116,3 +120,35 @@ def get_deal_reminder_counts(days: int = 14) -> dict:
         counts[row.reminder_date] = row.cnt
 
     return counts
+
+
+@lru_cache(maxsize=1)
+def _policy_dashboard_fields() -> tuple:
+    """Набор полей ``Policy`` без необязательных Drive-колонок."""
+    columns = {
+        column.name
+        for column in Policy._meta.database.get_columns(Policy._meta.table_name)
+    }
+
+    base_fields: tuple = (
+        Policy.id,
+        Policy.client,
+        Policy.deal,
+        Policy.policy_number,
+        Policy.note,
+        Policy.start_date,
+        Policy.end_date,
+        Policy.renewed_to,
+        Policy.is_deleted,
+    )
+    optional_fields = tuple(
+        getattr(Policy, field_name)
+        for field_name in ("drive_folder_path", "drive_folder_link")
+        if field_name in columns
+    )
+    return base_fields + optional_fields
+
+
+def _policy_dashboard_select() -> ModelSelect:
+    """Запрос на выборку полей ``Policy`` с проверкой наличия Drive-колонок."""
+    return Policy.select(*_policy_dashboard_fields())
