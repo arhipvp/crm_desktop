@@ -1,7 +1,7 @@
 import pytest
 from datetime import date
 
-from database.models import Client, Policy, Executor, Deal
+from database.models import Client, Policy, Executor, Deal, DealExecutor
 from services.clients.client_service import build_client_query
 from services.query_utils import apply_search_and_filters
 from services.executor_service import get_executors_page
@@ -120,3 +120,22 @@ def test_search_deals_by_policy_vin(in_memory_db):
 
     assert len(results) == 1
     assert results[0].id == deal.id
+
+
+def test_get_deals_page_with_search_text(in_memory_db):
+    client = Client.create(name="SearchClient", phone="7123456")
+    deal = _create_deal(client, "Searchable deal")
+    executor = Executor.create(full_name="Executor", tg_id=123, is_active=True)
+    DealExecutor.create(deal=deal, executor=executor, assigned_date=date.today())
+    Policy.create(
+        client=client,
+        deal=deal,
+        policy_number="SRCH-001",
+        start_date=date.today(),
+        vehicle_vin="SEARCHVIN001",
+    )
+
+    results = get_deals_page(page=1, per_page=5, search_text="SEARCHVIN")
+
+    assert [item.id for item in results] == [deal.id]
+    assert getattr(results[0], "_executor") == executor
