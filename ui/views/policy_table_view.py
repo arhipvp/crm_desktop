@@ -73,6 +73,8 @@ class PolicyTableView(BaseTableView):
         self.setAcceptDrops(True)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setSortingEnabled(True)
+        self._last_sortable_column = self.current_sort_column
+        self._last_sort_order = self.current_sort_order
         self.table.horizontalHeader().sortIndicatorChanged.connect(self.on_sort_changed)
         self.table.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked
@@ -542,7 +544,15 @@ class PolicyTableView(BaseTableView):
     def on_sort_changed(self, logical_index: int, order: Qt.SortOrder):
         field = self.COLUMN_FIELD_MAP.get(logical_index)
         if field is None:
+            header = self.table.horizontalHeader()
+            header.blockSignals(True)
+            try:
+                header.setSortIndicator(self._last_sortable_column, self._last_sort_order)
+            finally:
+                header.blockSignals(False)
             return
+        self._last_sortable_column = logical_index
+        self._last_sort_order = order
         self.current_sort_column = logical_index
         self.current_sort_order = order
         self.page = 1

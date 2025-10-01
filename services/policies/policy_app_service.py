@@ -158,13 +158,15 @@ class PolicyAppService:
 
     def _resolve_order_field(self, order_by: Any | None) -> Field | None:
         if isinstance(order_by, Field):
+            if getattr(order_by, "model", None) is None:
+                return None
             return order_by
         if isinstance(order_by, str):
             alias_field = self._FIELD_ALIASES.get(order_by)
-            if alias_field is not None:
+            if isinstance(alias_field, Field) and getattr(alias_field, "model", None) is not None:
                 return alias_field
             candidate = getattr(Policy, order_by, None)
-            if isinstance(candidate, Field):
+            if isinstance(candidate, Field) and getattr(candidate, "model", None) is not None:
                 return candidate
         return Policy.start_date
 
