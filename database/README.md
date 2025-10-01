@@ -15,4 +15,11 @@
 python database/migrations/001_decimal_fields.py
 ```
 
+Если в таблице `policy` отсутствует столбец `drive_folder_path`, выполните
+миграцию `migrations/002_add_policy_drive_folder_path.py`:
+
+```bash
+python database/migrations/002_add_policy_drive_folder_path.py
+```
+
 Для работы в тестах база создаётся в памяти с помощью фикстуры `test_db` из `tests/conftest.py`.
