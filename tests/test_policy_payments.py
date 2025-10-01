@@ -220,13 +220,14 @@ def test_add_policy_rolls_back_on_payment_error(
 
 @pytest.mark.parametrize("fail", ["income", "expense"])
 def test_add_payment_rolls_back_on_related_error(
-    in_memory_db, monkeypatch, mock_payments, fail
+    in_memory_db, monkeypatch, fail
 ):
-    import importlib
     import services.income_service as income_service
     import services.expense_service as expense_service
 
-    pay_module = importlib.reload(pay_svc)
+    monkeypatch.setattr(
+        Payment, "soft_delete", lambda self: self.delete_instance()
+    )
 
     client = Client.create(name="C")
     d1 = datetime.date(2024, 1, 1)
@@ -244,7 +245,7 @@ def test_add_payment_rolls_back_on_related_error(
         monkeypatch.setattr(expense_service, "add_expense", boom)
 
     with pytest.raises(RuntimeError):
-        pay_module.add_payment(policy=policy, amount=100, payment_date=d1)
+        pay_svc.add_payment(policy=policy, amount=100, payment_date=d1)
 
     assert Payment.select().count() == 0
     assert Income.select().count() == 0
