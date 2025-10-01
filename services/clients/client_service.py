@@ -633,7 +633,12 @@ def mark_clients_deleted(client_ids: list[int]) -> int:
 
 
 def delete_clients(clients: list[ClientDTO]) -> None:
-    """Удаляет клиентов, переданных в виде DTO."""
+    """Помечает переданных клиентов удалёнными (soft delete).
+
+    Для одиночного клиента вызывает :func:`mark_client_deleted`, а при
+    пакетной обработке — :func:`mark_clients_deleted`, чтобы отметить записи
+    удалёнными без физического удаления из базы.
+    """
     ids = [c.id for c in clients]
     if not ids:
         return
