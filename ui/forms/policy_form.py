@@ -33,6 +33,7 @@ from services.validators import normalize_policy_number, normalize_number
 
 from services.deal_service import get_all_deals, get_deals_by_client_id
 from ui.forms.contractor_expense_dialog import ContractorExpenseDialog
+from ui.forms.payment_helpers import resolve_actual_payment_date
 from ui.forms.policy_merge_dialog import PolicyMergeDialog
 from ui.base.base_edit_form import BaseEditForm
 from ui.common.combo_helpers import (
@@ -277,13 +278,12 @@ class PolicyForm(BaseEditForm):
 
         for idx, pay in enumerate(self._draft_payments):
             chk = self.payments_table.cellWidget(idx, 2)
-            if isinstance(chk, QCheckBox):
-                if chk.isChecked():
-                    pay["actual_payment_date"] = (
-                        pay.get("actual_payment_date") or pay["payment_date"]
-                    )
-                else:
-                    pay["actual_payment_date"] = None
+            is_checked = isinstance(chk, QCheckBox) and chk.isChecked()
+            pay["actual_payment_date"] = resolve_actual_payment_date(
+                pay.get("payment_date"),
+                pay.get("actual_payment_date"),
+                is_checked,
+            )
         if not data.get("end_date"):
             QMessageBox.warning(
                 self, "Ошибка", "Дата окончания полиса обязательна для заполнения!"

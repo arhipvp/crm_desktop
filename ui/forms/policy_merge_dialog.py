@@ -38,6 +38,7 @@ from ui.common.date_utils import (
 
 from database.models import Policy, Payment
 from ui import settings as ui_settings
+from ui.forms.payment_helpers import resolve_actual_payment_date
 
 
 class PolicyMergeDialog(QDialog):
@@ -412,11 +413,11 @@ class PolicyMergeDialog(QDialog):
 
             # читаем фактическую дату оплаты из UserRole
             actual_dt = date_item.data(Qt.UserRole)
-            if isinstance(actual_dt, QDate):
-                actual_payment_date = actual_dt.toPython()
-            else:
-                # если чекбокс отмечен, но отдельной фактической даты нет — берём дату платежа
-                actual_payment_date = qd.toPython() if (chk and chk.isChecked()) else None
+            stored_actual = actual_dt.toPython() if isinstance(actual_dt, QDate) else None
+            is_checked = isinstance(chk, QCheckBox) and chk.isChecked()
+            actual_payment_date = resolve_actual_payment_date(
+                qd.toPython(), stored_actual, is_checked
+            )
 
             payments.append(
                 {
