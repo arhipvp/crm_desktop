@@ -101,3 +101,22 @@ def test_search_deals_by_phone(in_memory_db):
     results = list(query)
     assert len(results) == 1
     assert results[0].id == d2.id
+
+
+def test_search_deals_by_policy_vin(in_memory_db):
+    client = Client.create(name="VinClient")
+    deal = _create_deal(client, "Deal with VIN")
+    Policy.create(
+        client=client,
+        deal=deal,
+        policy_number="VIN-001",
+        start_date=date.today(),
+        vehicle_vin="X123VIN456",
+    )
+    _create_deal(client, "Another deal")
+
+    query = build_deal_query(search_text="VIN456")
+    results = list(query)
+
+    assert len(results) == 1
+    assert results[0].id == deal.id

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from types import SimpleNamespace
 from typing import Iterable, Optional
@@ -80,6 +80,7 @@ class DealRowDTO:
     drive_folder_link: Optional[str]
     is_deleted: bool
     executor: Optional[DealExecutorInfo] = None
+    policy_vins: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def client_id(self) -> int:
@@ -116,6 +117,18 @@ def _to_executor_info(executor: Executor | None) -> DealExecutorInfo | None:
     return DealExecutorInfo(id=executor.id, full_name=executor.full_name)
 
 
+def _collect_policy_vins(deal: Deal) -> tuple[str, ...]:
+    policies = getattr(deal, "policies", [])
+    vins: set[str] = set()
+    for policy in policies:
+        if getattr(policy, "is_deleted", False):
+            continue
+        vin = getattr(policy, "vehicle_vin", None)
+        if vin:
+            vins.add(vin)
+    return tuple(sorted(vins))
+
+
 def deal_to_row_dto(deal: Deal) -> DealRowDTO:
     client_info = _to_client_info(getattr(deal, "client", None), deal.client_id)
     executor = getattr(deal, "_executor", None)
@@ -134,6 +147,7 @@ def deal_to_row_dto(deal: Deal) -> DealRowDTO:
         drive_folder_link=deal.drive_folder_link,
         is_deleted=deal.is_deleted,
         executor=executor_info,
+        policy_vins=_collect_policy_vins(deal),
     )
 
 

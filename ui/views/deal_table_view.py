@@ -105,8 +105,14 @@ class DealTableModel(BaseTableModel):
 
         def matches(obj: DealRowDTO) -> bool:
             if self._quick_text:
+                vin_text = " ".join(getattr(obj, "policy_vins", ()))
                 haystack = " ".join(
-                    [obj.client.name, obj.description or "", obj.status or ""]
+                    [
+                        obj.client.name,
+                        obj.description or "",
+                        obj.status or "",
+                        vin_text,
+                    ]
                 ).lower()
                 if self._quick_text not in haystack:
                     return False
