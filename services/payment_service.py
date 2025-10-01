@@ -227,7 +227,11 @@ def mark_payments_paid(payment_ids: list[int], paid_date: date | None = None) ->
 
 
 def add_payment(**kwargs):
-    """Создать платёж и связанные записи дохода и расхода."""
+    """Создать платёж с авто-добавлением нулевого дохода и условного расхода.
+
+    Авто-расход контрагенту создаётся только если у полиса заполнено поле
+    ``contractor``.
+    """
     from services.income_service import add_income
     from services.expense_service import add_expense
 
