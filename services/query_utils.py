@@ -124,7 +124,13 @@ def apply_search_and_filters(
 def sum_column(query: ModelSelect, field: Field) -> Decimal:
     """Вернуть сумму значений ``field`` для переданного запроса."""
 
-    aggregate = query.clone().select(fn.COALESCE(fn.SUM(field), 0))
+    aggregate = (
+        query.clone()
+        .limit(None)
+        .offset(None)
+        .order_by()
+        .select(fn.COALESCE(fn.SUM(field), 0))
+    )
     value: Any | None = aggregate.scalar()
     if value is None:
         return Decimal("0")
