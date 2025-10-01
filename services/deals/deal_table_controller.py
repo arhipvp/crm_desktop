@@ -44,7 +44,8 @@ class DealTableController(TableController):
     def load_deal(self, deal_id: int) -> Deal | None:
         """Возвращает сделку по идентификатору или ``None``."""
 
-        return get_deal_by_id(deal_id)
+        include_deleted = self.view.is_checked("Показывать удалённые")
+        return get_deal_by_id(deal_id, include_deleted=include_deleted)
 
     def get_statuses(self) -> list[str]:
         return list(self.service.get_statuses())

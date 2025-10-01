@@ -83,8 +83,9 @@ def get_deals_by_client_id(client_id: int):
     return Deal.active().where(Deal.client_id == client_id)
 
 
-def get_deal_by_id(deal_id: int) -> Deal | None:
-    return Deal.active().where(Deal.id == deal_id).get_or_none()
+def get_deal_by_id(deal_id: int, include_deleted: bool = False) -> Deal | None:
+    query = Deal.select() if include_deleted else Deal.active()
+    return query.where(Deal.id == deal_id).get_or_none()
 
 
 def get_distinct_statuses() -> list[str]:
