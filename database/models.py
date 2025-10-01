@@ -92,6 +92,7 @@ class Policy(SoftDeleteModel):
     vehicle_model = CharField(null=True)
     vehicle_vin = CharField(null=True)
     note = TextField(null=True)
+    drive_folder_path = CharField(null=True)
     drive_folder_link = CharField(null=True)
     renewed_to = CharField(null=True)
 
