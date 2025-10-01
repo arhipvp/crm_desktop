@@ -1,4 +1,5 @@
 import logging
+
 from typing import Any, Callable, Iterable
 
 from PySide6.QtCore import Qt, QTimer
@@ -29,11 +30,18 @@ class TableController:
         self.filter_func = filter_func
 
     # --- Работа с моделью -------------------------------------------------
+    def _create_table_model(self, items: Iterable[Any], model_class: Any) -> BaseTableModel:
+        """Создаёт таблицу по умолчанию для контроллера."""
+
+        if not isinstance(items, list):
+            items = list(items)
+        return BaseTableModel(items, model_class)
+
     def set_model_class_and_items(
         self, model_class, items: list[Any], total_count: int | None = None
     ):
         """Устанавливает модель и обновляет связанные элементы UI."""
-        self.view.model = BaseTableModel(items, model_class)
+        self.view.model = self._create_table_model(items, model_class)
         self.view.proxy.setSourceModel(self.view.model)
         self.view.table.setModel(self.view.proxy)
         self.view.apply_saved_filters()
@@ -136,7 +144,7 @@ class TableController:
             )
             return
 
-        self.view.model = BaseTableModel(items, self.model_class)
+        self.view.model = self._create_table_model(items, self.model_class)
         self.view.proxy.setSourceModel(self.view.model)
         self.view.table.setModel(self.view.proxy)
         self.view.apply_saved_filters()

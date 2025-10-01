@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Any, Iterable, Sequence
 
 from database.models import Policy
 from ui.base.table_controller import TableController
@@ -33,11 +33,24 @@ class PolicyTableController(TableController):
 
         return self.service.get_policies_by_ids(policy_ids, as_dto=as_dto)
 
+    def update_policy_field(self, policy_id: int, field: str, value: Any) -> PolicyRowDTO:
+        """Обновить отдельное поле полиса через фасад приложения."""
+
+        return self.service.update_policy_field(policy_id, field, value)
+
     def _get_page(self, page: int, per_page: int, **filters):
         return self.service.get_page(page, per_page, **filters)
 
     def _get_total(self, **filters):
         return self.service.count(**filters)
+
+    def _create_table_model(
+        self, items: Iterable[PolicyRowDTO], model_class
+    ):
+        factory = getattr(self.view, "create_table_model", None)
+        if callable(factory):
+            return factory(items, model_class)
+        return super()._create_table_model(items, model_class)
 
 
 __all__ = ["PolicyTableController"]

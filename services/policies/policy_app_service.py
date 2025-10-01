@@ -12,6 +12,7 @@ from services.policies.policy_service import (
     attach_premium,
     build_policy_query,
     mark_policies_deleted,
+    update_policy,
 )
 from infrastructure.drive_gateway import DriveGateway
 
@@ -39,6 +40,22 @@ class PolicyAppService:
         "renewed_to": Policy.renewed_to,
     }
 
+    _UPDATABLE_FIELDS: frozenset[str] = frozenset(
+        {
+            "policy_number",
+            "insurance_type",
+            "insurance_company",
+            "contractor",
+            "sales_channel",
+            "start_date",
+            "end_date",
+            "vehicle_brand",
+            "vehicle_model",
+            "vehicle_vin",
+            "note",
+        }
+    )
+
     def get_page(
         self,
         page: int,
@@ -63,6 +80,20 @@ class PolicyAppService:
         policies = list(query.offset(offset).limit(per_page))
         attach_premium(policies)
         return [PolicyRowDTO.from_model(policy) for policy in policies]
+
+    def update_policy_field(self, policy_id: int, field: str, value: Any) -> PolicyRowDTO:
+        """Обновить отдельное поле полиса и вернуть актуальные данные строки."""
+
+        if field not in self._UPDATABLE_FIELDS:
+            raise ValueError(f"Поле '{field}' нельзя редактировать")
+
+        policy = Policy.active().where(Policy.id == policy_id).get_or_none()
+        if policy is None:
+            raise ValueError("Полис не найден")
+
+        updated_policy = update_policy(policy, **{field: value})
+        attach_premium([updated_policy])
+        return PolicyRowDTO.from_model(updated_policy)
 
     def count(
         self,
