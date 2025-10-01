@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import os
 import urllib.parse
-from peewee import PostgresqlDatabase, SqliteDatabase
+from peewee import CharField, PostgresqlDatabase, SqliteDatabase
+from playhouse.migrate import PostgresqlMigrator, SqliteMigrator, migrate
 
 from .db import db  # тот самый Proxy
 from .models import (
@@ -49,6 +50,39 @@ def _postgres_from_url(url: str) -> PostgresqlDatabase:
     )
 
 
+def _get_migrator(database):
+    if isinstance(database, PostgresqlDatabase):
+        return PostgresqlMigrator(database)
+    if isinstance(database, SqliteDatabase):
+        return SqliteMigrator(database)
+    return None
+
+
+def _apply_runtime_migrations(database) -> None:
+    """Применяет обязательные миграции, которые нужны приложению для старта."""
+
+    migrator = _get_migrator(database)
+    if migrator is None:
+        return
+
+    with database.connection_context():
+        if not database.table_exists("policy"):
+            return
+
+        column_names = {column.name for column in database.get_columns("policy")}
+        if "drive_folder_path" in column_names:
+            return
+
+        with database.atomic():
+            migrate(
+                migrator.add_column(
+                    "policy",
+                    "drive_folder_path",
+                    CharField(null=True),
+                )
+            )
+
+
 def init_from_env(database_url: str | None = None, env_var: str = _DEFAULT_ENV) -> None:
     """Инициализирует :data:`db` из переданного URL или переменной окружения.
 
@@ -71,3 +105,4 @@ def init_from_env(database_url: str | None = None, env_var: str = _DEFAULT_ENV) 
         database = _postgres_from_url(url)
 
     db.initialize(database)
+    _apply_runtime_migrations(database)
