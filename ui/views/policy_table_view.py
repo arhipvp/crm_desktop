@@ -612,7 +612,7 @@ class PolicyTableView(BaseTableView):
         policy = self.get_selected()
         if not policy or not policy.deal_id:
             return
-        deal = get_deal_by_id(policy.deal_id)
+        deal = get_deal_by_id(policy.deal_id, include_deleted=True)
         if deal is None:
             show_error("Сделка не найдена")
             return
