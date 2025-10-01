@@ -96,7 +96,7 @@ def stub_client_app_service(monkeypatch):
 
 
 @pytest.fixture
-def make_deal_with_executor():
+def make_deal_with_executor(db_transaction):
     def _make_deal_with_executor(
         client_name: str = "C",
         deal_description: str = "D",
@@ -123,7 +123,7 @@ def make_deal_with_executor():
 
 
 @pytest.fixture
-def make_task():
+def make_task(db_transaction):
     def _make_task(
         *,
         client: Client | None = None,
@@ -166,7 +166,7 @@ def make_task():
 
 
 @pytest.fixture
-def make_policy_with_payment():
+def make_policy_with_payment(db_transaction):
     def _make_policy_with_payment(
         *,
         client: Client | None = None,
@@ -198,7 +198,7 @@ def make_policy_with_payment():
 
 
 @pytest.fixture
-def dummy_delay_view(monkeypatch):
+def dummy_delay_view(monkeypatch, db_transaction):
     def _make(confirm_result: bool = True):
         from ui.forms import deal_next_event_dialog
 
