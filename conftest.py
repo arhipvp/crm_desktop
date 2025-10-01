@@ -94,7 +94,21 @@ def ui_settings_temp_path(tmp_path, monkeypatch):
             path.unlink()
 
 
-@pytest.fixture()
+_MODELS = [
+    Client,
+    Policy,
+    Payment,
+    Income,
+    Expense,
+    Deal,
+    Executor,
+    DealExecutor,
+    DealCalculation,
+    Task,
+]
+
+
+@pytest.fixture(scope="session")
 def in_memory_db(monkeypatch):
     # If db is not initialized yet, bind it to a fresh in-memory DB.
     # If it is already initialized (e.g., by an early init_from_env reading the
@@ -109,37 +123,22 @@ def in_memory_db(monkeypatch):
         if not (isinstance(test_db, _Sqlite) and getattr(test_db, "database", None) == ":memory:"):
             raise RuntimeError("Refusing to run tests on a non in-memory database")
 
-    test_db.create_tables([
-        Client,
-        Policy,
-        Payment,
-        Income,
-        Expense,
-        Deal,
-        Executor,
-        DealExecutor,
-        DealCalculation,
-        Task,
-    ])
+    test_db.create_tables(_MODELS)
     try:
-        yield
+        yield test_db
     finally:
-        test_db.drop_tables([
-            Client,
-            Policy,
-            Payment,
-            Income,
-            Expense,
-            Deal,
-            Executor,
-            DealExecutor,
-            DealCalculation,
-            Task,
-        ])
+        test_db.drop_tables(_MODELS)
         try:
             test_db.close()
         except Exception:
             pass
+
+
+@pytest.fixture(autouse=True)
+def db_transaction(in_memory_db):
+    with in_memory_db.atomic() as txn:
+        yield in_memory_db
+        txn.rollback()
 
 
 @pytest.fixture()
