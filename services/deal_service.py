@@ -13,7 +13,7 @@ from dateutil.relativedelta import relativedelta
 from utils.time_utils import now_str
 
 
-from peewee import JOIN, ModelSelect, Model  # если ещё не импортирован
+from peewee import JOIN, ModelSelect, Field  # если ещё не импортирован
 
 from core.app_context import get_app_context
 from infrastructure.drive_gateway import DriveGateway
@@ -41,6 +41,38 @@ logger = logging.getLogger(__name__)
 
 def _resolve_gateway(gateway: DriveGateway | None) -> DriveGateway:
     return gateway or get_app_context().drive_gateway
+
+
+def _ensure_distinct_order_columns(
+    query: ModelSelect, *fields_with_aliases: tuple[Field, str]
+) -> ModelSelect:
+    """Добавить поля сортировки в SELECT при ``DISTINCT`` запросах."""
+
+    if not getattr(query, "_distinct", False):
+        return query
+
+    current_selection = list(query._select or [])
+    if not current_selection:
+        current_selection.append(query.model_class)
+
+    existing_aliases = {
+        getattr(item, "_alias", None)
+        for item in current_selection
+        if getattr(item, "_alias", None)
+    }
+
+    appended = False
+    for field, alias in fields_with_aliases:
+        if alias in existing_aliases:
+            continue
+        current_selection.append(field.alias(alias))
+        existing_aliases.add(alias)
+        appended = True
+
+    if appended:
+        query = query.select(*current_selection)
+
+    return query
 
 # ──────────────────────────── Получение ─────────────────────────────
 
@@ -469,22 +501,42 @@ def get_deals_page(
         # результирующий SELECT (PostgreSQL требует, чтобы такие столбцы были
         # явно выбраны при использовании DISTINCT).
         query = query.select(Deal, Client, Executor.full_name.alias("executor_order"))
+        query = _ensure_distinct_order_columns(
+            query,
+            (Executor.full_name, "order_executor"),
+            (Deal.id, "order_deal_id"),
+        )
         if order_dir == "desc":
             query = query.order_by(Executor.full_name.desc(), Deal.id.desc())
         else:
             query = query.order_by(Executor.full_name.asc(), Deal.id.asc())
     elif order_by == "client_name":
+        query = _ensure_distinct_order_columns(
+            query,
+            (Client.name, "order_client_name"),
+            (Deal.id, "order_deal_id"),
+        )
         if order_dir == "desc":
             query = query.order_by(Client.name.desc(), Deal.id.desc())
         else:
             query = query.order_by(Client.name.asc(), Deal.id.asc())
     elif order_by and hasattr(Deal, order_by):
         order_field = getattr(Deal, order_by)
+        query = _ensure_distinct_order_columns(
+            query,
+            (order_field, f"order_{order_by}"),
+            (Deal.id, "order_deal_id"),
+        )
         if order_dir == "desc":
             query = query.order_by(order_field.desc(), Deal.id.desc())
         else:
             query = query.order_by(order_field.asc(), Deal.id.asc())
     else:
+        query = _ensure_distinct_order_columns(
+            query,
+            (Deal.start_date, "order_start_date"),
+            (Deal.id, "order_deal_id"),
+        )
         query = query.order_by(Deal.start_date.desc(), Deal.id.desc())
 
     from peewee import prefetch
