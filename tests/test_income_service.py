@@ -1,5 +1,6 @@
 """Tests for functions in :mod:`services.income_service`."""
 
+from decimal import Decimal
 from datetime import date, timedelta
 
 import pytest
@@ -17,6 +18,7 @@ from services.income_service import (
     mark_incomes_deleted,
     get_incomes_page,
 )
+from services.query_utils import sum_column
 
 
 def _create_income(*, received_date: date, amount: int, suffix: str) -> Income:
@@ -160,5 +162,25 @@ def test_get_incomes_page_ignores_date_range_when_excluding_received(
     )
 
     assert [income.id for income in page] == [pending_income.id]
+
+
+def test_sum_column_ignores_pagination(in_memory_db):
+    """``sum_column`` должен суммировать все записи независимо от пагинации."""
+
+    today = date.today()
+    amounts = [10, 20, 30]
+    for index, amount in enumerate(amounts, start=1):
+        _create_income(
+            received_date=today - timedelta(days=index),
+            amount=amount,
+            suffix=str(index),
+        )
+
+    query = Income.select().order_by(Income.id).limit(1).offset(1)
+
+    total = sum_column(query, Income.amount)
+
+    assert isinstance(total, Decimal)
+    assert total == Decimal(sum(amounts))
 
 
