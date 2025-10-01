@@ -105,7 +105,12 @@ def create_client_drive_folder(
     gateway: DriveGateway,
     base_path: str | os.PathLike[str] | None = None,
 ) -> Tuple[str, Optional[str]]:
-    """Создать локальную папку клиента и вернуть путь."""
+    """Создать локальную папку клиента и вернуть путь и ссылку.
+
+    Returns:
+        tuple[str, Optional[str]]: Кортеж из локального пути к созданной
+        папке клиента и опциональной ссылки на удалённую директорию.
+    """
 
     safe_name = sanitize_name(client_name)
     root = _resolve_base_path(gateway, base_path)
@@ -128,7 +133,12 @@ def create_deal_folder(
     gateway: DriveGateway,
     base_path: str | os.PathLike[str] | None = None,
 ) -> Tuple[str, Optional[str]]:
-    """Создать локальную папку сделки и вернуть путь."""
+    """Создать локальную папку сделки и вернуть путь и ссылку.
+
+    Returns:
+        tuple[str, Optional[str]]: Кортеж из локального пути к папке
+        сделки и опциональной ссылки на удалённую директорию клиента.
+    """
 
     root = _resolve_base_path(gateway, base_path)
     deal_name = sanitize_name(f"Сделка - {deal_description}")
