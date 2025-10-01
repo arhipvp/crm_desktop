@@ -17,7 +17,7 @@
 - `update_calculation` изменяет допустимые параметры расчёта и, при необходимости, привязывает его к другой сделке【F:services/calculation_service.py†L108-L132】.
 
 ## policy_service
-- `_check_duplicate_policy` предотвращает создание полиса с существующим номером【F:services/policies/policy_service.py†L117-L155】.
+- `_check_duplicate_policy` предотвращает создание полиса с существующим номером, проверяя активные записи по нормализованному номеру【F:services/policies/policy_service.py†L117-L155】.
 - `add_policy` создаёт локальную папку полиса (синхронизация с Google Drive выполняется вручную), привязывает платежи и уведомляет исполнителя【F:services/policies/policy_service.py†L426-L592】.
 
 ## payment_service
@@ -44,9 +44,11 @@
 - `ask_consultant` отправляет вопрос в OpenAI, добавляя контекст БД и выбранную модель【F:services/ai_consultant_service.py†L30-L63】.
 
 ## ai_policy_service
-
 - `process_policy_text_with_ai` принимает строку с уже извлечённым текстом полиса, отправляет её в OpenAI через `recognize_policy_interactive`, возвращая JSON‑структуру и протокол диалога либо выбрасывая `ValueError` при ошибке разбора; чтением файлов занимаются `process_policy_files_with_ai` и `process_policy_bundle_with_ai`, которые подготавливают текст перед вызовом функции【F:services/policies/ai_policy_service.py†L367-L390】【F:services/policies/ai_policy_service.py†L333-L366】.
 - Системный промпт задаётся переменной окружения `AI_POLICY_PROMPT` (см. `Settings.ai_policy_prompt`)【F:config.py†L25-L25】【F:config.py†L57-L57】【F:services/policies/ai_policy_service.py†L117-L119】.
+- `process_policy_text_with_ai` принимает строку с уже извлечённым текстом полиса, отправляет её в OpenAI через `recognize_policy_interactive`, возвращая JSON‑структуру и протокол диалога либо выбрасывая `ValueError` при ошибке разбора; чтением файлов занимаются `process_policy_files_with_ai` и `process_policy_bundle_with_ai`, которые подготавливают текст перед вызовом функции【F:services/policies/ai_policy_service.py†L367-L390】【F:services/policies/ai_policy_service.py†L347-L376】.
+- Системный промпт задаётся переменной окружения `AI_POLICY_PROMPT`【F:config.py†L25-L25】【F:config.py†L57-L57】【F:services/policies/ai_policy_service.py†L117-L119】.
+
 
 - Основные правила дефолтного промпта: не придумывать данные, объединять полисы только при совпадении объекта/периода/страховой, жёстко фиксировать `note` = «импортировано через ChatGPT», держать `actual_payment_date` равным `payment_date`, оставлять `contractor` пустым, тянуть VIN при наличии, соблюдать формат дат ISO и ограничение `end_date ≤ start_date + 1 год`. При необходимости можно переопределить любую из этих инструкций через `AI_POLICY_PROMPT`.
 - Полный текст промпта лежит в [`services/policies/ai_policy_service.py`](../services/policies/ai_policy_service.py) внутри константы `DEFAULT_PROMPT`.
