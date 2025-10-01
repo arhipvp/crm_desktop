@@ -26,7 +26,7 @@
 - `mark_payments_paid` проставляет фактическую дату оплаты (текущую или переданную) только тем платежам, у которых она ещё не заполнена【F:services/payment_service.py†L206-L223】.
 
 ## income_service
-- CRUD и массовые пометки: `add_income`, `update_income`, `mark_income_deleted` и `mark_incomes_deleted`【F:services/income_service.py†L64-L80】【F:services/income_service.py†L166-L195】【F:services/income_service.py†L200-L235】.
+- CRUD и массовые пометки: `add_income`, `update_income`, `mark_income_deleted` и `mark_incomes_deleted`【F:services/income_service.py†L185-L215】【F:services/income_service.py†L220-L260】【F:services/income_service.py†L65-L72】【F:services/income_service.py†L74-L82】.
 - `get_incomes_page` и `apply_income_filters` обеспечивают фильтрацию, сортировку и пагинацию доходов【F:services/income_service.py†L83-L143】【F:services/income_service.py†L238-L256】.
 - `_notify_income_received` уведомляет исполнителя о поступлении средств при создании или обновлении записи【F:services/income_service.py†L145-L162】.
 
