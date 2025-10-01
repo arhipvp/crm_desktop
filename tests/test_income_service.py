@@ -72,7 +72,7 @@ def test_get_incomes_page_pagination_and_deleted(in_memory_db):
             page=1,
             per_page=2,
             order_by="received_date",
-            order_dir="desc",
+            order_dir="DeSc",
         )
     )
     assert [i.id for i in page1] == [inc4.id, inc3.id]
@@ -82,7 +82,7 @@ def test_get_incomes_page_pagination_and_deleted(in_memory_db):
             page=2,
             per_page=2,
             order_by="received_date",
-            order_dir="desc",
+            order_dir=" desc ",
         )
     )
     assert [i.id for i in page2] == [inc2.id]

@@ -11,8 +11,10 @@ from services import expense_service
     [
         (Payment.amount, "asc", ("second", "first")),
         (Payment.amount, "desc", ("first", "second")),
+        (Payment.amount, "DeSc", ("first", "second")),
         (Payment.payment_date, "asc", ("second", "first")),
         (Payment.payment_date, "desc", ("first", "second")),
+        (Payment.payment_date, " aSc ", ("second", "first")),
     ],
 )
 def test_build_expense_query_orders_by_payment_fields(

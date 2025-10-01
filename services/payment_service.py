@@ -130,6 +130,9 @@ def get_payments_page(
     **filters,
 ) -> ModelSelect:
     """Получить страницу платежей по заданным фильтрам."""
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "asc"
     query = build_payment_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -137,7 +140,7 @@ def get_payments_page(
         include_paid=include_paid,
         column_filters=column_filters,
         order_by=order_by,
-        order_dir=order_dir,
+        order_dir=normalized_order_dir,
         **filters,
     )
     if not order_by:
@@ -147,7 +150,9 @@ def get_payments_page(
     else:
         order_field = order_by
     order_expr = (
-        order_field.desc() if order_dir == "desc" else order_field.asc()
+        order_field.desc()
+        if normalized_order_dir == "desc"
+        else order_field.asc()
     )
     offset = (page - 1) * per_page
     return query.order_by(order_expr).offset(offset).limit(per_page)

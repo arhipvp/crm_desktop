@@ -48,17 +48,25 @@ class ClientAppService:
         **filters: Any,
     ) -> list[ClientDTO]:
         order_field = self._normalize_order_field(order_by)
+        normalized_order_dir = (order_dir or "").strip().lower()
+        if normalized_order_dir not in {"asc", "desc"}:
+            normalized_order_dir = "asc"
         return get_clients_page_dto(
             page,
             per_page,
             order_by=order_field,
-            order_dir=order_dir,
+            order_dir=normalized_order_dir,
             **filters,
         )
 
     def count(self, *, order_by: Any | None = None, order_dir: str = "asc", **filters: Any) -> int:
         order_field = self._normalize_order_field(order_by)
-        return count_clients(order_by=order_field, order_dir=order_dir, **filters)
+        normalized_order_dir = (order_dir or "").strip().lower()
+        if normalized_order_dir not in {"asc", "desc"}:
+            normalized_order_dir = "asc"
+        return count_clients(
+            order_by=order_field, order_dir=normalized_order_dir, **filters
+        )
 
     def get_detail(self, client_id: int) -> ClientDetailsDTO:
         detail = get_client_detail_dto(client_id)

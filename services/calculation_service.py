@@ -68,7 +68,14 @@ def build_calculation_query(
         order_field = getattr(DealCalculation, order_by, DealCalculation.created_at)
     else:
         order_field = order_by or DealCalculation.created_at
-    order_expr = order_field.desc() if order_dir == "desc" else order_field.asc()
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "desc"
+    order_expr = (
+        order_field.desc()
+        if normalized_order_dir == "desc"
+        else order_field.asc()
+    )
     return query.order_by(order_expr)
 
 

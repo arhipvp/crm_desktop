@@ -474,6 +474,9 @@ def get_deals_page(
     **filters,
 ) -> ModelSelect:
     """Вернуть страницу сделок с указанными фильтрами."""
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "asc"
     logger.debug("column_filters=%s", column_filters)
     query = build_deal_query(
         search_text=search_text,
@@ -498,7 +501,7 @@ def get_deals_page(
             (Executor.full_name, "order_executor"),
             (Deal.id, "order_deal_id"),
         )
-        if order_dir == "desc":
+        if normalized_order_dir == "desc":
             query = query.order_by(Executor.full_name.desc(), Deal.id.desc())
         else:
             query = query.order_by(Executor.full_name.asc(), Deal.id.asc())
@@ -508,7 +511,7 @@ def get_deals_page(
             (Client.name, "order_client_name"),
             (Deal.id, "order_deal_id"),
         )
-        if order_dir == "desc":
+        if normalized_order_dir == "desc":
             query = query.order_by(Client.name.desc(), Deal.id.desc())
         else:
             query = query.order_by(Client.name.asc(), Deal.id.asc())
@@ -519,7 +522,7 @@ def get_deals_page(
             (order_field, f"order_{order_by}"),
             (Deal.id, "order_deal_id"),
         )
-        if order_dir == "desc":
+        if normalized_order_dir == "desc":
             query = query.order_by(order_field.desc(), Deal.id.desc())
         else:
             query = query.order_by(order_field.asc(), Deal.id.asc())

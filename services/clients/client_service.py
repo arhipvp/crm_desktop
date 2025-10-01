@@ -88,7 +88,10 @@ def get_clients_page(
         field = getattr(Client, order_by, Client.name)
     else:
         field = order_by
-    order_func = field.desc if order_dir == "desc" else field.asc
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "asc"
+    order_func = field.desc if normalized_order_dir == "desc" else field.asc
     offset = (page - 1) * per_page
     return query.order_by(order_func()).limit(per_page).offset(offset)
 
@@ -102,11 +105,14 @@ def get_clients_page_dto(
     **filters,
 ) -> list[ClientDTO]:
     """Получить страницу клиентов в виде DTO."""
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "asc"
     clients = get_clients_page(
         page,
         per_page,
         order_by=order_by,
-        order_dir=order_dir,
+        order_dir=normalized_order_dir,
         column_filters=column_filters,
         **filters,
     )
@@ -702,6 +708,9 @@ def build_client_query(
             field = getattr(Client, order_by, Client.name)
         else:
             field = order_by
-        order_func = field.desc if order_dir == "desc" else field.asc
+        normalized_order_dir = (order_dir or "").strip().lower()
+        if normalized_order_dir not in {"asc", "desc"}:
+            normalized_order_dir = "asc"
+        order_func = field.desc if normalized_order_dir == "desc" else field.asc
         query = query.order_by(order_func())
     return query
