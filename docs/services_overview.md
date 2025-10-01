@@ -17,7 +17,7 @@
 - `update_calculation` изменяет допустимые параметры расчёта и, при необходимости, привязывает его к другой сделке【F:services/calculation_service.py†L108-L132】.
 
 ## policy_service
-- `_check_duplicate_policy` предотвращает создание полиса с существующим номером【F:services/policies/policy_service.py†L117-L155】.
+- `_check_duplicate_policy` предотвращает создание полиса с существующим номером, проверяя активные записи по нормализованному номеру【F:services/policies/policy_service.py†L117-L155】.
 - `add_policy` создаёт локальную папку полиса (синхронизация с Google Drive выполняется вручную), привязывает платежи и уведомляет исполнителя【F:services/policies/policy_service.py†L426-L592】.
 
 ## payment_service
