@@ -397,8 +397,13 @@ def update_payment(payment: Payment, **kwargs) -> Payment:
     for key, value in kwargs.items():
         if key in allowed_fields:
             if key == "policy_id" and not kwargs.get("policy"):
-                value = Policy.get_or_none(Policy.id == value)
+                policy = Policy.get_or_none(Policy.id == value)
+                if policy is None:
+                    raise ValueError(f"Полис с id={value} не найден")
                 key = "policy"
+                value = policy
+            if key == "policy" and value is None:
+                raise ValueError("Полис не может быть None")
             if key == "amount" and value is not None:
                 value = Decimal(str(value))
             updates[key] = value
