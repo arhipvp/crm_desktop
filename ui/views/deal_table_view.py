@@ -229,14 +229,28 @@ class DealTableView(BaseTableView):
         source_row = self.proxy.mapToSource(index).row()
         return self.model.get_item(source_row)
 
+    def get_selected_multiple(self) -> list[DealRowDTO]:
+        selection_model = self.table.selectionModel()
+        if selection_model is None:
+            return []
+        indexes = selection_model.selectedRows()
+        return [
+            self.model.get_item(self.proxy.mapToSource(index).row())
+            for index in indexes
+        ]
+
     def delete_selected(self) -> None:
-        deal = self.get_selected()
-        if not deal:
+        deals = self.get_selected_multiple()
+        if not deals:
             return
-        if not confirm(f"Удалить сделку {deal.description}?"):
+        if len(deals) == 1:
+            message = f"Удалить сделку {deals[0].description}?"
+        else:
+            message = f"Удалить {len(deals)} сделок?"
+        if not confirm(message):
             return
         try:
-            self.controller.delete_deals([deal])
+            self.controller.delete_deals(deals)
             self.refresh()
         except Exception as exc:  # noqa: BLE001
             show_error(str(exc))
