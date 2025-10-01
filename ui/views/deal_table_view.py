@@ -245,6 +245,12 @@ class DealTableView(BaseTableView):
         form = DealForm(context=self._context)
         if form.exec():
             self.refresh()
+            instance = getattr(form, "saved_instance", None)
+            if instance is None:
+                instance = getattr(form, "instance", None)
+            if instance is not None:
+                dlg = DealDetailView(instance, parent=self, context=self._context)
+                dlg.exec()
 
     def duplicate_selected(self, _=None):
         dto = self.get_selected()
