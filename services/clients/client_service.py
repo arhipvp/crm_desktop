@@ -546,11 +546,11 @@ def merge_clients_to_dto(
 
 
 def delete_clients_by_ids(client_ids: Sequence[int]) -> int:
-    """Помечает клиентов удалёнными (soft delete) по списку идентификаторов.
+    """Выполняет soft delete клиентов по списку идентификаторов.
 
-    В зависимости от числа идентификаторов вызывает
-    :func:`mark_client_deleted` или :func:`mark_clients_deleted`, поэтому
-    записи физически не удаляются из базы данных.
+    Метод не удаляет записи из базы данных: при одном идентификаторе
+    вызывается :func:`mark_client_deleted`, при нескольких —
+    :func:`mark_clients_deleted`, которые лишь помечают клиентов удалёнными.
     """
 
     ids = list(dict.fromkeys(client_ids))
