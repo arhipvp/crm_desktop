@@ -192,7 +192,13 @@ class BaseTableView(QWidget):
         self.search_edit = QLineEdit()
         self.search_edit.setClearButtonEnabled(True)
         self.search_edit.setPlaceholderText("Поиск…")
-        self.search_edit.textChanged.connect(self._on_filters_changed)
+        self._search_debounce_timer = QTimer(self)
+        self._search_debounce_timer.setSingleShot(True)
+        self._search_debounce_timer.setInterval(350)
+        self._search_debounce_timer.timeout.connect(self._apply_search_filter)
+        self.search_edit.textChanged.connect(self._on_search_text_changed)
+        self.search_edit.returnPressed.connect(self._trigger_search_immediately)
+        self.search_edit.editingFinished.connect(self._on_search_editing_finished)
         self.toolbar.addWidget(self.search_edit)
 
         # Фильтр по дате
@@ -339,6 +345,26 @@ class BaseTableView(QWidget):
         """Возвращает текст из поля поиска."""
         return self.search_edit.text().strip()
 
+    def _on_search_text_changed(self, _text: str) -> None:
+        """Перезапускает таймер отложенной фильтрации при изменении текста."""
+        self._search_debounce_timer.stop()
+        self._search_debounce_timer.start()
+
+    def _apply_search_filter(self) -> None:
+        """Запускает фильтрацию после срабатывания таймера."""
+        self._on_filters_changed()
+
+    def _on_search_editing_finished(self) -> None:
+        """Мгновенно фильтрует по окончании ввода, если есть отложенный запрос."""
+        if self._search_debounce_timer.isActive():
+            self._trigger_search_immediately()
+
+    def _trigger_search_immediately(self) -> None:
+        """Останавливает таймер и немедленно применяет фильтрацию."""
+        if hasattr(self, "_search_debounce_timer"):
+            self._search_debounce_timer.stop()
+        self._on_filters_changed()
+
     def is_checked(self, label: str) -> bool:
         """Возвращает состояние чекбокса по метке."""
         box = self.checkboxes.get(label)
@@ -356,6 +382,8 @@ class BaseTableView(QWidget):
 
     def clear_filters(self) -> None:
         """Сбрасывает состояние всех фильтров на панели."""
+        if hasattr(self, "_search_debounce_timer"):
+            self._search_debounce_timer.stop()
         self.search_edit.blockSignals(True)
         self.search_edit.clear()
         self.search_edit.blockSignals(False)
@@ -414,6 +442,8 @@ class BaseTableView(QWidget):
             self.controller._on_per_page_changed(per_page)
 
     def _on_reset_filters(self):
+        if hasattr(self, "_search_debounce_timer"):
+            self._search_debounce_timer.stop()
         if self.controller:
             # Сбрасываем фильтры столбцов до сохранения настроек в контроллере
             self.clear_column_filters()
@@ -1383,6 +1413,8 @@ class BaseTableView(QWidget):
 
     def load_table_settings(self):
         """Применяет сохранённые настройки, если они есть."""
+        if hasattr(self, "_search_debounce_timer"):
+            self._search_debounce_timer.stop()
         self._settings_restore_pending = False
         header = self.table.horizontalHeader()
         saved = ui_settings.get_table_settings(self.settings_id)
