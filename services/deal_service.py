@@ -407,6 +407,20 @@ def apply_deal_filters(
         Deal.calculations,
     ]
 
+    joined_policy = False
+    if search_text:
+        query = (
+            query.switch(Deal)
+            .join(
+                Policy,
+                JOIN.LEFT_OUTER,
+                on=((Policy.deal == Deal.id) & (Policy.is_deleted == False)),
+            )
+            .switch(Deal)
+        )
+        extra_fields.append(Policy.vehicle_vin)
+        joined_policy = True
+
     if column_filters and Executor.full_name in column_filters:
         query = (
             query.switch(Deal)
@@ -417,6 +431,8 @@ def apply_deal_filters(
     query = apply_search_and_filters(
         query, Deal, search_text, column_filters, extra_fields
     )
+    if joined_policy:
+        query = query.distinct()
     return query
 
 
@@ -466,7 +482,7 @@ def get_deals_page(
 
     offset = (page - 1) * per_page
     page_query = query.limit(per_page).offset(offset)
-    items = list(prefetch(page_query, DealExecutor, Executor))
+    items = list(prefetch(page_query, DealExecutor, Executor, Policy))
     for deal in items:
         ex = deal.executors[0].executor if getattr(deal, "executors", []) else None
         setattr(deal, "_executor", ex)
