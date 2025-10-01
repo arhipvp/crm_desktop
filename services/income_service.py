@@ -98,11 +98,14 @@ def get_incomes_page(
     **kwargs,
 ):
     """Получить страницу доходов по фильтрам."""
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "desc"
     logger.debug(
         "get_incomes_page filters=%s order=%s %s",
         column_filters,
         order_by,
-        order_dir,
+        normalized_order_dir,
     )
     if join_executor is None:
         join_executor = (
@@ -124,7 +127,7 @@ def get_incomes_page(
         "\U0001F50E built income query. join_executor=%s order_by=%s order_dir=%s",
         join_executor,
         getattr(order_by, 'name', order_by),
-        order_dir,
+        normalized_order_dir,
     )
 
     # --- сортировка ---
@@ -142,7 +145,9 @@ def get_incomes_page(
         and not isinstance(db.obj, SqliteDatabase)
     ):
         order_fields.append(Income.id)
-    order_fields.append(field.desc() if order_dir == "desc" else field.asc())
+    order_fields.append(
+        field.desc() if normalized_order_dir == "desc" else field.asc()
+    )
     query = query.order_by(*order_fields)
     logger.debug("\U0001F4DD final SQL: %s", query.sql())
 

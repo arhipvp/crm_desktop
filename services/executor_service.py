@@ -138,7 +138,10 @@ def get_executors_page(
         field = getattr(Executor, order_by, Executor.full_name)
     else:
         field = order_by
-    order_func = field.desc if order_dir == "desc" else field.asc
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "asc"
+    order_func = field.desc if normalized_order_dir == "desc" else field.asc
     offset = (page - 1) * per_page
     return query.order_by(order_func()).limit(per_page).offset(offset)
 

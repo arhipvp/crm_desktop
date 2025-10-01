@@ -262,11 +262,14 @@ def get_expenses_page(
     Returns:
         ModelSelect: Выборка расходов.
     """
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "desc"
     logger.debug(
         "get_expenses_page filters=%s order=%s %s",
         column_filters,
         order_by,
-        order_dir,
+        normalized_order_dir,
     )
     query = build_expense_query(
         search_text=search_text,
@@ -276,7 +279,7 @@ def get_expenses_page(
         expense_date_range=expense_date_range,
         column_filters=column_filters,
         order_by=order_by,
-        order_dir=order_dir,
+        order_dir=normalized_order_dir,
     )
     offset = (page - 1) * per_page
     paged_query = query.limit(per_page).offset(offset)
@@ -356,6 +359,9 @@ def build_expense_query(
     order_dir: str = "desc",
     **kwargs,
 ):
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "desc"
     base = Expense.active() if not show_deleted else Expense.select()
     query = (
         base.select(
@@ -428,7 +434,11 @@ def build_expense_query(
             field_obj = field_obj.unwrap()
 
         if field_obj is not None and hasattr(field_obj, "asc") and hasattr(field_obj, "desc"):
-            order_expr = field_obj.desc() if order_dir == "desc" else field_obj.asc()
+            order_expr = (
+                field_obj.desc()
+                if normalized_order_dir == "desc"
+                else field_obj.asc()
+            )
             query = query.order_by(order_expr)
     logger.debug("expense query SQL: %s", query.sql())
     return query

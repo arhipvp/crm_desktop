@@ -221,6 +221,9 @@ def get_policies_page(
     else:
         order_field = Policy.start_date
 
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "asc"
     query = build_policy_query(
         search_text=search_text,
         show_deleted=show_deleted,
@@ -232,7 +235,7 @@ def get_policies_page(
         order_by=order_field,
         **filters,
     )
-    if order_dir == "desc":
+    if normalized_order_dir == "desc":
         query = query.order_by(order_field.desc())
     else:
         query = query.order_by(order_field.asc())

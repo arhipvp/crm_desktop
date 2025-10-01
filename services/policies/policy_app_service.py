@@ -68,13 +68,20 @@ class PolicyAppService:
         column_filters = filters.pop("column_filters", None)
         prepared_filters = self._prepare_column_filters(column_filters)
         order_field = self._resolve_order_field(order_by)
+        normalized_order_dir = (order_dir or "").strip().lower()
+        if normalized_order_dir not in {"asc", "desc"}:
+            normalized_order_dir = "asc"
         query = build_policy_query(
             column_filters=prepared_filters,
             order_by=order_field,
             **filters,
         )
         if order_field is not None:
-            ordering = order_field.desc() if order_dir == "desc" else order_field.asc()
+            ordering = (
+                order_field.desc()
+                if normalized_order_dir == "desc"
+                else order_field.asc()
+            )
             query = query.order_by(ordering)
         offset = max(page - 1, 0) * per_page
         policies = list(query.offset(offset).limit(per_page))
