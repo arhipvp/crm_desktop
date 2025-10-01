@@ -32,10 +32,65 @@ logger = logging.getLogger(__name__)
 EXECUTOR_DIALOG_SETTINGS_KEY = "executor_dialog"
 
 
+def apply_main_window_settings(
+    settings: dict,
+    tab_widget,
+    restore_geometry,
+    window_state_getter,
+    set_window_state,
+    *,
+    logger_: logging.Logger | None = None,
+):
+    logger_ = logger_ or logger
+    geom = settings.get("geometry")
+    if geom:
+        try:
+            restore_geometry(base64.b64decode(geom))
+        except Exception:  # pragma: no cover - логирование ошибки
+            logger_.exception("Не удалось восстановить геометрию окна")
+    idx = settings.get("last_tab")
+    if idx is not None:
+        try:
+            idx_int = int(idx)
+        except (TypeError, ValueError):
+            idx_int = None
+        if idx_int is not None and 0 <= idx_int < tab_widget.count():
+            tab_widget.setCurrentIndex(idx_int)
+    if "open_maximized" in settings:
+        current_state = window_state_getter()
+        if settings.get("open_maximized"):
+            set_window_state(current_state | Qt.WindowMaximized)
+        else:
+            set_window_state(current_state & ~Qt.WindowMaximized)
+
+
+def run_import_policy_dialog(
+    dialog_factory,
+    status_bar,
+    *,
+    accepted_value: int = QDialog.Accepted,
+    success_message: str = "Полис успешно импортирован",
+    message_timeout_ms: int = 5000,
+):
+    dialog = dialog_factory()
+    result = dialog.exec()
+    if result == accepted_value:
+        status_bar.showMessage(success_message, message_timeout_ms)
+    return result
+
+
 class MainWindow(QMainWindow):
-    def __init__(self, *, context: AppContext | None = None):
+    def __init__(
+        self,
+        *,
+        context: AppContext | None = None,
+        settings_applier=apply_main_window_settings,
+        import_policy_runner=run_import_policy_dialog,
+    ):
         super().__init__()
         self._context = context or get_app_context()
+        self._settings_applier = settings_applier
+        self._import_policy_runner = import_policy_runner
         self.setWindowTitle("CRM Desktop")
         size = get_scaled_size(1600, 960, ratio=0.95)
         self.resize(size)
@@ -82,19 +137,13 @@ class MainWindow(QMainWindow):
 
     def _load_settings(self):
         st = ui_settings.get_window_settings("MainWindow")
-        geom = st.get("geometry")
-        if geom:
-            try:
-                self.restoreGeometry(base64.b64decode(geom))
-            except Exception:
-                logger.exception("Не удалось восстановить геометрию окна")
-        idx = st.get("last_tab")
-        if idx is not None and 0 <= int(idx) < self.tab_widget.count():
-            self.tab_widget.setCurrentIndex(int(idx))
-        if st.get("open_maximized"):
-            self.setWindowState(self.windowState() | Qt.WindowMaximized)
-        else:
-            self.setWindowState(self.windowState() & ~Qt.WindowMaximized)
+        self._settings_applier(
+            st,
+            self.tab_widget,
+            self.restoreGeometry,
+            self.windowState,
+            self.setWindowState,
+        )
 
     def show_count(self, count: int):
         self.status_bar.showMessage(f"Записей: {count}")
@@ -106,10 +155,10 @@ class MainWindow(QMainWindow):
             self.status_bar.clearMessage()
 
     def open_import_policy_json(self):
-        dlg = ImportPolicyJsonForm(self)
-        if dlg.exec() == QDialog.Accepted:
-            # Уведомляем пользователя об успешном импорте
-            self.status_bar.showMessage("Полис успешно импортирован", 5000)
+        return self._import_policy_runner(
+            lambda: ImportPolicyJsonForm(self),
+            self.status_bar,
+        )
 
     def open_reso_import(self):
         from ui.forms.reso_import_dialog import ResoImportDialog

@@ -109,7 +109,7 @@ _MODELS = [
 
 
 @pytest.fixture(scope="session")
-def in_memory_db(monkeypatch):
+def in_memory_db():
     # If db is not initialized yet, bind it to a fresh in-memory DB.
     # If it is already initialized (e.g., by an early init_from_env reading the
     # default DATABASE_URL we set above), reuse that handle.
