@@ -75,6 +75,7 @@ def apply_search_and_filters(
     search_text: str = "",
     column_filters: dict[Field | str, str] | None = None,
     extra_fields: Iterable[Field] = (),
+    extra_condition: Node | None = None,
 ) -> ModelSelect:
     """Apply substring search and column/field filters to a query.
 
@@ -86,13 +87,25 @@ def apply_search_and_filters(
         extra_fields: Дополнительные поля из других моделей для включения в
             условие ``OR`` поиска.
     """
+    combined_condition: Node | None = None
+
     if search_text:
         fields = [f for f in model._meta.sorted_fields if isinstance(f, Field)]
         if extra_fields:
             fields.extend(extra_fields)
         condition = build_or_condition(fields, search_text)
         if condition is not None:
-            query = query.where(condition)
+            combined_condition = condition
+
+    if extra_condition is not None:
+        combined_condition = (
+            extra_condition
+            if combined_condition is None
+            else (combined_condition | extra_condition)
+        )
+
+    if combined_condition is not None:
+        query = query.where(combined_condition)
 
     field_filters: dict[Field, str] = {}
     name_filters: dict[str, str] = {}
