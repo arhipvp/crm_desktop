@@ -13,7 +13,7 @@ from dateutil.relativedelta import relativedelta
 from utils.time_utils import now_str
 
 
-from peewee import JOIN, ModelSelect, Field, fn  # если ещё не импортирован
+from peewee import JOIN, ModelSelect, Field, fn, Model  # если ещё не импортирован
 
 from core.app_context import get_app_context
 from infrastructure.drive_gateway import DriveGateway
