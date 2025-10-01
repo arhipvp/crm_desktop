@@ -764,10 +764,33 @@ class BaseTableView(QWidget):
             return ""
         return str(header_value)
 
+    def _resolve_field_by_name(self, name: str) -> Field | None:
+        if not name:
+            return None
+        model_fields = getattr(self.model, "fields", None)
+        if model_fields:
+            for field in model_fields:
+                if getattr(field, "name", None) == name:
+                    return field
+        model_class = getattr(self.controller, "model_class", None) or self.model_class
+        if model_class is not None:
+            meta = getattr(model_class, "_meta", None)
+            meta_fields = getattr(meta, "fields", None)
+            if isinstance(meta_fields, dict):
+                candidate = meta_fields.get(name)
+                if isinstance(candidate, Field):
+                    return candidate
+        return None
+
     def _get_field_for_column(self, column: int) -> Field | str | None:
         column_map = getattr(self, "COLUMN_FIELD_MAP", {})
         if column in column_map:
-            return column_map[column]
+            mapped = column_map[column]
+            if isinstance(mapped, str):
+                resolved = self._resolve_field_by_name(mapped)
+                if resolved is not None:
+                    return resolved
+            return mapped
         model_fields = getattr(self.model, "fields", None)
         if model_fields and 0 <= column < len(model_fields):
             return model_fields[column]

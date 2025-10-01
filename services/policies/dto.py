@@ -4,22 +4,52 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Iterable
+from typing import Callable, Iterable
+
+from peewee import CharField, DecimalField, Field, IntegerField, TextField
 
 from database.models import Client, Deal, Policy
 
 
-class _FieldStub:
-    """Простейший объект поля, имитирующий интерфейс Peewee."""
+_EXTRA_FIELD_FACTORIES: dict[str, Callable[[], Field]] = {
+    "client_id": lambda: IntegerField(null=True),
+    "client_name": lambda: CharField(null=True),
+    "deal_id": lambda: IntegerField(null=True),
+    "deal_description": lambda: TextField(null=True),
+    "premium": lambda: DecimalField(null=True, max_digits=12, decimal_places=2),
+}
 
-    def __init__(self, name: str, *, null: bool = True) -> None:
-        self.name = name
-        self.null = null
+
+def _resolve_policy_field(name: str) -> Field:
+    """Вернуть peewee-поле для указанного имени столбца таблицы полисов."""
+
+    meta = Policy._meta
+    primary_key = meta.primary_key
+    if primary_key is not None and name == primary_key.name:
+        return primary_key
+    existing = meta.fields.get(name)
+    if isinstance(existing, Field):
+        return existing
+    factory = _EXTRA_FIELD_FACTORIES.get(name)
+    if factory is not None:
+        field = factory()
+    else:
+        field = CharField(null=True)
+    field.name = name
+    # ``column_name`` используется при экспорте CSV, поэтому задаём его явно.
+    field.column_name = name  # type: ignore[attr-defined]
+    return field
 
 
-def _build_meta(fields: Iterable[str]) -> SimpleNamespace:
-    stubs = [_FieldStub(name) for name in fields]
-    return SimpleNamespace(sorted_fields=stubs, fields={stub.name: stub for stub in stubs})
+def _build_meta(fields: Iterable[str | Field]) -> SimpleNamespace:
+    resolved: list[Field] = []
+    for item in fields:
+        field = item if isinstance(item, Field) else _resolve_policy_field(item)
+        if not getattr(field, "name", None):
+            # На всякий случай синхронизируем имя с исходным значением.
+            field.name = str(item)
+        resolved.append(field)
+    return SimpleNamespace(sorted_fields=resolved, fields={f.name: f for f in resolved})
 
 
 @dataclass(slots=True, frozen=True)
@@ -115,26 +145,26 @@ class PolicyRowDTO:
 
 
 POLICY_TABLE_FIELDS = [
-    "id",
+    Policy._meta.primary_key,
     "client_id",
     "client_name",
     "deal_id",
     "deal_description",
-    "policy_number",
-    "insurance_type",
-    "insurance_company",
-    "contractor",
-    "sales_channel",
-    "start_date",
-    "end_date",
-    "vehicle_brand",
-    "vehicle_model",
-    "vehicle_vin",
-    "note",
-    "drive_folder_link",
-    "renewed_to",
+    Policy.policy_number,
+    Policy.insurance_type,
+    Policy.insurance_company,
+    Policy.contractor,
+    Policy.sales_channel,
+    Policy.start_date,
+    Policy.end_date,
+    Policy.vehicle_brand,
+    Policy.vehicle_model,
+    Policy.vehicle_vin,
+    Policy.note,
+    Policy.drive_folder_link,
+    Policy.renewed_to,
     "premium",
-    "is_deleted",
+    Policy.is_deleted,
 ]
 
 PolicyRowDTO._meta = _build_meta(POLICY_TABLE_FIELDS)  # type: ignore[attr-defined]
