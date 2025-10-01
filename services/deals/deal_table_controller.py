@@ -85,6 +85,8 @@ class DealTableController(TableController):
             else "asc"
         )
 
+        order_by = self._normalize_order_by(order_by)
+
         logger.debug("load_data filters=%s sort=%s %s", filters, order_by, order_dir)
 
         try:
@@ -107,6 +109,9 @@ class DealTableController(TableController):
         self._apply_items(items, self._pending_total)
 
     def _get_page(self, *args: Any, **kwargs: Any) -> list[DealRowDTO]:
+        if "order_by" in kwargs:
+            kwargs["order_by"] = self._normalize_order_by(kwargs.get("order_by"))
+
         items, total = self.service.get_page(*args, **kwargs)
         self._pending_total = total
         return items
@@ -134,3 +139,8 @@ class DealTableController(TableController):
         filters = dict(filters)
         filters["show_closed"] = self.view.is_checked("Показать закрытые")
         return filters
+
+    def _normalize_order_by(self, order_by: str | None) -> str | None:
+        if order_by == "client":
+            return "client_name"
+        return order_by

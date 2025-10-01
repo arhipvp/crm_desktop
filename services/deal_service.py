@@ -469,6 +469,11 @@ def get_deals_page(
             query = query.order_by(Executor.full_name.desc(), Deal.id.desc())
         else:
             query = query.order_by(Executor.full_name.asc(), Deal.id.asc())
+    elif order_by == "client_name":
+        if order_dir == "desc":
+            query = query.order_by(Client.name.desc(), Deal.id.desc())
+        else:
+            query = query.order_by(Client.name.asc(), Deal.id.asc())
     elif order_by and hasattr(Deal, order_by):
         order_field = getattr(Deal, order_by)
         if order_dir == "desc":
