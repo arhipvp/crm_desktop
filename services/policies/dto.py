@@ -146,9 +146,7 @@ class PolicyRowDTO:
 
 POLICY_TABLE_FIELDS = [
     Policy._meta.primary_key,
-    "client_id",
     "client_name",
-    "deal_id",
     "deal_description",
     Policy.policy_number,
     Policy.insurance_type,
