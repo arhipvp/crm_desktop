@@ -48,29 +48,21 @@ def _ensure_distinct_order_columns(
 ) -> ModelSelect:
     """Добавить поля сортировки в SELECT при ``DISTINCT`` запросах."""
 
-    if not getattr(query, "_distinct", False):
+    distinct_flag = getattr(query, "_distinct", None)
+    if distinct_flag in (None, False):
         return query
-
-    current_selection = list(query._select or [])
-    if not current_selection:
-        current_selection.append(query.model_class)
 
     existing_aliases = {
         getattr(item, "_alias", None)
-        for item in current_selection
+        for item in (getattr(query, "_returning", None) or ())
         if getattr(item, "_alias", None)
     }
 
-    appended = False
     for field, alias in fields_with_aliases:
         if alias in existing_aliases:
             continue
-        current_selection.append(field.alias(alias))
+        query = query.select_extend(field.alias(alias))
         existing_aliases.add(alias)
-        appended = True
-
-    if appended:
-        query = query.select(*current_selection)
 
     return query
 
