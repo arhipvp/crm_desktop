@@ -15,8 +15,9 @@
 python database/migrations/001_decimal_fields.py
 ```
 
-Если в таблице `policy` отсутствует столбец `drive_folder_path`, выполните
-миграцию `migrations/002_add_policy_drive_folder_path.py`:
+После обновления приложения обязательно выполните миграцию
+`migrations/002_add_policy_drive_folder_path.py`, которая добавляет
+столбец `drive_folder_path` в таблицу `policy`:
 
 ```bash
 python database/migrations/002_add_policy_drive_folder_path.py
