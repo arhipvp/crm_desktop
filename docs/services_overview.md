@@ -31,9 +31,9 @@
 - `_notify_income_received` уведомляет исполнителя о поступлении средств при создании или обновлении записи【F:services/income_service.py†L145-L162】.
 
 ## expense_service
-- CRUD и массовые пометки: `add_expense`, `update_expense`, `mark_expense_deleted` и `mark_expenses_deleted`【F:services/expense_service.py†L48-L64】【F:services/expense_service.py†L70-L108】【F:services/expense_service.py†L114-L153】.
-- `get_expenses_page` и `apply_expense_filters` предоставляют фильтрацию по дате, сделке и статусу с пагинацией【F:services/expense_service.py†L159-L200】【F:services/expense_service.py†L203-L244】.
-- Каждая запись связывается с платежом и полисом для консистентности финансовых данных【F:services/expense_service.py†L80-L105】.
+- CRUD и массовые пометки: `add_expense`, `update_expense`, `mark_expense_deleted` и `mark_expenses_deleted`【F:services/expense_service.py†L125-L166】【F:services/expense_service.py†L171-L229】【F:services/expense_service.py†L106-L113】【F:services/expense_service.py†L115-L120】.
+- `get_expenses_page` и `apply_expense_filters` предоставляют фильтрацию по дате, сделке и статусу с пагинацией【F:services/expense_service.py†L235-L294】【F:services/expense_service.py†L296-L345】.
+- Каждая запись связывается с платежом и полисом для консистентности финансовых данных【F:services/expense_service.py†L158-L160】【F:services/expense_service.py†L207-L223】.
 
 ## executor_service
 - `ensure_executors_from_env` создаёт записи исполнителей на основе `APPROVED_EXECUTOR_IDS` из переменных окружения【F:services/executor_service.py†L17-L21】.
