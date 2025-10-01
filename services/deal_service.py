@@ -197,7 +197,7 @@ def add_deal_from_policy(
 
         resolved_gateway = _resolve_gateway(gateway)
         new_folder_path = move_policy_folder_to_deal(
-            policy.drive_folder_link,
+            policy.drive_folder_path,
             policy.client.name,
             deal.description,
             gateway=resolved_gateway,
@@ -248,7 +248,7 @@ def add_deal_from_policies(
         new_path = None
         try:
             new_path = move_policy_folder_to_deal(
-                policy.drive_folder_link,
+                policy.drive_folder_path,
                 policy.client.name,
                 deal.description,
                 gateway=resolved_gateway,

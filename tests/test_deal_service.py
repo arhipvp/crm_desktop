@@ -1,9 +1,16 @@
 from datetime import date
+from pathlib import Path
 
 from dateutil.relativedelta import relativedelta
 
 from database.models import Client, Deal, Policy
-from services.deal_service import add_deal_from_policy, get_open_deals, update_deal
+from services.deal_service import (
+    add_deal_from_policy,
+    add_deal_from_policies,
+    get_open_deals,
+    update_deal,
+)
+from services.folder_utils import sanitize_name
 
 
 def test_add_deal_from_policy_sets_reminder_date(
@@ -20,6 +27,77 @@ def test_add_deal_from_policy_sets_reminder_date(
     deal = add_deal_from_policy(policy, gateway=stub_drive_gateway)
 
     assert deal.reminder_date == start_date + relativedelta(months=9)
+
+
+def test_add_deal_from_policy_moves_folder(in_memory_db, stub_drive_gateway):
+    client = Client.create(name="Клиент")
+    policy_folder = stub_drive_gateway.local_root / "policy_folder"
+    policy_folder.mkdir()
+
+    policy = Policy.create(
+        client=client,
+        policy_number="P-123",
+        start_date=date(2024, 1, 15),
+        drive_folder_path=str(policy_folder),
+    )
+
+    deal = add_deal_from_policy(policy, gateway=stub_drive_gateway)
+
+    updated_policy = Policy.get_by_id(policy.id)
+    expected_base = (
+        Path(stub_drive_gateway.local_root)
+        / sanitize_name(client.name)
+        / sanitize_name(f"Сделка - Из полиса {policy.policy_number}")
+    )
+    expected_path = expected_base / policy_folder.name
+
+    assert expected_path.is_dir()
+    assert updated_policy.drive_folder_path == str(expected_path)
+    assert not policy_folder.exists()
+    assert deal.drive_folder_path == str(expected_base)
+
+
+def test_add_deal_from_policies_moves_all_folders(in_memory_db, stub_drive_gateway):
+    client = Client.create(name="Клиент")
+    folder_one = stub_drive_gateway.local_root / "policy_one"
+    folder_two = stub_drive_gateway.local_root / "policy_two"
+    folder_one.mkdir()
+    folder_two.mkdir()
+
+    policy_one = Policy.create(
+        client=client,
+        policy_number="P-001",
+        start_date=date(2024, 1, 10),
+        drive_folder_path=str(folder_one),
+    )
+    policy_two = Policy.create(
+        client=client,
+        policy_number="P-002",
+        start_date=date(2024, 2, 10),
+        drive_folder_path=str(folder_two),
+    )
+
+    deal = add_deal_from_policies(
+        [policy_one, policy_two], gateway=stub_drive_gateway
+    )
+
+    updated_one = Policy.get_by_id(policy_one.id)
+    updated_two = Policy.get_by_id(policy_two.id)
+    expected_base = (
+        Path(stub_drive_gateway.local_root)
+        / sanitize_name(client.name)
+        / sanitize_name(f"Сделка - Из полиса {policy_one.policy_number}")
+    )
+    expected_one = expected_base / folder_one.name
+    expected_two = expected_base / folder_two.name
+
+    assert expected_one.is_dir()
+    assert expected_two.is_dir()
+    assert updated_one.drive_folder_path == str(expected_one)
+    assert updated_two.drive_folder_path == str(expected_two)
+    assert not folder_one.exists()
+    assert not folder_two.exists()
+    assert deal.drive_folder_path == str(expected_base)
 
 
 def test_update_deal_reopen_clears_closed_reason(in_memory_db):
