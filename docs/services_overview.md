@@ -23,7 +23,7 @@
 ## payment_service
 - Полный набор CRUD‑операций: `add_payment`, `update_payment`, `mark_payment_deleted` и `restore_payment`【F:services/payment_service.py†L81-L137】【F:services/payment_service.py†L163-L177】【F:services/payment_service.py†L277-L305】.
 - `get_payments_page` предоставляет постраничный вывод с фильтрами и сортировкой через `apply_payment_filters` и `build_payment_query`【F:services/payment_service.py†L47-L78】【F:services/payment_service.py†L307-L360】.
-- `mark_payments_paid` массово отмечает платежи как оплаченные и каскадно обновляет связанные записи【F:services/payment_service.py†L140-L157】.
+- `mark_payments_paid` проставляет фактическую дату оплаты (текущую или переданную) только тем платежам, у которых она ещё не заполнена【F:services/payment_service.py†L206-L220】.
 
 ## income_service
 - CRUD и массовые пометки: `add_income`, `update_income`, `mark_income_deleted` и `mark_incomes_deleted`【F:services/income_service.py†L64-L80】【F:services/income_service.py†L166-L195】【F:services/income_service.py†L200-L235】.
