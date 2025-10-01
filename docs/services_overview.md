@@ -7,8 +7,8 @@
 - `add_client` нормализует имя и телефон, создаёт только локальную папку и сохраняет путь без ссылки; синхронизация с Google Drive выполняется вручную【F:services/clients/client_service.py†L156-L163】.
 
 ## deal_service
-- `add_deal` создаёт сделку, формирует запись в журнале и создаёт локальную папку «Сделка - …»【F:services/deal_service.py†L56-L123】.
-- `add_deal_from_policy` строит описание сделки из данных полиса и связывает их между собой【F:services/deal_service.py†L137-L160】.
+- `add_deal` создаёт сделку, формирует запись в журнале и создаёт локальную папку «Сделка - …»【F:services/deal_service.py†L100-L166】.
+- `add_deal_from_policy` строит описание сделки из данных полиса и связывает их между собой【F:services/deal_service.py†L169-L216】.
 
 ## calculation_service
 - `add_calculation` добавляет расчёт к сделке, ограничивает набор полей и уведомляет администратора【F:services/calculation_service.py†L14-L34】.
