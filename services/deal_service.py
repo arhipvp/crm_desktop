@@ -13,7 +13,7 @@ from dateutil.relativedelta import relativedelta
 from utils.time_utils import now_str
 
 
-from peewee import JOIN, ModelSelect, Field  # если ещё не импортирован
+from peewee import JOIN, ModelSelect, Field, fn  # если ещё не импортирован
 
 from core.app_context import get_app_context
 from infrastructure.drive_gateway import DriveGateway
@@ -431,19 +431,15 @@ def apply_deal_filters(
         Deal.calculations,
     ]
 
-    joined_policy = False
+    policy_search_condition = None
     if search_text:
-        query = (
-            query.switch(Deal)
-            .join(
-                Policy,
-                JOIN.LEFT_OUTER,
-                on=((Policy.deal == Deal.id) & (Policy.is_deleted == False)),
+        policy_search_condition = fn.EXISTS(
+            Policy.select(1).where(
+                (Policy.deal == Deal.id)
+                & (Policy.is_deleted == False)
+                & Policy.vehicle_vin.cast("TEXT").contains(search_text)
             )
-            .switch(Deal)
         )
-        extra_fields.append(Policy.vehicle_vin)
-        joined_policy = True
 
     if column_filters and Executor.full_name in column_filters:
         query = (
@@ -453,10 +449,13 @@ def apply_deal_filters(
         )
 
     query = apply_search_and_filters(
-        query, Deal, search_text, column_filters, extra_fields
+        query,
+        Deal,
+        search_text,
+        column_filters,
+        extra_fields,
+        extra_condition=policy_search_condition,
     )
-    if joined_policy:
-        query = query.distinct()
     return query
 
 
