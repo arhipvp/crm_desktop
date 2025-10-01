@@ -185,7 +185,14 @@ def _check_duplicate_phone(phone: str, *, exclude_id: int | None = None) -> None
 
 
 def add_client(**kwargs) -> Client:
-    """Создать и вернуть нового клиента."""
+    """Создать клиента или вернуть уже существующего с тем же именем.
+
+    Имя предварительно нормализуется через :func:`normalize_full_name` и
+    передаётся в :meth:`Client.get_or_create`. Если в базе уже есть запись с
+    таким нормализованным именем (в том числе отличавшимся только пробелами или
+    регистром букв), будет возвращён существующий клиент без обновления
+    дополнительных полей из ``kwargs``.
+    """
     allowed_fields = CLIENT_ALLOWED_FIELDS
 
     clean_data = {
