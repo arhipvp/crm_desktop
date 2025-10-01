@@ -472,7 +472,13 @@ class BaseTableView(QWidget):
         if self.delete_callback:
             self.delete_callback()
         elif self.can_delete:
-            self.delete_selected_default()
+            # Если потомок переопределил ``delete_selected`` (например, для работы
+            # через контроллер и DTO), используем его реализацию. В противном
+            # случае откатываемся на стандартный механизм удаления моделей.
+            if type(self).delete_selected is not BaseTableView.delete_selected:
+                self.delete_selected()
+            else:
+                self.delete_selected_default()
 
     def _on_restore(self):
         if hasattr(self, "restore_callback") and self.restore_callback:
