@@ -123,7 +123,12 @@ def get_client_detail_dto(client_id: int) -> ClientDetailsDTO | None:
 
 
 def create_client_from_command(command: ClientCreateCommand) -> ClientDetailsDTO:
-    """Создать клиента из команды и вернуть DTO."""
+    """Создать клиента из команды и вернуть DTO.
+
+    Если в базе уже есть клиент с таким нормализованным именем, будет
+    возвращён DTO существующей записи, поскольку :func:`add_client`
+    использует :meth:`Client.get_or_create`.
+    """
 
     payload = command.to_payload()
     client = add_client(**payload)
