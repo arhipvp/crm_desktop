@@ -862,7 +862,12 @@ def build_policy_query(
 ):
     """Сформировать запрос для выборки полисов с фильтрами."""
     base = Policy.active() if not show_deleted else Policy.select()
-    query = base.select(Policy, Client).join(Client)
+    query = (
+        base.select(Policy, Client, Deal)
+        .join(Client)
+        .switch(Policy)
+        .join(Deal, JOIN.LEFT_OUTER)
+    )
     if deal_id is not None:
         query = query.where(Policy.deal_id == deal_id)
     if client_id is not None:
@@ -875,11 +880,6 @@ def build_policy_query(
         )
     if deal_id is None and without_deal_only:
         query = query.where(Policy.deal_id.is_null(True))
-    join_deal = bool(column_filters and Deal.description in column_filters)
-    if isinstance(order_by, Field) and order_by.model == Deal:
-        join_deal = True
-    if join_deal:
-        query = query.switch(Policy).join(Deal, JOIN.LEFT_OUTER)
     query = apply_search_and_filters(query, Policy, search_text, column_filters)
     return query
 
