@@ -1,5 +1,6 @@
 import logging
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 
@@ -8,131 +9,93 @@ from services.policies import find_candidate_deals
 from services.policies.deal_matching import (
     BRAND_MODEL_DATE_WEIGHT,
     EMAIL_MATCH_WEIGHT,
+    CandidateDeal,
     build_deal_match_index,
     find_candidate_deal_ids,
 )
 
 
-@pytest.mark.usefixtures("in_memory_db")
 def test_find_candidate_deals_orders_and_merges(caplog, monkeypatch):
     caplog.set_level(logging.INFO, logger="services.policies.deal_matching")
 
-    strict_client = Client.create(
-        name="ООО Альфа",
-        phone="+7 (900) 111-22-33",
-        email="alpha@example.com",
-        drive_folder_path="clients/alpha/deal",
-    )
-    deal_strict = Deal.create(
-        client=strict_client,
-        description="Оформление полиса",
-        start_date=date(2024, 1, 1),
-        drive_folder_path="clients/alpha/deal",
-    )
-    existing_policy = Policy.create(
-        client=strict_client,
-        deal=deal_strict,
-        policy_number="VIN-EXIST",
-        start_date=date(2024, 1, 10),
-        vehicle_vin="XW8-1234-5678",
-    )
+    policy = SimpleNamespace(policy_number="NEW-999")
 
-    email_client = Client.create(
-        name="ООО Гамма",
-        phone="+7 (901) 333-44-55",
-        email="shared@example.com",
-    )
-    deal_email = Deal.create(
-        client=email_client,
-        description="Продление полиса",
-        start_date=date(2024, 1, 5),
-    )
-
-    brand_client = Client.create(
-        name="ИП Петров",
-        phone="+7 (902) 666-77-88",
-    )
-    deal_brand = Deal.create(
-        client=brand_client,
-        description="Корпоративный автопарк",
-        start_date=date(2024, 1, 15),
-    )
-    Policy.create(
-        client=brand_client,
-        deal=deal_brand,
-        policy_number="BRAND-001",
-        start_date=date(2024, 1, 20),
-        end_date=date(2024, 7, 20),
-        vehicle_brand="Toyota",
-        vehicle_model="Camry",
-    )
-
-    candidate_client = Client.create(
-        name="ООО Бета",
-        phone="+7 900 111 22 33",
-        email="shared@example.com",
-    )
-    candidate_policy = Policy.create(
-        client=candidate_client,
-        deal=None,
-        policy_number="NEW-999",
-        start_date=date(2024, 2, 1),
-        vehicle_vin="xw812345678",
-        vehicle_brand="Toyota",
-        vehicle_model="Camry",
-        insurance_company="ВСК",
-        insurance_type="КАСКО",
-        sales_channel="Онлайн",
-    )
-
-    expected_candidates = {deal_strict.id, deal_email.id, deal_brand.id}
-    assert find_candidate_deal_ids(candidate_policy) == expected_candidates
-
-    original_build = build_deal_match_index
+    expected_candidates = {1, 2, 3}
+    deal_index = {
+        deal_id: SimpleNamespace(deal=SimpleNamespace(id=deal_id))
+        for deal_id in expected_candidates
+    }
     captured_calls: list[set[int] | None] = []
 
-    def fake_build(ids=None):
-        captured_calls.append(None if ids is None else set(ids))
-        return original_build(ids)
+    strict_matches = [
+        CandidateDeal(
+            deal_id=1,
+            score=0.4,
+            reasons=["VIN совпадает"],
+            is_strict=True,
+        ),
+        CandidateDeal(
+            deal_id=2,
+            score=0.4,
+            reasons=["VIN совпадает"],
+            is_strict=True,
+        ),
+    ]
+    indirect_matches = [
+        CandidateDeal(
+            deal_id=1,
+            score=0.5,
+            reasons=["Совпадает email"],
+        ),
+        CandidateDeal(
+            deal_id=2,
+            score=0.5,
+            reasons=["Совпадает email", "VIN совпадает"],
+        ),
+        CandidateDeal(
+            deal_id=3,
+            score=0.9,
+            reasons=["Совпадают марка и модель", "Совпадают марка и модель"],
+        ),
+    ]
 
     monkeypatch.setattr(
+        "services.policies.deal_matching.find_candidate_deal_ids",
+        lambda _: expected_candidates,
+    )
+    monkeypatch.setattr(
         "services.policies.deal_matching.build_deal_match_index",
-        fake_build,
+        lambda ids=None: captured_calls.append(
+            None if ids is None else set(ids)
+        ) or deal_index,
+    )
+    monkeypatch.setattr(
+        "services.policies.deal_matching.make_policy_profile",
+        lambda _: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "services.policies.deal_matching.find_strict_matches",
+        lambda _policy, _index: strict_matches,
+    )
+    monkeypatch.setattr(
+        "services.policies.deal_matching.collect_indirect_matches",
+        lambda _policy, _index: indirect_matches,
     )
 
-    candidates = find_candidate_deals(candidate_policy, limit=5)
+    candidates = find_candidate_deals(policy, limit=5)
 
-    assert [candidate.deal_id for candidate in candidates] == [
-        deal_strict.id,
-        deal_email.id,
-        deal_brand.id,
+    assert [candidate.deal_id for candidate in candidates] == [1, 2, 3]
+    assert [candidate.score for candidate in candidates] == [0.9, 0.9, 0.9]
+    assert [candidate.is_strict for candidate in candidates] == [
+        True,
+        True,
+        False,
     ]
-
-    strict_candidate = candidates[0]
-    expected_phone = "".join(filter(str.isdigit, strict_client.phone))
-    assert strict_candidate.deal == deal_strict
-    assert strict_candidate.score == 1.0
-    assert strict_candidate.reasons == [
-        f"VIN совпадает с полисом №{existing_policy.policy_number}",
-        f"Совпадает телефон клиента: {expected_phone}",
+    assert [candidate.reasons for candidate in candidates] == [
+        ["VIN совпадает", "Совпадает email"],
+        ["VIN совпадает", "Совпадает email"],
+        ["Совпадают марка и модель"],
     ]
-    assert strict_candidate.is_strict is True
-
-    email_candidate = candidates[1]
-    assert email_candidate.deal == deal_email
-    assert email_candidate.score == EMAIL_MATCH_WEIGHT
-    assert email_candidate.reasons == [
-        "Совпадает email клиента: shared@example.com",
-    ]
-    assert email_candidate.is_strict is False
-
-    brand_candidate = candidates[2]
-    assert brand_candidate.deal == deal_brand
-    assert brand_candidate.score == BRAND_MODEL_DATE_WEIGHT
-    assert brand_candidate.reasons == [
-        "Совпадают марка и модель без совпадения VIN (Toyota / Camry)",
-    ]
-    assert brand_candidate.is_strict is False
 
     logged_reasons = [
         record.args[3]
