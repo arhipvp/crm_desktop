@@ -27,8 +27,24 @@ class _FieldStub:
 
 
 def _build_meta(fields: Iterable[str]) -> SimpleNamespace:
-    stubs = [_FieldStub(name) for name in fields]
-    return SimpleNamespace(sorted_fields=stubs, fields={stub.name: stub for stub in stubs})
+    """Создаёт объект meta с настоящими полями модели, если они существуют."""
+
+    deal_meta_fields = getattr(Deal._meta, "fields", {})
+    primary_key = getattr(Deal._meta, "primary_key", None)
+
+    resolved_fields = []
+    for name in fields:
+        field = deal_meta_fields.get(name)
+        if field is None and primary_key is not None and primary_key.name == name:
+            field = primary_key
+        if field is None:
+            field = _FieldStub(name)
+        resolved_fields.append(field)
+
+    return SimpleNamespace(
+        sorted_fields=resolved_fields,
+        fields={field.name: field for field in resolved_fields},
+    )
 
 
 @dataclass(slots=True)
