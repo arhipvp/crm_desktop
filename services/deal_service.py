@@ -531,13 +531,37 @@ def get_deals_page(
         )
         query = query.order_by(Deal.start_date.desc(), Deal.id.desc())
 
-    from peewee import prefetch
-
     offset = (page - 1) * per_page
     page_query = query.limit(per_page).offset(offset)
-    items = list(prefetch(page_query, DealExecutor, Executor, Policy))
+    items = list(page_query)
+    if not items:
+        return []
+
+    from peewee import prefetch
+
+    deal_ids = [deal.id for deal in items]
+
+    base_query = (
+        Deal.select(Deal, Client)
+        .join(Client)
+        .where(Deal.id.in_(deal_ids))
+    )
+
+    related_deals = prefetch(
+        base_query,
+        DealExecutor.select(DealExecutor, Executor).join(Executor),
+        Policy,
+    )
+
+    related_map = {deal.id: deal for deal in related_deals}
+
     for deal in items:
-        ex = deal.executors[0].executor if getattr(deal, "executors", []) else None
+        related = related_map.get(deal.id)
+        executors = list(getattr(related, "executors", [])) if related else []
+        if related:
+            setattr(deal, "executors", executors)
+            setattr(deal, "policies", list(getattr(related, "policies", [])))
+        ex = executors[0].executor if executors else None
         setattr(deal, "_executor", ex)
     return items
 
