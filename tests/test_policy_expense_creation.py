@@ -7,30 +7,9 @@ from unittest.mock import MagicMock
 from PySide6.QtWidgets import QDialog
 
 from database.models import Client, Policy, Payment, Expense
-from ui.forms.policy_form import PolicyForm
 from services.policies import add_contractor_expense, add_policy
-
-
-@pytest.fixture
-def policy_form(monkeypatch, qapp, in_memory_db):
-    client = Client.create(name="C")
-    policy = Policy.create(
-        client=client,
-        policy_number="P",
-        start_date=date.today(),
-        end_date=date.today(),
-        contractor="Y",
-    )
-    form = PolicyForm(policy)
-    monkeypatch.setattr(form, "collect_data", lambda: {"contractor": "X"})
-
-    def fake_save_data(data):
-        policy.contractor = data.get("contractor")
-        policy.save()
-        return policy
-
-    monkeypatch.setattr(form, "save_data", fake_save_data)
-    return form, policy
+from ui.forms import policy_form as policy_form_module
+from ui.forms.policy_form import PolicyForm, handle_contractor_expense_dialog
 
 
 def test_add_policy_first_payment_paid_sets_contractor_expense_date(
@@ -69,93 +48,85 @@ def test_add_policy_first_payment_paid_sets_contractor_expense_date(
     assert expense.expense_date is None
 
 
-def test_dialog_creates_expenses_for_selected_payments(policy_form, monkeypatch):
-    form, policy = policy_form
-    first_payment = Payment.create(
-        policy=policy,
-        amount=100,
-        payment_date=date.today(),
-    )
-    second_payment = Payment.create(
-        policy=policy,
-        amount=150,
-        payment_date=date.today(),
-    )
-
-    from ui.forms import policy_form as module
-
-    created_dialogs: list[tuple[Policy, str]] = []
+def test_handle_dialog_creates_expenses_for_selected_payments():
+    previous_policy = SimpleNamespace(contractor="Y")
+    saved_policy = SimpleNamespace(id=1, contractor="X")
+    selected_payments = [SimpleNamespace(id=10)]
+    created_dialogs = []
+    parent_token = object()
 
     class DummyDialog:
         def __init__(self, dlg_policy, contractor_name, parent=None):
-            created_dialogs.append((dlg_policy, contractor_name))
+            created_dialogs.append((dlg_policy, contractor_name, parent))
 
         def exec(self) -> int:
             return QDialog.Accepted
 
         def get_selected_payments(self):
-            return [first_payment]
+            return selected_payments
 
+    add_expense_result = SimpleNamespace(created=["expense"], updated=[])
+    add_expense_mock = MagicMock(return_value=add_expense_result)
     show_info_mock = MagicMock()
     show_error_mock = MagicMock()
-    monkeypatch.setattr(module, "ContractorExpenseDialog", DummyDialog)
-    monkeypatch.setattr(module, "show_info", show_info_mock)
-    monkeypatch.setattr(module, "show_error", show_error_mock)
 
-    form.save()
+    result = handle_contractor_expense_dialog(
+        previous_policy,
+        saved_policy,
+        parent=parent_token,
+        get_expense_count_by_policy=lambda _pid: 0,
+        contractor_dialog_factory=DummyDialog,
+        add_contractor_expense=add_expense_mock,
+        show_info=show_info_mock,
+        show_error=show_error_mock,
+    )
 
-    assert created_dialogs == [(policy, "X")]
+    assert len(created_dialogs) == 1
+    dlg_policy, contractor_name, parent = created_dialogs[0]
+    assert dlg_policy is saved_policy
+    assert contractor_name == "X"
+    assert parent is parent_token
+    assert result.contractor_changed is True
+    assert result.dialog_shown is True
+    assert result.expenses_created == ["expense"]
+    assert result.expenses_updated == []
+    add_expense_mock.assert_called_once_with(saved_policy, payments=selected_payments)
+    show_info_mock.assert_called_once_with("Расходы для контрагента созданы.")
     show_error_mock.assert_not_called()
 
-    first_expenses = (
-        Expense.active()
-        .where((Expense.payment == first_payment) & (Expense.expense_type == "контрагент"))
-    )
-    second_expenses = (
-        Expense.active()
-        .where((Expense.payment == second_payment) & (Expense.expense_type == "контрагент"))
-    )
 
-    assert first_expenses.count() == 1
-    assert second_expenses.count() == 0
-    show_info_mock.assert_called_once()
-
-
-def test_no_dialog_when_contractor_unchanged(monkeypatch, qapp, in_memory_db):
-    client = Client.create(name="C")
-    policy = Policy.create(
-        client=client,
-        policy_number="P",
-        start_date=date.today(),
-        end_date=date.today(),
-        contractor="X",
-    )
-    form = PolicyForm(policy)
-    monkeypatch.setattr(form, "collect_data", lambda: {"contractor": "X"})
-    monkeypatch.setattr(form, "save_data", lambda data: policy)
-
-    from ui.forms import policy_form as module
-
-    dialog_mock = MagicMock()
+def test_handle_dialog_skips_when_contractor_unchanged():
+    previous_policy = SimpleNamespace(contractor="X")
+    saved_policy = SimpleNamespace(id=1, contractor="X")
+    get_count_mock = MagicMock(return_value=0)
+    dialog_factory = MagicMock()
+    add_expense_mock = MagicMock()
     show_info_mock = MagicMock()
-    monkeypatch.setattr(module, "ContractorExpenseDialog", dialog_mock)
-    monkeypatch.setattr(module, "show_info", show_info_mock)
+    show_error_mock = MagicMock()
 
-    form.save()
-
-    dialog_mock.assert_not_called()
-    show_info_mock.assert_not_called()
-
-
-def test_no_expense_when_dialog_rejected(policy_form, monkeypatch):
-    form, policy = policy_form
-    payment = Payment.create(
-        policy=policy,
-        amount=50,
-        payment_date=date.today(),
+    result = handle_contractor_expense_dialog(
+        previous_policy,
+        saved_policy,
+        parent=None,
+        get_expense_count_by_policy=get_count_mock,
+        contractor_dialog_factory=dialog_factory,
+        add_contractor_expense=add_expense_mock,
+        show_info=show_info_mock,
+        show_error=show_error_mock,
     )
 
-    from ui.forms import policy_form as module
+    assert result.contractor_changed is False
+    assert result.dialog_shown is False
+    get_count_mock.assert_not_called()
+    dialog_factory.assert_not_called()
+    add_expense_mock.assert_not_called()
+    show_info_mock.assert_not_called()
+    show_error_mock.assert_not_called()
+
+
+def test_handle_dialog_no_expense_when_rejected():
+    previous_policy = SimpleNamespace(contractor="Y")
+    saved_policy = SimpleNamespace(id=2, contractor="X")
 
     class RejectingDialog:
         def __init__(self, *_args, **_kwargs):
@@ -165,48 +136,91 @@ def test_no_expense_when_dialog_rejected(policy_form, monkeypatch):
             return QDialog.Rejected
 
         def get_selected_payments(self):
-            return [payment]
+            return [SimpleNamespace(id=1)]
 
-    add_expense_mock = MagicMock(return_value=SimpleNamespace(created=[], updated=[]))
+    add_expense_mock = MagicMock()
     show_info_mock = MagicMock()
     show_error_mock = MagicMock()
 
-    monkeypatch.setattr(module, "ContractorExpenseDialog", RejectingDialog)
-    monkeypatch.setattr(module, "add_contractor_expense", add_expense_mock)
-    monkeypatch.setattr(module, "show_info", show_info_mock)
-    monkeypatch.setattr(module, "show_error", show_error_mock)
+    result = handle_contractor_expense_dialog(
+        previous_policy,
+        saved_policy,
+        parent=None,
+        get_expense_count_by_policy=lambda _pid: 0,
+        contractor_dialog_factory=RejectingDialog,
+        add_contractor_expense=add_expense_mock,
+        show_info=show_info_mock,
+        show_error=show_error_mock,
+    )
 
-    form.save()
-
+    assert result.contractor_changed is True
+    assert result.dialog_shown is True
+    assert result.expenses_created == []
+    assert result.expenses_updated == []
     add_expense_mock.assert_not_called()
     show_info_mock.assert_not_called()
     show_error_mock.assert_not_called()
 
 
-def test_dialog_skipped_for_new_policy(monkeypatch, qapp, in_memory_db):
+def test_handle_dialog_skipped_for_new_policy_with_existing_expenses():
+    saved_policy = SimpleNamespace(id=5, contractor="X")
+    dialog_factory = MagicMock()
+
+    result = handle_contractor_expense_dialog(
+        None,
+        saved_policy,
+        parent=None,
+        get_expense_count_by_policy=lambda _pid: 1,
+        contractor_dialog_factory=dialog_factory,
+        add_contractor_expense=MagicMock(),
+        show_info=MagicMock(),
+        show_error=MagicMock(),
+    )
+
+    assert result.contractor_changed is True
+    assert result.dialog_shown is False
+    dialog_factory.assert_not_called()
+
+
+def test_policy_form_save_invokes_helper(monkeypatch, qapp, in_memory_db):
     client = Client.create(name="C")
     policy = Policy.create(
         client=client,
         policy_number="P",
         start_date=date.today(),
         end_date=date.today(),
-        contractor="X",
+        contractor="Y",
     )
-    Payment.create(policy=policy, amount=0, payment_date=date.today())
-
-    form = PolicyForm()
+    form = PolicyForm(policy)
     monkeypatch.setattr(form, "collect_data", lambda: {"contractor": "X"})
-    monkeypatch.setattr(form, "save_data", lambda data: policy)
 
-    from ui.forms import policy_form as module
+    def fake_save_data(data):
+        policy.contractor = data["contractor"]
+        policy.save()
+        return policy
 
-    dialog_mock = MagicMock()
-    monkeypatch.setattr(module, "ContractorExpenseDialog", dialog_mock)
-    monkeypatch.setattr(module, "get_expense_count_by_policy", lambda pid: 1)
+    monkeypatch.setattr(form, "save_data", fake_save_data)
+
+    helper_result = SimpleNamespace(
+        contractor_changed=True,
+        dialog_shown=False,
+        expenses_created=[],
+        expenses_updated=[],
+    )
+    helper_mock = MagicMock(return_value=helper_result)
+    monkeypatch.setattr(policy_form_module, "handle_contractor_expense_dialog", helper_mock)
 
     form.save()
 
-    dialog_mock.assert_not_called()
+    helper_mock.assert_called_once()
+    args, kwargs = helper_mock.call_args
+    assert args == (policy, policy)
+    assert kwargs["parent"] is form
+    assert kwargs["get_expense_count_by_policy"] is policy_form_module.get_expense_count_by_policy
+    assert kwargs["contractor_dialog_factory"] is policy_form_module.ContractorExpenseDialog
+    assert kwargs["add_contractor_expense"] is policy_form_module.add_contractor_expense
+    assert kwargs["show_info"] is policy_form_module.show_info
+    assert kwargs["show_error"] is policy_form_module.show_error
 
 
 def test_add_contractor_expense_creates_record(in_memory_db):

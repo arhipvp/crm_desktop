@@ -1,4 +1,6 @@
 import logging
+from dataclasses import dataclass, field
+from typing import Any, Callable
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
     QDialog,
@@ -47,6 +49,74 @@ from ui.common.message_boxes import show_error, show_info
 from services.expense_service import get_expense_count_by_policy
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ContractorExpenseHandlingResult:
+    contractor_changed: bool = False
+    dialog_shown: bool = False
+    expenses_created: list[Any] = field(default_factory=list)
+    expenses_updated: list[Any] = field(default_factory=list)
+
+
+def handle_contractor_expense_dialog(
+    previous_policy,
+    saved_policy,
+    *,
+    parent=None,
+    get_expense_count_by_policy: Callable[[int], int],
+    contractor_dialog_factory: Callable[..., QDialog],
+    add_contractor_expense: Callable[..., Any],
+    show_info: Callable[[str], None],
+    show_error: Callable[[str], None],
+) -> ContractorExpenseHandlingResult:
+    result = ContractorExpenseHandlingResult()
+
+    contractor = getattr(saved_policy, "contractor", None)
+    current_contractor = getattr(previous_policy, "contractor", None)
+    contractor_provided = contractor not in (None, "-", "—")
+    contractor_changed = contractor_provided and contractor != current_contractor
+    result.contractor_changed = contractor_changed
+
+    if not contractor_changed:
+        return result
+
+    policy_id = getattr(saved_policy, "id", None)
+    expense_count = get_expense_count_by_policy(policy_id) if policy_id else 0
+    is_new_policy = previous_policy is None
+    should_show_dialog = not (is_new_policy and expense_count > 0)
+
+    contractor_name = (contractor or "").strip()
+    if not should_show_dialog or contractor_name in {"", "-", "—"}:
+        return result
+
+    dialog = contractor_dialog_factory(saved_policy, contractor_name, parent=parent)
+    result.dialog_shown = True
+
+    if dialog.exec() != QDialog.Accepted:
+        return result
+
+    selected_payments = dialog.get_selected_payments()
+    if not selected_payments:
+        return result
+
+    try:
+        expense_result = add_contractor_expense(saved_policy, payments=selected_payments)
+    except ValueError as err:
+        show_error(str(err))
+        return result
+
+    result.expenses_created = list(getattr(expense_result, "created", []) or [])
+    result.expenses_updated = list(getattr(expense_result, "updated", []) or [])
+
+    if result.expenses_created:
+        show_info("Расходы для контрагента созданы.")
+    elif result.expenses_updated:
+        show_info("Расходы для контрагента обновлены.")
+    else:
+        show_info("Расходы для контрагента уже существовали.")
+
+    return result
 
 
 class PolicyForm(BaseEditForm):
@@ -315,40 +385,19 @@ class PolicyForm(BaseEditForm):
 
     def save(self):
         data = self.collect_data()
-        contractor = data.get("contractor")
-        contractor_provided = contractor not in (None, "-", "—")
-        current_contractor = getattr(self.instance, "contractor", None)
-        contractor_changed = contractor_provided and contractor != current_contractor
         try:
             saved = self.save_data(data)
             if saved:
-                if contractor_changed:
-                    cnt = get_expense_count_by_policy(saved.id)
-                    is_new_policy = self.instance is None
-                    should_show_dialog = not (is_new_policy and cnt > 0)
-                    contractor_name = (saved.contractor or "").strip()
-                    if should_show_dialog and contractor_name not in {"", "-", "—"}:
-                        dialog = ContractorExpenseDialog(
-                            saved, contractor_name, parent=self
-                        )
-                        if dialog.exec() == QDialog.Accepted:
-                            selected_payments = dialog.get_selected_payments()
-                            if selected_payments:
-                                try:
-                                    result = add_contractor_expense(
-                                        saved, payments=selected_payments
-                                    )
-                                except ValueError as err:
-                                    show_error(str(err))
-                                else:
-                                    if result.created:
-                                        show_info("Расходы для контрагента созданы.")
-                                    elif result.updated:
-                                        show_info("Расходы для контрагента обновлены.")
-                                    else:
-                                        show_info(
-                                            "Расходы для контрагента уже существовали."
-                                        )
+                handle_contractor_expense_dialog(
+                    self.instance,
+                    saved,
+                    parent=self,
+                    get_expense_count_by_policy=get_expense_count_by_policy,
+                    contractor_dialog_factory=ContractorExpenseDialog,
+                    add_contractor_expense=add_contractor_expense,
+                    show_info=show_info,
+                    show_error=show_error,
+                )
                 self.saved_instance = saved
                 self.accept()
         except DuplicatePolicyError as e:
