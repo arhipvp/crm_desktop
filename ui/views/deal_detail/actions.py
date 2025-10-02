@@ -9,6 +9,11 @@ from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QDialog, QInputDialog, QMessageBox, QProgressDialog
 
 from database.models import Deal
+from services.clients import get_client_by_id
+from services.clients.client_app_service import (
+    ClientNotFoundError,
+    client_app_service,
+)
 from services.container import get_sheets_sync_service
 from services.deal_service import (
     get_deal_by_id,
@@ -254,9 +259,25 @@ class DealActionsMixin:
             self._init_tabs()
 
     def _on_edit_client(self):
-        form = ClientForm(self.instance.client, parent=self)
+        client = getattr(self.instance, "client", None)
+        if client is None:
+            show_error("Клиент не найден")
+            return
+
+        try:
+            client_dto = client_app_service.get_detail(client.id)
+        except ClientNotFoundError:
+            show_error("Клиент не найден")
+            return
+
+        form = ClientForm(client_dto, parent=self)
         if form.exec():
-            self.instance.client = form.instance
+            updated_client = get_client_by_id(form.instance.id)
+            if updated_client is None:
+                show_error("Не удалось обновить данные клиента")
+                return
+
+            self.instance.client = updated_client
             self.setWindowTitle(
                 f"Сделка #{self.instance.id} — {self.instance.client.name}: {self.instance.description}"
             )
