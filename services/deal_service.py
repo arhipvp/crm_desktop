@@ -71,7 +71,12 @@ def _ensure_distinct_order_columns(
 
 def get_all_deals():
     """Возвращает все сделки, кроме помеченных как удалённые."""
-    return Deal.active()
+
+    return (
+        Deal.select(Deal, Client)
+        .join(Client)
+        .where(Deal.is_deleted == False)
+    )
 
 
 def get_open_deals():
@@ -80,7 +85,10 @@ def get_open_deals():
 
 
 def get_deals_by_client_id(client_id: int):
-    return Deal.active().where(Deal.client_id == client_id)
+    return (
+        get_all_deals()
+        .where(Deal.client_id == client_id)
+    )
 
 
 def get_deal_by_id(deal_id: int, include_deleted: bool = False) -> Deal | None:

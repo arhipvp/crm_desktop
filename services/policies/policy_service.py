@@ -58,7 +58,12 @@ def get_all_policies():
     Returns:
         ModelSelect: Выборка полисов.
     """
-    return Policy.active()
+
+    return (
+        Policy.select(Policy, Client)
+        .join(Client)
+        .where(Policy.is_deleted == False)
+    )
 
 
 def get_policies_by_client_id(client_id: int):
