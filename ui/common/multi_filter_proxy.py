@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 import math
-from typing import Any, Callable, Dict, Mapping, Optional
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Sequence, Set, Tuple
 
 from PySide6.QtCore import (
     QDate,
@@ -224,6 +224,128 @@ class ColumnFilterState:
         return values
 
 
+_IDENTIFIER_KEYS: Tuple[str, ...] = ("id", "pk", "value", "key", "code", "uuid")
+
+
+def _freeze_choice_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return tuple(
+            sorted((key, _freeze_choice_value(inner)) for key, inner in value.items())
+        )
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_choice_value(item) for item in value)
+    if isinstance(value, (set, frozenset)):
+        return tuple(sorted(_freeze_choice_value(item) for item in value))
+    return value
+
+
+def _string_tokens(value: Any) -> Set[str]:
+    if value is None:
+        return {"", "—", "None", "none", "null"}
+    text = str(value)
+    tokens = {text}
+    lowered = text.casefold()
+    tokens.add(lowered)
+    return tokens
+
+
+def _iter_choice_values(value: Any) -> Iterable[Any]:
+    if value is None:
+        return [None]
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return list(value)
+    return [value]
+
+
+def _extract_identifiers(value: Any) -> Iterable[Any]:
+    if isinstance(value, Mapping):
+        for key in _IDENTIFIER_KEYS:
+            if key in value:
+                yield value[key]
+        return
+    for key in _IDENTIFIER_KEYS:
+        if hasattr(value, key):
+            yield getattr(value, key)
+
+
+def _register_choice_value(
+    value: Any,
+    *,
+    selected_exact: Set[Any],
+    selected_strings: Set[str],
+) -> None:
+    normalized = _freeze_choice_value(value)
+    try:
+        selected_exact.add(normalized)
+    except TypeError:
+        pass
+    selected_strings.update(_string_tokens(value))
+    for identifier in _extract_identifiers(value):
+        normalized_identifier = _freeze_choice_value(identifier)
+        try:
+            selected_exact.add(normalized_identifier)
+        except TypeError:
+            pass
+        selected_strings.update(_string_tokens(identifier))
+
+
+def create_choices_matcher(
+    state: ColumnFilterState,
+) -> Optional[Callable[[Any, Any], bool]]:
+    values = state._choices_values()
+    if not values:
+        return None
+
+    selected_exact: Set[Any] = set()
+    selected_strings: Set[str] = set()
+
+    for item in values:
+        _register_choice_value(
+            item, selected_exact=selected_exact, selected_strings=selected_strings
+        )
+
+    if isinstance(state.meta, Mapping):
+        display_values = state.meta.get("choices_display")
+        if isinstance(display_values, Sequence):
+            for display in display_values:
+                selected_strings.update(_string_tokens(display))
+        labels_map = state.meta.get("choices_labels")
+        if isinstance(labels_map, Mapping):
+            for display in labels_map.values():
+                selected_strings.update(_string_tokens(display))
+
+    def matches_single(value: Any) -> bool:
+        normalized = _freeze_choice_value(value)
+        try:
+            if normalized in selected_exact:
+                return True
+        except TypeError:
+            pass
+        for identifier in _extract_identifiers(value):
+            normalized_identifier = _freeze_choice_value(identifier)
+            try:
+                if normalized_identifier in selected_exact:
+                    return True
+            except TypeError:
+                pass
+            if _string_tokens(identifier) & selected_strings:
+                return True
+        if _string_tokens(value) & selected_strings:
+            return True
+        return False
+
+    def matcher(raw: Any, display: Any) -> bool:
+        for candidate in _iter_choice_values(raw):
+            if matches_single(candidate):
+                return True
+        for candidate in _iter_choice_values(display):
+            if matches_single(candidate):
+                return True
+        return False
+
+    return matcher
+
+
 class MultiFilterProxyModel(QSortFilterProxyModel):
     """Расширенная `QSortFilterProxyModel` с несколькими фильтрами.
 
@@ -283,7 +405,10 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
         for column, matcher in self._filters.items():
             index = model.index(source_row, column, source_parent)
             raw_value = model.data(index, Qt.UserRole)
-            display_value = model.data(index, self.filterRole())
+            display_role = self.filterRole()
+            display_value = model.data(index, display_role)
+            if display_value is None and display_role != Qt.DisplayRole:
+                display_value = model.data(index, Qt.DisplayRole)
             if not matcher(raw_value, display_value):
                 return False
         return True
@@ -417,41 +542,7 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
             return matcher
 
         if state.type == "choices":
-            values = state._choices_values()
-            if not values:
-                return None
-            selected_exact: set[Any] = set()
-            selected_strings = {str(item) for item in values}
-            for item in values:
-                try:
-                    selected_exact.add(item)
-                except TypeError:
-                    continue
-            if isinstance(state.meta, Mapping):
-                display_values = state.meta.get("choices_display")
-                if isinstance(display_values, list):
-                    selected_strings.update(str(item) for item in display_values)
-                labels_map = state.meta.get("choices_labels")
-                if isinstance(labels_map, Mapping):
-                    selected_strings.update(str(item) for item in labels_map.values())
-
-            def iter_values(value: Any) -> list[Any]:
-                if value is None:
-                    return []
-                if isinstance(value, (list, tuple, set, frozenset)):
-                    return list(value)
-                return [value]
-
-            def matcher(raw: Any, display: Any) -> bool:
-                for candidate in iter_values(raw):
-                    if candidate in selected_exact or str(candidate) in selected_strings:
-                        return True
-                for candidate in iter_values(display):
-                    if str(candidate) in selected_strings:
-                        return True
-                return False
-
-            return matcher
+            return create_choices_matcher(state)
 
         # Для неизвестных типов используем текстовое сравнение
         text = str(state.value or "").strip()
