@@ -56,6 +56,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QSpinBox,
     QDoubleSpinBox,
+    QPushButton,
+    QScrollArea,
 )
 
 from ui.base.table_controller import TableController
@@ -74,6 +76,8 @@ from database.models import Deal
 
 
 class BaseTableView(QWidget):
+    _CHOICE_IDENTIFIER_KEYS = ("id", "pk", "value", "key", "code", "uuid")
+
     class _ProxyModel(QSortFilterProxyModel):
         def __init__(self, owner: "BaseTableView") -> None:
             super().__init__(owner)
@@ -1090,6 +1094,193 @@ class BaseTableView(QWidget):
 
         return clear
 
+    def _create_choices_filter_widget(
+        self,
+        menu: QMenu,
+        column: int,
+        state: Optional[ColumnFilterState],
+    ) -> Callable[[], None]:
+        source_model = self.proxy.sourceModel()
+        if source_model is None:
+            source_model = getattr(self, "model", None)
+
+        choices: list[tuple[str, dict[str, Any]]] = []
+        seen_keys: set[tuple[Any, str]] = set()
+        if source_model is not None:
+            try:
+                row_count = source_model.rowCount()
+            except Exception:
+                row_count = 0
+            for row in range(row_count):
+                try:
+                    index = source_model.index(row, column)
+                except Exception:
+                    continue
+                if not index or not index.isValid():
+                    continue
+                raw_value = source_model.data(index, Qt.UserRole)
+                display_value = source_model.data(index, Qt.DisplayRole)
+                label = self._format_choice_label(raw_value, display_value)
+                storage_value = self._normalize_choice_storage_value(raw_value)
+                key = (storage_value, label)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                payload = {
+                    "value": storage_value,
+                    "display": label,
+                }
+                choices.append((label, payload))
+
+        if isinstance(state, ColumnFilterState) and state.type == "choices":
+            for item in state._choices_values(raw=True):
+                normalized = self._normalize_choice_storage_value(item)
+                if isinstance(item, Mapping):
+                    label_value = item.get("display", item.get("value"))
+                else:
+                    label_value = item
+                label = self._format_choice_label(None, label_value)
+                key = (normalized, label)
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                payload = {
+                    "value": normalized,
+                    "display": label,
+                }
+                choices.append((label, payload))
+
+        choices.sort(key=lambda item: item[0].casefold())
+
+        container = QWidget(menu)
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(6, 6, 6, 6)
+        container_layout.setSpacing(6)
+
+        scroll_area = QScrollArea(container)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setMinimumWidth(220)
+        list_widget = QWidget(scroll_area)
+        list_layout = QVBoxLayout(list_widget)
+        list_layout.setContentsMargins(0, 0, 0, 0)
+        list_layout.setSpacing(4)
+
+        selected_keys: set[tuple[Any, str]] = set()
+        if isinstance(state, ColumnFilterState) and state.type == "choices":
+            for item in state._choices_values(raw=True):
+                normalized = self._normalize_choice_storage_value(item)
+                if isinstance(item, Mapping):
+                    label_value = item.get("display", item.get("value"))
+                else:
+                    label_value = item
+                label_text = self._format_choice_label(None, label_value)
+                selected_keys.add((normalized, label_text))
+
+        checkbox_entries: list[tuple[QCheckBox, dict[str, Any]]] = []
+
+        if choices:
+            for label, payload in choices:
+                checkbox = QCheckBox(label, list_widget)
+                key = payload.get("value")
+                if (key, label) in selected_keys:
+                    checkbox.setChecked(True)
+                list_layout.addWidget(checkbox)
+                checkbox_entries.append((checkbox, payload))
+        else:
+            placeholder = QLabel("Нет значений", list_widget)
+            placeholder.setEnabled(False)
+            list_layout.addWidget(placeholder)
+
+        list_layout.addStretch(1)
+        scroll_area.setWidget(list_widget)
+        container_layout.addWidget(scroll_area)
+
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setContentsMargins(0, 0, 0, 0)
+        buttons_layout.setSpacing(6)
+        select_all_btn = QPushButton("Выделить всё", container)
+        clear_all_btn = QPushButton("Снять всё", container)
+        buttons_layout.addWidget(select_all_btn)
+        buttons_layout.addWidget(clear_all_btn)
+        container_layout.addLayout(buttons_layout)
+
+        action = QWidgetAction(menu)
+        action.setDefaultWidget(container)
+        menu.addAction(action)
+
+        updating = False
+
+        def apply_selection() -> None:
+            if updating:
+                return
+            selected_payloads: list[dict[str, Any]] = []
+            selected_labels: list[str] = []
+            for checkbox, payload in checkbox_entries:
+                if checkbox.isChecked():
+                    selected_payloads.append(payload)
+                    label_text = payload.get("display", "")
+                    if not isinstance(label_text, str):
+                        label_text = str(label_text)
+                    if not label_text:
+                        label_text = "—"
+                    selected_labels.append(label_text)
+            if not selected_payloads:
+                self._apply_column_filter(column, None)
+                return
+            summary = self._format_choices_summary(selected_labels)
+            meta: dict[str, Any] = {"choices_display": selected_labels}
+            self._apply_column_filter(
+                column,
+                ColumnFilterState(
+                    "choices",
+                    selected_payloads,
+                    display=summary,
+                    meta=meta,
+                ),
+            )
+
+        def on_checkbox_state_changed(_state: int) -> None:
+            nonlocal updating
+            if updating:
+                return
+            apply_selection()
+
+        for checkbox, _ in checkbox_entries:
+            checkbox.stateChanged.connect(on_checkbox_state_changed)
+
+        def select_all() -> None:
+            nonlocal updating
+            if not checkbox_entries:
+                return
+            updating = True
+            for checkbox, _ in checkbox_entries:
+                checkbox.setChecked(True)
+            updating = False
+            apply_selection()
+
+        def clear_selection() -> None:
+            nonlocal updating
+            if not checkbox_entries:
+                self._apply_column_filter(column, None)
+                return
+            updating = True
+            for checkbox, _ in checkbox_entries:
+                checkbox.setChecked(False)
+            updating = False
+            self._apply_column_filter(column, None)
+
+        select_all_btn.clicked.connect(select_all)
+        clear_all_btn.clicked.connect(clear_selection)
+
+        if not checkbox_entries:
+            select_all_btn.setEnabled(False)
+
+        def clear() -> None:
+            clear_selection()
+
+        return clear
+
     def _on_header_section_clicked(self, pos: QPoint) -> None:
         header = self.table.horizontalHeader()
         column = header.logicalIndexAt(pos)
@@ -1114,7 +1305,7 @@ class BaseTableView(QWidget):
         elif isinstance(field, Field) and self._is_numeric_field(field):
             clear_callback = self._create_numeric_filter_widget(menu, column, state, field)
         else:
-            clear_callback = self._create_text_filter_widget(menu, column, visual, state)
+            clear_callback = self._create_choices_filter_widget(menu, column, state)
 
         menu.addSeparator()
         clear_action = menu.addAction("Очистить фильтр")
@@ -1214,6 +1405,58 @@ class BaseTableView(QWidget):
                 return f"{base}\nФильтр: {filter_text}"
             return f"Фильтр: {filter_text}"
         return base_value
+
+    @classmethod
+    def _normalize_choice_storage_value(cls, value: Any) -> Any:
+        if isinstance(value, Mapping) and "value" in value:
+            return cls._normalize_choice_storage_value(value["value"])
+        if value in (None, ""):
+            return value
+        if isinstance(value, (bool, int)):
+            return value
+        if isinstance(value, float):
+            return float(value)
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, (date, datetime)):
+            return value.isoformat()
+        if isinstance(value, QDate):
+            return value.toString(Qt.ISODate)
+        if isinstance(value, str):
+            return value
+        if isinstance(value, Mapping):
+            for key in cls._CHOICE_IDENTIFIER_KEYS:
+                if key in value:
+                    return cls._normalize_choice_storage_value(value[key])
+        for key in cls._CHOICE_IDENTIFIER_KEYS:
+            if hasattr(value, key):
+                return cls._normalize_choice_storage_value(getattr(value, key))
+        return str(value)
+
+    @staticmethod
+    def _format_choice_label(raw_value: Any, display_value: Any) -> str:
+        if isinstance(display_value, str) and display_value.strip():
+            return display_value
+        if display_value not in (None, ""):
+            return str(display_value)
+        if raw_value is None:
+            return "—"
+        if isinstance(raw_value, (date, datetime)):
+            return raw_value.strftime("%d.%m.%Y")
+        if isinstance(raw_value, Decimal):
+            return str(raw_value)
+        return str(raw_value)
+
+    @staticmethod
+    def _format_choices_summary(labels: list[str]) -> str:
+        if not labels:
+            return ""
+        max_visible = 3
+        if len(labels) <= max_visible:
+            return ", ".join(labels)
+        visible = ", ".join(labels[:max_visible])
+        remainder = len(labels) - max_visible
+        return f"{visible} +{remainder}"
 
     def _normalize_filter_state(
         self,
