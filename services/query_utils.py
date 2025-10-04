@@ -1,5 +1,6 @@
 """Utility helpers for building filtered Peewee queries."""
 
+from collections.abc import Iterable as IterableABC
 from decimal import Decimal
 from typing import Any, Iterable, Iterator
 
@@ -7,20 +8,48 @@ from peewee import Field, Model, ModelSelect, Node, fn
 from playhouse.shortcuts import Cast
 
 
+def _normalize_filter_values(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
+    if isinstance(value, IterableABC):
+        result: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            if isinstance(item, str):
+                text = item.strip()
+            else:
+                text = str(item).strip()
+            if text:
+                result.append(text)
+        return result
+    text = str(value).strip()
+    return [text] if text else []
+
+
 def _apply_contains_filters(
-    query: ModelSelect, items: Iterable[tuple[Field, str]]
+    query: ModelSelect, items: Iterable[tuple[Field, Any]]
 ) -> ModelSelect:
     """Internal helper to apply ``contains`` filters to a query."""
     for field, value in items:
-        if not value:
+        values = _normalize_filter_values(value)
+        if not values:
             continue
-        query = query.where(Cast(field, "TEXT").contains(value))
+        condition: Node | None = None
+        for candidate in values:
+            expr = Cast(field, "TEXT").contains(candidate)
+            condition = expr if condition is None else (condition | expr)
+        if condition is not None:
+            query = query.where(condition)
     return query
 
 
 def apply_column_filters(
     query: ModelSelect,
-    column_filters: dict[str, str] | None,
+    column_filters: dict[str, Any] | None,
     model: type[Model],
 ) -> ModelSelect:
     """Apply simple ``contains`` filters for model fields.
@@ -32,7 +61,7 @@ def apply_column_filters(
     """
     if not column_filters:
         return query
-    items: Iterator[tuple[Field, str]] = (
+    items: Iterator[tuple[Field, Any]] = (
         (field, value)
         for name, value in column_filters.items()
         if (field := getattr(model, name, None)) is not None and isinstance(field, Field)
@@ -41,7 +70,7 @@ def apply_column_filters(
 
 
 def apply_field_filters(
-    query: ModelSelect, field_filters: dict[Field, str] | None
+    query: ModelSelect, field_filters: dict[Field, Any] | None
 ) -> ModelSelect:
     """Apply ``contains`` filters using explicit Peewee :class:`Field` keys."""
     if not field_filters:
@@ -73,7 +102,7 @@ def apply_search_and_filters(
     query: ModelSelect,
     model: type[Model],
     search_text: str = "",
-    column_filters: dict[Field | str, str] | None = None,
+    column_filters: dict[Field | str, Any] | None = None,
     extra_fields: Iterable[Field] = (),
     extra_condition: Node | None = None,
 ) -> ModelSelect:
@@ -107,8 +136,8 @@ def apply_search_and_filters(
     if combined_condition is not None:
         query = query.where(combined_condition)
 
-    field_filters: dict[Field, str] = {}
-    name_filters: dict[str, str] = {}
+    field_filters: dict[Field, Any] = {}
+    name_filters: dict[str, Any] = {}
     if column_filters:
         for key, val in column_filters.items():
             if isinstance(key, Field):

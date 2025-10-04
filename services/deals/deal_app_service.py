@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable as IterableABC
 from typing import Mapping, MutableMapping, Sequence
 
 from database.models import Client, Deal, Executor
@@ -94,8 +95,33 @@ class DealAppService:
             field = self._COLUMN_FILTER_MAP.get(str(name))
             if field is None:
                 continue
-            converted[field] = value
+            normalized = self._normalize_filter_values(value)
+            if not normalized:
+                continue
+            converted[field] = normalized
         return converted
+
+    @staticmethod
+    def _normalize_filter_values(value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            text = value.strip()
+            return [text] if text else []
+        if isinstance(value, IterableABC):
+            result: list[str] = []
+            for item in value:
+                if item is None:
+                    continue
+                if isinstance(item, str):
+                    text = item.strip()
+                else:
+                    text = str(item).strip()
+                if text:
+                    result.append(text)
+            return result
+        text = str(value).strip()
+        return [text] if text else []
 
 
 deal_app_service = DealAppService()

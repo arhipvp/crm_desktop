@@ -168,7 +168,7 @@ def test_column_filter_passed_to_payment_service(
     assert captured_column_filters, "Сервис не получил фильтры"
     last_filters = captured_column_filters[-1]
     assert Policy.policy_number in last_filters
-    assert last_filters[Policy.policy_number] == "PAY-001"
+    assert last_filters[Policy.policy_number] == ["PAY-001"]
 
     assert captured_sql, "SQL-запрос не сформирован"
     sql, params = captured_sql[-1]
@@ -213,6 +213,27 @@ def test_date_filter_resets_to_minimum(qapp):
     assert get_date_or_none(view.date_from) is None
 
     view.deleteLater()
+
+
+def test_column_filter_state_backend_value_for_choices_single():
+    state = ColumnFilterState(
+        "choices",
+        {"value": "alpha", "display": "Alpha"},
+    )
+    assert state.backend_value() == "alpha"
+
+
+def test_column_filter_state_backend_value_for_choices_multiple():
+    state = ColumnFilterState(
+        "choices",
+        [
+            {"value": "one", "display": "One"},
+            {"display": "Two"},
+            3,
+            None,
+        ],
+    )
+    assert state.backend_value() == ["one", "Two", "3"]
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")

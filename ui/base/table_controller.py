@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable as IterableABC
 
 from typing import Any, Callable, Iterable
 
@@ -9,6 +10,28 @@ from ui.base.base_table_model import BaseTableModel
 
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_filter_values(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
+    if isinstance(value, IterableABC):
+        result: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            if isinstance(item, str):
+                text = item.strip()
+            else:
+                text = str(item).strip()
+            if text:
+                result.append(text)
+        return result
+    text = str(value).strip()
+    return [text] if text else []
 
 
 class TableController:
@@ -209,9 +232,10 @@ class TableController:
             if not field:
                 continue
             backend_value = state.backend_value() if state else None
-            if backend_value is None:
+            values = _normalize_filter_values(backend_value)
+            if not values:
                 continue
-            column_filters[field] = backend_value
+            column_filters[field] = values
         filters["column_filters"] = column_filters
         date_range = self.view.get_date_filter()
         if date_range:
