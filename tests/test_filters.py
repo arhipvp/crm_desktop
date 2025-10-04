@@ -6,7 +6,7 @@ from datetime import date
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QCheckBox, QLabel, QLineEdit, QMenu
+from PySide6.QtWidgets import QCheckBox, QLabel, QLineEdit, QMenu, QPushButton
 
 from database.models import Client, Deal, Payment, Policy
 from ui import settings as ui_settings
@@ -223,6 +223,42 @@ def test_choices_filter_widget_has_search_and_filters(
 
     assert not checkbox_one.isHidden()
     assert checkbox_two.isHidden()
+
+    select_all_btn = next(
+        (btn for btn in container.findChildren(QPushButton) if btn.text() == "Выделить всё"),
+        None,
+    )
+    clear_all_btn = next(
+        (btn for btn in container.findChildren(QPushButton) if btn.text() == "Снять всё"),
+        None,
+    )
+    assert select_all_btn is not None and clear_all_btn is not None
+
+    checkbox_one.setChecked(False)
+    checkbox_two.setChecked(False)
+    qapp.processEvents()
+
+    select_all_btn.click()
+    qapp.processEvents()
+
+    assert checkbox_one.isChecked()
+    assert not checkbox_two.isChecked(), "Скрытый чекбокс не должен выделяться"
+
+    search_input.clear()
+    qapp.processEvents()
+
+    checkbox_one.setChecked(True)
+    checkbox_two.setChecked(True)
+    qapp.processEvents()
+
+    search_input.setText("one")
+    qapp.processEvents()
+
+    clear_all_btn.click()
+    qapp.processEvents()
+
+    assert not checkbox_one.isChecked()
+    assert checkbox_two.isChecked(), "Скрытый чекбокс не должен сбрасываться"
 
     search_input.setText("zzz")
     qapp.processEvents()
