@@ -38,6 +38,14 @@ class ColumnFilterState:
             return not (self.value.get("from") or self.value.get("to"))
         if self.type == "number":
             return self.value is None or str(self.value) == ""
+        if self.type == "choices":
+            if self.value is None:
+                return True
+            if isinstance(self.value, (list, tuple, set, frozenset)):
+                return len(self.value) == 0
+            if isinstance(self.value, Mapping):
+                return len(self.value) == 0
+            return False
         return self.value is None
 
     def display_text(self) -> str:
@@ -64,6 +72,14 @@ class ColumnFilterState:
             return " — ".join(parts)
         if self.type == "number":
             return "" if self.value is None else str(self.value)
+        if self.type == "choices":
+            values = self._choices_values()
+            if not values:
+                return ""
+            labels = self._choices_labels(values)
+            if len(labels) > 3:
+                return f"Выбрано {len(labels)}"
+            return ", ".join(labels)
         return "" if self.value is None else str(self.value)
 
     def backend_value(self) -> Optional[str]:
@@ -80,13 +96,29 @@ class ColumnFilterState:
             if self.value is None:
                 return None
             return str(self.value)
+        if self.type == "choices":
+            values = self._choices_values()
+            if not values:
+                return None
+            return ",".join(str(item) for item in values)
         # Для диапазонов и прочих сложных типов серверная фильтрация не поддерживается.
         return None
 
     def to_dict(self) -> Dict[str, Any]:
         """Преобразует состояние фильтра к сериализуемому виду."""
 
-        data: Dict[str, Any] = {"type": self.type, "value": self.value}
+        data: Dict[str, Any] = {"type": self.type}
+        if self.type == "choices":
+            if self.value is None:
+                data["value"] = None
+            else:
+                values = self._choices_values(raw=True)
+                data["value"] = list(values)
+                container = self._choices_container(self.value)
+                if container:
+                    data["value_container"] = container
+        else:
+            data["value"] = self.value
         if self.display is not None:
             data["display"] = self.display
         if self.meta:
@@ -102,7 +134,10 @@ class ColumnFilterState:
         type_ = data.get("type")
         if not type_:
             return None
+        value_container = data.get("value_container")
         value = data.get("value")
+        if type_ == "choices":
+            value = cls._restore_choices_value(value, value_container)
         display = data.get("display")
         meta = data.get("meta")
         if meta is not None and not isinstance(meta, dict):
@@ -116,6 +151,77 @@ class ColumnFilterState:
         except (TypeError, ValueError):
             return value
         return parsed.strftime("%d.%m.%Y")
+
+    def _choices_values(self, raw: bool = False) -> list[Any]:
+        values = self._flatten_choices(self.value)
+        if raw:
+            return values
+        if not values:
+            return values
+        order = None
+        if isinstance(self.meta, Mapping):
+            order = self.meta.get("choices_order")
+        if isinstance(order, list):
+            remaining = list(values)
+            ordered: list[Any] = []
+            for item in order:
+                try:
+                    while True:
+                        index = remaining.index(item)
+                        ordered.append(remaining.pop(index))
+                except ValueError:
+                    continue
+            ordered.extend(remaining)
+            return ordered
+        return values
+
+    def _choices_labels(self, values: list[Any]) -> list[str]:
+        if not isinstance(self.meta, Mapping):
+            return [str(item) for item in values]
+        display_values = self.meta.get("choices_display")
+        if isinstance(display_values, list) and len(display_values) == len(values):
+            return [str(item) for item in display_values]
+        labels_map = self.meta.get("choices_labels")
+        if isinstance(labels_map, Mapping):
+            return [str(labels_map.get(item, item)) for item in values]
+        return [str(item) for item in values]
+
+    @staticmethod
+    def _flatten_choices(value: Any) -> list[Any]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return list(value)
+        if isinstance(value, tuple):
+            return list(value)
+        if isinstance(value, (set, frozenset)):
+            return list(value)
+        return [value]
+
+    @staticmethod
+    def _choices_container(value: Any) -> Optional[str]:
+        if isinstance(value, set):
+            return "set"
+        if isinstance(value, frozenset):
+            return "frozenset"
+        if isinstance(value, tuple):
+            return "tuple"
+        return None
+
+    @staticmethod
+    def _restore_choices_value(value: Any, container: Any) -> Any:
+        if value is None:
+            return None
+        values = ColumnFilterState._flatten_choices(value)
+        if not isinstance(container, str):
+            return values
+        if container == "set":
+            return set(values)
+        if container == "frozenset":
+            return frozenset(values)
+        if container == "tuple":
+            return tuple(values)
+        return values
 
 
 class MultiFilterProxyModel(QSortFilterProxyModel):
@@ -217,7 +323,21 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
             if not text:
                 return None
             return ColumnFilterState("text", text)
-        return ColumnFilterState.from_dict(state)
+        normalized = ColumnFilterState.from_dict(state)
+        if normalized is not None:
+            return normalized
+        type_value = state.get("type") if isinstance(state, Mapping) else None
+        if type_value == "choices" and isinstance(state, Mapping):
+            raw_display = state.get("display")
+            display = raw_display if isinstance(raw_display, str) else None
+            raw_meta = state.get("meta")
+            meta = raw_meta if isinstance(raw_meta, dict) else None
+            value = ColumnFilterState._restore_choices_value(
+                state.get("value"),
+                state.get("value_container"),
+            )
+            return ColumnFilterState("choices", value, display, meta)
+        return None
 
     def _create_matcher(
         self, state: ColumnFilterState
@@ -293,6 +413,43 @@ class MultiFilterProxyModel(QSortFilterProxyModel):
                 if value_type == "int":
                     return int(current) == int(target)
                 return math.isclose(float(current), float(target), rel_tol=1e-9, abs_tol=1e-9)
+
+            return matcher
+
+        if state.type == "choices":
+            values = state._choices_values()
+            if not values:
+                return None
+            selected_exact: set[Any] = set()
+            selected_strings = {str(item) for item in values}
+            for item in values:
+                try:
+                    selected_exact.add(item)
+                except TypeError:
+                    continue
+            if isinstance(state.meta, Mapping):
+                display_values = state.meta.get("choices_display")
+                if isinstance(display_values, list):
+                    selected_strings.update(str(item) for item in display_values)
+                labels_map = state.meta.get("choices_labels")
+                if isinstance(labels_map, Mapping):
+                    selected_strings.update(str(item) for item in labels_map.values())
+
+            def iter_values(value: Any) -> list[Any]:
+                if value is None:
+                    return []
+                if isinstance(value, (list, tuple, set, frozenset)):
+                    return list(value)
+                return [value]
+
+            def matcher(raw: Any, display: Any) -> bool:
+                for candidate in iter_values(raw):
+                    if candidate in selected_exact or str(candidate) in selected_strings:
+                        return True
+                for candidate in iter_values(display):
+                    if str(candidate) in selected_strings:
+                        return True
+                return False
 
             return matcher
 
