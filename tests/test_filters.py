@@ -6,6 +6,7 @@ from datetime import date
 
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QCheckBox, QLabel, QLineEdit, QMenu
 
 from database.models import Client, Deal, Payment, Policy
 from ui import settings as ui_settings
@@ -109,6 +110,79 @@ def test_choices_filter_adds_multi_value_state(
     assert stored.type == "choices"
     assert stored.value == payloads
     assert view._column_filter_strings.get(0) == ", ".join(labels)
+
+    view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_choices_filter_widget_has_search_and_filters(
+    qapp,
+    in_memory_db,
+    make_policy_with_payment,
+):
+    """Виджет выбора значений содержит поле поиска и фильтрует список."""
+
+    ui_settings._CACHE = None
+
+    _, _, _, payment1 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "FLT-ONE"},
+        payment_kwargs={"amount": 10},
+    )
+    _, _, _, payment2 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "FLT-TWO"},
+        payment_kwargs={"amount": 20},
+    )
+
+    view = BaseTableView(model_class=Payment)
+    view.set_model_class_and_items(
+        Payment,
+        [payment1, payment2],
+        total_count=2,
+    )
+    qapp.processEvents()
+
+    menu = QMenu()
+    view._create_choices_filter_widget(menu, 0, None)
+    qapp.processEvents()
+
+    assert menu.actions(), "В меню должен появиться виджет фильтра"
+    container = menu.actions()[0].defaultWidget()
+    assert container is not None
+
+    search_input = container.findChild(QLineEdit)
+    assert search_input is not None, "Поле поиска не найдено"
+
+    checkboxes = container.findChildren(QCheckBox)
+    assert len(checkboxes) == 2
+    checkbox_one = next((cb for cb in checkboxes if "FLT-ONE" in cb.text()), None)
+    checkbox_two = next((cb for cb in checkboxes if "FLT-TWO" in cb.text()), None)
+    assert checkbox_one is not None and checkbox_two is not None
+
+    placeholder = None
+    for label in container.findChildren(QLabel):
+        if label.text() == "Нет значений":
+            placeholder = label
+            break
+    assert placeholder is not None
+    assert placeholder.isHidden()
+
+    search_input.setText("one")
+    qapp.processEvents()
+
+    assert not checkbox_one.isHidden()
+    assert checkbox_two.isHidden()
+
+    search_input.setText("zzz")
+    qapp.processEvents()
+
+    assert all(checkbox.isHidden() for checkbox in checkboxes)
+    assert not placeholder.isHidden()
+
+    search_input.clear()
+    qapp.processEvents()
+
+    assert all(not checkbox.isHidden() for checkbox in checkboxes)
+    assert placeholder.isHidden()
 
     view.deleteLater()
 

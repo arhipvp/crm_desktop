@@ -1157,6 +1157,11 @@ class BaseTableView(QWidget):
         container_layout.setContentsMargins(6, 6, 6, 6)
         container_layout.setSpacing(6)
 
+        filter_edit = QLineEdit(container)
+        filter_edit.setPlaceholderText("Фильтр…")
+        filter_edit.setClearButtonEnabled(True)
+        container_layout.addWidget(filter_edit)
+
         scroll_area = QScrollArea(container)
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -1178,6 +1183,9 @@ class BaseTableView(QWidget):
                 selected_keys.add((normalized, label_text))
 
         checkbox_entries: list[tuple[QCheckBox, dict[str, Any]]] = []
+        placeholder_label = QLabel("Нет значений", list_widget)
+        placeholder_label.setEnabled(False)
+        placeholder_label.hide()
 
         if choices:
             for label, payload in choices:
@@ -1187,14 +1195,27 @@ class BaseTableView(QWidget):
                     checkbox.setChecked(True)
                 list_layout.addWidget(checkbox)
                 checkbox_entries.append((checkbox, payload))
-        else:
-            placeholder = QLabel("Нет значений", list_widget)
-            placeholder.setEnabled(False)
-            list_layout.addWidget(placeholder)
+
+        list_layout.addWidget(placeholder_label)
 
         list_layout.addStretch(1)
         scroll_area.setWidget(list_widget)
         container_layout.addWidget(scroll_area)
+
+        def update_filter(text: str) -> None:
+            normalized = text.casefold().strip()
+            any_visible = False
+            if checkbox_entries:
+                for checkbox, _ in checkbox_entries:
+                    label = checkbox.text().casefold()
+                    is_visible = not normalized or normalized in label
+                    checkbox.setVisible(is_visible)
+                    if is_visible:
+                        any_visible = True
+            placeholder_label.setVisible((not checkbox_entries) or (not any_visible))
+
+        filter_edit.textChanged.connect(update_filter)
+        update_filter("")
 
         buttons_layout = QHBoxLayout()
         buttons_layout.setContentsMargins(0, 0, 0, 0)
