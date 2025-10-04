@@ -100,32 +100,7 @@ class ColumnFilterState:
             raw_values = self._choices_values(raw=True)
             collected: list[str] = []
             for item in raw_values:
-                text: str | None = None
-                if isinstance(item, Mapping):
-                    raw = item.get("value")
-                    if isinstance(raw, str):
-                        candidate = raw.strip()
-                        if candidate:
-                            text = candidate
-                    elif raw is not None:
-                        candidate = str(raw).strip()
-                        if candidate:
-                            text = candidate
-                    if text is None:
-                        display = item.get("display")
-                        if isinstance(display, str):
-                            candidate = display.strip()
-                            if candidate:
-                                text = candidate
-                        elif display is not None:
-                            candidate = str(display).strip()
-                            if candidate:
-                                text = candidate
-                if text is None:
-                    if item is None:
-                        text = ""
-                    else:
-                        text = str(item).strip()
+                text = self._choice_backend_text(item)
                 if text:
                     collected.append(text)
             if not collected:
@@ -145,7 +120,18 @@ class ColumnFilterState:
             if self.value is None:
                 data["value"] = None
             else:
-                values = self._choices_values(raw=True)
+                values = []
+                for item in self._choices_values(raw=True):
+                    if isinstance(item, Mapping):
+                        raw_text = self._stringify_choice_part(item.get("value"))
+                        if raw_text is None:
+                            display_text = self._stringify_choice_part(
+                                item.get("display")
+                            )
+                            if display_text is not None:
+                                values.append(display_text)
+                                continue
+                    values.append(item)
                 data["value"] = list(values)
                 container = self._choices_container(self.value)
                 if container:
@@ -255,6 +241,24 @@ class ColumnFilterState:
         if container == "tuple":
             return tuple(values)
         return values
+
+    @staticmethod
+    def _stringify_choice_part(raw: Any) -> Optional[str]:
+        if raw is None:
+            return None
+        if isinstance(raw, str):
+            text = raw.strip()
+        else:
+            text = str(raw).strip()
+        return text or None
+
+    def _choice_backend_text(self, item: Any) -> Optional[str]:
+        if isinstance(item, Mapping):
+            value_text = self._stringify_choice_part(item.get("value"))
+            if value_text is not None:
+                return value_text
+            return self._stringify_choice_part(item.get("display"))
+        return self._stringify_choice_part(item)
 
 
 _IDENTIFIER_KEYS: Tuple[str, ...] = ("id", "pk", "value", "key", "code", "uuid")

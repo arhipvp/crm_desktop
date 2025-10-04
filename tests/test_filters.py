@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from database.models import Client, Deal, Payment, Policy
 from ui import settings as ui_settings
 from ui.base.base_table_view import BaseTableView
+from ui.base.table_controller import TableController
 from ui.common.multi_filter_proxy import ColumnFilterState
 from ui.views.payment_table_view import PaymentTableView
 from ui.views.deal_table_view import DealTableView
@@ -111,6 +112,57 @@ def test_choices_filter_adds_multi_value_state(
     assert view._column_filter_strings.get(0) == ", ".join(labels)
 
     view.deleteLater()
+
+
+def test_choice_filter_without_value_serialization_and_controller():
+    state = ColumnFilterState("choices", [{"value": None, "display": "Имя"}])
+
+    assert state.backend_value() == ["Имя"]
+
+    serialized = state.to_dict()
+    assert serialized["value"] == ["Имя"]
+
+    class DummyHeader:
+        def visualIndex(self, logical: int) -> int:
+            return logical
+
+        def logicalIndex(self, visual: int) -> int:
+            return visual
+
+        def isSectionHidden(self, index: int) -> bool:
+            return False
+
+    class DummyTable:
+        def __init__(self) -> None:
+            self._header = DummyHeader()
+
+        def horizontalHeader(self) -> DummyHeader:
+            return self._header
+
+    class DummyView:
+        def __init__(self, filter_state: ColumnFilterState) -> None:
+            self.COLUMN_FIELD_MAP = {0: "executor"}
+            self._column_filters = {0: filter_state}
+            self.table = DummyTable()
+            self.page = 1
+            self.per_page = 25
+            self.controller = TableController(self)
+
+        def is_checked(self, *_args, **_kwargs) -> bool:
+            return False
+
+        def get_search_text(self) -> str:
+            return ""
+
+        def get_date_filter(self):
+            return None
+
+        get_filters = BaseTableView.get_filters
+
+    view = DummyView(state)
+    filters = view.get_filters()
+
+    assert filters["column_filters"] == {"executor": ["Имя"]}
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
