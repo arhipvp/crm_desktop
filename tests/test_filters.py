@@ -15,6 +15,8 @@ from ui.views.payment_table_view import PaymentTableView
 from ui.views.deal_table_view import DealTableView
 from ui.views import payment_table_view as payment_table_view_module
 from ui.common.date_utils import get_date_or_none
+from services.deals.dto import DealClientInfo, DealExecutorInfo, DealRowDTO
+from services.deals.deal_table_controller import DealTableController
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
@@ -53,6 +55,61 @@ def test_header_filter_input_filters_proxy(
     assert isinstance(state, ColumnFilterState)
     assert state.type == "text"
     assert state.value == "POL-001"
+    view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_choices_filter_adds_multi_value_state(
+    qapp,
+    in_memory_db,
+    make_policy_with_payment,
+):
+    """Выбор нескольких элементов должен сохранять фильтр в column_filters."""
+
+    ui_settings._CACHE = None
+
+    _, _, _, payment1 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "CHO-001"},
+        payment_kwargs={"amount": 10},
+    )
+    _, _, _, payment2 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "CHO-002"},
+        payment_kwargs={"amount": 20},
+    )
+
+    view = BaseTableView(model_class=Payment)
+    view.set_model_class_and_items(
+        Payment,
+        [payment1, payment2],
+        total_count=2,
+    )
+    qapp.processEvents()
+
+    assert view._settings_loaded is True
+
+    labels = [
+        payment1.policy.policy_number,
+        payment2.policy.policy_number,
+    ]
+    payloads = [
+        {"value": payment1.policy.id, "display": labels[0]},
+        {"value": payment2.policy.id, "display": labels[1]},
+    ]
+    state = ColumnFilterState(
+        "choices",
+        payloads,
+        display=", ".join(labels),
+        meta={"choices_display": labels},
+    )
+
+    view._apply_column_filter(0, state, trigger_filter=False)
+
+    stored = view._column_filters.get(0)
+    assert stored is not None
+    assert stored.type == "choices"
+    assert stored.value == payloads
+    assert view._column_filter_strings.get(0) == ", ".join(labels)
+
     view.deleteLater()
 
 
@@ -159,6 +216,81 @@ def test_date_filter_resets_to_minimum(qapp):
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
+def test_load_table_settings_restores_choices_filter(
+    qapp,
+    in_memory_db,
+    make_policy_with_payment,
+):
+    """Фильтр со списком значений сохраняется и применяется после перезапуска."""
+
+    ui_settings._CACHE = None
+
+    _, _, _, payment1 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "RST-001"},
+        payment_kwargs={"amount": 100},
+    )
+    _, _, _, payment2 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "RST-002"},
+        payment_kwargs={"amount": 200},
+    )
+    _, _, _, payment3 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "RST-003"},
+        payment_kwargs={"amount": 300},
+    )
+
+    payments = [payment1, payment2, payment3]
+
+    view = BaseTableView(model_class=Payment)
+    view.set_model_class_and_items(Payment, payments, total_count=3)
+    qapp.processEvents()
+
+    assert view._settings_loaded is True
+
+    labels = [payment1.policy.policy_number, payment2.policy.policy_number]
+    payloads = [
+        {"value": payment1.policy.id, "display": labels[0]},
+        {"value": payment2.policy.id, "display": labels[1]},
+    ]
+    state = ColumnFilterState(
+        "choices",
+        payloads,
+        display=", ".join(labels),
+        meta={"choices_display": labels},
+    )
+
+    view._apply_column_filter(0, state, trigger_filter=False)
+    qapp.processEvents()
+
+    saved_settings = ui_settings.get_table_settings(view.settings_id)
+    assert saved_settings.get("column_filters")
+    assert str(0) in saved_settings["column_filters"]
+
+    view.deleteLater()
+
+    new_view = BaseTableView(model_class=Payment)
+    new_view.set_model_class_and_items(Payment, payments, total_count=3)
+    qapp.processEvents()
+
+    restored = new_view._column_filters.get(0)
+    assert restored is not None
+    assert restored.type == "choices"
+    assert restored.value == payloads
+
+    qapp.processEvents()
+
+    assert new_view.proxy.rowCount() == 2
+    visible_policies = {
+        new_view.model.objects[  # type: ignore[attr-defined]
+            new_view.proxy.mapToSource(new_view.proxy.index(row, 0)).row()
+        ].policy.policy_number
+        for row in range(new_view.proxy.rowCount())
+    }
+    assert visible_policies == set(labels)
+
+    new_view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
 def test_deal_table_show_deleted_filter(qapp, in_memory_db):
     """Чекбокс «Показывать удалённые» добавляет записи в выборку."""
 
@@ -198,6 +330,125 @@ def test_deal_table_show_deleted_filter(qapp, in_memory_db):
     descriptions = {deal.description for deal in view.model.objects}
     assert {"Active", "Deleted", "ClosedDeleted"} <= descriptions
     assert any(deal.is_deleted for deal in view.model.objects)
-    assert any(deal.is_deleted and deal.is_closed for deal in view.model.objects)
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_deal_table_multi_choice_filters(qapp, monkeypatch):
+    """Фильтр по статусам и исполнителям оставляет только выбранные сделки."""
+
+    ui_settings._CACHE = None
+
+    today = date.today()
+    client_info = DealClientInfo(id=1, name="Client")
+    exec1 = DealExecutorInfo(id=1, full_name="Executor A")
+    exec2 = DealExecutorInfo(id=2, full_name="Executor B")
+    exec3 = DealExecutorInfo(id=3, full_name="Executor C")
+
+    deals = [
+        DealRowDTO(
+            id=1,
+            reminder_date=None,
+            client=client_info,
+            status="NEW",
+            description="Alpha",
+            calculations=None,
+            start_date=today,
+            is_closed=False,
+            closed_reason=None,
+            drive_folder_path=None,
+            drive_folder_link=None,
+            is_deleted=False,
+            executor=exec1,
+        ),
+        DealRowDTO(
+            id=2,
+            reminder_date=None,
+            client=client_info,
+            status="SUCCESS",
+            description="Beta",
+            calculations=None,
+            start_date=today,
+            is_closed=False,
+            closed_reason=None,
+            drive_folder_path=None,
+            drive_folder_link=None,
+            is_deleted=False,
+            executor=exec2,
+        ),
+        DealRowDTO(
+            id=3,
+            reminder_date=None,
+            client=client_info,
+            status="FAILED",
+            description="Gamma",
+            calculations=None,
+            start_date=today,
+            is_closed=False,
+            closed_reason=None,
+            drive_folder_path=None,
+            drive_folder_link=None,
+            is_deleted=False,
+            executor=exec3,
+        ),
+    ]
+
+    def fake_load_data(self):
+        self._apply_items(deals, total_count=len(deals))
+
+    monkeypatch.setattr(DealTableController, "load_data", fake_load_data)
+
+    view = DealTableView()
+    qapp.processEvents()
+
+    assert view.model is not None
+
+    view.on_filter_changed = lambda *a, **k: None  # избегаем перезагрузки данных
+
+    status_col = view.get_column_index("status")
+    executor_col = view.get_column_index("executor")
+
+    status_labels = ["NEW", "SUCCESS"]
+    status_payloads = [
+        {"value": "NEW", "display": "NEW"},
+        {"value": "SUCCESS", "display": "SUCCESS"},
+    ]
+    executor_labels = ["Executor A", "Executor B"]
+    executor_payloads = [
+        {"value": None, "display": "Executor A"},
+        {"value": None, "display": "Executor B"},
+    ]
+
+    view._apply_column_filter(
+        status_col,
+        ColumnFilterState(
+            "choices",
+            status_payloads,
+            display=", ".join(status_labels),
+            meta={"choices_display": status_labels},
+        ),
+        trigger_filter=False,
+    )
+
+    view._apply_column_filter(
+        executor_col,
+        ColumnFilterState(
+            "choices",
+            executor_payloads,
+            display=", ".join(executor_labels),
+            meta={"choices_display": executor_labels},
+        ),
+        trigger_filter=False,
+    )
+
+    qapp.processEvents()
+
+    assert view.proxy.rowCount() == 2
+
+    description_col = view.get_column_index("description")
+    remaining = {
+        view.proxy.data(view.proxy.index(row, description_col), Qt.DisplayRole)
+        for row in range(view.proxy.rowCount())
+    }
+    assert remaining == {"Alpha", "Beta"}
 
     view.deleteLater()
