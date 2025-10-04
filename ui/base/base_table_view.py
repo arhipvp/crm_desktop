@@ -58,6 +58,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QPushButton,
     QScrollArea,
+    QCompleter,
 )
 
 from ui.base.table_controller import TableController
@@ -1157,10 +1158,18 @@ class BaseTableView(QWidget):
         container_layout.setContentsMargins(6, 6, 6, 6)
         container_layout.setSpacing(6)
 
-        filter_edit = QLineEdit(container)
-        filter_edit.setPlaceholderText("Фильтр…")
-        filter_edit.setClearButtonEnabled(True)
-        container_layout.addWidget(filter_edit)
+        search_edit = QLineEdit(container)
+        search_edit.setPlaceholderText("Поиск…")
+        search_edit.setClearButtonEnabled(True)
+
+        completer_values = [label for label, _ in choices]
+        completer = QCompleter(completer_values, container)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchContains)
+        completer.setCompletionMode(QCompleter.PopupCompletion)
+        search_edit.setCompleter(completer)
+
+        container_layout.addWidget(search_edit)
 
         scroll_area = QScrollArea(container)
         scroll_area.setWidgetResizable(True)
@@ -1214,7 +1223,7 @@ class BaseTableView(QWidget):
                         any_visible = True
             placeholder_label.setVisible((not checkbox_entries) or (not any_visible))
 
-        filter_edit.textChanged.connect(update_filter)
+        search_edit.textChanged.connect(update_filter)
         update_filter("")
 
         buttons_layout = QHBoxLayout()

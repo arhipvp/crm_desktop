@@ -203,6 +203,7 @@ def test_choices_filter_widget_has_search_and_filters(
 
     search_input = container.findChild(QLineEdit)
     assert search_input is not None, "Поле поиска не найдено"
+    assert search_input.placeholderText() == "Поиск…"
 
     checkboxes = container.findChildren(QCheckBox)
     assert len(checkboxes) == 2
@@ -271,6 +272,72 @@ def test_choices_filter_widget_has_search_and_filters(
 
     assert all(not checkbox.isHidden() for checkbox in checkboxes)
     assert placeholder.isHidden()
+
+    view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_choices_filter_widget_completer_filters_values(
+    qapp,
+    in_memory_db,
+    make_policy_with_payment,
+):
+    """Поле поиска предлагает существующие значения и фильтрует список."""
+
+    ui_settings._CACHE = None
+
+    _, _, _, payment1 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "CMP-ONE"},
+        payment_kwargs={"amount": 50},
+    )
+    _, _, _, payment2 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "CMP-TWO"},
+        payment_kwargs={"amount": 75},
+    )
+
+    view = BaseTableView(model_class=Payment)
+    view.set_model_class_and_items(
+        Payment,
+        [payment1, payment2],
+        total_count=2,
+    )
+    qapp.processEvents()
+
+    menu = QMenu()
+    view._create_choices_filter_widget(menu, 0, None)
+    qapp.processEvents()
+
+    container = menu.actions()[0].defaultWidget()
+    assert container is not None
+
+    search_input = container.findChild(QLineEdit)
+    assert search_input is not None
+
+    checkboxes = container.findChildren(QCheckBox)
+    assert len(checkboxes) == 2
+    expected_labels = sorted([cb.text() for cb in checkboxes], key=str.casefold)
+
+    completer = search_input.completer()
+    assert completer is not None
+    model = completer.model()
+    row_count = model.rowCount()
+    suggestions = [
+        model.data(model.index(row, 0), Qt.DisplayRole)
+        for row in range(row_count)
+    ]
+    assert suggestions == expected_labels
+
+    search_input.setText("cmp-one")
+    qapp.processEvents()
+
+    visible_checkboxes = [cb for cb in checkboxes if not cb.isHidden()]
+    assert len(visible_checkboxes) == 1
+    assert "CMP-ONE" in visible_checkboxes[0].text()
+
+    search_input.clear()
+    qapp.processEvents()
+
+    assert all(not cb.isHidden() for cb in checkboxes)
 
     view.deleteLater()
 
