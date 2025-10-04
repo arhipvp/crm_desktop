@@ -124,6 +124,16 @@ class DealTableController(TableController):
             return total
         return self.service.count(*args, **kwargs)
 
+    def get_distinct_values(self, column_key: str):
+        filters = self.get_filters()
+        column_filters = dict(filters.get("column_filters") or {})
+        column_filters.pop(column_key, None)
+        filters["column_filters"] = column_filters
+        try:
+            return self.service.get_distinct_values(column_key, filters=filters)
+        except AttributeError:
+            return None
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------

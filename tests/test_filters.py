@@ -276,6 +276,42 @@ def test_choices_filter_widget_has_search_and_filters(
     view.deleteLater()
 
 
+def test_choices_filter_widget_uses_controller_values(qapp):
+    class DummyController(TableController):
+        def __init__(self):
+            super().__init__(None, model_class=Deal)
+
+        def get_distinct_values(self, column_key: str):
+            assert column_key == "status"
+            return [
+                {"value": "NEW", "display": "Новая"},
+                {"value": "DONE", "display": "Завершена"},
+            ]
+
+    class DummyView(BaseTableView):
+        COLUMN_FIELD_MAP = {0: "status"}
+
+        def __init__(self):
+            controller = DummyController()
+            super().__init__(model_class=Deal, controller=controller)
+            controller.view = self
+
+    view = DummyView()
+    menu = QMenu()
+
+    view._create_choices_filter_widget(menu, 0, None)
+    qapp.processEvents()
+
+    assert menu.actions(), "В меню должен появиться виджет фильтра"
+    widget = menu.actions()[0].defaultWidget()
+    checkboxes = widget.findChildren(QCheckBox)
+    labels = {checkbox.text() for checkbox in checkboxes}
+
+    assert {"Новая", "Завершена"}.issubset(labels)
+
+    view.deleteLater()
+
+
 @pytest.mark.usefixtures("ui_settings_temp_path")
 def test_choices_filter_widget_completer_filters_values(
     qapp,
