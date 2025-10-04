@@ -7,7 +7,7 @@ from typing import Iterable
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QShortcut
-from PySide6.QtWidgets import QAbstractItemView, QComboBox, QHBoxLayout, QLineEdit
+from PySide6.QtWidgets import QAbstractItemView
 
 from core.app_context import AppContext
 from services import deal_journal
@@ -34,7 +34,6 @@ class DealTableModel(BaseTableModel):
     ) -> None:
         super().__init__(list(objects), DealRowDTO, parent)
         self._deal_journal = deal_journal_module or deal_journal
-        self._all_objects = list(self.objects)
 
         # скрываем ссылку на папку и переносим поля закрытия в конец
         self.fields = [f for f in self.fields if f.name != "drive_folder_link"]
@@ -51,9 +50,6 @@ class DealTableModel(BaseTableModel):
         self.headers = [f.name for f in self.fields]
         self.virtual_fields = ["executor"]
         self.headers.append("Исполнитель")
-
-        self._quick_text = ""
-        self._quick_status: str | None = None
 
     def columnCount(self, parent=None):  # type: ignore[override]
         return len(self.fields) + len(self.virtual_fields)
@@ -98,33 +94,6 @@ class DealTableModel(BaseTableModel):
             return super().headerData(section, orientation, role)
         return self.headers[-1]
 
-    # --- Быстрый фильтр -------------------------------------------------
-    def apply_quick_filter(self, text: str = "", status: str | None = None) -> None:
-        self._quick_text = text.lower()
-        self._quick_status = status
-
-        def matches(obj: DealRowDTO) -> bool:
-            if self._quick_text:
-                vin_text = " ".join(getattr(obj, "policy_vins", ()))
-                haystack = " ".join(
-                    [
-                        obj.client.name,
-                        obj.description or "",
-                        obj.status or "",
-                        vin_text,
-                    ]
-                ).lower()
-                if self._quick_text not in haystack:
-                    return False
-            if self._quick_status:
-                if (obj.status or "") != self._quick_status:
-                    return False
-            return True
-
-        self.objects = [obj for obj in self._all_objects if matches(obj)]
-        self.layoutChanged.emit()
-
-
 class DealTableView(BaseTableView):
     COLUMN_FIELD_MAP = {
         0: "reminder_date",
@@ -163,24 +132,6 @@ class DealTableView(BaseTableView):
         )
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
-        # быстрый фильтр по строке и статусу
-        self.quick_filter_edit = QLineEdit()
-        self.quick_filter_edit.setPlaceholderText("Поиск...")
-        self.status_filter = QComboBox()
-        self.status_filter.addItem("Все", None)
-        for status in controller.get_statuses():
-            self.status_filter.addItem(status, status)
-
-        quick_layout = QHBoxLayout()
-        quick_layout.addWidget(self.quick_filter_edit)
-        quick_layout.addWidget(self.status_filter)
-
-        index = self.left_layout.indexOf(self.table)
-        self.left_layout.insertLayout(index, quick_layout)
-
-        self.quick_filter_edit.textChanged.connect(self.apply_quick_filter)
-        self.status_filter.currentIndexChanged.connect(self.apply_quick_filter)
-
         self.table.horizontalHeader().sortIndicatorChanged.connect(
             self.on_sort_changed
         )
@@ -217,7 +168,6 @@ class DealTableView(BaseTableView):
         self.table.horizontalHeader().setSortIndicator(
             self.current_sort_column, self.current_sort_order
         )
-        self.apply_quick_filter()
 
     # ------------------------------------------------------------------
     # Работа с элементами управления
@@ -338,13 +288,6 @@ class DealTableView(BaseTableView):
         self.current_sort_column = column
         self.current_sort_order = order
         self.refresh()
-
-    def apply_quick_filter(self):  # type: ignore[override]
-        if not getattr(self, "model", None):
-            return
-        text = self.quick_filter_edit.text().strip()
-        status = self.status_filter.currentData()
-        self.model.apply_quick_filter(text, status)
 
     def get_column_index(self, field_name: str) -> int:
         if getattr(self, "model", None) and field_name == "executor":
