@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from services import deal_journal
-from ui.widgets.flow_layout import FlowLayout
+from ui.widgets.masonry_layout import MasonryLayout
 from services.deal_journal import JournalEntry
 
 
@@ -55,7 +55,7 @@ class StickyNotesBoard(QWidget):
         self._container.setObjectName("stickyNotesContainer")
         self._scroll.setWidget(self._container)
 
-        self._container_layout = FlowLayout()
+        self._container_layout = MasonryLayout()
         self._container_layout.setContentsMargins(0, 0, 0, 0)
         self._container_layout.setSpacing(12)
         self._container.setLayout(self._container_layout)
@@ -114,7 +114,7 @@ class StickyNotesBoard(QWidget):
                 header = QLabel(title)
                 header.setStyleSheet("font-weight: bold; color: #444;")
                 header.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                header.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
                 header.setProperty("flow_fill_row", True)
                 self._container_layout.addWidget(header)
 
@@ -137,7 +137,7 @@ class StickyNotesBoard(QWidget):
                 placeholder.setAlignment(Qt.AlignCenter)
                 placeholder.setStyleSheet("color: #888; font-style: italic;")
                 placeholder.setTextInteractionFlags(Qt.TextSelectableByMouse)
-                placeholder.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                placeholder.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
                 placeholder.setProperty("flow_fill_row", True)
                 self._container_layout.addWidget(placeholder)
 
@@ -153,7 +153,7 @@ class StickyNotesBoard(QWidget):
             }
             """
         )
-        card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        card.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
 
         layout = QVBoxLayout(card)
         layout.setContentsMargins(12, 10, 12, 10)
