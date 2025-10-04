@@ -1,6 +1,8 @@
+import base64
+import binascii
 from pathlib import Path
 
-from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt, QUrl
+from PySide6.QtCore import QByteArray, QItemSelectionModel, QModelIndex, Qt, QUrl, QTimer
 from PySide6.QtGui import (
     QAction,
     QDesktopServices,
@@ -29,6 +31,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ui import settings as ui_settings
 
 
 class DealFilesTreeView(QTreeView):
@@ -183,6 +187,8 @@ class CollapsibleWidget(QWidget):
 class DealFilesPanel(CollapsibleWidget):
     """Панель для отображения локальной папки сделки."""
 
+    SETTINGS_KEY = "deal_files_panel"
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("Файлы сделки", parent)
 
@@ -197,6 +203,8 @@ class DealFilesPanel(CollapsibleWidget):
         if header is not None:
             header.setSectionsClickable(True)
             header.setSortIndicatorShown(True)
+            header.sectionResized.connect(self._schedule_save_settings)
+            header.sectionMoved.connect(self._schedule_save_settings)
         self._tree.sortByColumn(0, Qt.AscendingOrder)
         self._tree.setHeaderHidden(False)
         self._tree.hide()
@@ -267,6 +275,14 @@ class DealFilesPanel(CollapsibleWidget):
         stack.addWidget(self._tree)
         self._stack = stack
 
+        self._settings_loaded = False
+        self._save_settings_timer = QTimer(self)
+        self._save_settings_timer.setSingleShot(True)
+        self._save_settings_timer.setInterval(250)
+        self._save_settings_timer.timeout.connect(self._save_settings)
+        self.destroyed.connect(self._schedule_save_settings)
+        self.destroyed.connect(self._save_settings)
+
         content_layout = QVBoxLayout()
         content_layout.addLayout(controls)
         content_layout.addWidget(toolbar)
@@ -276,8 +292,80 @@ class DealFilesPanel(CollapsibleWidget):
 
         self.setContentLayout(content_layout)
 
+        self._load_settings()
         self.set_folder(None)
         self._update_actions_state()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        self._schedule_save_settings()
+        self._save_settings_timer.stop()
+        self._save_settings()
+        super().closeEvent(event)
+
+    def _load_settings(self) -> None:
+        header = self._tree.header()
+        if header is None:
+            self._settings_loaded = True
+            return
+
+        settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        header_state = settings.get("header_state")
+        restored = False
+        if header_state:
+            try:
+                decoded = base64.b64decode(header_state)
+            except (TypeError, ValueError, binascii.Error):
+                decoded = b""
+            if decoded:
+                try:
+                    restored = header.restoreState(QByteArray(decoded))
+                except Exception:
+                    restored = False
+
+        if not restored:
+            widths = settings.get("column_widths", {})
+            if isinstance(widths, dict):
+                for column, width in widths.items():
+                    try:
+                        section = int(column)
+                        size = int(width)
+                    except (TypeError, ValueError):
+                        continue
+                    if 0 <= section < header.count() and size > 0:
+                        header.resizeSection(section, size)
+
+        self._settings_loaded = True
+
+    def _schedule_save_settings(self, *_args) -> None:
+        if not self._settings_loaded:
+            return
+        self._save_settings_timer.start()
+
+    def _save_settings(self, *_args) -> None:
+        if not self._settings_loaded:
+            return
+
+        header = self._tree.header()
+        if header is None:
+            return
+
+        if self._save_settings_timer.isActive():
+            self._save_settings_timer.stop()
+
+        try:
+            header_state = base64.b64encode(bytes(header.saveState())).decode("ascii")
+        except Exception:
+            header_state = ""
+
+        settings = ui_settings.get_window_settings(self.SETTINGS_KEY)
+        if header_state:
+            settings["header_state"] = header_state
+        else:
+            settings.pop("header_state", None)
+        settings["column_widths"] = {
+            str(i): header.sectionSize(i) for i in range(header.count())
+        }
+        ui_settings.set_window_settings(self.SETTINGS_KEY, settings)
 
     def set_folder(self, path: str | None) -> None:
         """Обновить корневую папку дерева файлов."""
