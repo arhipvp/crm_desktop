@@ -5,6 +5,7 @@ import re
 from typing import Iterable, Sequence
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -64,7 +65,8 @@ class StickyNotesBoard(QWidget):
         self._active_entries: list[tuple[bool, JournalEntry]] = []
         self._archived_entries: list[tuple[bool, JournalEntry]] = []
         self._search_term: str = ""
-        self._card_width = 160
+        self._card_min_width = 200
+        self._card_max_width = 360
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
     def load_entries(self, deal) -> None:
@@ -151,8 +153,7 @@ class StickyNotesBoard(QWidget):
             }
             """
         )
-        card.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Minimum)
-        card.setFixedWidth(self._card_width)
+        card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
 
         layout = QVBoxLayout(card)
         layout.setContentsMargins(12, 10, 12, 10)
@@ -166,6 +167,7 @@ class StickyNotesBoard(QWidget):
         header.setText(self._highlight_text(entry.header or "—"))
         layout.addWidget(header)
 
+        body: QLabel | None = None
         if entry.body:
             body = QLabel()
             body.setTextFormat(Qt.RichText)
@@ -173,6 +175,38 @@ class StickyNotesBoard(QWidget):
             body.setTextInteractionFlags(Qt.TextSelectableByMouse)
             body.setText(self._highlight_text(entry.body))
             layout.addWidget(body)
+
+        margins = layout.contentsMargins()
+        spacing = layout.spacing()
+        max_text_width = 0
+
+        header_metrics = QFontMetrics(header.font())
+        header_lines = (entry.header or "—").splitlines() or ["—"]
+        max_text_width = max(
+            max_text_width,
+            max(header_metrics.horizontalAdvance(line) for line in header_lines),
+        )
+
+        if body:
+            body_metrics = QFontMetrics(body.font())
+            body_text = entry.body or ""
+            body_lines = body_text.splitlines() or [body_text]
+            max_text_width = max(
+                max_text_width,
+                max(body_metrics.horizontalAdvance(line) for line in body_lines),
+            )
+
+        required_width = max_text_width + margins.left() + margins.right()
+        if body:
+            required_width += spacing
+
+        bounded_width = max(
+            self._card_min_width,
+            min(self._card_max_width, required_width),
+        )
+
+        card.setMinimumWidth(int(bounded_width))
+        card.setMaximumWidth(int(bounded_width))
 
         button_row = QHBoxLayout()
         button_row.setContentsMargins(0, 0, 0, 0)
@@ -240,6 +274,8 @@ class StickyNotesBoard(QWidget):
         header.setToolTip(card.toolTip())
         if entry.body:
             body.setToolTip(card.toolTip())
+
+        card.adjustSize()
 
         return card
 
