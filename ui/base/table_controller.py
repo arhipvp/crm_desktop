@@ -243,3 +243,13 @@ class TableController:
         if self.filter_func:
             filters = self.filter_func(filters)
         return filters
+
+    # --- Значения --------------------------------------------------------
+    def get_distinct_values(self, column_key: str) -> list[Any] | None:
+        """Возвращает список уникальных значений для столбца.
+
+        Базовая реализация не имеет доступа к данным и возвращает ``None``.
+        Потомки могут переопределить метод для работы с сервисами/репозиториями.
+        """
+
+        return None

@@ -1095,43 +1095,121 @@ class BaseTableView(QWidget):
 
         return clear
 
+    def _resolve_column_key(self, column: int) -> str | None:
+        column_map = getattr(self, "COLUMN_FIELD_MAP", {})
+        field = column_map.get(column)
+        if isinstance(field, str):
+            return field
+        if isinstance(field, Field):
+            return getattr(field, "name", None)
+        if hasattr(field, "name"):
+            name = getattr(field, "name")
+            if isinstance(name, str):
+                return name
+        return None
+
+    def _get_controller_distinct_values(
+        self, column: int
+    ) -> list[Any] | None:
+        controller = getattr(self, "controller", None)
+        if not controller or not hasattr(controller, "get_distinct_values"):
+            return None
+        column_key = self._resolve_column_key(column)
+        if not column_key:
+            return None
+        try:
+            values = controller.get_distinct_values(column_key)
+        except Exception:  # noqa: BLE001 - не блокируем меню при ошибке контроллера
+            logger.exception(
+                "Не удалось получить уникальные значения для столбца %s", column_key
+            )
+            return None
+        if values is None:
+            return None
+        if isinstance(values, list):
+            return values
+        try:
+            return list(values)
+        except TypeError:
+            return None
+
+    def _collect_model_choices(
+        self,
+        column: int,
+        choices: list[tuple[str, dict[str, Any]]],
+        seen_keys: set[tuple[Any, str]],
+    ) -> None:
+        source_model = self.proxy.sourceModel()
+        if source_model is None:
+            source_model = getattr(self, "model", None)
+
+        if source_model is None:
+            return
+
+        try:
+            row_count = source_model.rowCount()
+        except Exception:
+            row_count = 0
+        for row in range(row_count):
+            try:
+                index = source_model.index(row, column)
+            except Exception:
+                continue
+            if not index or not index.isValid():
+                continue
+            raw_value = source_model.data(index, Qt.UserRole)
+            display_value = source_model.data(index, Qt.DisplayRole)
+            label = self._format_choice_label(raw_value, display_value)
+            storage_value = self._normalize_choice_storage_value(raw_value)
+            key = (storage_value, label)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            payload = {
+                "value": storage_value,
+                "display": label,
+            }
+            choices.append((label, payload))
+
+    def _get_distinct_choices(
+        self, column: int
+    ) -> tuple[list[tuple[str, dict[str, Any]]], set[tuple[Any, str]]]:
+        choices: list[tuple[str, dict[str, Any]]] = []
+        seen_keys: set[tuple[Any, str]] = set()
+
+        controller_values = self._get_controller_distinct_values(column)
+        if controller_values is None:
+            self._collect_model_choices(column, choices, seen_keys)
+            return choices, seen_keys
+
+        for item in controller_values:
+            if isinstance(item, Mapping):
+                raw_value = item.get("value", item)
+                display_hint = item.get("display", raw_value)
+                payload: dict[str, Any] = dict(item)
+            else:
+                raw_value = item
+                display_hint = item
+                payload = {}
+            storage_value = self._normalize_choice_storage_value(raw_value)
+            label = self._format_choice_label(raw_value, display_hint)
+            key = (storage_value, label)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            payload["value"] = storage_value
+            payload["display"] = payload.get("display", label)
+            choices.append((label, payload))
+
+        return choices, seen_keys
+
     def _create_choices_filter_widget(
         self,
         menu: QMenu,
         column: int,
         state: Optional[ColumnFilterState],
     ) -> Callable[[], None]:
-        source_model = self.proxy.sourceModel()
-        if source_model is None:
-            source_model = getattr(self, "model", None)
-
-        choices: list[tuple[str, dict[str, Any]]] = []
-        seen_keys: set[tuple[Any, str]] = set()
-        if source_model is not None:
-            try:
-                row_count = source_model.rowCount()
-            except Exception:
-                row_count = 0
-            for row in range(row_count):
-                try:
-                    index = source_model.index(row, column)
-                except Exception:
-                    continue
-                if not index or not index.isValid():
-                    continue
-                raw_value = source_model.data(index, Qt.UserRole)
-                display_value = source_model.data(index, Qt.DisplayRole)
-                label = self._format_choice_label(raw_value, display_value)
-                storage_value = self._normalize_choice_storage_value(raw_value)
-                key = (storage_value, label)
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                payload = {
-                    "value": storage_value,
-                    "display": label,
-                }
-                choices.append((label, payload))
+        choices, seen_keys = self._get_distinct_choices(column)
 
         if isinstance(state, ColumnFilterState) and state.type == "choices":
             for item in state._choices_values(raw=True):

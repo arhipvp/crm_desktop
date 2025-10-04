@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable as IterableABC
 from typing import Mapping, MutableMapping, Sequence
 
-from database.models import Client, Deal, Executor
+from database.models import Client, Deal, DealExecutor, Executor
 from services.deal_service import (
     build_deal_query,
     get_deals_page,
@@ -80,6 +80,86 @@ class DealAppService:
 
     def get_statuses(self) -> Sequence[str]:
         return tuple(self._statuses_provider())
+
+    def get_distinct_values(
+        self,
+        column_key: str,
+        *,
+        filters: Mapping[str, object] | None = None,
+    ) -> list[dict[str, object]]:
+        filters = dict(filters or {})
+        search_text = str(filters.get("search_text") or "")
+        show_deleted = bool(filters.get("show_deleted"))
+        show_closed = bool(filters.get("show_closed"))
+
+        raw_column_filters = dict(filters.get("column_filters") or {})
+        raw_column_filters.pop(column_key, None)
+        column_filters = self._convert_column_filters(raw_column_filters)
+
+        query = self._build_query(
+            search_text=search_text,
+            show_deleted=show_deleted,
+            show_closed=show_closed,
+            column_filters=column_filters,
+        )
+
+        if column_key == "executor":
+            executor_query = (
+                Executor.select(Executor.full_name)
+                .join(DealExecutor)
+                .where(DealExecutor.deal.in_(query.select(Deal.id).distinct()))
+                .where(Executor.full_name.is_null(False))
+                .distinct()
+                .order_by(Executor.full_name.asc())
+            )
+            values = [
+                {"value": executor.full_name, "display": executor.full_name}
+                for executor in executor_query
+            ]
+            values.insert(0, {"value": None, "display": "—"})
+            return values
+
+        if column_key == "status":
+            rows = (
+                Deal.select(Deal.status)
+                .where(Deal.id.in_(query.select(Deal.id).distinct()))
+                .where(Deal.status.is_null(False))
+                .distinct()
+                .order_by(Deal.status.asc())
+            )
+            return [
+                {"value": row.status, "display": row.status}
+                for row in rows
+            ]
+
+        if column_key == "client":
+            rows = (
+                Client.select(Client.name)
+                .join(Deal)
+                .where(Deal.id.in_(query.select(Deal.id).distinct()))
+                .where(Client.name.is_null(False))
+                .distinct()
+                .order_by(Client.name.asc())
+            )
+            return [
+                {"value": row.name, "display": row.name}
+                for row in rows
+            ]
+
+        if column_key == "closed_reason":
+            rows = (
+                Deal.select(Deal.closed_reason)
+                .where(Deal.id.in_(query.select(Deal.id).distinct()))
+                .where(Deal.closed_reason.is_null(False))
+                .distinct()
+                .order_by(Deal.closed_reason.asc())
+            )
+            return [
+                {"value": row.closed_reason, "display": row.closed_reason}
+                for row in rows
+            ]
+
+        return []
 
     # ------------------------------------------------------------------
     # Вспомогательные методы
