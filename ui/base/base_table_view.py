@@ -66,7 +66,7 @@ from ui.common.date_utils import (
     configure_optional_date_edit,
     get_date_or_none,
 )
-from ui.common.multi_filter_proxy import ColumnFilterState
+from ui.common.multi_filter_proxy import ColumnFilterState, create_choices_matcher
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
 from services.export_service import export_objects_to_csv
@@ -1189,7 +1189,10 @@ class BaseTableView(QWidget):
                 continue
             index = model.index(source_row, column, source_parent)
             raw_value = model.data(index, Qt.UserRole)
-            display_value = model.data(index, self.proxy.filterRole())
+            display_role = self.proxy.filterRole()
+            display_value = model.data(index, display_role)
+            if display_value is None and display_role != Qt.DisplayRole:
+                display_value = model.data(index, Qt.DisplayRole)
             if not matcher(raw_value, display_value):
                 return False
         return True
@@ -1303,6 +1306,9 @@ class BaseTableView(QWidget):
                 return math.isclose(float(current), float(target), rel_tol=1e-9, abs_tol=1e-9)
 
             return matcher
+
+        if state.type == "choices":
+            return create_choices_matcher(state)
 
         text = str(state.value or "").strip()
         if not text:
