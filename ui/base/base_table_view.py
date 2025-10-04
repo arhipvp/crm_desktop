@@ -1270,35 +1270,39 @@ class BaseTableView(QWidget):
         for checkbox, _ in checkbox_entries:
             checkbox.stateChanged.connect(on_checkbox_state_changed)
 
-        def select_all() -> None:
+        def select_all(*, visible_only: bool = False) -> None:
             nonlocal updating
             if not checkbox_entries:
                 return
             updating = True
             for checkbox, _ in checkbox_entries:
+                if visible_only and checkbox.isHidden():
+                    continue
                 checkbox.setChecked(True)
             updating = False
             apply_selection()
 
-        def clear_selection() -> None:
+        def clear_selection(*, visible_only: bool = False) -> None:
             nonlocal updating
             if not checkbox_entries:
                 self._apply_column_filter(column, None)
                 return
             updating = True
             for checkbox, _ in checkbox_entries:
+                if visible_only and checkbox.isHidden():
+                    continue
                 checkbox.setChecked(False)
             updating = False
-            self._apply_column_filter(column, None)
+            apply_selection()
 
-        select_all_btn.clicked.connect(select_all)
-        clear_all_btn.clicked.connect(clear_selection)
+        select_all_btn.clicked.connect(lambda: select_all(visible_only=True))
+        clear_all_btn.clicked.connect(lambda: clear_selection(visible_only=True))
 
         if not checkbox_entries:
             select_all_btn.setEnabled(False)
 
         def clear() -> None:
-            clear_selection()
+            clear_selection(visible_only=False)
 
         return clear
 
