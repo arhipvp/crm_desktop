@@ -82,7 +82,7 @@ class ColumnFilterState:
             return ", ".join(labels)
         return "" if self.value is None else str(self.value)
 
-    def backend_value(self) -> Optional[str]:
+    def backend_value(self) -> Optional[str | list[str]]:
         """Возвращает представление фильтра для передачи в сервисы."""
 
         if self.type == "text":
@@ -97,10 +97,43 @@ class ColumnFilterState:
                 return None
             return str(self.value)
         if self.type == "choices":
-            values = self._choices_values()
-            if not values:
+            raw_values = self._choices_values(raw=True)
+            collected: list[str] = []
+            for item in raw_values:
+                text: str | None = None
+                if isinstance(item, Mapping):
+                    raw = item.get("value")
+                    if isinstance(raw, str):
+                        candidate = raw.strip()
+                        if candidate:
+                            text = candidate
+                    elif raw is not None:
+                        candidate = str(raw).strip()
+                        if candidate:
+                            text = candidate
+                    if text is None:
+                        display = item.get("display")
+                        if isinstance(display, str):
+                            candidate = display.strip()
+                            if candidate:
+                                text = candidate
+                        elif display is not None:
+                            candidate = str(display).strip()
+                            if candidate:
+                                text = candidate
+                if text is None:
+                    if item is None:
+                        text = ""
+                    else:
+                        text = str(item).strip()
+                if text:
+                    collected.append(text)
+            if not collected:
                 return None
-            return ",".join(str(item) for item in values)
+            is_multi = isinstance(self.value, (list, tuple, set, frozenset))
+            if not is_multi:
+                return collected[0]
+            return collected
         # Для диапазонов и прочих сложных типов серверная фильтрация не поддерживается.
         return None
 
