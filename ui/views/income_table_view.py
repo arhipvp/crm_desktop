@@ -1,7 +1,9 @@
 import logging
 from datetime import date, datetime
 
-from peewee import prefetch
+from typing import Any
+
+from peewee import Field, prefetch
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import QHeaderView, QAbstractItemView
 
@@ -16,11 +18,77 @@ from services.income_service import (
 )
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
+from ui.base.table_controller import TableController
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.income_form import IncomeForm
 
 
 logger = logging.getLogger(__name__)
+
+
+class IncomeTableController(TableController):
+    def __init__(self, view) -> None:
+        super().__init__(view, model_class=Income)
+
+    def get_distinct_values(
+        self, column_key: str, *, column_field: Any | None = None
+    ) -> list[dict[str, Any]]:
+        filters = self.get_filters()
+        column_filters = dict(filters.get("column_filters") or {})
+        removed = False
+        if column_field is not None and column_field in column_filters:
+            column_filters.pop(column_field, None)
+            removed = True
+        if not removed:
+            column_filters.pop(column_key, None)
+        filters["column_filters"] = column_filters
+
+        search_text = str(filters.get("search_text") or "")
+        show_deleted = bool(filters.get("show_deleted"))
+        include_received = bool(filters.get("include_received", True))
+        received_range = filters.get("received_date_range")
+        deal_id = filters.get("deal_id")
+        join_executor = column_field is Executor.full_name
+
+        query = build_income_query(
+            search_text=search_text,
+            show_deleted=show_deleted,
+            include_received=include_received,
+            received_date_range=received_range,
+            column_filters=column_filters,
+            deal_id=deal_id,
+            join_executor=join_executor,
+        )
+
+        if isinstance(column_field, Field):
+            target_field = column_field
+        else:
+            field_map: dict[str, Field] = {
+                "policy_number": Policy.policy_number,
+                "deal_description": Deal.description,
+                "client_name": Client.name,
+                "sales_channel": Policy.sales_channel,
+                "start_date": Policy.start_date,
+                "amount": Income.amount,
+                "payment_date": Payment.payment_date,
+                "received_date": Income.received_date,
+            }
+            target_field = field_map.get(column_key)
+
+        if target_field is None:
+            return []
+
+        values_query = (
+            query.select(target_field)
+            .where(target_field.is_null(False))
+            .distinct()
+            .order_by(target_field.asc())
+        )
+
+        return [
+            {"value": value, "display": value}
+            for (value,) in values_query.tuples()
+        ]
 
 
 class IncomeTableModel(BaseTableModel):
@@ -172,6 +240,7 @@ class IncomeTableView(BaseTableView):
         checkbox_map = {
             "Показывать выплаченные": self.load_data,
         }
+        controller = IncomeTableController(self)
         super().__init__(
             parent=parent,
             model_class=Income,
@@ -179,6 +248,7 @@ class IncomeTableView(BaseTableView):
             entity_name="Доход",
             checkbox_map=checkbox_map,
             date_filter_field="received_date",
+            controller=controller,
             **kwargs,
         )
         self.deal_id = deal_id

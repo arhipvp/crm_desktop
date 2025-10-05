@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from peewee import Field
 
@@ -118,6 +118,45 @@ class PolicyAppService:
             **filters,
         )
         return query.count()
+
+    def get_distinct_values(
+        self,
+        column_key: str,
+        *,
+        column_field: Field | None = None,
+        filters: Mapping[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        filters = dict(filters or {})
+        raw_column_filters = filters.pop("column_filters", None)
+        prepared_filters = self._prepare_column_filters(raw_column_filters)
+        filters["column_filters"] = prepared_filters
+
+        if isinstance(column_field, Field):
+            target_field = column_field
+        else:
+            target_field = self._FIELD_ALIASES.get(column_key)
+            if target_field is None:
+                target_field = getattr(Policy, column_key, None)
+
+        if target_field is None:
+            return []
+
+        query = build_policy_query(
+            column_filters=prepared_filters,
+            **filters,
+        )
+
+        values_query = (
+            query.select(target_field)
+            .where(target_field.is_null(False))
+            .distinct()
+            .order_by(target_field.asc())
+        )
+
+        return [
+            {"value": value, "display": value}
+            for (value,) in values_query.tuples()
+        ]
 
     def mark_deleted(
         self, policy_ids: Sequence[int], *, gateway: DriveGateway | None = None

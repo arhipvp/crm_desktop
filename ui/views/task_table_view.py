@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
+from peewee import Field, JOIN
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QAbstractItemView, QHeaderView, QMessageBox
 
@@ -20,6 +22,7 @@ from services.task_notifications import notify_task
 from services.task_queue import queue_task
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
+from ui.base.table_controller import TableController
 from ui.common.delegates import StatusDelegate
 from ui.common.message_boxes import confirm, show_error
 from ui.common.styled_widgets import styled_button
@@ -27,6 +30,73 @@ from ui.forms.task_form import TaskForm
 from ui.views.task_detail_view import TaskDetailView
 
 logger = logging.getLogger(__name__)
+
+
+class TaskTableController(TableController):
+    def __init__(self, view) -> None:
+        super().__init__(view, model_class=Task)
+
+    def get_distinct_values(
+        self, column_key: str, *, column_field: Any | None = None
+    ) -> list[dict[str, Any]]:
+        filters = self.get_filters()
+        column_filters = dict(filters.get("column_filters") or {})
+        removed = False
+        if column_field is not None and column_field in column_filters:
+            column_filters.pop(column_field, None)
+            removed = True
+        if not removed:
+            column_filters.pop(column_key, None)
+        filters["column_filters"] = column_filters
+
+        include_deleted = bool(filters.get("include_deleted", False))
+        include_done = bool(filters.get("include_done", True))
+        search_text = filters.get("search_text")
+        deal_id = getattr(self.view, "deal_id", None)
+
+        query = build_task_query(
+            include_deleted=include_deleted,
+            include_done=include_done,
+            search_text=search_text,
+            deal_id=deal_id,
+            sort_field=getattr(self.view, "sort_field", "due_date"),
+            sort_order=getattr(self.view, "sort_order", "asc"),
+            column_filters=column_filters,
+        )
+
+        if isinstance(column_field, Field):
+            target_field = column_field
+        else:
+            target_field = None
+
+        if target_field is None:
+            return []
+
+        target_model = getattr(target_field, "model", None)
+        if column_field is Executor.full_name:
+            query = query.switch(Task).join(Deal, JOIN.LEFT_OUTER)
+            query = (
+                query.switch(Deal)
+                .join(DealExecutor, JOIN.LEFT_OUTER)
+                .join(Executor, JOIN.LEFT_OUTER)
+            )
+        else:
+            if target_model is Policy:
+                query = query.switch(Task).join(Policy, JOIN.LEFT_OUTER)
+            if target_model is Deal:
+                query = query.switch(Task).join(Deal, JOIN.LEFT_OUTER)
+
+        values_query = (
+            query.select(target_field)
+            .where(target_field.is_null(False))
+            .distinct()
+            .order_by(target_field.asc())
+        )
+
+        return [
+            {"value": value, "display": value}
+            for (value,) in values_query.tuples()
+        ]
 
 
 class TaskTableModel(BaseTableModel):
@@ -121,12 +191,14 @@ class TaskTableView(BaseTableView):
             )
         else:
             self._sheets_sync_service = None
+        controller = TaskTableController(self)
         super().__init__(
             parent=parent,
             model_class=Task,
             form_class=TaskForm,
             detail_view_class=TaskDetailView,
             checkbox_map=checkbox_map,
+            controller=controller,
         )
         self.sort_field = "due_date"
         self.sort_order = "asc"

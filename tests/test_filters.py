@@ -282,6 +282,51 @@ def test_choices_filter_widget_has_search_and_filters(
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
+def test_controller_distinct_values_used_for_choices(
+    qapp,
+    in_memory_db,
+    make_policy_with_payment,
+):
+    class DummyController(TableController):
+        def __init__(self, view) -> None:
+            super().__init__(view, model_class=Payment)
+
+        def get_distinct_values(
+            self, column_key: str, *, column_field=None
+        ):
+            assert column_key == "policy_number"
+            return [
+                {"value": "CTRL-1", "display": "CTRL-1"},
+                {"value": "CTRL-2", "display": "CTRL-2"},
+            ]
+
+    _, _, _, payment = make_policy_with_payment(
+        policy_kwargs={"policy_number": "LOCAL-ONLY"},
+        payment_kwargs={"amount": 50},
+    )
+
+    view = BaseTableView(model_class=Payment)
+    view.COLUMN_FIELD_MAP = {0: "policy_number"}
+    view.controller = DummyController(view)
+    view.set_model_class_and_items(Payment, [payment], total_count=1)
+    qapp.processEvents()
+
+    menu = QMenu()
+    view._create_choices_filter_widget(menu, 0, None)
+    qapp.processEvents()
+
+    action = menu.actions()[0]
+    container = action.defaultWidget()
+    assert container is not None
+    checkboxes = container.findChildren(QCheckBox)
+    labels = {cb.text() for cb in checkboxes}
+    assert "CTRL-1" in labels
+    assert "CTRL-2" in labels
+
+    view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
 def test_finance_tables_filters_use_raw_values(
     qapp,
     in_memory_db,
@@ -371,7 +416,7 @@ def test_choices_filter_widget_uses_controller_values(qapp):
         def __init__(self):
             super().__init__(None, model_class=Deal)
 
-        def get_distinct_values(self, column_key: str):
+        def get_distinct_values(self, column_key: str, *, column_field=None):
             assert column_key == "status"
             return [
                 {"value": "NEW", "display": "Новая"},

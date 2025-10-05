@@ -1,6 +1,9 @@
 import logging
 from datetime import date, datetime
 
+from typing import Any
+
+from peewee import Field
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
@@ -11,6 +14,7 @@ from database.models import Client, Deal, Expense, Payment, Policy
 from services import expense_service
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
+from ui.base.table_controller import TableController
 from ui.common.colors import HIGHLIGHT_COLOR_INCOME
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.expense_form import ExpenseForm
@@ -18,6 +22,64 @@ from ui.views.expense_detail_view import ExpenseDetailView
 
 
 logger = logging.getLogger(__name__)
+
+
+class ExpenseTableController(TableController):
+    def __init__(self, view) -> None:
+        super().__init__(view, model_class=Expense)
+
+    def get_distinct_values(
+        self, column_key: str, *, column_field: Any | None = None
+    ) -> list[dict[str, Any]]:
+        filters = self.get_filters()
+        column_filters = dict(filters.get("column_filters") or {})
+        removed = False
+        if column_field is not None and column_field in column_filters:
+            column_filters.pop(column_field, None)
+            removed = True
+        if not removed:
+            column_filters.pop(column_key, None)
+        filters["column_filters"] = column_filters
+
+        search_text = str(filters.get("search_text") or "")
+        show_deleted = bool(filters.get("show_deleted"))
+        include_paid = bool(filters.get("include_paid", True))
+        deal_id = filters.get("deal_id")
+        expense_date_range = filters.get("expense_date_range")
+
+        query = expense_service.build_expense_query(
+            search_text=search_text,
+            show_deleted=show_deleted,
+            deal_id=deal_id,
+            include_paid=include_paid,
+            expense_date_range=expense_date_range,
+            column_filters=column_filters,
+        )
+
+        if isinstance(column_field, Field):
+            target_field = column_field
+        else:
+            mapping: dict[str, Field] = {
+                "expense_type": Expense.expense_type,
+                "amount": Expense.amount,
+                "expense_date": Expense.expense_date,
+            }
+            target_field = mapping.get(column_key)
+
+        if target_field is None:
+            return []
+
+        values_query = (
+            query.select(target_field)
+            .where(target_field.is_null(False))
+            .distinct()
+            .order_by(target_field.asc())
+        )
+
+        return [
+            {"value": value, "display": value}
+            for (value,) in values_query.tuples()
+        ]
 
 
 class ExpenseTableModel(BaseTableModel):
@@ -208,10 +270,12 @@ class ExpenseTableView(BaseTableView):
             "Показывать выплаченные": self.load_data,
         }
         self.deal_id = deal_id
+        controller = ExpenseTableController(self)
         super().__init__(
             parent=parent,
             checkbox_map=checkbox_map,
             date_filter_field="expense_date",
+            controller=controller,
             **kwargs,
         )
         self.model_class = Expense  # или Client, Policy и т.д.
