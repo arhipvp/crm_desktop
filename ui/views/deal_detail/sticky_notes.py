@@ -164,7 +164,6 @@ class StickyNotesBoard(QWidget):
         header.setWordWrap(True)
         header.setStyleSheet("font-weight: bold;")
         header.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        header.setText(self._highlight_text(entry.header or "—"))
         layout.addWidget(header)
 
         body: QLabel | None = None
@@ -173,15 +172,17 @@ class StickyNotesBoard(QWidget):
             body.setTextFormat(Qt.RichText)
             body.setWordWrap(True)
             body.setTextInteractionFlags(Qt.TextSelectableByMouse)
-            body.setText(self._highlight_text(entry.body))
             layout.addWidget(body)
 
         margins = layout.contentsMargins()
         spacing = layout.spacing()
         max_text_width = 0
 
+        header_text = entry.header or "—"
+        body_text = entry.body or ""
+
         header_metrics = QFontMetrics(header.font())
-        header_lines = (entry.header or "—").splitlines() or ["—"]
+        header_lines = header_text.splitlines() or ["—"]
         max_text_width = max(
             max_text_width,
             max(header_metrics.horizontalAdvance(line) for line in header_lines),
@@ -189,7 +190,6 @@ class StickyNotesBoard(QWidget):
 
         if body:
             body_metrics = QFontMetrics(body.font())
-            body_text = entry.body or ""
             body_lines = body_text.splitlines() or [body_text]
             max_text_width = max(
                 max_text_width,
@@ -207,6 +207,15 @@ class StickyNotesBoard(QWidget):
 
         card.setMinimumWidth(int(bounded_width))
         card.setMaximumWidth(int(bounded_width))
+
+        available_width = int(bounded_width) - (margins.left() + margins.right())
+        wrapped_header = self._wrap_text(header_text, header_metrics, available_width)
+        header.setText(self._highlight_text(wrapped_header))
+
+        wrapped_body: str | None = None
+        if body:
+            wrapped_body = self._wrap_text(body_text, body_metrics, available_width)
+            body.setText(self._highlight_text(wrapped_body))
 
         button_row = QHBoxLayout()
         button_row.setContentsMargins(0, 0, 0, 0)
@@ -264,12 +273,11 @@ class StickyNotesBoard(QWidget):
         layout.addLayout(button_row)
 
         tooltip_parts: list[str] = []
-        header_text = entry.header or "—"
         tooltip_parts.append(
-            f"<b>{self._highlight_text(header_text)}</b>"
+            f"<b>{self._highlight_text(wrapped_header)}</b>"
         )
-        if entry.body:
-            tooltip_parts.append(self._highlight_text(entry.body))
+        if wrapped_body:
+            tooltip_parts.append(self._highlight_text(wrapped_body))
         card.setToolTip("<br/><br/>".join(tooltip_parts))
         header.setToolTip(card.toolTip())
         if entry.body:
@@ -312,20 +320,197 @@ class StickyNotesBoard(QWidget):
 
         self._rebuild()
 
+    def _wrap_text(
+        self, text: str, metrics: QFontMetrics, max_width: int
+    ) -> str:
+        if not text or max_width <= 0:
+            return text
+
+        soft_break = "\u200b"
+        wrapped_lines: list[str] = []
+
+        def append_line(line: str) -> None:
+            if line:
+                while line.endswith(soft_break):
+                    line = line[:-1]
+            wrapped_lines.append(line.rstrip())
+
+        for source_line in text.split("\n"):
+            if not source_line:
+                wrapped_lines.append("")
+                continue
+
+            current_line = ""
+            current_plain = ""
+            tokens = re.split(r"(\s+)", source_line)
+
+            for token in tokens:
+                if token is None or token == "":
+                    continue
+
+                if token.isspace():
+                    if not current_plain:
+                        continue
+                    candidate_plain = current_plain + token
+                    if metrics.horizontalAdvance(candidate_plain) <= max_width:
+                        current_line += token
+                        current_plain = candidate_plain
+                    else:
+                        append_line(current_line)
+                        current_line = ""
+                        current_plain = ""
+                    continue
+
+                segments = self._split_word_segments(token, metrics, max_width)
+                for index, segment in enumerate(segments):
+                    if current_plain and metrics.horizontalAdvance(current_plain + segment) > max_width:
+                        append_line(current_line)
+                        current_line = ""
+                        current_plain = ""
+
+                    current_line += segment
+                    current_plain += segment
+
+                    if index < len(segments) - 1:
+                        next_segment = segments[index + 1]
+                        if (
+                            metrics.horizontalAdvance(current_plain + next_segment)
+                            <= max_width
+                        ):
+                            current_line += soft_break
+
+            append_line(current_line)
+
+        return "\n".join(wrapped_lines)
+
+    def _split_word_segments(
+        self, word: str, metrics: QFontMetrics, max_width: int
+    ) -> list[str]:
+        if not word:
+            return [""]
+
+        if metrics.horizontalAdvance(word) <= max_width or max_width <= 0:
+            return [word]
+
+        segments: list[str] = []
+        start = 0
+        length = len(word)
+
+        while start < length:
+            end = start + 1
+            while end <= length and metrics.horizontalAdvance(word[start:end]) <= max_width:
+                end += 1
+
+            if end == start + 1 and metrics.horizontalAdvance(word[start:end]) > max_width:
+                end = start + 1
+            else:
+                end -= 1
+
+            segment = word[start:end]
+            if not segment:
+                segment = word[start : start + 1]
+                end = start + 1
+
+            segments.append(segment)
+            start = end
+
+        return segments
+
     def _highlight_text(self, text: str) -> str:
         if not text:
             return ""
 
         if not self._search_term:
-            return html.escape(text).replace("\n", "<br/>")
+            return self._convert_to_html(text)
 
-        pattern = re.compile(re.escape(self._search_term), re.IGNORECASE)
+        normalized_chars: list[str] = []
+        for ch in text:
+            if ch == "\u200b":
+                continue
+            if ch == "\n":
+                normalized_chars.append(" ")
+            else:
+                normalized_chars.append(ch)
+
+        normalized_text = "".join(normalized_chars)
+        pattern = self._build_search_pattern()
+        matches = list(pattern.finditer(normalized_text))
+
+        if not matches:
+            return self._convert_to_html(text)
+
         parts: list[str] = []
-        last_index = 0
-        for match in pattern.finditer(text):
-            parts.append(html.escape(text[last_index:match.start()]))
-            highlighted = html.escape(match.group(0))
-            parts.append(f'<span style="background-color: #ffe082;">{highlighted}</span>')
-            last_index = match.end()
-        parts.append(html.escape(text[last_index:]))
-        return "".join(parts).replace("\n", "<br/>")
+        current_match_index = 0
+        current_match = matches[current_match_index]
+        in_highlight = False
+        plain_index = 0
+
+        for ch in text:
+            if ch == "\u200b":
+                parts.append("<wbr/>")
+                continue
+
+            while current_match and plain_index >= current_match.end():
+                if in_highlight:
+                    parts.append("</span>")
+                    in_highlight = False
+                current_match_index += 1
+                if current_match_index >= len(matches):
+                    current_match = None
+                else:
+                    current_match = matches[current_match_index]
+
+            highlight_char = False
+            if current_match and current_match.start() <= plain_index < current_match.end():
+                highlight_char = True
+
+            html_fragment = "<br/>" if ch == "\n" else html.escape(ch)
+
+            if highlight_char:
+                if not in_highlight:
+                    parts.append('<span style="background-color: #ffe082;">')
+                    in_highlight = True
+                parts.append(html_fragment)
+            else:
+                if in_highlight:
+                    parts.append("</span>")
+                    in_highlight = False
+                parts.append(html_fragment)
+
+            plain_index += 1
+
+        if in_highlight:
+            parts.append("</span>")
+
+        return "".join(parts)
+
+    def _convert_to_html(self, text: str) -> str:
+        parts: list[str] = []
+        for ch in text:
+            if ch == "\u200b":
+                parts.append("<wbr/>")
+            elif ch == "\n":
+                parts.append("<br/>")
+            else:
+                parts.append(html.escape(ch))
+        return "".join(parts)
+
+    def _build_search_pattern(self) -> re.Pattern[str]:
+        parts: list[str] = []
+        last_was_space = False
+        for ch in self._search_term:
+            if ch.isspace():
+                if not last_was_space:
+                    parts.append(r"\s+")
+                    last_was_space = True
+            else:
+                if last_was_space:
+                    last_was_space = False
+                parts.append(re.escape(ch))
+                parts.append(r"\s*")
+
+        if parts and parts[-1] == r"\s*":
+            parts.pop()
+
+        pattern_str = "".join(parts) or re.escape(self._search_term)
+        return re.compile(pattern_str, re.IGNORECASE)
