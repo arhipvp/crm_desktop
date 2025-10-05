@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QAbstractItemView
 
 from core.app_context import AppContext
+from database.models import Client
 from services.clients.client_app_service import (
     ClientMergeError,
     ClientNotFoundError,
@@ -21,6 +22,15 @@ from ui.views.client_detail_view import ClientDetailView
 
 
 class ClientTableView(BaseTableView):
+    COLUMN_FIELD_MAP = {
+        0: Client.name,
+        1: Client.phone,
+        2: Client.email,
+        3: Client.is_company,
+        4: Client.note,
+        5: Client.drive_folder_link,
+    }
+
     def __init__(
         self,
         parent=None,

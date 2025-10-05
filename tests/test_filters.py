@@ -23,6 +23,7 @@ from services.deals.dto import DealClientInfo, DealExecutorInfo, DealRowDTO
 from services.deals.deal_table_controller import DealTableController
 from ui.views.income_table_view import IncomeTableView
 from ui.views.expense_table_view import ExpenseTableView
+from ui.views.client_table_view import ClientTableView
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
@@ -327,6 +328,50 @@ def test_controller_distinct_values_used_for_choices(
     assert "CTRL-1" in labels
     assert "CTRL-2" in labels
 
+    view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_client_table_filters_forwarded_to_controller(qapp, in_memory_db):
+    """Выбранные значения фильтра клиентов попадают в column_filters контроллера."""
+
+    ui_settings._CACHE = None
+
+    client_one = Client.create(name="Filter One", phone="111", email="one@example.com")
+    client_two = Client.create(name="Filter Two", phone="222", email="two@example.com")
+
+    view = BaseTableView(model_class=Client)
+    view.COLUMN_FIELD_MAP = dict(ClientTableView.COLUMN_FIELD_MAP)
+    view.set_model_class_and_items(Client, [client_one, client_two], total_count=2)
+    qapp.processEvents()
+
+    menu = QMenu()
+    view._create_choices_filter_widget(menu, 0, None)
+    qapp.processEvents()
+
+    actions = menu.actions()
+    assert actions, "Меню фильтра должно содержать действия"
+    container = actions[0].defaultWidget()
+    assert container is not None, "В меню отсутствует контейнер виджета фильтра"
+
+    checkboxes = container.findChildren(QCheckBox)
+    assert len(checkboxes) >= 2, "Ожидались чекбоксы с именами клиентов"
+
+    target_labels = {client_one.name, client_two.name}
+    selected_boxes = [cb for cb in checkboxes if cb.text() in target_labels]
+    assert len(selected_boxes) == 2, "Чекбоксы для клиентов не найдены"
+
+    for checkbox in selected_boxes:
+        checkbox.setChecked(True)
+    qapp.processEvents()
+
+    filters = view.controller.get_filters()
+    column_filters = filters.get("column_filters", {})
+    expected = sorted(target_labels)
+
+    assert column_filters.get(Client.name) == expected
+
+    menu.deleteLater()
     view.deleteLater()
 
 
