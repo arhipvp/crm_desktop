@@ -342,13 +342,18 @@ def apply_expense_filters(
             query = query.where(Expense.expense_date <= date_to)
 
     def _build_having_condition(expr, value):
-        values = _normalize_filter_values(value)
-        if not values:
+        values, include_null = _normalize_filter_values(value)
+        if not values and not include_null:
             return None
         condition = None
         for item in values:
             candidate = Cast(expr, "TEXT").contains(item)
             condition = candidate if condition is None else (condition | candidate)
+        if include_null:
+            null_candidate = expr.is_null(True)
+            condition = (
+                null_candidate if condition is None else (condition | null_candidate)
+            )
         return condition
 
     for expression, filter_value in (

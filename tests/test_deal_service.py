@@ -4,6 +4,7 @@ from pathlib import Path
 from dateutil.relativedelta import relativedelta
 
 from database.models import Client, Deal, Policy
+from services.deals.deal_app_service import DealAppService
 from services.deal_service import (
     add_deal_from_policy,
     add_deal_from_policies,
@@ -11,6 +12,7 @@ from services.deal_service import (
     update_deal,
 )
 from services.folder_utils import sanitize_name
+from utils.filter_constants import CHOICE_NULL_TOKEN
 
 
 def test_add_deal_from_policy_sets_reminder_date(
@@ -118,3 +120,40 @@ def test_update_deal_reopen_clears_closed_reason(in_memory_db):
 
     open_ids = {d.id for d in get_open_deals()}
     assert deal.id in open_ids
+
+
+def test_deal_app_service_filters_null_closed_reason(in_memory_db):
+    client = Client.create(name="Фильтр")
+    deal_without_reason = Deal.create(
+        client=client,
+        description="Без причины",
+        start_date=date(2024, 6, 1),
+        closed_reason=None,
+    )
+    deal_with_reason = Deal.create(
+        client=client,
+        description="С причиной",
+        start_date=date(2024, 6, 2),
+        closed_reason="Отказ",
+    )
+
+    service = DealAppService()
+
+    rows, total = service.get_page(
+        1,
+        20,
+        column_filters={"closed_reason": [CHOICE_NULL_TOKEN]},
+    )
+    assert total == 1
+    assert {row.id for row in rows} == {deal_without_reason.id}
+
+    mixed_rows, mixed_total = service.get_page(
+        1,
+        20,
+        column_filters={"closed_reason": [CHOICE_NULL_TOKEN, "Отказ"]},
+    )
+    assert mixed_total == 2
+    assert {row.id for row in mixed_rows} == {
+        deal_without_reason.id,
+        deal_with_reason.id,
+    }
