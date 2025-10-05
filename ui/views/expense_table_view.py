@@ -1,6 +1,7 @@
 import logging
+from datetime import date, datetime
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView
 
@@ -55,6 +56,15 @@ class ExpenseTableModel(BaseTableModel):
             return None
 
         obj = self.objects[index.row()]
+        def to_qdate(value):
+            if isinstance(value, QDate):
+                return value
+            if isinstance(value, datetime):
+                value = value.date()
+            if isinstance(value, date):
+                return QDate(value.year, value.month, value.day)
+            return None
+
         policy = getattr(obj, "policy", None)
         payment = getattr(obj, "payment", None)
         if not policy and payment:
@@ -79,53 +89,93 @@ class ExpenseTableModel(BaseTableModel):
                     obj.other_expense_details = details
                 return details or None
             return None
+        col = index.column()
+
+        policy_number = policy.policy_number if policy else None
+        deal_description = deal.description if deal else None
+        client_name = policy.client.name if policy and policy.client else None
+        contractor = policy.contractor if policy and policy.contractor else None
+        policy_start_date = policy.start_date if policy and policy.start_date else None
+        policy_start_qdate = to_qdate(policy_start_date)
+        expense_type = obj.expense_type or None
+        payment_amount = payment.amount if payment else None
+        payment_date = payment.payment_date if payment and payment.payment_date else None
+        payment_qdate = to_qdate(payment_date)
+        income_total = getattr(obj, "income_total", None)
+        other_total = getattr(obj, "other_expense_total", None)
+        net_income = getattr(obj, "net_income", None)
+        expense_amount = obj.amount if obj.amount is not None else None
+        expense_date = obj.expense_date
+        expense_qdate = to_qdate(expense_date)
+
+        raw_values = {
+            0: policy_number,
+            1: deal_description,
+            2: client_name,
+            3: contractor,
+            4: policy_start_qdate,
+            5: expense_type,
+            6: payment_amount,
+            7: payment_qdate,
+            8: income_total,
+            9: other_total,
+            10: net_income,
+            11: expense_amount,
+            12: expense_qdate,
+        }
+
+        if role == Qt.UserRole:
+            return raw_values.get(col)
 
         if role != Qt.DisplayRole:
             return None
 
-        col = index.column()
-
         if col == 0:
-            return policy.policy_number if policy else "—"
+            return policy_number or "—"
         elif col == 1:
-            return deal.description if deal else "—"
+            return deal_description or "—"
         elif col == 2:
-            return policy.client.name if policy and policy.client else "—"
+            return client_name or "—"
         elif col == 3:
-            return policy.contractor if policy and policy.contractor else "—"
+            return contractor or "—"
         elif col == 4:
             return (
-                policy.start_date.strftime("%d.%m.%Y")
-                if policy and policy.start_date
+                policy_start_date.strftime("%d.%m.%Y")
+                if policy_start_date
                 else "—"
             )
         elif col == 5:
-            return obj.expense_type or "—"
+            return expense_type or "—"
         elif col == 6:
             return (
-                self.format_money(payment.amount)
-                if payment and payment.amount
+                self.format_money(payment_amount)
+                if payment_amount
                 else "0 ₽"
             )
         elif col == 7:
-            return (
-                payment.payment_date.strftime("%d.%m.%Y")
-                if payment and payment.payment_date
-                else "—"
-            )
+            return payment_date.strftime("%d.%m.%Y") if payment_date else "—"
         elif col == 8:
-            total = getattr(obj, "income_total", 0) or 0
-            return self.format_money(total) if total else "0 ₽"
+            return (
+                self.format_money(income_total)
+                if income_total
+                else "0 ₽"
+            )
         elif col == 9:
-            other_total = getattr(obj, "other_expense_total", 0) or 0
-            return self.format_money(other_total) if other_total else "0 ₽"
+            return (
+                self.format_money(other_total)
+                if other_total
+                else "0 ₽"
+            )
         elif col == 10:
-            net_income = getattr(obj, "net_income", 0) or 0
-            return self.format_money(net_income) if net_income else "0 ₽"
+            return (
+                self.format_money(net_income)
+                if net_income
+                else "0 ₽"
+            )
         elif col == 11:
-            return self.format_money(obj.amount) if obj.amount else "0 ₽"
+            return self.format_money(expense_amount) if expense_amount else "0 ₽"
         elif col == 12:
-            return obj.expense_date.strftime("%d.%m.%Y") if obj.expense_date else "—"
+            return expense_date.strftime("%d.%m.%Y") if expense_date else "—"
 
 
 class ExpenseTableView(BaseTableView):
