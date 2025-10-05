@@ -15,7 +15,7 @@ from ui.base.base_table_view import BaseTableView
 from ui.base.table_controller import TableController
 from ui.common.multi_filter_proxy import ColumnFilterState
 from utils.filter_constants import CHOICE_NULL_TOKEN
-from ui.views.payment_table_view import PaymentTableView
+from ui.views.payment_table_view import PaymentTableController, PaymentTableView
 from ui.views.deal_table_view import DealTableView
 from ui.views import payment_table_view as payment_table_view_module
 from ui.common.date_utils import get_date_or_none
@@ -330,6 +330,39 @@ def test_controller_distinct_values_used_for_choices(
 
     view.deleteLater()
 
+
+def test_payment_controller_distinct_values_include_null(
+    in_memory_db, make_policy_with_payment
+):
+    _, _, _, unpaid = make_policy_with_payment(
+        policy_kwargs={"policy_number": "PM-NULL"},
+        payment_kwargs={"actual_payment_date": None},
+    )
+    _, _, _, paid = make_policy_with_payment(
+        policy_kwargs={"policy_number": "PM-FULL"},
+        payment_kwargs={"actual_payment_date": date(2024, 5, 20)},
+    )
+
+    controller = PaymentTableController(object(), model_class=Payment)
+    controller.get_filters = lambda: {
+        "search_text": "",
+        "show_deleted": False,
+        "include_paid": True,
+        "deal_id": None,
+        "payment_date_range": None,
+        "column_filters": {},
+    }
+
+    values = controller.get_distinct_values(
+        "actual_payment_date", column_field=Payment.actual_payment_date
+    )
+
+    assert values, "Должны вернуться значения фильтра"
+    assert values[0]["value"] is None
+    assert values[0]["display"] == "—"
+    assert any(item["value"] == paid.actual_payment_date for item in values)
+
+    assert unpaid.actual_payment_date is None  # гарантируем использование NULL
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
 def test_client_table_filters_forwarded_to_controller(qapp, in_memory_db):

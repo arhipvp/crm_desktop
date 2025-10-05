@@ -76,10 +76,20 @@ class ExpenseTableController(TableController):
             .order_by(target_field.asc())
         )
 
-        return [
+        values = [
             {"value": value, "display": value}
             for (value,) in values_query.tuples()
         ]
+
+        if (
+            query.select(target_field)
+            .where(target_field.is_null(True))
+            .limit(1)
+            .exists()
+        ):
+            values.insert(0, {"value": None, "display": "—"})
+
+        return values
 
 
 class ExpenseTableModel(BaseTableModel):
