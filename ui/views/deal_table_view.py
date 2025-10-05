@@ -68,8 +68,10 @@ class DealTableModel(BaseTableModel):
 
         column = index.column()
         if column >= len(self.fields):
+            executor = obj.executor
+            if role == Qt.UserRole:
+                return executor.full_name if executor else None
             if role == Qt.DisplayRole:
-                executor = obj.executor
                 return executor.full_name if executor else "—"
             return None
 

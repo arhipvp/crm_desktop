@@ -903,8 +903,8 @@ def test_deal_table_multi_choice_filters(qapp, monkeypatch):
     ]
     executor_labels = ["Executor A", "Executor B"]
     executor_payloads = [
-        {"value": None, "display": "Executor A"},
-        {"value": None, "display": "Executor B"},
+        {"value": "Executor A", "display": "Executor A"},
+        {"value": "Executor B", "display": "Executor B"},
     ]
 
     view._apply_column_filter(
@@ -939,5 +939,114 @@ def test_deal_table_multi_choice_filters(qapp, monkeypatch):
         for row in range(view.proxy.rowCount())
     }
     assert remaining == {"Alpha", "Beta"}
+
+    view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_deal_executor_filter_hides_rows_immediately(qapp, monkeypatch):
+    """Фильтрация по исполнителю скрывает строки без перезагрузки данных."""
+
+    ui_settings._CACHE = None
+
+    today = date.today()
+    client_info = DealClientInfo(id=1, name="Client")
+    exec1 = DealExecutorInfo(id=1, full_name="Executor A")
+    exec2 = DealExecutorInfo(id=2, full_name="Executor B")
+    exec3 = DealExecutorInfo(id=3, full_name="Executor C")
+
+    deals = [
+        DealRowDTO(
+            id=1,
+            reminder_date=None,
+            client=client_info,
+            status="NEW",
+            description="Alpha",
+            calculations=None,
+            start_date=today,
+            is_closed=False,
+            closed_reason=None,
+            drive_folder_path=None,
+            drive_folder_link=None,
+            is_deleted=False,
+            executor=exec1,
+        ),
+        DealRowDTO(
+            id=2,
+            reminder_date=None,
+            client=client_info,
+            status="IN_PROGRESS",
+            description="Beta",
+            calculations=None,
+            start_date=today,
+            is_closed=False,
+            closed_reason=None,
+            drive_folder_path=None,
+            drive_folder_link=None,
+            is_deleted=False,
+            executor=exec2,
+        ),
+        DealRowDTO(
+            id=3,
+            reminder_date=None,
+            client=client_info,
+            status="FAILED",
+            description="Gamma",
+            calculations=None,
+            start_date=today,
+            is_closed=False,
+            closed_reason=None,
+            drive_folder_path=None,
+            drive_folder_link=None,
+            is_deleted=False,
+            executor=exec3,
+        ),
+        DealRowDTO(
+            id=4,
+            reminder_date=None,
+            client=client_info,
+            status="NEW",
+            description="Delta",
+            calculations=None,
+            start_date=today,
+            is_closed=False,
+            closed_reason=None,
+            drive_folder_path=None,
+            drive_folder_link=None,
+            is_deleted=False,
+            executor=None,
+        ),
+    ]
+
+    def fake_load_data(self):
+        self._apply_items(deals, total_count=len(deals))
+
+    monkeypatch.setattr(DealTableController, "load_data", fake_load_data)
+
+    view = DealTableView()
+    qapp.processEvents()
+
+    executor_col = view.get_column_index("executor")
+    choices_data: list[tuple[str, dict[str, object]]] = []
+    view._collect_model_choices(executor_col, choices_data, set())
+    choice_values = {payload.get("value") for _label, payload in choices_data}
+    assert {"Executor A", "Executor B", "Executor C", None} <= choice_values
+
+    view.on_filter_changed = lambda *args, **kwargs: None
+
+    state = ColumnFilterState(
+        "choices",
+        [{"value": "Executor B", "display": "Executor B"}],
+        display="Executor B",
+        meta={"choices_display": ["Executor B"]},
+    )
+
+    view._apply_column_filter(executor_col, state, trigger_filter=False)
+    qapp.processEvents()
+
+    assert view.proxy.rowCount() == 1
+    description_col = view.get_column_index("description")
+    index = view.proxy.index(0, description_col)
+    assert view.proxy.data(index, Qt.DisplayRole) == "Beta"
 
     view.deleteLater()
