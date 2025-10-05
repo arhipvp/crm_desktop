@@ -27,6 +27,44 @@ from ui.views.client_table_view import ClientTableView
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
+def test_client_filter_distinct_values_cover_all_pages(
+    qapp, in_memory_db
+):
+    """Меню фильтра клиентов показывает значения со всех страниц и «—» для NULL."""
+
+    ui_settings._CACHE = None
+
+    target_phone = "+7999000039"
+    for index in range(40):
+        Client.create(
+            name=f"Client {index:02d}",
+            phone=None if index == 0 else f"+79990000{index:02d}",
+            email=f"client{index}@example.com",
+        )
+
+    view = ClientTableView()
+    qapp.processEvents()
+
+    menu = QMenu()
+    view._create_choices_filter_widget(menu, 1, None)
+    qapp.processEvents()
+
+    actions = menu.actions()
+    assert actions, "Ожидались элементы меню фильтра"
+    container = actions[0].defaultWidget()
+    assert container is not None, "Контейнер фильтра не найден"
+
+    checkboxes = container.findChildren(QCheckBox)
+    labels = {checkbox.text() for checkbox in checkboxes}
+
+    assert target_phone in labels, "В меню нет значения со следующей страницы"
+    assert "—" in labels, "Значение для NULL должно отображаться как «—»"
+
+    menu.deleteLater()
+    view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
 def test_header_filter_input_filters_proxy(
     qapp,
     in_memory_db,

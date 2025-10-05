@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
+from peewee import Field
+
+from database.models import Client
 from services.clients.client_service import (
     ClientMergeError,
     DuplicatePhoneError,
@@ -15,6 +18,7 @@ from services.clients.client_service import (
     get_client_detail_dto,
     get_clients_details_by_ids,
     get_clients_page_dto,
+    build_client_query,
     merge_clients_to_dto,
     update_client_from_command,
 )
@@ -106,6 +110,65 @@ class ClientAppService:
     ) -> MergeResult:
         client = merge_clients_to_dto(primary_id, duplicate_ids, updates)
         return MergeResult(client=client)
+
+    def get_distinct_values(
+        self,
+        column_key: str,
+        *,
+        column_field: Field | None = None,
+        filters: Mapping[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        filters = dict(filters or {})
+        search_text = str(filters.pop("search_text", "") or "")
+        show_deleted = bool(filters.pop("show_deleted", False))
+
+        raw_column_filters = dict(filters.pop("column_filters", {}) or {})
+        keys_to_remove: set[Any] = {column_key}
+        if column_field is not None:
+            keys_to_remove.add(column_field)
+            field_name = getattr(column_field, "name", None)
+            if isinstance(field_name, str):
+                keys_to_remove.add(field_name)
+        for key in list(raw_column_filters.keys()):
+            if key in keys_to_remove:
+                raw_column_filters.pop(key, None)
+
+        query = build_client_query(
+            search_text=search_text,
+            show_deleted=show_deleted,
+            column_filters=raw_column_filters,
+            **filters,
+        )
+
+        target_field: Field | None
+        if isinstance(column_field, Field):
+            target_field = column_field
+        else:
+            target_field = getattr(Client, column_key, None)
+        if target_field is None:
+            return []
+
+        values_query = (
+            query.select(target_field)
+            .where(target_field.is_null(False))
+            .distinct()
+            .order_by(target_field.asc())
+        )
+
+        values = [
+            {"value": value, "display": value}
+            for (value,) in values_query.tuples()
+        ]
+
+        if (
+            query.select(target_field)
+            .where(target_field.is_null(True))
+            .limit(1)
+            .exists()
+        ):
+            values.insert(0, {"value": None, "display": "—"})
+
+        return values
 
     def _normalize_order_field(self, order_by: Any | None) -> Any:
         if hasattr(order_by, "name"):
