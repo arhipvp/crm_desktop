@@ -1,6 +1,8 @@
 import logging
+from datetime import date, datetime
+
 from peewee import prefetch
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import QHeaderView, QAbstractItemView
 
 from core.app_context import AppContext
@@ -63,50 +65,79 @@ class IncomeTableModel(BaseTableModel):
         obj = self.objects[index.row()]
         col = index.column()
 
+        def to_qdate(value):
+            if isinstance(value, QDate):
+                return value
+            if isinstance(value, datetime):
+                value = value.date()
+            if isinstance(value, date):
+                return QDate(value.year, value.month, value.day)
+            return None
+
         payment = getattr(obj, "payment", None)
         policy = getattr(payment, "policy", None) if payment else None
         deal = getattr(policy, "deal", None) if policy else None
+
+        policy_number = policy.policy_number if policy else None
+        deal_description = deal.description if deal else None
+        client_name = policy.client.name if policy and policy.client else None
+        sales_channel = policy.sales_channel if policy and policy.sales_channel else None
+        policy_start_date = policy.start_date if policy and policy.start_date else None
+        policy_start_qdate = to_qdate(policy_start_date)
+        payment_amount = payment.amount if payment else None
+        payment_date = payment.payment_date if payment and payment.payment_date else None
+        payment_qdate = to_qdate(payment_date)
+        income_amount = obj.amount if obj.amount is not None else None
+        received_date = obj.received_date
+        received_qdate = to_qdate(received_date)
+        executor_name = None
+        if deal and getattr(deal, "executors", None):
+            ex = deal.executors[0].executor
+            executor_name = ex.full_name if ex else None
+
+        raw_values = {
+            0: policy_number,
+            1: deal_description,
+            2: client_name,
+            3: sales_channel,
+            4: policy_start_qdate,
+            5: payment_amount,
+            6: payment_qdate,
+            7: income_amount,
+            8: received_qdate,
+            9: executor_name,
+        }
+
+        if role == Qt.UserRole:
+            return raw_values.get(col)
 
         if role != Qt.DisplayRole:
             return None
 
         if col == 0:
-            return policy.policy_number if policy else "—"
+            return policy_number or "—"
         elif col == 1:
-            return deal.description if deal else "—"
+            return deal_description or "—"
         elif col == 2:
-            return policy.client.name if policy and policy.client else "—"
+            return client_name or "—"
         elif col == 3:
-            return policy.sales_channel if policy and policy.sales_channel else "—"
+            return sales_channel or "—"
         elif col == 4:
             return (
-                policy.start_date.strftime("%d.%m.%Y")
-                if policy and policy.start_date
+                policy_start_date.strftime("%d.%m.%Y")
+                if policy_start_date
                 else "—"
             )
         elif col == 5:
-            return (
-                f"{payment.amount:,.2f} ₽" if payment and payment.amount else "0 ₽"
-            )
+            return f"{payment_amount:,.2f} ₽" if payment_amount else "0 ₽"
         elif col == 6:
-            return (
-                payment.payment_date.strftime("%d.%m.%Y")
-                if payment and payment.payment_date
-                else "—"
-            )
+            return payment_date.strftime("%d.%m.%Y") if payment_date else "—"
         elif col == 7:
-            return f"{obj.amount:,.2f} ₽" if obj.amount else "0 ₽"
+            return f"{income_amount:,.2f} ₽" if income_amount else "0 ₽"
         elif col == 8:
-            return (
-                obj.received_date.strftime("%d.%m.%Y")
-                if obj.received_date
-                else "—"
-            )
+            return received_date.strftime("%d.%m.%Y") if received_date else "—"
         elif col == 9:
-            if deal and getattr(deal, "executors", None):
-                ex = deal.executors[0].executor
-                return ex.full_name if ex else "—"
-            return "—"
+            return executor_name or "—"
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if role != Qt.DisplayRole or orientation != Qt.Horizontal:

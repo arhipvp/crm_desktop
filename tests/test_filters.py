@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox, QLabel, QLineEdit, QMenu, QPushButton
 
-from database.models import Client, Deal, Payment, Policy
+from database.models import Client, Deal, Expense, Income, Payment, Policy
 from ui import settings as ui_settings
 from ui.base.base_table_view import BaseTableView
 from ui.base.table_controller import TableController
@@ -19,6 +20,8 @@ from ui.views import payment_table_view as payment_table_view_module
 from ui.common.date_utils import get_date_or_none
 from services.deals.dto import DealClientInfo, DealExecutorInfo, DealRowDTO
 from services.deals.deal_table_controller import DealTableController
+from ui.views.income_table_view import IncomeTableView
+from ui.views.expense_table_view import ExpenseTableView
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
@@ -198,6 +201,8 @@ def test_choices_filter_widget_has_search_and_filters(
     qapp.processEvents()
 
     assert menu.actions(), "В меню должен появиться виджет фильтра"
+
+
     container = menu.actions()[0].defaultWidget()
     assert container is not None
 
@@ -275,6 +280,91 @@ def test_choices_filter_widget_has_search_and_filters(
 
     view.deleteLater()
 
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_finance_tables_filters_use_raw_values(
+    qapp,
+    in_memory_db,
+    make_policy_with_payment,
+    monkeypatch,
+):
+    """Фильтры для доходов и расходов используют неизменённые значения."""
+
+    ui_settings._CACHE = None
+
+    _, _, policy, payment = make_policy_with_payment(
+        policy_kwargs={
+            "policy_number": "INC-001",
+            "start_date": date(2024, 5, 1),
+        },
+        payment_kwargs={
+            "amount": Decimal("1234.50"),
+            "payment_date": date(2024, 5, 10),
+        },
+    )
+
+    income = Income.create(
+        payment=payment,
+        amount=Decimal("1234.50"),
+        received_date=date(2024, 5, 10),
+    )
+
+    expense = Expense.create(
+        payment=payment,
+        amount=Decimal("432.10"),
+        expense_type="Комиссия",
+        expense_date=date(2024, 5, 11),
+        policy=policy,
+    )
+
+    monkeypatch.setattr(IncomeTableView, "load_data", lambda self: None)
+    income_view = IncomeTableView()
+    income_view.set_model_class_and_items(Income, [income], total_count=1)
+    qapp.processEvents()
+
+    def _apply_choice(view, column: int):
+        choices: list[tuple[str, dict[str, object]]] = []
+        seen: set[tuple[object, str]] = set()
+        view._collect_model_choices(column, choices, seen)
+        assert choices, f"Нет значений для столбца {column}"
+        label, payload = choices[0]
+        state = ColumnFilterState(
+            "choices",
+            [payload],
+            display=label,
+            meta={"choices_display": [label]},
+        )
+        view._apply_column_filter(
+            column,
+            state,
+            save_settings=False,
+            trigger_filter=False,
+        )
+
+    _apply_choice(income_view, 5)
+    _apply_choice(income_view, 8)
+
+    income_filters = income_view.controller.get_filters()
+    income_column_filters = income_filters.get("column_filters", {})
+    assert income_column_filters.get(Payment.amount) == ["1234.50"]
+    assert income_column_filters.get(Income.received_date) == ["2024-05-10"]
+
+    monkeypatch.setattr(ExpenseTableView, "load_data", lambda self: None)
+    expense_view = ExpenseTableView()
+    expense_view.set_model_class_and_items(Expense, [expense], total_count=1)
+    qapp.processEvents()
+
+    _apply_choice(expense_view, 11)
+    _apply_choice(expense_view, 12)
+
+    expense_filters = expense_view.controller.get_filters()
+    expense_column_filters = expense_filters.get("column_filters", {})
+    assert expense_column_filters.get("amount") == ["432.10"]
+    assert expense_column_filters.get("expense_date") == ["2024-05-11"]
+
+    income_view.deleteLater()
+    expense_view.deleteLater()
+    qapp.processEvents()
 
 def test_choices_filter_widget_uses_controller_values(qapp):
     class DummyController(TableController):
