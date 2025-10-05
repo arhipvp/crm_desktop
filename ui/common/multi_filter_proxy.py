@@ -15,6 +15,8 @@ from PySide6.QtCore import (
     QSortFilterProxyModel,
 )
 
+from utils.filter_constants import CHOICE_NULL_TOKEN
+
 
 @dataclass(eq=True)
 class ColumnFilterState:
@@ -99,12 +101,17 @@ class ColumnFilterState:
         if self.type == "choices":
             raw_values = self._choices_values(raw=True)
             collected: list[str] = []
+            includes_null = False
             for item in raw_values:
-                text = self._choice_backend_text(item)
+                text, is_null = self._choice_backend_text(item)
                 if text:
                     collected.append(text)
+                if is_null:
+                    includes_null = True
             if not collected:
                 return None
+            if includes_null:
+                self._ensure_null_token()
             is_multi = isinstance(self.value, (list, tuple, set, frozenset))
             if not is_multi:
                 return collected[0]
@@ -121,7 +128,13 @@ class ColumnFilterState:
                 data["value"] = None
             else:
                 values = []
+                null_token = self._get_null_token()
                 for item in self._choices_values(raw=True):
+                    if self._is_null_choice_item(item, null_token):
+                        token = null_token or self._ensure_null_token()
+                        null_token = token
+                        values.append(token)
+                        continue
                     if isinstance(item, Mapping):
                         raw_text = self._stringify_choice_part(item.get("value"))
                         if raw_text is None:
@@ -157,10 +170,14 @@ class ColumnFilterState:
         value = data.get("value")
         if type_ == "choices":
             value = cls._restore_choices_value(value, value_container)
-        display = data.get("display")
         meta = data.get("meta")
-        if meta is not None and not isinstance(meta, dict):
+        if isinstance(meta, Mapping):
+            meta = dict(meta)
+        else:
             meta = None
+        if type_ == "choices":
+            meta = cls._ensure_null_token_in_meta(value, meta)
+        display = data.get("display")
         return cls(str(type_), value, display if isinstance(display, str) else None, meta)
 
     @staticmethod
@@ -252,13 +269,83 @@ class ColumnFilterState:
             text = str(raw).strip()
         return text or None
 
-    def _choice_backend_text(self, item: Any) -> Optional[str]:
+    def _choice_backend_text(self, item: Any) -> tuple[Optional[str], bool]:
+        existing_token = self._get_null_token()
+        default_token = existing_token or CHOICE_NULL_TOKEN
         if isinstance(item, Mapping):
+            if "value" in item and item.get("value") is None:
+                return default_token, True
             value_text = self._stringify_choice_part(item.get("value"))
             if value_text is not None:
-                return value_text
-            return self._stringify_choice_part(item.get("display"))
-        return self._stringify_choice_part(item)
+                return value_text, False
+            display_text = self._stringify_choice_part(item.get("display"))
+            return display_text, False
+        if item is None:
+            return default_token, True
+        if isinstance(item, str):
+            text = item.strip()
+            if not text:
+                return None, False
+            if existing_token and text == existing_token:
+                return existing_token, True
+            if not existing_token and text == CHOICE_NULL_TOKEN:
+                return CHOICE_NULL_TOKEN, True
+            return text, False
+        text = str(item).strip()
+        if not text:
+            return None, False
+        if existing_token and text == existing_token:
+            return existing_token, True
+        if not existing_token and text == CHOICE_NULL_TOKEN:
+            return CHOICE_NULL_TOKEN, True
+        return text, False
+
+    def _get_null_token(self) -> Optional[str]:
+        if isinstance(self.meta, Mapping):
+            token = self.meta.get("choices_null_token")
+            if isinstance(token, str) and token:
+                return token
+        return None
+
+    def _ensure_null_token(self) -> str:
+        token = self._get_null_token()
+        if token:
+            return token
+        meta: dict[str, Any]
+        if isinstance(self.meta, Mapping):
+            meta = dict(self.meta)
+        else:
+            meta = {}
+        meta["choices_null_token"] = CHOICE_NULL_TOKEN
+        self.meta = meta
+        return CHOICE_NULL_TOKEN
+
+    @staticmethod
+    def _is_null_choice_item(item: Any, null_token: Optional[str]) -> bool:
+        if isinstance(item, Mapping):
+            if "value" in item and item.get("value") is None:
+                return True
+        if item is None:
+            return True
+        if isinstance(item, str) and null_token and item.strip() == null_token:
+            return True
+        if isinstance(item, str) and not null_token and item.strip() == CHOICE_NULL_TOKEN:
+            return True
+        return False
+
+    @staticmethod
+    def _ensure_null_token_in_meta(value: Any, meta: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+        if meta is not None:
+            token = meta.get("choices_null_token")
+            if isinstance(token, str) and token:
+                return meta
+        values = ColumnFilterState._flatten_choices(value)
+        for item in values:
+            if ColumnFilterState._is_null_choice_item(item, None):
+                normalized_meta = dict(meta or {})
+                normalized_meta["choices_null_token"] = CHOICE_NULL_TOKEN
+                return normalized_meta
+        return meta
 
 
 _IDENTIFIER_KEYS: Tuple[str, ...] = ("id", "pk", "value", "key", "code", "uuid")

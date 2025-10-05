@@ -7,27 +7,39 @@ from typing import Any, Iterable, Iterator
 from peewee import Field, Model, ModelSelect, Node, fn
 from playhouse.shortcuts import Cast
 
+from utils.filter_constants import CHOICE_NULL_TOKEN
 
-def _normalize_filter_values(value: Any) -> list[str]:
+
+def _normalize_filter_values(value: Any) -> tuple[list[str], bool]:
+    values: list[str] = []
+    includes_null = False
+
+    def _append(text: str) -> None:
+        nonlocal includes_null
+        if not text:
+            return
+        if text == CHOICE_NULL_TOKEN:
+            includes_null = True
+        else:
+            values.append(text)
+
     if value is None:
-        return []
+        return values, includes_null
     if isinstance(value, str):
-        text = value.strip()
-        return [text] if text else []
+        _append(value.strip())
+        return values, includes_null
     if isinstance(value, IterableABC):
-        result: list[str] = []
         for item in value:
             if item is None:
+                includes_null = True
                 continue
             if isinstance(item, str):
-                text = item.strip()
+                _append(item.strip())
             else:
-                text = str(item).strip()
-            if text:
-                result.append(text)
-        return result
-    text = str(value).strip()
-    return [text] if text else []
+                _append(str(item).strip())
+        return values, includes_null
+    _append(str(value).strip())
+    return values, includes_null
 
 
 def _apply_contains_filters(
@@ -35,13 +47,16 @@ def _apply_contains_filters(
 ) -> ModelSelect:
     """Internal helper to apply ``contains`` filters to a query."""
     for field, value in items:
-        values = _normalize_filter_values(value)
-        if not values:
+        values, include_null = _normalize_filter_values(value)
+        if not values and not include_null:
             continue
         condition: Node | None = None
         for candidate in values:
             expr = Cast(field, "TEXT").contains(candidate)
             condition = expr if condition is None else (condition | expr)
+        if include_null:
+            null_expr = field.is_null(True)
+            condition = null_expr if condition is None else (condition | null_expr)
         if condition is not None:
             query = query.where(condition)
     return query

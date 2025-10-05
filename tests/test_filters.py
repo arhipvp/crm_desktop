@@ -14,6 +14,7 @@ from ui import settings as ui_settings
 from ui.base.base_table_view import BaseTableView
 from ui.base.table_controller import TableController
 from ui.common.multi_filter_proxy import ColumnFilterState
+from utils.filter_constants import CHOICE_NULL_TOKEN
 from ui.views.payment_table_view import PaymentTableView
 from ui.views.deal_table_view import DealTableView
 from ui.views import payment_table_view as payment_table_view_module
@@ -121,10 +122,13 @@ def test_choices_filter_adds_multi_value_state(
 def test_choice_filter_without_value_serialization_and_controller():
     state = ColumnFilterState("choices", [{"value": None, "display": "Имя"}])
 
-    assert state.backend_value() == ["Имя"]
+    assert state.backend_value() == [CHOICE_NULL_TOKEN]
+    assert isinstance(state.meta, dict)
+    assert state.meta.get("choices_null_token") == CHOICE_NULL_TOKEN
 
     serialized = state.to_dict()
-    assert serialized["value"] == ["Имя"]
+    assert serialized["value"] == [CHOICE_NULL_TOKEN]
+    assert serialized.get("meta", {}).get("choices_null_token") == CHOICE_NULL_TOKEN
 
     class DummyHeader:
         def visualIndex(self, logical: int) -> int:
@@ -166,7 +170,7 @@ def test_choice_filter_without_value_serialization_and_controller():
     view = DummyView(state)
     filters = view.get_filters()
 
-    assert filters["column_filters"] == {"executor": ["Имя"]}
+    assert filters["column_filters"] == {"executor": [CHOICE_NULL_TOKEN]}
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
@@ -633,7 +637,26 @@ def test_column_filter_state_backend_value_for_choices_multiple():
             None,
         ],
     )
-    assert state.backend_value() == ["one", "Two", "3"]
+    assert state.backend_value() == ["one", "Two", "3", CHOICE_NULL_TOKEN]
+
+
+def test_choice_filter_serialization_preserves_null_token_without_backend_call():
+    state = ColumnFilterState(
+        "choices",
+        [{"value": None, "display": "—"}],
+        meta={"choices_display": ["—"]},
+    )
+
+    serialized = state.to_dict()
+    assert serialized["value"] == [CHOICE_NULL_TOKEN]
+    assert serialized.get("meta", {}).get("choices_null_token") == CHOICE_NULL_TOKEN
+
+    restored = ColumnFilterState.from_dict(serialized)
+    assert restored is not None
+    assert restored.value == [CHOICE_NULL_TOKEN]
+    assert isinstance(restored.meta, dict)
+    assert restored.meta.get("choices_null_token") == CHOICE_NULL_TOKEN
+    assert restored.backend_value() == [CHOICE_NULL_TOKEN]
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
