@@ -47,3 +47,32 @@ def test_deal_app_service_column_filters_multiple_values(in_memory_db):
 
     results = list(query)
     assert {deal.id for deal in results} == {deal_new.id, deal_closed.id}
+
+
+def test_deal_app_service_distinct_closed_reason_includes_null(in_memory_db):
+    client = Client.create(name="Null reason")
+    with_reason = Deal.create(
+        client=client,
+        description="С причиной",
+        start_date=date.today(),
+        closed_reason="Отказ",
+    )
+    without_reason = Deal.create(
+        client=client,
+        description="Без причины",
+        start_date=date.today(),
+        closed_reason=None,
+    )
+
+    service = DealAppService()
+    values = service.get_distinct_values("closed_reason")
+
+    assert values, "Должны вернуться варианты фильтра"
+    assert values[0]["value"] is None
+    assert values[0]["display"] == "—"
+    assert any(item["value"] == with_reason.closed_reason for item in values)
+
+    without_reason.delete_instance()
+
+    no_null_values = service.get_distinct_values("closed_reason")
+    assert all(item["value"] is not None for item in no_null_values)

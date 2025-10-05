@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Iterable as IterableABC
 from typing import Mapping, MutableMapping, Sequence
 
+from peewee import JOIN
+
 from database.models import Client, Deal, DealExecutor, Executor
 from services.deal_service import (
     build_deal_query,
@@ -116,7 +118,20 @@ class DealAppService:
                 {"value": executor.full_name, "display": executor.full_name}
                 for executor in executor_query
             ]
-            values.insert(0, {"value": None, "display": "—"})
+            null_executor_exists = (
+                query.select(Deal.id)
+                .switch(Deal)
+                .join(DealExecutor, JOIN.LEFT_OUTER)
+                .join(Executor, JOIN.LEFT_OUTER)
+                .where(
+                    (DealExecutor.id.is_null(True))
+                    | (Executor.full_name.is_null(True))
+                )
+                .limit(1)
+                .exists()
+            )
+            if null_executor_exists:
+                values.insert(0, {"value": None, "display": "—"})
             return values
 
         if column_key == "status":
@@ -127,10 +142,18 @@ class DealAppService:
                 .distinct()
                 .order_by(Deal.status.asc())
             )
-            return [
+            values = [
                 {"value": row.status, "display": row.status}
                 for row in rows
             ]
+            if (
+                query.select(Deal.status)
+                .where(Deal.status.is_null(True))
+                .limit(1)
+                .exists()
+            ):
+                values.insert(0, {"value": None, "display": "—"})
+            return values
 
         if column_key == "client":
             rows = (
@@ -141,10 +164,18 @@ class DealAppService:
                 .distinct()
                 .order_by(Client.name.asc())
             )
-            return [
+            values = [
                 {"value": row.name, "display": row.name}
                 for row in rows
             ]
+            if (
+                query.select(Client.name)
+                .where(Client.name.is_null(True))
+                .limit(1)
+                .exists()
+            ):
+                values.insert(0, {"value": None, "display": "—"})
+            return values
 
         if column_key == "closed_reason":
             rows = (
@@ -154,10 +185,18 @@ class DealAppService:
                 .distinct()
                 .order_by(Deal.closed_reason.asc())
             )
-            return [
+            values = [
                 {"value": row.closed_reason, "display": row.closed_reason}
                 for row in rows
             ]
+            if (
+                query.select(Deal.closed_reason)
+                .where(Deal.closed_reason.is_null(True))
+                .limit(1)
+                .exists()
+            ):
+                values.insert(0, {"value": None, "display": "—"})
+            return values
 
         return []
 

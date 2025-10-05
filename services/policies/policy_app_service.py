@@ -129,7 +129,6 @@ class PolicyAppService:
         filters = dict(filters or {})
         raw_column_filters = filters.pop("column_filters", None)
         prepared_filters = self._prepare_column_filters(raw_column_filters)
-        filters["column_filters"] = prepared_filters
 
         if isinstance(column_field, Field):
             target_field = column_field
@@ -153,10 +152,20 @@ class PolicyAppService:
             .order_by(target_field.asc())
         )
 
-        return [
+        values = [
             {"value": value, "display": value}
             for (value,) in values_query.tuples()
         ]
+
+        if (
+            query.select(target_field)
+            .where(target_field.is_null(True))
+            .limit(1)
+            .exists()
+        ):
+            values.insert(0, {"value": None, "display": "—"})
+
+        return values
 
     def mark_deleted(
         self, policy_ids: Sequence[int], *, gateway: DriveGateway | None = None
