@@ -6,7 +6,7 @@ import logging
 import pytest
 
 from database.models import Expense, Income
-from services.expense_service import build_expense_query, update_expense
+from services.expense_service import INCOME_TOTAL, build_expense_query, update_expense
 
 
 def test_other_expense_total_excludes_current(in_memory_db, make_policy_with_payment):
@@ -121,4 +121,44 @@ def test_update_expense_allows_clearing_nullable_fields(
     log_messages = [record.getMessage() for record in caplog.records]
     assert any("'expense_date': None" in message for message in log_messages)
     assert any("'note': None" in message for message in log_messages)
+
+
+def test_income_total_filter_accepts_multiple_values(
+    in_memory_db, make_policy_with_payment
+):
+    """Фильтр по ``income_total`` строит OR-условие для нескольких значений."""
+
+    _, _, policy1, payment1 = make_policy_with_payment()
+    Income.create(payment=payment1, amount=123)
+    expense1 = Expense.create(
+        payment=payment1, policy=policy1, amount=10, expense_type="первый"
+    )
+
+    _, _, policy2, payment2 = make_policy_with_payment(
+        client_kwargs={"name": "C2"},
+        deal_kwargs={"description": "D2"},
+        policy_kwargs={"policy_number": "P2"},
+    )
+    Income.create(payment=payment2, amount=456)
+    expense2 = Expense.create(
+        payment=payment2, policy=policy2, amount=15, expense_type="второй"
+    )
+
+    query = build_expense_query(
+        column_filters={INCOME_TOTAL: ["123", "456"]},
+        order_by="id",
+        order_dir="asc",
+    )
+
+    sql, params = query.sql()
+    upper_sql = sql.upper()
+    assert "HAVING" in upper_sql
+    having_part = upper_sql.split("HAVING", 1)[1]
+    assert having_part.count("LIKE ?") == 2
+    assert " OR " in having_part
+    assert params.count("%123%") == 1
+    assert params.count("%456%") == 1
+
+    results = list(query)
+    assert {row.id for row in results} == {expense1.id, expense2.id}
 
