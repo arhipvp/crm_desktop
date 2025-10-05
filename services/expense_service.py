@@ -5,11 +5,16 @@ from decimal import Decimal
 from typing import Any
 
 from peewee import Alias, Field, JOIN, fn
+from playhouse.shortcuts import Cast
 
 from database.db import db
 from database.models import Client, Deal, Expense, Income, Payment, Policy
 from services.payment_service import get_payment_by_id
-from services.query_utils import apply_search_and_filters, sum_column
+from services.query_utils import (
+    _normalize_filter_values,
+    apply_search_and_filters,
+    sum_column,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -336,14 +341,24 @@ def apply_expense_filters(
         if date_to:
             query = query.where(Expense.expense_date <= date_to)
 
-    if income_total_filter:
-        query = query.having(INCOME_TOTAL.cast("TEXT").contains(income_total_filter))
-    if other_expense_total_filter:
-        query = query.having(
-            OTHER_EXPENSE_TOTAL.cast("TEXT").contains(other_expense_total_filter)
-        )
-    if net_income_filter:
-        query = query.having(NET_INCOME.cast("TEXT").contains(net_income_filter))
+    def _build_having_condition(expr, value):
+        values = _normalize_filter_values(value)
+        if not values:
+            return None
+        condition = None
+        for item in values:
+            candidate = Cast(expr, "TEXT").contains(item)
+            condition = candidate if condition is None else (condition | candidate)
+        return condition
+
+    for expression, filter_value in (
+        (INCOME_TOTAL, income_total_filter),
+        (OTHER_EXPENSE_TOTAL, other_expense_total_filter),
+        (NET_INCOME, net_income_filter),
+    ):
+        having_condition = _build_having_condition(expression, filter_value)
+        if having_condition is not None:
+            query = query.having(having_condition)
 
     return query
 
