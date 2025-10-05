@@ -1,5 +1,9 @@
 from datetime import date
 
+from datetime import date
+from typing import Any
+
+from peewee import Field
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QAbstractItemView, QMenu
@@ -23,6 +27,9 @@ from ui.views.payment_detail_view import PaymentDetailView
 
 
 class PaymentTableController(TableController):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
     def set_model_class_and_items(self, model_class, items, total_count=None):
         total_sum = sum(p.amount for p in items)
         overdue_sum = sum(
@@ -39,6 +46,66 @@ class PaymentTableController(TableController):
         self.view.paginator.set_summary(
             f"Сумма: {total_sum} ₽ (просрочено: {overdue_sum} ₽)"
         )
+
+    def get_distinct_values(
+        self, column_key: str, *, column_field: Any | None = None
+    ) -> list[dict[str, Any]]:
+        filters = self.get_filters()
+        column_filters = dict(filters.get("column_filters") or {})
+        removed = False
+        if column_field is not None and column_field in column_filters:
+            column_filters.pop(column_field, None)
+            removed = True
+        if not removed:
+            column_filters.pop(column_key, None)
+        filters["column_filters"] = column_filters
+
+        search_text = str(filters.get("search_text") or "")
+        show_deleted = bool(filters.get("show_deleted"))
+        include_paid = bool(filters.get("include_paid", True))
+        deal_id = filters.get("deal_id")
+        payment_date_range = filters.get("payment_date_range")
+
+        query = build_payment_query(
+            search_text=search_text,
+            show_deleted=show_deleted,
+            deal_id=deal_id,
+            include_paid=include_paid,
+            column_filters=column_filters,
+        )
+
+        if payment_date_range:
+            date_from, date_to = payment_date_range
+            if date_from:
+                query = query.where(Payment.payment_date >= date_from)
+            if date_to:
+                query = query.where(Payment.payment_date <= date_to)
+
+        if isinstance(column_field, Field):
+            target_field = column_field
+        else:
+            field_map: dict[str, Field] = {
+                "policy_number": Policy.policy_number,
+                "amount": Payment.amount,
+                "payment_date": Payment.payment_date,
+                "actual_payment_date": Payment.actual_payment_date,
+            }
+            target_field = field_map.get(column_key)
+
+        if target_field is None:
+            return []
+
+        values_query = (
+            query.select(target_field)
+            .where(target_field.is_null(False))
+            .distinct()
+            .order_by(target_field.asc())
+        )
+
+        return [
+            {"value": value, "display": value}
+            for (value,) in values_query.tuples()
+        ]
 
 
 class PaymentTableView(BaseTableView):

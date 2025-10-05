@@ -245,11 +245,43 @@ class TableController:
         return filters
 
     # --- Значения --------------------------------------------------------
-    def get_distinct_values(self, column_key: str) -> list[Any] | None:
+    def get_distinct_values(
+        self, column_key: str, *, column_field: Any | None = None
+    ) -> list[Any] | None:
         """Возвращает список уникальных значений для столбца.
 
         Базовая реализация не имеет доступа к данным и возвращает ``None``.
         Потомки могут переопределить метод для работы с сервисами/репозиториями.
         """
 
+        provider = getattr(self, "service", None)
+        if not provider or not hasattr(provider, "get_distinct_values"):
+            return None
+
+        filters = dict(self.get_filters())
+        column_filters = dict(filters.get("column_filters") or {})
+        removed = False
+        if column_field is not None and column_field in column_filters:
+            column_filters.pop(column_field, None)
+            removed = True
+        if not removed and column_key in column_filters:
+            column_filters.pop(column_key, None)
+        filters["column_filters"] = column_filters
+
+        try:
+            return provider.get_distinct_values(
+                column_key, column_field=column_field, filters=filters
+            )
+        except TypeError:
+            try:
+                return provider.get_distinct_values(column_key, filters=filters)
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "Ошибка провайдера distinct для столбца %s", column_key
+                )
+                return None
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Ошибка провайдера distinct для столбца %s", column_key
+            )
         return None

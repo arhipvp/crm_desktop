@@ -1117,8 +1117,11 @@ class BaseTableView(QWidget):
         column_key = self._resolve_column_key(column)
         if not column_key:
             return None
+        column_field = getattr(self, "COLUMN_FIELD_MAP", {}).get(column)
         try:
-            values = controller.get_distinct_values(column_key)
+            values = controller.get_distinct_values(
+                column_key, column_field=column_field
+            )
         except Exception:  # noqa: BLE001 - не блокируем меню при ошибке контроллера
             logger.exception(
                 "Не удалось получить уникальные значения для столбца %s", column_key
@@ -1171,18 +1174,28 @@ class BaseTableView(QWidget):
             }
             choices.append((label, payload))
 
-    def _get_distinct_choices(
-        self, column: int
-    ) -> tuple[list[tuple[str, dict[str, Any]]], set[tuple[Any, str]]]:
+    def _fetch_distinct_choices(self, column: int) -> list[Any]:
+        controller_values = self._get_controller_distinct_values(column)
+        if controller_values is not None:
+            return controller_values
+
+        choices: list[tuple[str, dict[str, Any]]] = []
+        seen_keys: set[tuple[Any, str]] = set()
+        self._collect_model_choices(column, choices, seen_keys)
+        return [payload for _label, payload in choices]
+
+    def _create_choices_filter_widget(
+        self,
+        menu: QMenu,
+        column: int,
+        state: Optional[ColumnFilterState],
+    ) -> Callable[[], None]:
+        raw_items = self._fetch_distinct_choices(column)
+
         choices: list[tuple[str, dict[str, Any]]] = []
         seen_keys: set[tuple[Any, str]] = set()
 
-        controller_values = self._get_controller_distinct_values(column)
-        if controller_values is None:
-            self._collect_model_choices(column, choices, seen_keys)
-            return choices, seen_keys
-
-        for item in controller_values:
+        for item in raw_items:
             if isinstance(item, Mapping):
                 raw_value = item.get("value", item)
                 display_hint = item.get("display", raw_value)
@@ -1200,16 +1213,6 @@ class BaseTableView(QWidget):
             payload["value"] = storage_value
             payload["display"] = payload.get("display", label)
             choices.append((label, payload))
-
-        return choices, seen_keys
-
-    def _create_choices_filter_widget(
-        self,
-        menu: QMenu,
-        column: int,
-        state: Optional[ColumnFilterState],
-    ) -> Callable[[], None]:
-        choices, seen_keys = self._get_distinct_choices(column)
 
         if isinstance(state, ColumnFilterState) and state.type == "choices":
             for item in state._choices_values(raw=True):

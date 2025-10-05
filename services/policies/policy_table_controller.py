@@ -52,5 +52,24 @@ class PolicyTableController(TableController):
             return factory(items, model_class)
         return super()._create_table_model(items, model_class)
 
+    def get_distinct_values(
+        self, column_key: str, *, column_field: Any | None = None
+    ) -> list[dict[str, Any]] | None:
+        filters = self.get_filters()
+        column_filters = dict(filters.get("column_filters") or {})
+        removed = False
+        if column_field is not None and column_field in column_filters:
+            column_filters.pop(column_field, None)
+            removed = True
+        if not removed:
+            column_filters.pop(column_key, None)
+        filters["column_filters"] = column_filters
+        try:
+            return self.service.get_distinct_values(
+                column_key, column_field=column_field, filters=filters
+            )
+        except TypeError:
+            return self.service.get_distinct_values(column_key, filters=filters)
+
 
 __all__ = ["PolicyTableController"]
