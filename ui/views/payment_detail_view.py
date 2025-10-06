@@ -93,6 +93,12 @@ class PaymentDetailView(QDialog):
         self._lbl_incomes: QLabel | None = None
         self._lbl_expenses: QLabel | None = None
 
+        # кешированные данные
+        self._incomes: list[Income] = []
+        self._expenses: list[Expense] = []
+
+        self._reload_related_data()
+
         # ───── KPI панель ─────
         self._init_kpi_panel()
 
@@ -109,8 +115,8 @@ class PaymentDetailView(QDialog):
     # KPI
     # ------------------------------------------------------------------
     def _init_kpi_panel(self):
-        incomes_cnt = Income.select().where(Income.payment == self.instance).count()
-        expenses_cnt = Expense.select().where(Expense.payment == self.instance).count()
+        incomes_cnt = len(self._incomes)
+        expenses_cnt = len(self._expenses)
 
         while self.kpi_layout.count():
             item = self.kpi_layout.takeAt(0)
@@ -160,8 +166,7 @@ class PaymentDetailView(QDialog):
         btn_inc = styled_button("➕ Доход", tooltip="Добавить доход", shortcut="Ctrl+N")
         btn_inc.clicked.connect(self._on_add_income)
         inc_l.addWidget(btn_inc, alignment=Qt.AlignLeft)
-        incomes = list(Income.select().where(Income.payment == self.instance))
-        inc_l.addWidget(self._make_subtable(incomes, Income, IncomeDetailView))
+        inc_l.addWidget(self._make_subtable(self._incomes, Income, IncomeDetailView))
         self.tabs.addTab(inc_tab, "Доходы")
 
         # 3) Расходы
@@ -172,8 +177,7 @@ class PaymentDetailView(QDialog):
         )
         btn_exp.clicked.connect(self._on_add_expense)
         exp_l.addWidget(btn_exp, alignment=Qt.AlignLeft)
-        expenses = list(Expense.select().where(Expense.payment == self.instance))
-        exp_l.addWidget(self._make_subtable(expenses, Expense, ExpenseDetailView))
+        exp_l.addWidget(self._make_subtable(self._expenses, Expense, ExpenseDetailView))
         self.tabs.addTab(exp_tab, "Расходы")
 
     # ------------------------------------------------------------------
@@ -327,26 +331,32 @@ class PaymentDetailView(QDialog):
     def _on_edit(self):
         form = PaymentForm(self.instance, parent=self)
         if form.exec():
-            self._init_kpi_panel()
-            self._init_tabs()
+            self._refresh_view()
 
     def _on_add_income(self):
         form = IncomeForm(parent=self)
         self._prefill_payment_in_form(form)
         if form.exec():
-            self._init_kpi_panel()
-            self._init_tabs()
+            self._refresh_view()
 
     def _on_add_expense(self):
         form = ExpenseForm(parent=self)
         self._prefill_payment_in_form(form)
         if form.exec():
-            self._init_kpi_panel()
-            self._init_tabs()
+            self._refresh_view()
 
     # ------------------------------------------------------------------
     # Utils
     # ------------------------------------------------------------------
+    def _reload_related_data(self) -> None:
+        self._incomes = list(Income.select().where(Income.payment == self.instance))
+        self._expenses = list(Expense.select().where(Expense.payment == self.instance))
+
+    def _refresh_view(self) -> None:
+        self._reload_related_data()
+        self._init_kpi_panel()
+        self._init_tabs()
+
     def _make_subtable(self, items: list, model_cls, detail_cls):
         table = QTableView()
         model = BaseTableModel(items, model_cls)
