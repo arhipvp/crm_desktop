@@ -3,10 +3,11 @@ from datetime import date
 import pytest
 
 from database.db import db
-from database.models import Client, Deal, Policy
+from database.models import Client, Deal, DealExecutor, Executor, Policy
 from services.deal_service import get_all_deals
 from services.policies.policy_service import get_all_policies
 from services.clients.client_app_service import client_app_service
+from services import executor_service as es
 
 
 @pytest.mark.usefixtures("db_transaction")
@@ -103,3 +104,33 @@ def test_get_merge_candidates_prefetches_counts(monkeypatch):
         (client_two.id, 1, 1),
     }
     assert not executed, "Количество сделок/полисов должно быть предзагружено без дополнительных SQL"
+
+
+@pytest.mark.usefixtures("db_transaction")
+def test_get_executor_for_deal_fetches_executor_once(monkeypatch):
+    client = Client.create(name="Client Exec")
+    deal = Deal.create(client=client, description="Deal", start_date=date.today())
+    executor = Executor.create(full_name="Executor", tg_id=123, is_active=True)
+    DealExecutor.create(deal=deal, executor=executor, assigned_date=date.today())
+
+    database = db.obj
+    executed: list[str] = []
+    original_execute_sql = database.execute_sql
+
+    def spy(sql, params=None, *args, **kwargs):
+        executed.append(sql)
+        return original_execute_sql(sql, params, *args, **kwargs)
+
+    monkeypatch.setattr(database, "execute_sql", spy)
+
+    result = es.get_executor_for_deal(deal.id)
+
+    assert result is not None
+    assert result.id == executor.id
+    assert len(executed) == 1
+
+    executed.clear()
+    assert result.full_name == executor.full_name
+    assert (
+        not executed
+    ), "Исполнитель должен быть предзагружен без дополнительных SQL-запросов"
