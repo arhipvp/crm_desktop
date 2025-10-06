@@ -401,6 +401,33 @@ class TaskTableView(BaseTableView):
         total = self._build_task_query(**common_kwargs).count()
 
         items = list(prefetch(items, Deal, Client, Policy, DealExecutor, Executor))
+
+        deals = {
+            task.deal
+            for task in items
+            if getattr(task, "deal", None) is not None
+        }
+        if deals:
+            deal_ids = [deal.id for deal in deals]
+            executors_by_deal: dict[int, list[DealExecutor]] = {
+                deal_id: [] for deal_id in deal_ids
+            }
+            deal_executors = (
+                DealExecutor.select(DealExecutor, Executor)
+                .join(Executor)
+                .where(DealExecutor.deal.in_(deal_ids))
+            )
+            total_assignments = 0
+            for deal_executor in deal_executors:
+                executors_by_deal[deal_executor.deal_id].append(deal_executor)
+                total_assignments += 1
+            for deal in deals:
+                deal.executors = executors_by_deal.get(deal.id, [])
+            logger.debug(
+                "👥 Подгружены исполнители для %d сделок (%d назначений) одним запросом",
+                len(deals),
+                total_assignments,
+            )
         self.model = TaskTableModel(items, Task)
         self.proxy.setSourceModel(self.model)
         self.table.setModel(self.proxy)
