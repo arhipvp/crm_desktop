@@ -70,6 +70,7 @@ from ui.common.date_utils import (
     get_date_or_none,
 )
 from ui.common.multi_filter_proxy import ColumnFilterState, create_choices_matcher
+from utils.filter_constants import CHOICE_NULL_TOKEN
 from ui import settings as ui_settings
 from services.folder_utils import open_folder, copy_text_to_clipboard
 from services.export_service import export_objects_to_csv
@@ -1214,23 +1215,53 @@ class BaseTableView(QWidget):
             payload["display"] = payload.get("display", label)
             choices.append((label, payload))
 
+        state_choice_entries: list[tuple[tuple[Any, str], dict[str, Any]]] = []
+        state_display_labels: list[Any] = []
         if isinstance(state, ColumnFilterState) and state.type == "choices":
-            for item in state._choices_values(raw=True):
-                normalized = self._normalize_choice_storage_value(item)
+            meta = state.meta if isinstance(state.meta, Mapping) else None
+            if meta is not None:
+                display_meta = meta.get("choices_display")
+                if isinstance(display_meta, list):
+                    state_display_labels = list(display_meta)
+
+            def build_state_entry(index: int, item: Any) -> tuple[tuple[Any, str], dict[str, Any]]:
                 if isinstance(item, Mapping):
-                    label_value = item.get("display", item.get("value"))
+                    raw_value = item.get("value", item)
+                    display_hint = item.get("display", raw_value)
                 else:
-                    label_value = item
-                label = self._format_choice_label(None, label_value)
-                key = (normalized, label)
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
+                    raw_value = item
+                    display_hint = item
+                if raw_value == CHOICE_NULL_TOKEN:
+                    raw_value = None
+                normalized = self._normalize_choice_storage_value(raw_value)
+                label: Optional[str] = None
+                if index < len(state_display_labels):
+                    meta_label = state_display_labels[index]
+                    if isinstance(meta_label, str):
+                        if meta_label.strip():
+                            label = meta_label
+                        else:
+                            label = None
+                    elif meta_label is not None:
+                        label = str(meta_label)
+                if not label:
+                    if raw_value is None:
+                        label = "—"
+                    else:
+                        label = self._format_choice_label(None, display_hint)
                 payload = {
                     "value": normalized,
                     "display": label,
                 }
-                choices.append((label, payload))
+                return (normalized, label), payload
+
+            for index, item in enumerate(state._choices_values(raw=True)):
+                key, payload = build_state_entry(index, item)
+                state_choice_entries.append((key, payload))
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                choices.append((payload["display"], payload))
 
         choices.sort(key=lambda item: item[0].casefold())
 
@@ -1262,15 +1293,9 @@ class BaseTableView(QWidget):
         list_layout.setSpacing(4)
 
         selected_keys: set[tuple[Any, str]] = set()
-        if isinstance(state, ColumnFilterState) and state.type == "choices":
-            for item in state._choices_values(raw=True):
-                normalized = self._normalize_choice_storage_value(item)
-                if isinstance(item, Mapping):
-                    label_value = item.get("display", item.get("value"))
-                else:
-                    label_value = item
-                label_text = self._format_choice_label(None, label_value)
-                selected_keys.add((normalized, label_text))
+        if state_choice_entries:
+            for key, _payload in state_choice_entries:
+                selected_keys.add(key)
 
         checkbox_entries: list[tuple[QCheckBox, dict[str, Any]]] = []
         placeholder_label = QLabel("Нет значений", list_widget)
