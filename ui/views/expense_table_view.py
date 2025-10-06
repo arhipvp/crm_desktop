@@ -360,6 +360,8 @@ class ExpenseTableView(BaseTableView):
                 **filters,
             )
         )
+        if not items:
+            logger.info("Расходы не найдены для фильтров: %s", filters)
         logger.debug("Expense result rows=%d", len(items))
         total = expense_service.build_expense_query(
             order_by=self.order_by, order_dir=self.order_dir, **filters

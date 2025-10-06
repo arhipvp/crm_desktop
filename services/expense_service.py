@@ -316,16 +316,6 @@ def get_expenses_page(
     )
     offset = (page - 1) * per_page
     paged_query = query.limit(per_page).offset(offset)
-    filters = {
-        "search_text": search_text,
-        "show_deleted": show_deleted,
-        "deal_id": deal_id,
-        "include_paid": include_paid,
-        "expense_date_range": expense_date_range,
-        "column_filters": column_filters,
-    }
-    if not paged_query.exists():
-        logger.warning("No expenses found for filters=%s", filters)
     return paged_query
 
 
