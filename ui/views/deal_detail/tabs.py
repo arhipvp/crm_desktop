@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QLineEdit,
     QCompleter,
+    QPlainTextEdit,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -152,7 +153,7 @@ class DealTabsMixin:
         journal_panel = CollapsibleWidget("Журнал")
         journal_form = QFormLayout()
 
-        self.calc_append = QTextEdit()
+        self.calc_append = QPlainTextEdit()
         self.calc_append.setPlaceholderText("Новая запись…")
         self.calc_append.setFixedHeight(50)
 
