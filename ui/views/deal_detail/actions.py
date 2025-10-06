@@ -32,7 +32,7 @@ from services.policies import get_policies_by_deal_id
 from services.task_crud import get_incomplete_tasks_by_deal
 from services.task_notifications import mark_done
 from ui import settings as ui_settings
-from ui.common.message_boxes import confirm, show_error
+from ui.common.message_boxes import confirm, show_error, show_info
 from ui.common.styled_widgets import styled_button
 from ui.forms.client_form import ClientForm
 from ui.forms.deal_form import DealForm
