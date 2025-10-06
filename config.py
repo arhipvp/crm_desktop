@@ -23,6 +23,7 @@ class Settings:
     openai_base_url: str | None = None
     openai_model: str = "gpt-4o"
     ai_policy_prompt: str | None = None
+    ai_document_prompt: str | None = None
     drive_root_folder_id: str | None = "1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm"
     drive_service_account_file: str = "credentials.json"
     google_drive_local_root: str = r"G:\\Мой диск\\Клиенты"
@@ -55,6 +56,7 @@ def get_settings() -> Settings:
         openai_base_url=os.getenv("OPENAI_BASE_URL"),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o"),
         ai_policy_prompt=os.getenv("AI_POLICY_PROMPT"),
+        ai_document_prompt=os.getenv("AI_DOCUMENT_PROMPT"),
         drive_root_folder_id=os.getenv("GOOGLE_ROOT_FOLDER_ID")
         or "1-hTRZ7meDTGDQezoY_ydFkmXIng3gXFm",
         drive_service_account_file=os.getenv(

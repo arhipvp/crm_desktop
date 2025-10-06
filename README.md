@@ -33,6 +33,7 @@ LOG_LEVEL=INFO  # уровень логирования (например, DEBUG
 DETAILED_LOGGING=0  # подробный режим логирования (DEBUG + SQL-запросы)
 LOG_DIR=/path/to/logs  # каталог для файлов логов (опционально)
 AI_POLICY_PROMPT=
+AI_DOCUMENT_PROMPT=
 ```
 
 ### Общие переменные
@@ -43,12 +44,13 @@ AI_POLICY_PROMPT=
 
 ### Переменные OpenAI
 
-Эти параметры включают функции `ai_consultant_service` и импорт/обработку полисов.
+Эти параметры включают функции `ai_consultant_service`, `ai_document_service` и импорт/обработку полисов.
 
 - **OPENAI_API_KEY** — ключ API OpenAI или совместимого сервиса.
 - **OPENAI_BASE_URL** — базовый URL API (например, https://api.openai.com/v1).
 - **OPENAI_MODEL** — название модели для запросов (например, gpt-4o).
 - **AI_POLICY_PROMPT** — системный промпт для распознавания полисов; позволяет переопределить стандартные правила.
+- **AI_DOCUMENT_PROMPT** — системный промпт для подготовки заметок по произвольным документам.
 
 ### Переменные Telegram и Google Drive
 
