@@ -84,8 +84,12 @@ def unassign_executor(deal_id: int) -> None:
 
 
 def get_executor_for_deal(deal_id: int) -> Optional[Executor]:
-    de = DealExecutor.get_or_none(DealExecutor.deal_id == deal_id)
-    return de.executor if de else None
+    return (
+        Executor.select()
+        .join(DealExecutor)
+        .where(DealExecutor.deal_id == deal_id)
+        .get_or_none()
+    )
 
 
 def get_deals_for_executor(tg_id: int, *, only_with_tasks: bool = False) -> List[Deal]:
