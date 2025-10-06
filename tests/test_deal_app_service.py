@@ -76,3 +76,44 @@ def test_deal_app_service_distinct_closed_reason_includes_null(in_memory_db):
 
     no_null_values = service.get_distinct_values("closed_reason")
     assert all(item["value"] is not None for item in no_null_values)
+
+
+def test_deal_app_service_description_and_calculation_filters(in_memory_db):
+    client = Client.create(name="Filter client")
+    alpha = Deal.create(
+        client=client,
+        description="Alpha",
+        start_date=date.today(),
+        calculations="Calc-1",
+    )
+    Deal.create(
+        client=client,
+        description="Beta",
+        start_date=date.today(),
+        calculations="Calc-2",
+    )
+    Deal.create(
+        client=client,
+        description="Gamma",
+        start_date=date.today(),
+        calculations=None,
+    )
+
+    service = DealAppService()
+
+    description_values = service.get_distinct_values("description")
+    assert description_values is not None
+    assert {"value": "Alpha", "display": "Alpha"} in description_values
+
+    description_filters = service._convert_column_filters({"description": ["Alpha"]})
+    description_query = service._build_query(column_filters=description_filters)
+    assert {deal.id for deal in description_query} == {alpha.id}
+
+    calculation_values = service.get_distinct_values("calculations")
+    assert calculation_values is not None
+    assert calculation_values[0]["value"] is None
+    assert {"value": "Calc-1", "display": "Calc-1"} in calculation_values
+
+    calculation_filters = service._convert_column_filters({"calculations": ["Calc-1"]})
+    calculation_query = service._build_query(column_filters=calculation_filters)
+    assert {deal.id for deal in calculation_query} == {alpha.id}

@@ -88,7 +88,7 @@ class DealAppService:
         column_key: str,
         *,
         filters: Mapping[str, object] | None = None,
-    ) -> list[dict[str, object]]:
+    ) -> list[dict[str, object]] | None:
         filters = dict(filters or {})
         search_text = str(filters.get("search_text") or "")
         show_deleted = bool(filters.get("show_deleted"))
@@ -198,7 +198,31 @@ class DealAppService:
                 values.insert(0, {"value": None, "display": "—"})
             return values
 
-        return []
+        target_field = self._COLUMN_FILTER_MAP.get(column_key)
+        if target_field is None:
+            return None
+
+        rows = (
+            query.select(target_field)
+            .where(target_field.is_null(False))
+            .distinct()
+            .order_by(target_field.asc())
+        )
+
+        values = [
+            {"value": value, "display": value}
+            for (value,) in rows.tuples()
+        ]
+
+        if (
+            query.select(target_field)
+            .where(target_field.is_null(True))
+            .limit(1)
+            .exists()
+        ):
+            values.insert(0, {"value": None, "display": "—"})
+
+        return values
 
     # ------------------------------------------------------------------
     # Вспомогательные методы
