@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from peewee import JOIN, ModelSelect, fn, Field
+from peewee import JOIN, ModelSelect, fn, Field, Case
 
 from database.db import db
 from database.models import Client, Expense, Income, Payment, Policy
@@ -505,10 +505,34 @@ def get_payments_by_deal_id(deal_id: int) -> ModelSelect:
 
 def get_payment_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых платежей по сделке."""
-    base = Payment.active().join(Policy).where(Policy.deal_id == deal_id)
-    open_count = base.where(Payment.actual_payment_date.is_null(True)).count()
-    closed_count = base.where(Payment.actual_payment_date.is_null(False)).count()
-    return open_count, closed_count
+    query = (
+        Payment.select(
+            fn.SUM(
+                Case(
+                    None,
+                    ((Payment.actual_payment_date.is_null(True), 1),),
+                    0,
+                )
+            ).alias("open_count"),
+            fn.SUM(
+                Case(
+                    None,
+                    ((Payment.actual_payment_date.is_null(False), 1),),
+                    0,
+                )
+            ).alias("closed_count"),
+        )
+        .join(Policy)
+        .where((Policy.deal_id == deal_id) & ACTIVE)
+        .tuples()
+        .first()
+    )
+
+    if not query:
+        return 0, 0
+
+    open_count, closed_count = query
+    return int(open_count or 0), int(closed_count or 0)
 
 
 def get_payment_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:

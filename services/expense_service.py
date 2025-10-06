@@ -4,7 +4,7 @@ import logging
 from decimal import Decimal
 from typing import Any
 
-from peewee import Alias, Field, JOIN, fn
+from peewee import Alias, Field, JOIN, fn, Case
 from playhouse.shortcuts import Cast
 
 from database.db import db
@@ -58,10 +58,35 @@ def get_pending_expenses():
 
 def get_expense_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых расходов по сделке."""
-    base = Expense.active().join(Payment).join(Policy).where(Policy.deal_id == deal_id)
-    open_count = base.where(Expense.expense_date.is_null(True)).count()
-    closed_count = base.where(Expense.expense_date.is_null(False)).count()
-    return open_count, closed_count
+    query = (
+        Expense.select(
+            fn.SUM(
+                Case(
+                    None,
+                    ((Expense.expense_date.is_null(True), 1),),
+                    0,
+                )
+            ).alias("open_count"),
+            fn.SUM(
+                Case(
+                    None,
+                    ((Expense.expense_date.is_null(False), 1),),
+                    0,
+                )
+            ).alias("closed_count"),
+        )
+        .join(Payment)
+        .join(Policy)
+        .where((Policy.deal_id == deal_id) & (Expense.is_deleted == False))
+        .tuples()
+        .first()
+    )
+
+    if not query:
+        return 0, 0
+
+    open_count, closed_count = query
+    return int(open_count or 0), int(closed_count or 0)
 
 
 def get_expense_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:

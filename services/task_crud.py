@@ -2,7 +2,7 @@
 
 import logging
 
-from peewee import JOIN, Field, fn
+from peewee import JOIN, Field, fn, Case
 from playhouse.shortcuts import prefetch
 
 from utils.time_utils import now_str
@@ -75,10 +75,25 @@ def get_pending_tasks():
 
 def get_task_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых задач по сделке."""
-    base = Task.active().where(Task.deal_id == deal_id)
-    open_count = base.where(Task.is_done == False).count()
-    closed_count = base.where(Task.is_done == True).count()
-    return open_count, closed_count
+    query = (
+        Task.select(
+            fn.SUM(
+                Case(None, ((Task.is_done == False, 1),), 0)
+            ).alias("open_count"),
+            fn.SUM(
+                Case(None, ((Task.is_done == True, 1),), 0)
+            ).alias("closed_count"),
+        )
+        .where((Task.deal_id == deal_id) & (Task.is_deleted == False))
+        .tuples()
+        .first()
+    )
+
+    if not query:
+        return 0, 0
+
+    open_count, closed_count = query
+    return int(open_count or 0), int(closed_count or 0)
 
 
 def add_task(**kwargs):

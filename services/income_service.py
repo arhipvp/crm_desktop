@@ -4,7 +4,7 @@ import logging
 from typing import Any
 from decimal import Decimal
 
-from peewee import JOIN, Field
+from peewee import JOIN, Field, fn, Case
 from peewee import SqliteDatabase
 from database.db import db
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
@@ -33,15 +33,35 @@ def get_pending_incomes():
 
 def get_income_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых доходов по сделке."""
-    base = (
-        Income.active()
+    query = (
+        Income.select(
+            fn.SUM(
+                Case(
+                    None,
+                    ((Income.received_date.is_null(True), 1),),
+                    0,
+                )
+            ).alias("open_count"),
+            fn.SUM(
+                Case(
+                    None,
+                    ((Income.received_date.is_null(False), 1),),
+                    0,
+                )
+            ).alias("closed_count"),
+        )
         .join(Payment)
         .join(Policy)
-        .where(Policy.deal_id == deal_id)
+        .where((Policy.deal_id == deal_id) & (Income.is_deleted == False))
+        .tuples()
+        .first()
     )
-    open_count = base.where(Income.received_date.is_null(True)).count()
-    closed_count = base.where(Income.received_date.is_null(False)).count()
-    return open_count, closed_count
+
+    if not query:
+        return 0, 0
+
+    open_count, closed_count = query
+    return int(open_count or 0), int(closed_count or 0)
 
 
 def get_income_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:
