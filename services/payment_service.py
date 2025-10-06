@@ -10,7 +10,10 @@ from peewee import JOIN, ModelSelect, fn, Field
 
 from database.db import db
 from database.models import Client, Expense, Income, Payment, Policy
-from services.query_utils import apply_search_and_filters, sum_column
+from services.query_utils import (
+    apply_search_and_filters,
+    sum_amounts_by_completion,
+)
 
 # Выражение для активных платежей (не удалённых)
 ACTIVE = (Payment.is_deleted == False)
@@ -512,10 +515,10 @@ def get_payment_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:
     """Вернуть суммы ожидаемых и полученных платежей по сделке."""
 
     base = Payment.active().join(Policy).where(Policy.deal_id == deal_id)
-    expected = sum_column(
-        base.where(Payment.actual_payment_date.is_null(True)), Payment.amount
+    return sum_amounts_by_completion(
+        base,
+        Payment.amount,
+        Payment.actual_payment_date,
+        pending_alias="expected_total",
+        completed_alias="received_total",
     )
-    received = sum_column(
-        base.where(Payment.actual_payment_date.is_null(False)), Payment.amount
-    )
-    return expected, received

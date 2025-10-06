@@ -1,12 +1,19 @@
 """Tests for :mod:`services.expense_service`."""
 
 from datetime import date, timedelta
+from decimal import Decimal
 import logging
 
 import pytest
 
+from database.db import db
 from database.models import Expense, Income
-from services.expense_service import INCOME_TOTAL, build_expense_query, update_expense
+from services.expense_service import (
+    INCOME_TOTAL,
+    build_expense_query,
+    update_expense,
+    get_expense_amounts_by_deal_id,
+)
 
 
 def test_other_expense_total_excludes_current(in_memory_db, make_policy_with_payment):
@@ -161,4 +168,65 @@ def test_income_total_filter_accepts_multiple_values(
 
     results = list(query)
     assert {row.id for row in results} == {expense1.id, expense2.id}
+
+
+@pytest.mark.usefixtures("db_transaction")
+def test_get_expense_amounts_by_deal_id_single_query(
+    make_policy_with_payment, monkeypatch
+):
+    """Расходы по сделке суммируются одним SQL-запросом."""
+
+    client, deal, policy1, payment1 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "EXP-1"},
+        payment_kwargs={"amount": 100},
+    )
+    Expense.create(
+        payment=payment1,
+        policy=policy1,
+        amount=40,
+        expense_type="pending-1",
+    )
+    Expense.create(
+        payment=payment1,
+        policy=policy1,
+        amount=60,
+        expense_type="spent-1",
+        expense_date=date(2024, 1, 5),
+    )
+
+    _, _, policy2, payment2 = make_policy_with_payment(
+        client=client,
+        deal=deal,
+        policy_kwargs={"policy_number": "EXP-2"},
+        payment_kwargs={"amount": 200},
+    )
+    Expense.create(
+        payment=payment2,
+        policy=policy2,
+        amount=20,
+        expense_type="pending-2",
+    )
+    Expense.create(
+        payment=payment2,
+        policy=policy2,
+        amount=50,
+        expense_type="spent-2",
+        expense_date=date(2024, 2, 10),
+    )
+
+    database = db.obj
+    executed: list[str] = []
+    original_execute_sql = database.execute_sql
+
+    def spy(sql, params=None, *args, **kwargs):
+        executed.append(sql)
+        return original_execute_sql(sql, params, *args, **kwargs)
+
+    monkeypatch.setattr(database, "execute_sql", spy)
+
+    planned, spent = get_expense_amounts_by_deal_id(deal.id)
+
+    assert planned == Decimal("60")
+    assert spent == Decimal("110")
+    assert len(executed) == 1
 
