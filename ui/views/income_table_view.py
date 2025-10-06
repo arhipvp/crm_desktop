@@ -1,7 +1,7 @@
 import logging
 from datetime import date, datetime
 
-from typing import Any
+from typing import Any, Dict
 
 from peewee import Field, prefetch
 from PySide6.QtCore import Qt, QDate
@@ -335,6 +335,38 @@ class IncomeTableView(BaseTableView):
         items = list(
             prefetch(query, Payment, Policy, Client, Deal, DealExecutor, Executor)
         )
+        deals = set()
+        for income in items:
+            payment = getattr(income, "payment", None)
+            if not payment:
+                continue
+            policy = getattr(payment, "policy", None)
+            if not policy:
+                continue
+            deal = getattr(policy, "deal", None)
+            if deal is not None:
+                deals.add(deal)
+        if deals:
+            deal_ids = [deal.id for deal in deals]
+            executors_by_deal: Dict[int, list[DealExecutor]] = {
+                deal_id: [] for deal_id in deal_ids
+            }
+            deal_executors = (
+                DealExecutor.select(DealExecutor, Executor)
+                .join(Executor)
+                .where(DealExecutor.deal.in_(deal_ids))
+            )
+            total_assignments = 0
+            for deal_executor in deal_executors:
+                executors_by_deal[deal_executor.deal_id].append(deal_executor)
+                total_assignments += 1
+            for deal in deals:
+                deal.executors = executors_by_deal.get(deal.id, [])
+            logger.debug(
+                "👥 Подгружены исполнители для %d сделок (%d назначений) одним запросом",
+                len(deals),
+                total_assignments,
+            )
         logger.debug("Income result rows=%d", len(items))
         total = build_income_query(join_executor=join_executor, **filters).count()
         logger.debug("\U0001F4E6 Загружено доходов: %d", len(items))
