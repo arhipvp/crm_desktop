@@ -229,4 +229,5 @@ def test_get_expense_amounts_by_deal_id_single_query(
     assert planned == Decimal("60")
     assert spent == Decimal("110")
     assert len(executed) == 1
+    assert "CASE" in executed[0].upper()
 

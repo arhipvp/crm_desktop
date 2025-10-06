@@ -98,3 +98,4 @@ def test_get_payment_amounts_by_deal_id_single_query(
     assert expected == Decimal("300")
     assert received == Decimal("150")
     assert len(executed) == 1
+    assert "CASE" in executed[0].upper()
