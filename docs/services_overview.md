@@ -54,6 +54,11 @@
 - Полный текст промпта лежит в [`services/policies/ai_policy_service.py`](../services/policies/ai_policy_service.py) внутри константы `DEFAULT_PROMPT`.
 - Для многострочного собственного промпта при генерации `.env` удобно применять here-doc (`cat <<'EOF' >> .env`), либо хранить текст в отдельном файле и подставлять его при запуске: `AI_POLICY_PROMPT="$(<prompt.txt)"`.
 
+## ai_document_service
+- `summarize_document_files` агрегирует содержимое нескольких файлов (с указанием имени каждого) и передаёт объединённый текст в OpenAI, возвращая заметку и полный лог диалога либо ValueError с расшифровкой при неудаче【F:services/ai_document_service.py†L150-L182】.
+- `summarize_documents_interactive` позволяет дополнительно подключать callbacks прогресса и отмены, ведёт лог беседы через `_log_conversation` и использует общий промпт из `AI_DOCUMENT_PROMPT` либо дефолтное описание задачи【F:services/ai_document_service.py†L94-L149】【F:services/ai_document_service.py†L35-L78】.
+- Переменная окружения `AI_DOCUMENT_PROMPT` настраивает системное сообщение для генерации заметок (см. `Settings.ai_document_prompt`)【F:config.py†L24-L24】【F:config.py†L56-L56】【F:services/ai_document_service.py†L26-L78】.
+
 ## dashboard_service
 - `get_basic_stats` возвращает количество клиентов, сделок, полисов и задач【F:services/dashboard_service.py†L9-L18】.
 - `count_assistant_tasks`, `count_sent_tasks`, `count_working_tasks` и `count_unconfirmed_tasks` дают сводные счётчики задач【F:services/dashboard_service.py†L20-L46】.
