@@ -5,6 +5,7 @@ from datetime import date, timedelta
 
 import pytest
 
+from database.db import db
 from database.models import (
     Client,
     Policy,
@@ -17,6 +18,7 @@ from database.models import (
 from services.income_service import (
     mark_incomes_deleted,
     get_incomes_page,
+    get_income_amounts_by_deal_id,
 )
 from services.query_utils import sum_column
 
@@ -182,5 +184,44 @@ def test_sum_column_ignores_pagination(in_memory_db):
 
     assert isinstance(total, Decimal)
     assert total == Decimal(sum(amounts))
+
+
+@pytest.mark.usefixtures("db_transaction")
+def test_get_income_amounts_by_deal_id_single_query(
+    make_policy_with_payment, monkeypatch
+):
+    """Доходы по сделке считаются одним SQL-запросом."""
+
+    client, deal, policy, payment1 = make_policy_with_payment(
+        payment_kwargs={"amount": 100}
+    )
+    Income.create(payment=payment1, amount=120)
+    Income.create(payment=payment1, amount=70, received_date=date(2024, 1, 1))
+
+    _, _, _, payment2 = make_policy_with_payment(
+        client=client,
+        deal=deal,
+        policy_kwargs={"policy_number": f"{policy.policy_number}-2"},
+        payment_kwargs={"amount": 200},
+    )
+    Income.create(payment=payment2, amount=30)
+    Income.create(payment=payment2, amount=50, received_date=date(2024, 2, 1))
+
+    database = db.obj
+    executed: list[str] = []
+    original_execute_sql = database.execute_sql
+
+    def spy(sql, params=None, *args, **kwargs):
+        executed.append(sql)
+        return original_execute_sql(sql, params, *args, **kwargs)
+
+    monkeypatch.setattr(database, "execute_sql", spy)
+
+    expected, received = get_income_amounts_by_deal_id(deal.id)
+
+    assert expected == Decimal("150")
+    assert received == Decimal("120")
+    assert len(executed) == 1
+    assert "CASE" in executed[0].upper()
 
 

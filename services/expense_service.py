@@ -4,7 +4,7 @@ import logging
 from decimal import Decimal
 from typing import Any
 
-from peewee import Alias, Field, JOIN, fn
+from peewee import Alias, Field, JOIN, fn, Case
 from playhouse.shortcuts import Cast
 
 from database.db import db
@@ -13,7 +13,7 @@ from services.payment_service import get_payment_by_id
 from services.query_utils import (
     _normalize_filter_values,
     apply_search_and_filters,
-    sum_column,
+    sum_amounts_by_completion,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,10 +58,34 @@ def get_pending_expenses():
 
 def get_expense_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых расходов по сделке."""
-    base = Expense.active().join(Payment).join(Policy).where(Policy.deal_id == deal_id)
-    open_count = base.where(Expense.expense_date.is_null(True)).count()
-    closed_count = base.where(Expense.expense_date.is_null(False)).count()
-    return open_count, closed_count
+    open_case = Case(
+        None,
+        ((Expense.expense_date.is_null(True), 1),),
+        0,
+    )
+    closed_case = Case(
+        None,
+        ((Expense.expense_date.is_null(False), 1),),
+        0,
+    )
+
+    query = (
+        Expense.select(
+            fn.COALESCE(fn.SUM(open_case), 0).alias("open_count"),
+            fn.COALESCE(fn.SUM(closed_case), 0).alias("closed_count"),
+        )
+        .join(Payment)
+        .join(Policy)
+        .where((Policy.deal_id == deal_id) & (Expense.is_deleted == False))
+        .tuples()
+        .first()
+    )
+
+    if not query:
+        return 0, 0
+
+    open_count, closed_count = query
+    return int(open_count or 0), int(closed_count or 0)
 
 
 def get_expense_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:
@@ -73,9 +97,13 @@ def get_expense_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:
         .join(Policy)
         .where(Policy.deal_id == deal_id)
     )
-    planned = sum_column(base.where(Expense.expense_date.is_null(True)), Expense.amount)
-    spent = sum_column(base.where(Expense.expense_date.is_null(False)), Expense.amount)
-    return planned, spent
+    return sum_amounts_by_completion(
+        base,
+        Expense.amount,
+        Expense.expense_date,
+        pending_alias="planned_total",
+        completed_alias="spent_total",
+    )
 
 
 def get_expense_count_by_policy(policy_id: int) -> int:

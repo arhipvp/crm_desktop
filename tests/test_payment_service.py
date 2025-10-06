@@ -1,8 +1,10 @@
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
 from services import payment_service
+from database.db import db
 from database.models import Payment
 from utils.filter_constants import CHOICE_NULL_TOKEN
 
@@ -57,36 +59,43 @@ def test_payment_service_filters_null_actual_payment_date(
 
 
 @pytest.mark.usefixtures("db_transaction")
-def test_get_payments_page_filters_by_payment_date_range(
-    make_policy_with_payment,
+def test_get_payment_amounts_by_deal_id_single_query(
+    make_policy_with_payment, monkeypatch
 ):
-    _, _, _, older = make_policy_with_payment(
-        policy_kwargs={"policy_number": "PAY-OLD"},
-        payment_kwargs={"payment_date": date(2024, 1, 10)},
+    """Суммы платежей считаются одним SQL-запросом."""
+
+    client, deal, policy, _open_payment = make_policy_with_payment(
+        payment_kwargs={"amount": 100, "actual_payment_date": None}
     )
-    _, _, _, in_range = make_policy_with_payment(
-        policy_kwargs={"policy_number": "PAY-MID"},
-        payment_kwargs={"payment_date": date(2024, 2, 15)},
+    make_policy_with_payment(
+        client=client,
+        deal=deal,
+        policy_kwargs={"policy_number": f"{policy.policy_number}-2"},
+        payment_kwargs={
+            "amount": 150,
+            "actual_payment_date": date(2024, 1, 15),
+        },
     )
-    _, _, _, newer = make_policy_with_payment(
-        policy_kwargs={"policy_number": "PAY-NEW"},
-        payment_kwargs={"payment_date": date(2024, 3, 20)},
+    make_policy_with_payment(
+        client=client,
+        deal=deal,
+        policy_kwargs={"policy_number": f"{policy.policy_number}-3"},
+        payment_kwargs={"amount": 200, "actual_payment_date": None},
     )
 
-    query = payment_service.get_payments_page(
-        1,
-        20,
-        payment_date_range=(date(2024, 2, 1), date(2024, 2, 29)),
-    )
-    results = {payment.id for payment in query}
-    assert results == {in_range.id}
-    assert older.id not in results
+    database = db.obj
+    executed: list[str] = []
+    original_execute_sql = database.execute_sql
 
-    open_end_query = payment_service.get_payments_page(
-        1,
-        20,
-        payment_date_range=(date(2024, 2, 1), None),
-    )
-    open_end_results = {payment.id for payment in open_end_query}
-    assert open_end_results == {in_range.id, newer.id}
-    assert older.id not in open_end_results
+    def spy(sql, params=None, *args, **kwargs):
+        executed.append(sql)
+        return original_execute_sql(sql, params, *args, **kwargs)
+
+    monkeypatch.setattr(database, "execute_sql", spy)
+
+    expected, received = payment_service.get_payment_amounts_by_deal_id(deal.id)
+
+    assert expected == Decimal("300")
+    assert received == Decimal("150")
+    assert len(executed) == 1
+    assert "CASE" in executed[0].upper()

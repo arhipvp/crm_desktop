@@ -4,11 +4,14 @@ import logging
 from typing import Any
 from decimal import Decimal
 
-from peewee import JOIN, Field
+from peewee import JOIN, Field, fn, Case
 from peewee import SqliteDatabase
 from database.db import db
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
-from services.query_utils import apply_search_and_filters, sum_column
+from services.query_utils import (
+    apply_search_and_filters,
+    sum_amounts_by_completion,
+)
 from services.payment_service import get_payment_by_id
 from services import executor_service as es
 from services.telegram_service import notify_executor
@@ -30,15 +33,34 @@ def get_pending_incomes():
 
 def get_income_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых доходов по сделке."""
-    base = (
-        Income.active()
+    open_case = Case(
+        None,
+        ((Income.received_date.is_null(True), 1),),
+        0,
+    )
+    closed_case = Case(
+        None,
+        ((Income.received_date.is_null(False), 1),),
+        0,
+    )
+
+    query = (
+        Income.select(
+            fn.COALESCE(fn.SUM(open_case), 0).alias("open_count"),
+            fn.COALESCE(fn.SUM(closed_case), 0).alias("closed_count"),
+        )
         .join(Payment)
         .join(Policy)
-        .where(Policy.deal_id == deal_id)
+        .where((Policy.deal_id == deal_id) & (Income.is_deleted == False))
+        .tuples()
+        .first()
     )
-    open_count = base.where(Income.received_date.is_null(True)).count()
-    closed_count = base.where(Income.received_date.is_null(False)).count()
-    return open_count, closed_count
+
+    if not query:
+        return 0, 0
+
+    open_count, closed_count = query
+    return int(open_count or 0), int(closed_count or 0)
 
 
 def get_income_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:
@@ -50,11 +72,13 @@ def get_income_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:
         .join(Policy)
         .where(Policy.deal_id == deal_id)
     )
-    expected = sum_column(base.where(Income.received_date.is_null(True)), Income.amount)
-    received = sum_column(
-        base.where(Income.received_date.is_null(False)), Income.amount
+    return sum_amounts_by_completion(
+        base,
+        Income.amount,
+        Income.received_date,
+        pending_alias="expected_income",
+        completed_alias="received_income",
     )
-    return expected, received
 
 
 def get_income_by_id(income_id: int):

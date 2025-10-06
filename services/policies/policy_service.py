@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Iterable
 
-from peewee import JOIN, Field, fn
+from peewee import JOIN, Field, fn, Case
 
 from core.app_context import get_app_context
 from database.db import db
@@ -97,14 +97,32 @@ def get_policies_by_deal_id(deal_id: int):
 def get_policy_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых полисов по сделке."""
     today = date.today()
-    base = Policy.active().where(Policy.deal_id == deal_id)
-    open_count = base.where(
-        (Policy.end_date.is_null(True)) | (Policy.end_date >= today)
-    ).count()
-    closed_count = base.where(
-        (Policy.end_date.is_null(False)) & (Policy.end_date < today)
-    ).count()
-    return open_count, closed_count
+    open_case = Case(
+        None,
+        (((Policy.end_date.is_null(True)) | (Policy.end_date >= today), 1),),
+        0,
+    )
+    closed_case = Case(
+        None,
+        (((Policy.end_date.is_null(False)) & (Policy.end_date < today), 1),),
+        0,
+    )
+
+    query = (
+        Policy.select(
+            fn.COALESCE(fn.SUM(open_case), 0).alias("open_count"),
+            fn.COALESCE(fn.SUM(closed_case), 0).alias("closed_count"),
+        )
+        .where((Policy.deal_id == deal_id) & (Policy.is_deleted == False))
+        .tuples()
+        .first()
+    )
+
+    if not query:
+        return 0, 0
+
+    open_count, closed_count = query
+    return int(open_count or 0), int(closed_count or 0)
 
 
 def get_policy_by_number(policy_number: str):
