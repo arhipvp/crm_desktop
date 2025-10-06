@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QCompleter,
     QPlainTextEdit,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -70,7 +69,7 @@ class DealTabsMixin:
         self.status_edit.setCompleter(status_completer)
         form.addRow("Статус:", self.status_edit)
 
-        self.desc_edit = QTextEdit()
+        self.desc_edit = QPlainTextEdit()
         self.desc_edit.setMinimumHeight(60)
         self.desc_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.desc_edit.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
