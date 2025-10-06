@@ -30,6 +30,19 @@ class IncomeTableController(TableController):
     def __init__(self, view) -> None:
         super().__init__(view, model_class=Income)
 
+    def get_filters(self) -> dict:
+        filters = super().get_filters()
+        filters["include_received"] = bool(
+            self.view.is_checked("Показывать выплаченные")
+        )
+        deal_id = getattr(self.view, "deal_id", None)
+        if deal_id is not None:
+            filters["deal_id"] = deal_id
+        date_range = filters.pop("received_date", None)
+        if date_range:
+            filters["received_date_range"] = date_range
+        return filters
+
     def get_distinct_values(
         self, column_key: str, *, column_field: Any | None = None
     ) -> list[dict[str, Any]]:
@@ -247,6 +260,7 @@ class IncomeTableView(BaseTableView):
         **kwargs,
     ):
         self._context = context
+        self.deal_id = deal_id
         checkbox_map = {
             "Показывать выплаченные": self.load_data,
         }
@@ -261,7 +275,6 @@ class IncomeTableView(BaseTableView):
             controller=controller,
             **kwargs,
         )
-        self.deal_id = deal_id
         self.default_sort_column = 8
         self.default_sort_order = Qt.DescendingOrder
         self.current_sort_column = self.default_sort_column
@@ -288,26 +301,10 @@ class IncomeTableView(BaseTableView):
                 break
         self.load_data()
 
-    def get_filters(self) -> dict:
-        filters = super().get_filters()
-        filters.update(
-            {
-                "include_received": self.is_checked(
-                    "Показывать выплаченные"
-                )
-            }
-        )
-        column_filters = filters.get("column_filters", {})
-        if self.deal_id:
-            filters["deal_id"] = self.deal_id
-        date_range = filters.pop("received_date", None)
-        if date_range:
-            filters["received_date_range"] = date_range
-        logger.debug("\U0001F4C3 column_filters=%s", column_filters)
-        return filters
-
     def load_data(self):
-        filters = self.get_filters()  # используем метод подкласса
+        filters = self.get_filters()
+        column_filters = filters.get("column_filters", {})
+        logger.debug("\U0001F4C3 column_filters=%s", column_filters)
         logger.debug("\U0001F4CA Фильтры доходов: %s", filters)
 
         order_field = self.COLUMN_FIELD_MAP.get(

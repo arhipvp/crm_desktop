@@ -9,7 +9,7 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox, QLabel, QLineEdit, QMenu, QPushButton
 
-from database.models import Client, Deal, Expense, Income, Payment, Policy
+from database.models import Client, Deal, Executor, Expense, Income, Payment, Policy, Task
 from ui import settings as ui_settings
 from ui.base.base_table_view import BaseTableView
 from ui.base.table_controller import TableController
@@ -24,7 +24,9 @@ from services.deals.deal_table_controller import DealTableController
 from ui.views.income_table_view import IncomeTableView
 from services import expense_service
 from ui.views.expense_table_view import ExpenseTableController, ExpenseTableView
+from ui.views.executor_table_view import ExecutorTableView
 from ui.views.client_table_view import ClientTableView
+from ui.views.task_table_view import TaskTableView
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
@@ -604,6 +606,276 @@ def test_finance_tables_filters_use_raw_values(
 
     income_view.deleteLater()
     expense_view.deleteLater()
+    qapp.processEvents()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_income_distinct_values_respect_toggle_and_deal(
+    qapp,
+    in_memory_db,
+    make_policy_with_payment,
+    monkeypatch,
+):
+    ui_settings._CACHE = None
+
+    _, deal_one, policy_one, payment_one = make_policy_with_payment(
+        deal_kwargs={"description": "Deal One"},
+        policy_kwargs={"policy_number": "INC-D1"},
+    )
+    _, deal_two, policy_two, payment_two = make_policy_with_payment(
+        deal_kwargs={"description": "Deal Two"},
+        policy_kwargs={"policy_number": "INC-D2"},
+    )
+
+    Income.create(
+        payment=payment_one,
+        amount=Decimal("100.00"),
+        received_date=None,
+    )
+    received_income = Income.create(
+        payment=payment_one,
+        amount=Decimal("200.00"),
+        received_date=date(2024, 5, 1),
+    )
+    Income.create(
+        payment=payment_two,
+        amount=Decimal("300.00"),
+        received_date=date(2024, 6, 1),
+    )
+
+    monkeypatch.setattr(IncomeTableView, "load_data", lambda self: None)
+    view = IncomeTableView(deal_id=deal_one.id)
+    qapp.processEvents()
+
+    filters_default = view.controller.get_filters()
+    assert filters_default["deal_id"] == deal_one.id
+    assert filters_default["include_received"] is False
+
+    values_without = view.controller.get_distinct_values(
+        "received_date", column_field=Income.received_date
+    )
+    assert {item["value"] for item in values_without} == {None}
+
+    view.checkboxes["Показывать выплаченные"].setChecked(True)
+    qapp.processEvents()
+
+    filters_with = view.controller.get_filters()
+    assert filters_with["include_received"] is True
+    assert filters_with["deal_id"] == deal_one.id
+
+    values_with = view.controller.get_distinct_values(
+        "received_date", column_field=Income.received_date
+    )
+    assert received_income.received_date in {item["value"] for item in values_with}
+    assert None in {item["value"] for item in values_with}
+
+    policy_values = view.controller.get_distinct_values(
+        "policy_number", column_field=Policy.policy_number
+    )
+    labels = {item["display"] for item in policy_values}
+    assert policy_one.policy_number in labels
+    assert policy_two.policy_number not in labels
+
+    view.deleteLater()
+    qapp.processEvents()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_expense_distinct_values_respect_toggle_and_deal(
+    qapp,
+    in_memory_db,
+    make_policy_with_payment,
+    monkeypatch,
+):
+    ui_settings._CACHE = None
+
+    _, deal_one, policy_one, payment_one = make_policy_with_payment(
+        deal_kwargs={"description": "Deal One"},
+        policy_kwargs={"policy_number": "EXP-D1"},
+    )
+    _, deal_two, policy_two, payment_two = make_policy_with_payment(
+        deal_kwargs={"description": "Deal Two"},
+        policy_kwargs={"policy_number": "EXP-D2"},
+    )
+
+    Expense.create(
+        payment=payment_one,
+        amount=Decimal("50.00"),
+        expense_type="Комиссия",
+        expense_date=None,
+        policy=policy_one,
+    )
+    paid_expense = Expense.create(
+        payment=payment_one,
+        amount=Decimal("60.00"),
+        expense_type="Комиссия",
+        expense_date=date(2024, 5, 2),
+        policy=policy_one,
+    )
+    Expense.create(
+        payment=payment_two,
+        amount=Decimal("70.00"),
+        expense_type="Комиссия",
+        expense_date=date(2024, 6, 3),
+        policy=policy_two,
+    )
+
+    monkeypatch.setattr(ExpenseTableView, "load_data", lambda self: None)
+    view = ExpenseTableView(deal_id=deal_one.id)
+    qapp.processEvents()
+
+    filters_default = view.controller.get_filters()
+    assert filters_default["deal_id"] == deal_one.id
+    assert filters_default["include_paid"] is False
+
+    values_without = view.controller.get_distinct_values(
+        "expense_date", column_field=Expense.expense_date
+    )
+    assert {item["value"] for item in values_without} == {None}
+
+    view.checkboxes["Показывать выплаченные"].setChecked(True)
+    qapp.processEvents()
+
+    filters_with = view.controller.get_filters()
+    assert filters_with["include_paid"] is True
+    assert filters_with["deal_id"] == deal_one.id
+
+    values_with = view.controller.get_distinct_values(
+        "expense_date", column_field=Expense.expense_date
+    )
+    assert paid_expense.expense_date in {item["value"] for item in values_with}
+    assert None in {item["value"] for item in values_with}
+
+    policy_values = view.controller.get_distinct_values(
+        "policy_number", column_field=Policy.policy_number
+    )
+    labels = {item["display"] for item in policy_values}
+    assert policy_one.policy_number in labels
+    assert policy_two.policy_number not in labels
+
+    view.deleteLater()
+    qapp.processEvents()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_task_controller_filters_include_toggles_and_deal(
+    qapp,
+    in_memory_db,
+    monkeypatch,
+):
+    ui_settings._CACHE = None
+
+    client = Client.create(name="Task Client")
+    deal_one = Deal.create(
+        client=client,
+        description="Deal Tasks 1",
+        start_date=date(2024, 5, 1),
+    )
+    deal_two = Deal.create(
+        client=client,
+        description="Deal Tasks 2",
+        start_date=date(2024, 5, 1),
+    )
+
+    Task.create(title="Active", due_date=date(2024, 5, 10), deal=deal_one)
+    Task.create(
+        title="Done",
+        due_date=date(2024, 5, 11),
+        deal=deal_one,
+        is_done=True,
+    )
+    Task.create(
+        title="Deleted",
+        due_date=date(2024, 5, 12),
+        deal=deal_one,
+        is_deleted=True,
+    )
+    Task.create(title="Other", due_date=date(2024, 5, 13), deal=deal_two)
+
+    monkeypatch.setattr(TaskTableView, "load_data", lambda self: None)
+    view = TaskTableView(deal_id=deal_one.id, autoload=False)
+    qapp.processEvents()
+
+    filters_default = view.controller.get_filters()
+    assert filters_default["deal_id"] == deal_one.id
+    assert filters_default["include_done"] is False
+    assert filters_default["include_deleted"] is False
+    assert "show_deleted" not in filters_default
+
+    values_default = view.controller.get_distinct_values(
+        "title", column_field=Task.title
+    )
+    assert {item["value"] for item in values_default} == {"Active"}
+
+    view.checkboxes["Показывать выполненные"].setChecked(True)
+    qapp.processEvents()
+
+    filters_done = view.controller.get_filters()
+    assert filters_done["include_done"] is True
+    assert filters_done["include_deleted"] is False
+
+    values_done = view.controller.get_distinct_values(
+        "title", column_field=Task.title
+    )
+    assert {item["value"] for item in values_done} == {"Active", "Done"}
+
+    view.checkboxes["Показывать удалённые"].setChecked(True)
+    qapp.processEvents()
+
+    filters_all = view.controller.get_filters()
+    assert filters_all["include_deleted"] is True
+    assert filters_all["include_done"] is True
+    assert "show_deleted" not in filters_all
+
+    values_all = view.controller.get_distinct_values(
+        "title", column_field=Task.title
+    )
+    assert {item["value"] for item in values_all} == {"Active", "Done", "Deleted"}
+
+    view.deleteLater()
+    qapp.processEvents()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
+def test_executor_controller_respects_inactive_toggle(
+    qapp,
+    in_memory_db,
+    monkeypatch,
+):
+    ui_settings._CACHE = None
+
+    Executor.create(full_name="Active", tg_id=101, is_active=True)
+    Executor.create(full_name="Inactive", tg_id=202, is_active=False)
+
+    monkeypatch.setattr(ExecutorTableView, "load_data", lambda self: None)
+    view = ExecutorTableView()
+    qapp.processEvents()
+
+    filters_default = view.controller.get_filters()
+    assert filters_default.get("show_inactive") is False
+    assert "show_deleted" not in filters_default
+
+    values_active = view.controller.get_distinct_values(
+        "full_name", column_field=Executor.full_name
+    )
+    assert {item["display"] for item in values_active} == {"Active"}
+
+    view.checkboxes["Показывать неактивных"].setChecked(True)
+    qapp.processEvents()
+
+    filters_all = view.controller.get_filters()
+    assert filters_all.get("show_inactive") is True
+    assert "show_deleted" not in filters_all
+
+    values_all = view.controller.get_distinct_values(
+        "full_name", column_field=Executor.full_name
+    )
+    assert {item["display"] for item in values_all if item["value"] is not None} == {
+        "Active",
+        "Inactive",
+    }
+
+    view.deleteLater()
     qapp.processEvents()
 
 def test_choices_filter_widget_uses_controller_values(qapp):

@@ -34,6 +34,14 @@ class ExecutorTableController(TableController):
             get_total_func=self._get_total,
         )
 
+    def get_filters(self) -> dict:
+        filters = super().get_filters()
+        filters["show_inactive"] = bool(
+            self.view.is_checked("Показывать неактивных")
+        )
+        filters.pop("show_deleted", None)
+        return filters
+
     def _extract_query_params(self, filters: dict[str, Any]) -> dict[str, Any]:
         column_filters = filters.get("column_filters") or {}
         return {
@@ -164,16 +172,6 @@ class ExecutorTableView(BaseTableView):
             self.on_sort_changed
         )
         self.load_data()
-
-    def get_filters(self) -> dict:
-        filters = super().get_filters()
-        filters.update(
-            {
-                "show_inactive": self.is_checked("Показывать неактивных"),
-            }
-        )
-        filters.pop("show_deleted", None)
-        return filters
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
         self.current_sort_column = column
