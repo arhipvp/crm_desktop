@@ -155,7 +155,20 @@ class DealTabsMixin:
         self.calc_append = QTextEdit()
         self.calc_append.setPlaceholderText("Новая запись…")
         self.calc_append.setFixedHeight(50)
-        journal_form.addRow("Добавить:", self.calc_append)
+
+        calc_append_container = QWidget()
+        calc_append_layout = QVBoxLayout(calc_append_container)
+        calc_append_layout.setContentsMargins(0, 0, 0, 0)
+        calc_append_layout.setSpacing(4)
+        calc_append_layout.addWidget(self.calc_append)
+
+        self.btn_add_note = self._mark_flow_button(
+            styled_button("💾 Добавить заметку")
+        )
+        self.btn_add_note.clicked.connect(self._on_add_note)
+        calc_append_layout.addWidget(self.btn_add_note, alignment=Qt.AlignLeft)
+
+        journal_form.addRow("Добавить:", calc_append_container)
 
         self.notes_board = StickyNotesBoard()
         self.notes_board.archive_requested.connect(self._on_archive_note)

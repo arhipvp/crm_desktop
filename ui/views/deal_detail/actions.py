@@ -14,6 +14,7 @@ from services.clients.client_app_service import (
     ClientNotFoundError,
     client_app_service,
 )
+from services import deal_journal
 from services.container import get_sheets_sync_service
 from services.deal_service import (
     get_deal_by_id,
@@ -337,6 +338,28 @@ class DealActionsMixin:
                 queue_task(task.id)
             self._init_kpi_panel()
             self._init_tabs()
+
+    def _on_add_note(self) -> None:
+        text = self.calc_append.toPlainText().strip()
+        if not text:
+            show_error("Введите текст заметки")
+            return
+
+        button = getattr(self, "btn_add_note", None)
+        if button is not None:
+            button.setEnabled(False)
+
+        try:
+            deal_journal.append_entry(self.instance, text)
+        except Exception as exc:  # noqa: BLE001
+            show_error(str(exc))
+        else:
+            self.notes_board.load_entries(self.instance)
+            self.calc_append.clear()
+            show_info("Заметка добавлена")
+        finally:
+            if button is not None:
+                button.setEnabled(True)
 
     def _open_folder(self):
         path = self.instance.drive_folder_path or self.instance.drive_folder_link
