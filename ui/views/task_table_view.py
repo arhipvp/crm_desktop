@@ -36,6 +36,18 @@ class TaskTableController(TableController):
     def __init__(self, view) -> None:
         super().__init__(view, model_class=Task)
 
+    def get_filters(self) -> dict:
+        filters = super().get_filters()
+        include_deleted = bool(filters.pop("show_deleted", False))
+        filters["include_deleted"] = include_deleted
+        filters["include_done"] = bool(
+            self.view.is_checked("Показывать выполненные")
+        )
+        deal_id = getattr(self.view, "deal_id", None)
+        if deal_id is not None:
+            filters["deal_id"] = deal_id
+        return filters
+
     def get_distinct_values(
         self, column_key: str, *, column_field: Any | None = None
     ) -> list[dict[str, Any]]:
@@ -188,6 +200,7 @@ class TaskTableView(BaseTableView):
             "Показывать выполненные": self.on_filter_changed,
         }
         self._context = context
+        self.deal_id = deal_id
         self._get_tasks_page = get_tasks_page_func or get_tasks_page
         self._build_task_query = build_task_query_func or build_task_query
         self._queue_task = queue_task_func or queue_task
@@ -212,7 +225,6 @@ class TaskTableView(BaseTableView):
         )
         self.sort_field = "due_date"
         self.sort_order = "asc"
-        self.deal_id = deal_id
         self.resizable_columns = resizable_columns
         self.table.setItemDelegate(StatusDelegate(self.table))
         self.table.verticalHeader().setVisible(False)  # убираем нумерацию строк
@@ -328,17 +340,6 @@ class TaskTableView(BaseTableView):
                 f"Удалено: {len(tasks)}",
             )
         self.refresh()
-
-    def get_filters(self) -> dict:
-        filters = super().get_filters()
-        filters.update(
-            {
-                "include_deleted": self.is_checked("Показывать удалённые"),
-                "include_done": self.is_checked("Показывать выполненные"),
-            }
-        )
-        filters.pop("show_deleted", None)
-        return filters
 
     def refresh(self):
         try:

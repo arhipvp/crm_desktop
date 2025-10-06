@@ -28,6 +28,19 @@ class ExpenseTableController(TableController):
     def __init__(self, view) -> None:
         super().__init__(view, model_class=Expense)
 
+    def get_filters(self) -> dict:
+        filters = super().get_filters()
+        filters["include_paid"] = bool(
+            self.view.is_checked("Показывать выплаченные")
+        )
+        deal_id = getattr(self.view, "deal_id", None)
+        if deal_id is not None:
+            filters["deal_id"] = deal_id
+        date_range = filters.pop("expense_date", None)
+        if date_range:
+            filters["expense_date_range"] = date_range
+        return filters
+
     def get_distinct_values(
         self, column_key: str, *, column_field: Any | None = None
     ) -> list[dict[str, Any]]:
@@ -328,16 +341,9 @@ class ExpenseTableView(BaseTableView):
         self.load_data()
 
     def load_data(self):
-        filters = super().get_filters()
-        filters.update(
-            {"include_paid": self.is_checked("Показывать выплаченные")}
-        )
-        if self.deal_id:
-            filters["deal_id"] = self.deal_id
-        date_range = filters.pop("expense_date", None)
-        if date_range:
-            filters["expense_date_range"] = date_range
-
+        filters = self.get_filters()
+        column_filters = filters.get("column_filters", {})
+        logger.debug("\U0001F4C3 column_filters=%s", column_filters)
         logger.debug(
             "Expense filters=%s order=%s %s page=%d",
             filters,
