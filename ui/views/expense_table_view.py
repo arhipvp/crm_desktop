@@ -56,18 +56,35 @@ class ExpenseTableController(TableController):
             column_filters=column_filters,
         )
 
+        aggregate_fields = (
+            expense_service.INCOME_TOTAL,
+            expense_service.OTHER_EXPENSE_TOTAL,
+            expense_service.NET_INCOME,
+        )
+        aggregate_alias_map = {
+            getattr(expr, "_alias", None): expr for expr in aggregate_fields if getattr(expr, "_alias", None)
+        }
+
+        include_null_option = False
         if isinstance(column_field, Field):
             target_field = column_field
         else:
-            mapping: dict[str, Field] = {
-                "expense_type": Expense.expense_type,
-                "amount": Expense.amount,
-                "expense_date": Expense.expense_date,
-            }
-            target_field = mapping.get(column_key)
+            if column_field in aggregate_fields:
+                target_field = column_field
+            else:
+                mapping: dict[str, Any] = {
+                    "expense_type": Expense.expense_type,
+                    "amount": Expense.amount,
+                    "expense_date": Expense.expense_date,
+                }
+                mapping.update(aggregate_alias_map)
+                target_field = mapping.get(column_key)
 
         if target_field is None:
             return []
+
+        if target_field in aggregate_fields:
+            include_null_option = True
 
         values_query = (
             query.select(target_field)
@@ -81,12 +98,14 @@ class ExpenseTableController(TableController):
             for (value,) in values_query.tuples()
         ]
 
-        if (
+        has_nulls = (
             query.select(target_field)
             .where(target_field.is_null(True))
             .limit(1)
             .exists()
-        ):
+        )
+
+        if include_null_option or has_nulls:
             values.insert(0, {"value": None, "display": "—"})
 
         return values

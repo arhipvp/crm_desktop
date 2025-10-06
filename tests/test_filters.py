@@ -22,7 +22,8 @@ from ui.common.date_utils import get_date_or_none
 from services.deals.dto import DealClientInfo, DealExecutorInfo, DealRowDTO
 from services.deals.deal_table_controller import DealTableController
 from ui.views.income_table_view import IncomeTableView
-from ui.views.expense_table_view import ExpenseTableView
+from services import expense_service
+from ui.views.expense_table_view import ExpenseTableController, ExpenseTableView
 from ui.views.client_table_view import ClientTableView
 
 
@@ -401,6 +402,80 @@ def test_payment_controller_distinct_values_include_null(
     assert any(item["value"] == paid.actual_payment_date for item in values)
 
     assert unpaid.actual_payment_date is None  # гарантируем использование NULL
+
+
+def test_expense_aggregate_filter_choices_and_query(
+    in_memory_db, make_policy_with_payment
+):
+    _, _, policy1, payment1 = make_policy_with_payment(
+        policy_kwargs={"policy_number": "AG-001"},
+        payment_kwargs={"amount": Decimal("500.00")},
+    )
+    Income.create(payment=payment1, amount=Decimal("123"))
+    expense1 = Expense.create(
+        payment=payment1,
+        policy=policy1,
+        amount=Decimal("10.00"),
+        expense_type="Комиссия",
+    )
+
+    _, _, policy2, payment2 = make_policy_with_payment(
+        client_kwargs={"name": "Client B"},
+        deal_kwargs={"description": "Deal B"},
+        policy_kwargs={"policy_number": "AG-002"},
+        payment_kwargs={"amount": Decimal("800.00")},
+    )
+    Income.create(payment=payment2, amount=Decimal("456"))
+    Expense.create(
+        payment=payment2,
+        policy=policy2,
+        amount=Decimal("20.00"),
+        expense_type="Агент",
+    )
+
+    controller = ExpenseTableController(object())
+    controller.get_filters = lambda: {
+        "search_text": "",
+        "show_deleted": False,
+        "deal_id": None,
+        "include_paid": True,
+        "expense_date_range": None,
+        "column_filters": {},
+    }
+
+    values = controller.get_distinct_values(
+        "income_total", column_field=expense_service.INCOME_TOTAL
+    )
+
+    assert isinstance(values, list)
+    assert values, "Ожидались значения фильтра для агрегированного столбца"
+    assert values[0]["value"] is None
+    assert values[0]["display"] == "—"
+
+    all_rows = list(
+        expense_service.build_expense_query(order_by="id", order_dir="asc")
+    )
+    target_row = next(row for row in all_rows if row.id == expense1.id)
+    assert any(item["value"] == target_row.income_total for item in values)
+
+    filter_text = str(target_row.income_total)
+    filtered_query = expense_service.build_expense_query(
+        column_filters={expense_service.INCOME_TOTAL: [filter_text]},
+        order_by="id",
+        order_dir="asc",
+    )
+    filtered_ids = {row.id for row in filtered_query}
+    assert filtered_ids == {expense1.id}
+
+    null_query = expense_service.build_expense_query(
+        column_filters={expense_service.INCOME_TOTAL: [CHOICE_NULL_TOKEN]}
+    )
+    sql, _ = null_query.sql()
+    upper_sql = sql.upper()
+    assert "HAVING" in upper_sql
+    having_sql = upper_sql.split("HAVING", 1)[1]
+    assert "IS NULL" in having_sql
+
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
 def test_client_table_filters_forwarded_to_controller(qapp, in_memory_db):
