@@ -13,7 +13,7 @@ from services.payment_service import get_payment_by_id
 from services.query_utils import (
     _normalize_filter_values,
     apply_search_and_filters,
-    sum_column,
+    sum_amounts_by_completion,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,9 +73,13 @@ def get_expense_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:
         .join(Policy)
         .where(Policy.deal_id == deal_id)
     )
-    planned = sum_column(base.where(Expense.expense_date.is_null(True)), Expense.amount)
-    spent = sum_column(base.where(Expense.expense_date.is_null(False)), Expense.amount)
-    return planned, spent
+    return sum_amounts_by_completion(
+        base,
+        Expense.amount,
+        Expense.expense_date,
+        pending_alias="planned_total",
+        completed_alias="spent_total",
+    )
 
 
 def get_expense_count_by_policy(policy_id: int) -> int:

@@ -8,7 +8,10 @@ from peewee import JOIN, Field
 from peewee import SqliteDatabase
 from database.db import db
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
-from services.query_utils import apply_search_and_filters, sum_column
+from services.query_utils import (
+    apply_search_and_filters,
+    sum_amounts_by_completion,
+)
 from services.payment_service import get_payment_by_id
 from services import executor_service as es
 from services.telegram_service import notify_executor
@@ -50,11 +53,13 @@ def get_income_amounts_by_deal_id(deal_id: int) -> tuple[Decimal, Decimal]:
         .join(Policy)
         .where(Policy.deal_id == deal_id)
     )
-    expected = sum_column(base.where(Income.received_date.is_null(True)), Income.amount)
-    received = sum_column(
-        base.where(Income.received_date.is_null(False)), Income.amount
+    return sum_amounts_by_completion(
+        base,
+        Income.amount,
+        Income.received_date,
+        pending_alias="expected_income",
+        completed_alias="received_income",
     )
-    return expected, received
 
 
 def get_income_by_id(income_id: int):

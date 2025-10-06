@@ -4,7 +4,7 @@ from collections.abc import Iterable as IterableABC
 from decimal import Decimal
 from typing import Any, Iterable, Iterator
 
-from peewee import Field, Model, ModelSelect, Node, fn
+from peewee import Case, Field, Model, ModelSelect, Node, fn
 from playhouse.shortcuts import Cast
 
 from utils.filter_constants import CHOICE_NULL_TOKEN
@@ -165,6 +165,71 @@ def apply_search_and_filters(
     return query
 
 
+def _to_decimal(value: Any) -> Decimal:
+    """Преобразовать значение агрегата к ``Decimal``."""
+
+    if value is None:
+        return Decimal("0")
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
+def completion_sum_expr(
+    date_field: Field,
+    amount_field: Field,
+    *,
+    completed: bool,
+    alias: str | None = None,
+):
+    """Сформировать выражение ``SUM(CASE ...)`` для подсчёта сумм."""
+
+    condition = date_field.is_null(not completed)
+    case_expr = Case(None, ((condition, amount_field),), 0)
+    total_expr = fn.COALESCE(fn.SUM(case_expr), 0)
+    if alias:
+        total_expr = total_expr.alias(alias)
+    return total_expr
+
+
+def sum_amounts_by_completion(
+    query: ModelSelect,
+    amount_field: Field,
+    date_field: Field,
+    *,
+    pending_alias: str = "pending_total",
+    completed_alias: str = "completed_total",
+) -> tuple[Decimal, Decimal]:
+    """Посчитать суммы для «ожидаемых» и «завершённых» записей одним запросом."""
+
+    aggregate = (
+        query.clone()
+        .limit(None)
+        .offset(None)
+        .order_by()
+        .select(
+            completion_sum_expr(
+                date_field,
+                amount_field,
+                completed=False,
+                alias=pending_alias,
+            ),
+            completion_sum_expr(
+                date_field,
+                amount_field,
+                completed=True,
+                alias=completed_alias,
+            ),
+        )
+    )
+
+    result = aggregate.tuples().first()
+    if not result:
+        return Decimal("0"), Decimal("0")
+    pending, completed_total = result
+    return _to_decimal(pending), _to_decimal(completed_total)
+
+
 def sum_column(query: ModelSelect, field: Field) -> Decimal:
     """Вернуть сумму значений ``field`` для переданного запроса."""
 
@@ -176,8 +241,4 @@ def sum_column(query: ModelSelect, field: Field) -> Decimal:
         .select(fn.COALESCE(fn.SUM(field), 0))
     )
     value: Any | None = aggregate.scalar()
-    if value is None:
-        return Decimal("0")
-    if isinstance(value, Decimal):
-        return value
-    return Decimal(str(value))
+    return _to_decimal(value)
