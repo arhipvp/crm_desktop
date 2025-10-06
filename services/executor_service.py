@@ -2,13 +2,13 @@ import logging
 from datetime import date
 from typing import Iterable, List, Optional, Any
 
-from peewee import JOIN, ModelSelect, Field
+from peewee import ModelSelect, Field
 
 from services.query_utils import apply_search_and_filters
 
 from config import Settings, get_settings
 from database.db import db
-from database.models import Deal, DealExecutor, Executor
+from database.models import Client, Deal, DealExecutor, Executor
 from .task_states import QUEUED
 
 logger = logging.getLogger(__name__)
@@ -95,8 +95,11 @@ def get_executor_for_deal(deal_id: int) -> Optional[Executor]:
 def get_deals_for_executor(tg_id: int, *, only_with_tasks: bool = False) -> List[Deal]:
     query = (
         Deal.active()
+        .select(Deal, Client)
         .join(DealExecutor, on=(Deal.id == DealExecutor.deal))
         .join(Executor)
+        .switch(Deal)
+        .join(Client)
         .where((Executor.tg_id == tg_id) & (Deal.is_closed == False))
     )
 
