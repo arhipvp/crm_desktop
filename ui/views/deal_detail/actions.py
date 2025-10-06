@@ -662,51 +662,75 @@ class DealActionsMixin:
             self._init_kpi_panel()
             self._init_tabs()
 
-    def _on_process_policies_ai(self):
-        from ui.forms.ai_policy_files_dialog import AiPolicyFilesDialog
+    def _collect_selected_files_for_ai(
+        self,
+    ) -> tuple[list[Path], list[tuple[Path, str]]]:
+        """Подготовить список выбранных файлов и список пропусков."""
+
+        panel = getattr(self, "files_panel", None)
+        getter = getattr(panel, "selected_files", None)
+        if not callable(getter):
+            return [], []
+
+        try:
+            selected = list(getter())
+        except Exception:  # pragma: no cover - defensive branch
+            logger.exception("Не удалось получить список выбранных файлов")
+            return [], []
 
         initial_files: list[Path] = []
         skipped_items: list[tuple[Path, str]] = []
-        panel = getattr(self, "files_panel", None)
-        getter = getattr(panel, "selected_files", None)
-        if callable(getter):
-            try:
-                selected = list(getter())
-            except Exception:  # pragma: no cover - defensive
-                selected = []
+        seen: set[Path] = set()
 
-            for path in selected:
-                resolved_path = Path(path)
+        for raw_path in selected:
+            resolved_path = Path(raw_path)
+            try:
+                if not resolved_path.exists():
+                    skipped_items.append((resolved_path, "файл не найден"))
+                    continue
+                if resolved_path in seen:
+                    skipped_items.append((resolved_path, "файл уже добавлен"))
+                    continue
+                if resolved_path.is_dir():
+                    skipped_items.append((resolved_path, "нельзя обработать каталог"))
+                    continue
+                if not resolved_path.is_file():
+                    skipped_items.append((resolved_path, "недопустимый тип объекта"))
+                    continue
                 try:
-                    if not resolved_path.exists():
-                        skipped_items.append((resolved_path, "файл не найден"))
-                        continue
-                    if resolved_path.is_dir():
-                        skipped_items.append((resolved_path, "нельзя обработать каталог"))
-                        continue
-                    if not resolved_path.is_file():
-                        skipped_items.append((resolved_path, "недопустимый тип объекта"))
-                        continue
-                    try:
-                        size = resolved_path.stat().st_size
-                    except OSError:
-                        skipped_items.append((resolved_path, "нет доступа"))
-                        continue
-                    if size == 0:
-                        skipped_items.append((resolved_path, "файл пустой"))
-                        continue
+                    size = resolved_path.stat().st_size
                 except OSError:
                     skipped_items.append((resolved_path, "нет доступа"))
                     continue
-                initial_files.append(resolved_path)
+                if size == 0:
+                    skipped_items.append((resolved_path, "файл пустой"))
+                    continue
+            except OSError:
+                skipped_items.append((resolved_path, "нет доступа"))
+                continue
 
-        if skipped_items:
-            lines = [f"{path}: {reason}" for path, reason in skipped_items]
-            QMessageBox.information(
-                self,
-                "Пропущенные элементы",
-                "Не удалось использовать следующие элементы:\n" + "\n".join(lines),
-            )
+            seen.add(resolved_path)
+            initial_files.append(resolved_path)
+
+        return initial_files, skipped_items
+
+    def _show_skipped_items(self, skipped_items: list[tuple[Path, str]]) -> None:
+        if not skipped_items:
+            return
+
+        lines = [f"{path}: {reason}" for path, reason in skipped_items]
+        QMessageBox.information(
+            self,
+            "Пропущенные элементы",
+            "Не удалось использовать следующие элементы:\n" + "\n".join(lines),
+        )
+
+    def _on_process_policies_ai(self):
+        from ui.forms.ai_policy_files_dialog import AiPolicyFilesDialog
+
+        initial_files, skipped_items = self._collect_selected_files_for_ai()
+
+        self._show_skipped_items(skipped_items)
 
         dlg = AiPolicyFilesDialog(
             parent=self,
@@ -718,6 +742,38 @@ class DealActionsMixin:
         if dlg.exec():
             self._init_kpi_panel()
             self._init_tabs()
+
+    def _on_process_documents_ai(self):
+        from ui.forms.ai_document_files_dialog import AiDocumentFilesDialog
+
+        initial_files, skipped_items = self._collect_selected_files_for_ai()
+
+        self._show_skipped_items(skipped_items)
+
+        if not initial_files:
+            QMessageBox.information(
+                self,
+                "Файлы не выбраны",
+                "Перейдите к диалогу и добавьте документы вручную.",
+            )
+
+        dlg = AiDocumentFilesDialog(
+            parent=self,
+            forced_deal=self.instance,
+            initial_files=initial_files,
+            skipped_items=skipped_items,
+        )
+        if dlg.exec():
+            note = dlg.get_note().strip()
+            if not note:
+                return
+            try:
+                deal_journal.append_entry(self.instance, note)
+            except Exception as exc:  # noqa: BLE001
+                show_error(str(exc))
+            else:
+                if hasattr(self, "notes_board"):
+                    self.notes_board.load_entries(self.instance)
 
     def _on_process_policy_text_ai(self):
         from ui.forms.ai_policy_text_dialog import AiPolicyTextDialog
