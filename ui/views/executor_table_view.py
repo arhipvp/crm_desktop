@@ -1,3 +1,6 @@
+from typing import Any
+
+from peewee import Field
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QAbstractItemView
 
@@ -9,8 +12,108 @@ from services.executor_service import (
     update_executor,
 )
 from ui.base.base_table_view import BaseTableView
+from ui.base.table_controller import TableController
 from ui.common.message_boxes import confirm, show_error
 from ui.forms.executor_form import ExecutorForm
+
+
+class ExecutorTableController(TableController):
+    def __init__(
+        self,
+        view,
+        *,
+        get_page_func=get_executors_page,
+        build_query_func=build_executor_query,
+    ) -> None:
+        self._get_page_func = get_page_func or get_executors_page
+        self._build_query_func = build_query_func or build_executor_query
+        super().__init__(
+            view,
+            model_class=Executor,
+            get_page_func=self._get_page,
+            get_total_func=self._get_total,
+        )
+
+    def _extract_query_params(self, filters: dict[str, Any]) -> dict[str, Any]:
+        column_filters = filters.get("column_filters") or {}
+        return {
+            "search_text": str(filters.get("search_text") or ""),
+            "show_inactive": bool(filters.get("show_inactive", True)),
+            "column_filters": column_filters,
+        }
+
+    def _get_page(
+        self,
+        page: int,
+        per_page: int,
+        *,
+        order_by: Any | None = None,
+        order_dir: str = "asc",
+        **filters: Any,
+    ):
+        params = self._extract_query_params(filters)
+        return self._get_page_func(
+            page,
+            per_page,
+            order_by=order_by,
+            order_dir=order_dir,
+            **params,
+        )
+
+    def _get_total(self, **filters: Any) -> int:
+        params = self._extract_query_params(filters)
+        query = self._build_query_func(**params)
+        return query.count()
+
+    def get_distinct_values(
+        self, column_key: str, *, column_field: Any | None = None
+    ) -> list[dict[str, Any]]:
+        filters = dict(self.get_filters())
+        column_filters = dict(filters.get("column_filters") or {})
+        removed = False
+        if column_field is not None and column_field in column_filters:
+            column_filters.pop(column_field, None)
+            removed = True
+        if not removed:
+            column_filters.pop(column_key, None)
+        filters["column_filters"] = column_filters
+
+        params = self._extract_query_params(filters)
+        params["column_filters"] = column_filters
+        query = self._build_query_func(**params)
+
+        target_field: Field | None
+        if isinstance(column_field, Field):
+            target_field = column_field
+        elif isinstance(column_field, str):
+            target_field = getattr(Executor, column_field, None)
+        else:
+            target_field = getattr(Executor, column_key, None)
+
+        if target_field is None:
+            return []
+
+        values_query = (
+            query.select(target_field)
+            .where(target_field.is_null(False))
+            .distinct()
+            .order_by(target_field.asc())
+        )
+
+        values = [
+            {"value": value, "display": str(value)}
+            for (value,) in values_query.tuples()
+        ]
+
+        if (
+            query.select(target_field)
+            .where(target_field.is_null(True))
+            .limit(1)
+            .exists()
+        ):
+            values.insert(0, {"value": None, "display": "—"})
+
+        return values
 
 
 class ExecutorTableView(BaseTableView):
@@ -30,18 +133,17 @@ class ExecutorTableView(BaseTableView):
         update_executor_func=update_executor,
     ):
         self._context = context
-        self._get_executors_page = get_executors_page_func or get_executors_page
-        self._build_executor_query = (
-            build_executor_query_func or build_executor_query
-        )
         self._update_executor = update_executor_func or update_executor
-        self.order_by = Executor.full_name
-        self.order_dir = "asc"
         self.default_sort_column = 0
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = Qt.AscendingOrder
 
-        checkbox_map = {"Показывать неактивных": self.refresh}
+        checkbox_map = {"Показывать неактивных": lambda _state: self.load_data()}
+        controller = ExecutorTableController(
+            self,
+            get_page_func=get_executors_page_func,
+            build_query_func=build_executor_query_func,
+        )
         super().__init__(
             parent=parent,
             model_class=Executor,
@@ -49,6 +151,7 @@ class ExecutorTableView(BaseTableView):
             delete_callback=self.delete_selected,
             can_restore=False,
             checkbox_map=checkbox_map,
+            controller=controller,
         )
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         # Скрыть нерелевантный чекбокс "Показывать удалённые" для исполнителей
@@ -62,39 +165,6 @@ class ExecutorTableView(BaseTableView):
         )
         self.load_data()
 
-    # Ensure search/filters/pagination use local loader (not TableController)
-    def refresh(self):
-        self.load_data()
-
-    def on_filter_changed(self, *args, **kwargs):
-        self.page = 1
-        self.load_data()
-
-    def next_page(self):
-        self.page += 1
-        self.load_data()
-
-    def prev_page(self):
-        if self.page > 1:
-            self.page -= 1
-            self.load_data()
-
-    def _on_per_page_changed(self, per_page: int):
-        self.per_page = per_page
-        self.page = 1
-        try:
-            self.save_table_settings()
-        except Exception:
-            pass
-        self.load_data()
-
-    def _on_column_filter_changed(self, column: int, text: str):
-        self.on_filter_changed()
-        try:
-            self.save_table_settings()
-        except Exception:
-            pass
-
     def get_filters(self) -> dict:
         filters = super().get_filters()
         filters.update(
@@ -105,26 +175,9 @@ class ExecutorTableView(BaseTableView):
         filters.pop("show_deleted", None)
         return filters
 
-    def load_data(self):
-        filters = self.get_filters()
-        items = self._get_executors_page(
-            self.page,
-            self.per_page,
-            order_by=self.order_by,
-            order_dir=self.order_dir,
-            **filters,
-        )
-        total = self._build_executor_query(**filters).count()
-        self.set_model_class_and_items(Executor, list(items), total_count=total)
-
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
         self.current_sort_column = column
         self.current_sort_order = order
-        field = self.COLUMN_FIELD_MAP.get(column)
-        if field is None:
-            return
-        self.order_dir = "desc" if order == Qt.DescendingOrder else "asc"
-        self.order_by = field
         self.page = 1
         self.load_data()
 
