@@ -86,6 +86,11 @@ class PolicyDetailView(QDialog):
         self.kpi_layout.setContentsMargins(0, 0, 0, 0)
         self.kpi_layout.setSpacing(8)
         left_layout.addWidget(self.kpi_container)
+
+        self._payments: list[Payment] = []
+        self._incomes: list[Income] = []
+        self._expenses: list[Expense] = []
+        self._reload_related_data()
         self._init_kpi_panel()
 
         self.summary_widget = QWidget()
@@ -115,6 +120,16 @@ class PolicyDetailView(QDialog):
     # ---------------------------------------------------------------------
     # UI helpers
     # ---------------------------------------------------------------------
+    def _reload_related_data(self) -> None:
+        """Перечитывает связанные платежи, доходы и расходы."""
+        self._payments = list(get_payments_by_policy_id(self.instance.id))
+        self._incomes = list(
+            build_income_query().where(Income.payment.policy == self.instance.id)
+        )
+        self._expenses = list(
+            build_expense_query().where(Expense.policy == self.instance.id)
+        )
+
     def _init_kpi_panel(self):
         """Короткая статистика сверху окна."""
         while self.kpi_layout.count():
@@ -123,15 +138,9 @@ class PolicyDetailView(QDialog):
             if widget:
                 widget.deleteLater()
 
-        cnt_payments = get_payments_by_policy_id(self.instance.id).count()
-        cnt_incomes = (
-            build_income_query()
-            .where(Income.payment.policy == self.instance.id)
-            .count()
-        )
-        cnt_expenses = (
-            build_expense_query().where(Expense.policy == self.instance.id).count()
-        )
+        cnt_payments = len(self._payments)
+        cnt_incomes = len(self._incomes)
+        cnt_expenses = len(self._expenses)
         for text in [
             f"Платежей: <b>{cnt_payments}</b>",
             f"Доходов: <b>{cnt_incomes}</b>",
@@ -177,23 +186,21 @@ class PolicyDetailView(QDialog):
         )
         btn_add_payment.clicked.connect(self._on_add_payment)
         pay_l.addWidget(btn_add_payment, alignment=Qt.AlignLeft)
-        payments = list(get_payments_by_policy_id(self.instance.id))
+        payments = self._payments
         pay_l.addWidget(self._make_subtable(payments, Payment, PaymentDetailView))
         self.tabs.addTab(pay_tab, "Платежи")
 
         # ——— Доходы ————————————————————————————
         inc_tab = QWidget()
         inc_l = QVBoxLayout(inc_tab)
-        incomes = list(
-            build_income_query().where(Income.payment.policy == self.instance.id)
-        )
+        incomes = self._incomes
         inc_l.addWidget(self._make_subtable(incomes, Income, IncomeDetailView))
         self.tabs.addTab(inc_tab, "Доходы")
 
         # ——— Расходы ————————————————————————————
         exp_tab = QWidget()
         exp_l = QVBoxLayout(exp_tab)
-        expenses = list(build_expense_query().where(Expense.policy == self.instance.id))
+        expenses = self._expenses
         exp_l.addWidget(self._make_subtable(expenses, Expense, ExpenseDetailView))
         self.tabs.addTab(exp_tab, "Расходы")
 
@@ -330,6 +337,7 @@ class PolicyDetailView(QDialog):
         )
         if form.exec():
             # Перерисовать всё, если пользователь сохранил изменения
+            self._reload_related_data()
             self._init_kpi_panel()
             self._init_tabs()
 
@@ -344,6 +352,7 @@ class PolicyDetailView(QDialog):
                     combo.setCurrentIndex(idx)
         accepted = form.exec()
         if accepted:
+            self._reload_related_data()
             self._init_kpi_panel()
             self._init_tabs()
 
