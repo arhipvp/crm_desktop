@@ -127,7 +127,7 @@ def get_payments_page(
     column_filters: dict | None = None,
     order_by: str | Field | None = Payment.payment_date,
     order_dir: str = "asc",
-    **filters,
+    payment_date_range: tuple[date | None, date | None] | None = None,
 ) -> ModelSelect:
     """Получить страницу платежей по заданным фильтрам."""
     normalized_order_dir = (order_dir or "").strip().lower()
@@ -141,7 +141,7 @@ def get_payments_page(
         column_filters=column_filters,
         order_by=order_by,
         order_dir=normalized_order_dir,
-        **filters,
+        payment_date_range=payment_date_range,
     )
     if not order_by:
         order_field = Payment.payment_date
@@ -439,6 +439,7 @@ def apply_payment_filters(
     deal_id: int | None = None,
     include_paid: bool = True,
     column_filters: dict | None = None,
+    payment_date_range: tuple[date | None, date | None] | None = None,
 ) -> ModelSelect:
     """Фильтры для выборки платежей."""
     if deal_id is not None:
@@ -449,6 +450,12 @@ def apply_payment_filters(
     )
     if not include_paid:
         query = query.where(Payment.actual_payment_date.is_null(True))
+    if payment_date_range:
+        date_from, date_to = payment_date_range
+        if date_from:
+            query = query.where(Payment.payment_date >= date_from)
+        if date_to:
+            query = query.where(Payment.payment_date <= date_to)
     return query
 
 
@@ -460,7 +467,7 @@ def build_payment_query(
     column_filters: dict | None = None,
     order_by: str | Field | None = None,
     order_dir: str = "asc",
-    **filters,
+    payment_date_range: tuple[date | None, date | None] | None = None,
 ) -> ModelSelect:
     """Сконструировать базовый запрос платежей с агрегатами."""
     income_subq = Income.select(fn.COUNT(Income.id)).where(Income.payment == Payment.id)
@@ -485,7 +492,12 @@ def build_payment_query(
     )
 
     query = apply_payment_filters(
-        query, search_text=search_text, deal_id=deal_id, include_paid=include_paid, column_filters=column_filters
+        query,
+        search_text=search_text,
+        deal_id=deal_id,
+        include_paid=include_paid,
+        column_filters=column_filters,
+        payment_date_range=payment_date_range,
     )
     return query
 

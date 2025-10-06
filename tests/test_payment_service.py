@@ -54,3 +54,39 @@ def test_payment_service_filters_null_actual_payment_date(
     )
     mixed_results = list(mixed_query)
     assert {payment.id for payment in mixed_results} == {unpaid.id, paid.id}
+
+
+@pytest.mark.usefixtures("db_transaction")
+def test_get_payments_page_filters_by_payment_date_range(
+    make_policy_with_payment,
+):
+    _, _, _, older = make_policy_with_payment(
+        policy_kwargs={"policy_number": "PAY-OLD"},
+        payment_kwargs={"payment_date": date(2024, 1, 10)},
+    )
+    _, _, _, in_range = make_policy_with_payment(
+        policy_kwargs={"policy_number": "PAY-MID"},
+        payment_kwargs={"payment_date": date(2024, 2, 15)},
+    )
+    _, _, _, newer = make_policy_with_payment(
+        policy_kwargs={"policy_number": "PAY-NEW"},
+        payment_kwargs={"payment_date": date(2024, 3, 20)},
+    )
+
+    query = payment_service.get_payments_page(
+        1,
+        20,
+        payment_date_range=(date(2024, 2, 1), date(2024, 2, 29)),
+    )
+    results = {payment.id for payment in query}
+    assert results == {in_range.id}
+    assert older.id not in results
+
+    open_end_query = payment_service.get_payments_page(
+        1,
+        20,
+        payment_date_range=(date(2024, 2, 1), None),
+    )
+    open_end_results = {payment.id for payment in open_end_query}
+    assert open_end_results == {in_range.id, newer.id}
+    assert older.id not in open_end_results

@@ -72,14 +72,8 @@ class PaymentTableController(TableController):
             deal_id=deal_id,
             include_paid=include_paid,
             column_filters=column_filters,
+            payment_date_range=payment_date_range,
         )
-
-        if payment_date_range:
-            date_from, date_to = payment_date_range
-            if date_from:
-                query = query.where(Payment.payment_date >= date_from)
-            if date_to:
-                query = query.where(Payment.payment_date <= date_to)
 
         if isinstance(column_field, Field):
             target_field = column_field
@@ -138,13 +132,29 @@ class PaymentTableView(BaseTableView):
             "Показывать удалённые": lambda state: self.load_data(),
         }
 
+        def _prepare_service_kwargs(filters: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "search_text": str(filters.get("search_text") or ""),
+                "show_deleted": bool(filters.get("show_deleted")),
+                "deal_id": filters.get("deal_id"),
+                "include_paid": bool(filters.get("include_paid", True)),
+                "column_filters": filters.get("column_filters"),
+                "order_by": filters.get("order_by"),
+                "order_dir": filters.get("order_dir", "asc"),
+                "payment_date_range": filters.get("payment_date_range"),
+            }
+
         controller = PaymentTableController(
             self,
             model_class=Payment,
             get_page_func=lambda page, per_page, **f: get_payments_page(
-                page, per_page, **f
+                page,
+                per_page,
+                **_prepare_service_kwargs(f),
             ),
-            get_total_func=lambda **f: build_payment_query(**f).count(),
+            get_total_func=lambda **f: build_payment_query(
+                **_prepare_service_kwargs(f)
+            ).count(),
             filter_func=self._apply_filters,
         )
 
