@@ -75,14 +75,13 @@ def get_pending_tasks():
 
 def get_task_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых задач по сделке."""
+    open_case = Case(None, ((Task.is_done == False, 1),), 0)
+    closed_case = Case(None, ((Task.is_done == True, 1),), 0)
+
     query = (
         Task.select(
-            fn.SUM(
-                Case(None, ((Task.is_done == False, 1),), 0)
-            ).alias("open_count"),
-            fn.SUM(
-                Case(None, ((Task.is_done == True, 1),), 0)
-            ).alias("closed_count"),
+            fn.COALESCE(fn.SUM(open_case), 0).alias("open_count"),
+            fn.COALESCE(fn.SUM(closed_case), 0).alias("closed_count"),
         )
         .where((Task.deal_id == deal_id) & (Task.is_deleted == False))
         .tuples()
