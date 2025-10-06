@@ -32,7 +32,7 @@ from services.policies import get_policies_by_deal_id
 from services.task_crud import get_incomplete_tasks_by_deal
 from services.task_notifications import mark_done
 from ui import settings as ui_settings
-from ui.common.message_boxes import confirm, show_error, show_info
+from ui.common.message_boxes import confirm, show_error
 from ui.common.styled_widgets import styled_button
 from ui.forms.client_form import ClientForm
 from ui.forms.deal_form import DealForm
@@ -356,7 +356,6 @@ class DealActionsMixin:
         else:
             self.notes_board.load_entries(self.instance)
             self.calc_append.clear()
-            show_info("Заметка добавлена")
         finally:
             if button is not None:
                 button.setEnabled(True)
