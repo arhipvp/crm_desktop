@@ -851,6 +851,43 @@ def test_choice_filter_serialization_preserves_null_token_without_backend_call()
 
 
 @pytest.mark.usefixtures("ui_settings_temp_path")
+def test_choices_filter_widget_restores_null_checkbox(qapp):
+    """При восстановлении фильтра с NULL отображается единственный пункт «—»."""
+
+    ui_settings._CACHE = None
+
+    state_dict = {
+        "type": "choices",
+        "value": [CHOICE_NULL_TOKEN],
+        "meta": {
+            "choices_null_token": CHOICE_NULL_TOKEN,
+            "choices_display": ["—"],
+        },
+    }
+    state = ColumnFilterState.from_dict(state_dict)
+    assert state is not None
+
+    view = BaseTableView(model_class=Payment)
+    menu = QMenu()
+    view._create_choices_filter_widget(menu, 0, state)
+    qapp.processEvents()
+
+    actions = menu.actions()
+    assert actions, "Ожидался контейнер фильтра"
+    container = actions[0].defaultWidget()
+    assert container is not None, "Не удалось найти контейнер меню"
+
+    checkboxes = container.findChildren(QCheckBox)
+    assert len(checkboxes) == 1
+    checkbox = checkboxes[0]
+    assert checkbox.text() == "—"
+    assert checkbox.isChecked()
+
+    menu.deleteLater()
+    view.deleteLater()
+
+
+@pytest.mark.usefixtures("ui_settings_temp_path")
 def test_load_table_settings_restores_choices_filter(
     qapp,
     in_memory_db,
