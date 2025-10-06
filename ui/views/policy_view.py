@@ -74,21 +74,24 @@ class PolicyView(QWidget):
         search_text = self.search_input.text().strip().lower()
         show_deleted = self.show_deleted_checkbox.isChecked()
 
-        self.policies = get_policies_page(
-            self.current_page, self.per_page, search_text, show_deleted
+        policies = list(
+            get_policies_page(
+                self.current_page, self.per_page, search_text, show_deleted
+            )
         )
-        self.render_policies()
+        self.policies = policies
+        self.render_policies(policies)
         self.paginator.update_page(
-            self.current_page, len(self.policies), self.per_page
+            self.current_page, len(policies), self.per_page
         )
 
-    def render_policies(self):
+    def render_policies(self, policies):
         for i in reversed(range(self.content_layout.count())):
             widget = self.content_layout.itemAt(i).widget()
             if widget:
                 widget.deleteLater()
 
-        for policy in self.policies:
+        for policy in policies:
             card = PolicyCard(policy, parent=self)
             self.content_layout.addWidget(card)
 

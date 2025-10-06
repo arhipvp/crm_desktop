@@ -86,20 +86,23 @@ class PaymentView(QWidget):
         show_deleted = self.show_deleted_checkbox.isChecked()
         include_paid = self.include_paid_checkbox.isChecked()
 
-        self.payments = get_payments_page(
-            self.current_page,
-            self.per_page,
-            search_text,
-            show_deleted,
-            include_paid=include_paid,
+        payments = list(
+            get_payments_page(
+                self.current_page,
+                self.per_page,
+                search_text,
+                show_deleted,
+                include_paid=include_paid,
+            )
         )
 
-        self.render_payments()
+        self.payments = payments
+        self.render_payments(payments)
         self.paginator.update_page(
-            self.current_page, len(self.payments), self.per_page
+            self.current_page, len(payments), self.per_page
         )
 
-    def render_payments(self):
+    def render_payments(self, payments):
         while self.content_layout.count():
             item = self.content_layout.takeAt(0)
             widget = item.widget()
@@ -108,7 +111,7 @@ class PaymentView(QWidget):
             else:
                 del item
 
-        for payment in self.payments:
+        for payment in payments:
             card = PaymentCard(payment, parent=self)
             self.content_layout.addWidget(card)
 
