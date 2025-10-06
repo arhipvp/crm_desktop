@@ -119,12 +119,42 @@ def get_clients_page_dto(
     return [ClientDTO.from_model(c) for c in clients]
 
 
+def _get_related_counts_by_client_ids(
+    client_ids: Sequence[int],
+) -> tuple[dict[int, int], dict[int, int]]:
+    if not client_ids:
+        return {}, {}
+
+    ids = list(dict.fromkeys(client_ids))
+
+    deals_counts_query = (
+        Deal.select(Deal.client_id, fn.COUNT(Deal.id).alias("count"))
+        .where(Deal.client_id.in_(ids))
+        .group_by(Deal.client_id)
+    )
+    deals_counts = {client_id: count for client_id, count in deals_counts_query.tuples()}
+
+    policies_counts_query = (
+        Policy.select(Policy.client_id, fn.COUNT(Policy.id).alias("count"))
+        .where(Policy.client_id.in_(ids))
+        .group_by(Policy.client_id)
+    )
+    policies_counts = {
+        client_id: count for client_id, count in policies_counts_query.tuples()
+    }
+
+    return deals_counts, policies_counts
+
+
 def get_client_detail_dto(client_id: int) -> ClientDetailsDTO | None:
     """Получить подробную информацию о клиенте в виде DTO."""
 
     client = Client.select().where(Client.id == client_id).get_or_none()
     if not client:
         return None
+    deals_counts, policies_counts = _get_related_counts_by_client_ids([client.id])
+    setattr(client, "_deals_count", deals_counts.get(client.id, 0))
+    setattr(client, "_policies_count", policies_counts.get(client.id, 0))
     return ClientDetailsDTO.from_model(client)
 
 
@@ -582,11 +612,15 @@ def get_clients_details_by_ids(client_ids: Sequence[int]) -> list[ClientDetailsD
     if not client_ids:
         return []
     ids = list(dict.fromkeys(client_ids))
-    clients = (
+    clients = list(
         Client.select()
         .where(Client.id.in_(ids))
         .order_by(Client.id)
     )
+    deals_counts, policies_counts = _get_related_counts_by_client_ids(ids)
+    for client in clients:
+        setattr(client, "_deals_count", deals_counts.get(client.id, 0))
+        setattr(client, "_policies_count", policies_counts.get(client.id, 0))
     clients_by_id = {client.id: client for client in clients}
     return [
         ClientDetailsDTO.from_model(clients_by_id[cid])

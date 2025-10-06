@@ -69,8 +69,13 @@ class ClientDetailsDTO(ClientDTO):
 
     @classmethod
     def from_model(cls, client: Client) -> "ClientDetailsDTO":
-        deals_count = client.deals.count()
-        policies_count = client.policies.count()
+        deals_count = getattr(client, "_deals_count", None)
+        if deals_count is None:
+            deals_count = client.deals.count()
+
+        policies_count = getattr(client, "_policies_count", None)
+        if policies_count is None:
+            policies_count = client.policies.count()
         return cls(
             id=client.id,
             name=client.name,
