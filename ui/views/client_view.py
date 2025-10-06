@@ -70,21 +70,24 @@ class ClientView(QWidget):
         search_text = self.search_input.text().strip().lower()
         show_deleted = self.show_deleted_checkbox.isChecked()
 
-        self.clients = get_clients_page(
-            self.current_page, self.per_page, search_text, show_deleted
+        clients = list(
+            get_clients_page(
+                self.current_page, self.per_page, search_text, show_deleted
+            )
         )
-        self.render_clients()
+        self.clients = clients
+        self.render_clients(clients)
         self.paginator.update_page(
-            self.current_page, len(self.clients), self.per_page
+            self.current_page, len(clients), self.per_page
         )
 
-    def render_clients(self):
+    def render_clients(self, clients):
         for i in reversed(range(self.content_layout.count())):
             widget = self.content_layout.itemAt(i).widget()
             if widget:
                 widget.deleteLater()
 
-        for client in self.clients:
+        for client in clients:
             card = ClientCard(client, parent=self)
             self.content_layout.addWidget(card)
 
