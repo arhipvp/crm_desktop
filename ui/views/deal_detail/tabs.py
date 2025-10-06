@@ -168,6 +168,16 @@ class DealTabsMixin:
         self.btn_add_note.clicked.connect(self._on_add_note)
         calc_append_layout.addWidget(self.btn_add_note, alignment=Qt.AlignLeft)
 
+        self.btn_ai_documents = self._mark_flow_button(
+            styled_button(
+                "🤖 Распознать документы",
+                tooltip="Суммаризировать выбранные файлы через ИИ",
+                shortcut="Ctrl+Shift+D",
+            )
+        )
+        self.btn_ai_documents.clicked.connect(self._on_process_documents_ai)
+        calc_append_layout.addWidget(self.btn_ai_documents, alignment=Qt.AlignLeft)
+
         journal_form.addRow("Добавить:", calc_append_container)
 
         self.notes_board = StickyNotesBoard()
@@ -224,7 +234,8 @@ class DealTabsMixin:
 
         self.deal_tab_idx = self.tabs.addTab(deal_tab, "Сделка")
         self.register_tab_actions(
-            self.deal_tab_idx, [btn_save, btn_save_close, btn_refresh]
+            self.deal_tab_idx,
+            [btn_save, btn_save_close, btn_refresh, self.btn_ai_documents],
         )
 
         # ---------- Полисы -----------------------------------------
