@@ -335,6 +335,13 @@ class IncomeTableView(BaseTableView):
         items = list(
             prefetch(query, Payment, Policy, Client, Deal, DealExecutor, Executor)
         )
+        if not items:
+            logger.warning(
+                "No incomes found for filters=%s page=%d per_page=%d",
+                filters,
+                self.page,
+                self.per_page,
+            )
         deals = set()
         for income in items:
             payment = getattr(income, "payment", None)
