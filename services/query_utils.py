@@ -175,17 +175,17 @@ def _to_decimal(value: Any) -> Decimal:
     return Decimal(str(value))
 
 
-def completion_sum_expr(
+def completion_case_sum(
     date_field: Field,
     amount_field: Field,
     *,
     completed: bool,
     alias: str | None = None,
 ):
-    """Сформировать выражение ``SUM(CASE ...)`` для подсчёта сумм."""
+    """Сформировать выражение ``SUM(CASE ...)`` для заданного статуса."""
 
-    condition = date_field.is_null(not completed)
-    case_expr = Case(None, ((condition, amount_field),), 0)
+    completion_condition = date_field.is_null(not completed)
+    case_expr = Case(None, ((completion_condition, amount_field),), 0)
     total_expr = fn.COALESCE(fn.SUM(case_expr), 0)
     if alias:
         total_expr = total_expr.alias(alias)
@@ -208,13 +208,13 @@ def sum_amounts_by_completion(
         .offset(None)
         .order_by()
         .select(
-            completion_sum_expr(
+            completion_case_sum(
                 date_field,
                 amount_field,
                 completed=False,
                 alias=pending_alias,
             ),
-            completion_sum_expr(
+            completion_case_sum(
                 date_field,
                 amount_field,
                 completed=True,
