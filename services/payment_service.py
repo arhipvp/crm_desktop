@@ -505,22 +505,21 @@ def get_payments_by_deal_id(deal_id: int) -> ModelSelect:
 
 def get_payment_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых платежей по сделке."""
+    open_case = Case(
+        None,
+        ((Payment.actual_payment_date.is_null(True), 1),),
+        0,
+    )
+    closed_case = Case(
+        None,
+        ((Payment.actual_payment_date.is_null(False), 1),),
+        0,
+    )
+
     query = (
         Payment.select(
-            fn.SUM(
-                Case(
-                    None,
-                    ((Payment.actual_payment_date.is_null(True), 1),),
-                    0,
-                )
-            ).alias("open_count"),
-            fn.SUM(
-                Case(
-                    None,
-                    ((Payment.actual_payment_date.is_null(False), 1),),
-                    0,
-                )
-            ).alias("closed_count"),
+            fn.COALESCE(fn.SUM(open_case), 0).alias("open_count"),
+            fn.COALESCE(fn.SUM(closed_case), 0).alias("closed_count"),
         )
         .join(Policy)
         .where((Policy.deal_id == deal_id) & ACTIVE)

@@ -97,34 +97,21 @@ def get_policies_by_deal_id(deal_id: int):
 def get_policy_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых полисов по сделке."""
     today = date.today()
+    open_case = Case(
+        None,
+        (((Policy.end_date.is_null(True)) | (Policy.end_date >= today), 1),),
+        0,
+    )
+    closed_case = Case(
+        None,
+        (((Policy.end_date.is_null(False)) & (Policy.end_date < today), 1),),
+        0,
+    )
+
     query = (
         Policy.select(
-            fn.SUM(
-                Case(
-                    None,
-                    (
-                        (
-                            (Policy.end_date.is_null(True))
-                            | (Policy.end_date >= today),
-                            1,
-                        ),
-                    ),
-                    0,
-                )
-            ).alias("open_count"),
-            fn.SUM(
-                Case(
-                    None,
-                    (
-                        (
-                            (Policy.end_date.is_null(False))
-                            & (Policy.end_date < today),
-                            1,
-                        ),
-                    ),
-                    0,
-                )
-            ).alias("closed_count"),
+            fn.COALESCE(fn.SUM(open_case), 0).alias("open_count"),
+            fn.COALESCE(fn.SUM(closed_case), 0).alias("closed_count"),
         )
         .where((Policy.deal_id == deal_id) & (Policy.is_deleted == False))
         .tuples()

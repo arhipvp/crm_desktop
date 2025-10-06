@@ -58,22 +58,21 @@ def get_pending_expenses():
 
 def get_expense_counts_by_deal_id(deal_id: int) -> tuple[int, int]:
     """Подсчитать количество открытых и закрытых расходов по сделке."""
+    open_case = Case(
+        None,
+        ((Expense.expense_date.is_null(True), 1),),
+        0,
+    )
+    closed_case = Case(
+        None,
+        ((Expense.expense_date.is_null(False), 1),),
+        0,
+    )
+
     query = (
         Expense.select(
-            fn.SUM(
-                Case(
-                    None,
-                    ((Expense.expense_date.is_null(True), 1),),
-                    0,
-                )
-            ).alias("open_count"),
-            fn.SUM(
-                Case(
-                    None,
-                    ((Expense.expense_date.is_null(False), 1),),
-                    0,
-                )
-            ).alias("closed_count"),
+            fn.COALESCE(fn.SUM(open_case), 0).alias("open_count"),
+            fn.COALESCE(fn.SUM(closed_case), 0).alias("closed_count"),
         )
         .join(Payment)
         .join(Policy)
