@@ -471,7 +471,7 @@ def apply_deal_filters(
 # ──────────────────────────── Пагинация ─────────────────────────────
 
 
-def get_deals_page(
+def fetch_deals_page_with_total(
     page: int,
     per_page: int,
     search_text: str = "",
@@ -480,8 +480,8 @@ def get_deals_page(
     order_dir: str = "asc",
     column_filters: dict | None = None,
     **filters,
-) -> ModelSelect:
-    """Вернуть страницу сделок с указанными фильтрами."""
+) -> tuple[list[Deal], int]:
+    """Вернуть список сделок и их общее количество для указанной страницы."""
     normalized_order_dir = (order_dir or "").strip().lower()
     if normalized_order_dir not in {"asc", "desc"}:
         normalized_order_dir = "asc"
@@ -492,6 +492,8 @@ def get_deals_page(
         column_filters=column_filters,
         **filters,
     )
+
+    total = query.count()
 
     # 👉 Стабильная сортировка
     if order_by == "executor":
@@ -555,7 +557,7 @@ def get_deals_page(
     )
     )
     if not prefetched_deals:
-        return []
+        return [], total
 
     for deal in prefetched_deals:
         executors = list(
@@ -575,7 +577,32 @@ def get_deals_page(
         setattr(deal, "executors", executors)
         setattr(deal, "policies", policies)
         setattr(deal, "_executor", executors[0].executor if executors else None)
-    return prefetched_deals
+    return prefetched_deals, total
+
+
+def get_deals_page(
+    page: int,
+    per_page: int,
+    search_text: str = "",
+    show_deleted: bool = False,
+    order_by: str = "reminder_date",
+    order_dir: str = "asc",
+    column_filters: dict | None = None,
+    **filters,
+) -> list[Deal]:
+    """Вернуть страницу сделок с указанными фильтрами."""
+
+    deals, _ = fetch_deals_page_with_total(
+        page,
+        per_page,
+        search_text=search_text,
+        show_deleted=show_deleted,
+        order_by=order_by,
+        order_dir=order_dir,
+        column_filters=column_filters,
+        **filters,
+    )
+    return deals
 
 
 def get_open_deals_page(page: int = 1, per_page: int = 50) -> ModelSelect:

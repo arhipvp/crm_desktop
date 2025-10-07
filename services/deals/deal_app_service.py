@@ -10,6 +10,7 @@ from peewee import JOIN
 from database.models import Client, Deal, DealExecutor, Executor
 from services.deal_service import (
     build_deal_query,
+    fetch_deals_page_with_total,
     get_deals_page,
     get_distinct_statuses,
 )
@@ -39,10 +40,12 @@ class DealAppService:
         *,
         build_query=build_deal_query,
         page_query=get_deals_page,
+        fetch_page_with_total=fetch_deals_page_with_total,
         statuses_provider=get_distinct_statuses,
     ) -> None:
         self._build_query = build_query
         self._page_query = page_query
+        self._fetch_page_with_total = fetch_page_with_total
         self._statuses_provider = statuses_provider
 
     # ------------------------------------------------------------------
@@ -58,7 +61,7 @@ class DealAppService:
         **filters,
     ) -> tuple[list[DealRowDTO], int]:
         column_filters = self._convert_column_filters(filters.pop("column_filters", None))
-        items = self._page_query(
+        items, total = self._fetch_page_with_total(
             page,
             per_page,
             order_by=order_by or "reminder_date",
@@ -66,11 +69,6 @@ class DealAppService:
             column_filters=column_filters,
             **filters,
         )
-        query = self._build_query(
-            column_filters=column_filters,
-            **filters,
-        )
-        total = query.count()
         return deals_to_row_dtos(items), total
 
     def count(self, **filters) -> int:
