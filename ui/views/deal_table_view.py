@@ -116,6 +116,7 @@ class DealTableView(BaseTableView):
         context: AppContext | None = None,
         controller: DealTableController | None = None,
         deal_journal_module=deal_journal,
+        autoload: bool = True,
     ) -> None:
         self._context = context
         self._deal_journal = deal_journal_module or deal_journal
@@ -144,7 +145,8 @@ class DealTableView(BaseTableView):
         QShortcut("Delete", self.table, activated=self.delete_selected)
         QShortcut("Ctrl+D", self.table, activated=self.duplicate_selected)
 
-        self.load_data()
+        if autoload:
+            self.load_data()
 
     # ------------------------------------------------------------------
     # Работа с моделью

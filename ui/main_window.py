@@ -103,6 +103,7 @@ class MainWindow(QMainWindow):
         self.menu_bar = MainMenu(self)
         self.setMenuBar(self.menu_bar)
 
+        self._pending_tab_loads: set[int] = set()
         self.init_tabs()
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
 
@@ -112,11 +113,15 @@ class MainWindow(QMainWindow):
         self.tab_widget = QTabWidget(self)
         self.setCentralWidget(self.tab_widget)
         self.home_tab = HomeTab(context=self._context)
-        self.client_tab = ClientTableView(parent=self, context=self._context)
-        self.deal_tab = DealTableView(parent=self, context=self._context)
-        self.policy_tab = PolicyTableView(parent=self, context=self._context)
-        self.finance_tab = FinanceTab(parent=self, context=self._context)
-        self.task_tab = TaskTableView(parent=self, context=self._context)
+        self.client_tab = ClientTableView(
+            parent=self, context=self._context, autoload=False
+        )
+        self.deal_tab = DealTableView(parent=self, context=self._context, autoload=False)
+        self.policy_tab = PolicyTableView(
+            parent=self, context=self._context, autoload=False
+        )
+        self.finance_tab = FinanceTab(parent=self, context=self._context, autoload=False)
+        self.task_tab = TaskTableView(parent=self, context=self._context, autoload=False)
 
         self.tab_widget.addTab(self.home_tab, "Главная")
         self.tab_widget.addTab(self.client_tab, "Клиенты")
@@ -134,6 +139,18 @@ class MainWindow(QMainWindow):
         ):
             if hasattr(tab, "data_loaded"):
                 tab.data_loaded.connect(self.show_count)
+
+        self._pending_tab_loads = {
+            id(tab)
+            for tab in (
+                self.client_tab,
+                self.deal_tab,
+                self.policy_tab,
+                self.finance_tab,
+                self.task_tab,
+            )
+            if hasattr(tab, "load_data")
+        }
 
     def _load_settings(self):
         st = ui_settings.get_window_settings("MainWindow")
@@ -153,6 +170,12 @@ class MainWindow(QMainWindow):
         if widget is self.home_tab:
             self.home_tab.update_stats()
             self.status_bar.clearMessage()
+            return
+
+        widget_id = id(widget)
+        if hasattr(widget, "load_data") and widget_id in self._pending_tab_loads:
+            widget.load_data()
+            self._pending_tab_loads.discard(widget_id)
 
     def open_import_policy_json(self):
         return self._import_policy_runner(
