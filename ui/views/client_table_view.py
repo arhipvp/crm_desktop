@@ -38,6 +38,7 @@ class ClientTableView(BaseTableView):
         context: AppContext | None = None,
         controller: ClientTableController | None = None,
         service=client_app_service,
+        autoload: bool = True,
     ):
         self._context = context
         controller = controller or ClientTableController(
@@ -65,7 +66,8 @@ class ClientTableView(BaseTableView):
         if selection_model:
             selection_model.selectionChanged.connect(self.on_selection_changed)
         self.update_merge_button_state()
-        self.load_data()
+        if autoload:
+            self.load_data()
 
     def get_selected(self):
         index = self.table.currentIndex()
