@@ -17,6 +17,7 @@ class FinanceTab(QWidget):
         payment_view_factory=PaymentTableView,
         income_view_factory=IncomeTableView,
         expense_view_factory=ExpenseTableView,
+        autoload: bool = True,
     ):
         super().__init__(parent)
         self._context = context
@@ -29,13 +30,13 @@ class FinanceTab(QWidget):
         layout.addWidget(self.tabs)
 
         self.payment_view = payment_view_factory(
-            parent=self, context=self._context
+            parent=self, context=self._context, autoload=autoload
         )
         self.income_view = income_view_factory(
-            parent=self, context=self._context, autoload=False
+            parent=self, context=self._context, autoload=autoload
         )
         self.expense_view = expense_view_factory(
-            parent=self, context=self._context, autoload=False
+            parent=self, context=self._context, autoload=autoload
         )
 
         self.tabs.addTab(self.payment_view, "Платежи")

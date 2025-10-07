@@ -3,21 +3,78 @@
 from datetime import date, timedelta
 from functools import lru_cache
 
-from peewee import ModelSelect, fn
+from peewee import Case, ModelSelect, fn
 from playhouse.shortcuts import prefetch
 
 from database.models import Client, Deal, Policy, Task
 from .task_states import SENT
 
 
+def get_dashboard_counters() -> dict:
+    """Вернуть агрегированные счётчики сущностей и задач."""
+
+    sent_case = Case(
+        None,
+        ((Task.queued_at.is_null(False), 1),),
+        0,
+    )
+    working_case = Case(
+        None,
+        ((Task.tg_chat_id.is_null(False), 1),),
+        0,
+    )
+    unconfirmed_case = Case(
+        None,
+        (((Task.note.is_null(False)) & (Task.is_done == False), 1),),
+        0,
+    )
+    assistant_case = Case(
+        None,
+        ((((Task.dispatch_state == SENT) & (Task.is_done == False)), 1),),
+        0,
+    )
+
+    query = (
+        Task.select(
+            fn.COALESCE(fn.COUNT(Task.id), 0).alias("tasks_total"),
+            fn.COALESCE(fn.SUM(sent_case), 0).alias("tasks_sent"),
+            fn.COALESCE(fn.SUM(working_case), 0).alias("tasks_working"),
+            fn.COALESCE(fn.SUM(unconfirmed_case), 0).alias("tasks_unconfirmed"),
+            fn.COALESCE(fn.SUM(assistant_case), 0).alias("tasks_assistant"),
+            Client.select(fn.COUNT(Client.id))
+            .where(Client.is_deleted == False)
+            .alias("clients_total"),
+            Deal.select(fn.COUNT(Deal.id))
+            .where(Deal.is_deleted == False)
+            .alias("deals_total"),
+            Policy.select(fn.COUNT(Policy.id))
+            .where(Policy.is_deleted == False)
+            .alias("policies_total"),
+        )
+        .where(Task.is_deleted == False)
+    )
+
+    totals = query.dicts().get()
+
+    return {
+        "entities": {
+            "clients": totals["clients_total"],
+            "deals": totals["deals_total"],
+            "policies": totals["policies_total"],
+            "tasks": totals["tasks_total"],
+        },
+        "tasks": {
+            "assistant": totals["tasks_assistant"],
+            "sent": totals["tasks_sent"],
+            "working": totals["tasks_working"],
+            "unconfirmed": totals["tasks_unconfirmed"],
+        },
+    }
+
+
 def get_basic_stats() -> dict:
     """Получить общее количество записей по основным сущностям."""
-    return {
-        "clients": Client.active().count(),
-        "deals": Deal.active().count(),
-        "policies": Policy.active().count(),
-        "tasks": Task.active().count(),
-    }
+    return get_dashboard_counters()["entities"]
 
 
 def count_assistant_tasks() -> int:
