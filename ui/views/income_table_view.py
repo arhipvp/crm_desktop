@@ -181,10 +181,15 @@ class IncomeTableModel(BaseTableModel):
         income_amount = obj.amount if obj.amount is not None else None
         received_date = obj.received_date
         received_qdate = to_qdate(received_date)
-        executor_name = None
-        if deal and getattr(deal, "executors", None):
-            ex = deal.executors[0].executor
-            executor_name = ex.full_name if ex else None
+        executor = getattr(obj, "_executor", None)
+        if executor is None and deal is not None:
+            executor = getattr(deal, "_cached_executor", None)
+            if executor is None:
+                executors_prefetch = getattr(deal, "executors_prefetch", None)
+                if executors_prefetch:
+                    executor = executors_prefetch[0].executor
+                    setattr(deal, "_cached_executor", executor)
+        executor_name = executor.full_name if executor else None
 
         raw_values = {
             0: policy_number,
@@ -370,7 +375,16 @@ class IncomeTableView(BaseTableView):
                 executors_by_deal[deal_executor.deal_id].append(deal_executor)
                 total_assignments += 1
             for deal in deals:
-                deal.executors = executors_by_deal.get(deal.id, [])
+                assigned = executors_by_deal.get(deal.id, [])
+                setattr(deal, "executors_prefetch", assigned)
+                primary_executor = assigned[0].executor if assigned else None
+                setattr(deal, "_cached_executor", primary_executor)
+            for income in items:
+                payment = getattr(income, "payment", None)
+                policy = getattr(payment, "policy", None) if payment else None
+                deal = getattr(policy, "deal", None) if policy else None
+                if deal is not None:
+                    setattr(income, "_executor", getattr(deal, "_cached_executor", None))
             logger.debug(
                 "👥 Подгружены исполнители для %d сделок (%d назначений) одним запросом",
                 len(deals),

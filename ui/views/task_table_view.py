@@ -147,13 +147,17 @@ class TaskTableModel(BaseTableModel):
         col = index.column()
         if col >= len(self.fields):
             task = self.objects[index.row()]
-            deal = getattr(task, "deal", None)
-            ex = (
-                deal.executors[0].executor
-                if deal and getattr(deal, "executors", None)
-                else None
-            )
-            name = ex.full_name if ex else "—"
+            executor = getattr(task, "_executor", None)
+            if executor is None:
+                deal = getattr(task, "deal", None)
+                if deal is not None:
+                    executor = getattr(deal, "_cached_executor", None)
+                    if executor is None:
+                        executors_prefetch = getattr(deal, "executors_prefetch", None)
+                        if executors_prefetch:
+                            executor = executors_prefetch[0].executor
+                            setattr(deal, "_cached_executor", executor)
+            name = executor.full_name if executor else "—"
             if role in (Qt.DisplayRole, Qt.UserRole):
                 return name
             return None
@@ -422,7 +426,14 @@ class TaskTableView(BaseTableView):
                 executors_by_deal[deal_executor.deal_id].append(deal_executor)
                 total_assignments += 1
             for deal in deals:
-                deal.executors = executors_by_deal.get(deal.id, [])
+                assigned = executors_by_deal.get(deal.id, [])
+                setattr(deal, "executors_prefetch", assigned)
+                primary_executor = assigned[0].executor if assigned else None
+                setattr(deal, "_cached_executor", primary_executor)
+            for task in items:
+                deal = getattr(task, "deal", None)
+                if deal is not None:
+                    setattr(task, "_executor", getattr(deal, "_cached_executor", None))
             logger.debug(
                 "👥 Подгружены исполнители для %d сделок (%d назначений) одним запросом",
                 len(deals),
