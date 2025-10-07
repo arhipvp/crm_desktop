@@ -353,21 +353,17 @@ class ExpenseTableView(BaseTableView):
             self.order_dir,
             self.page,
         )
-        items = list(
-            expense_service.get_expenses_page(
-                self.page,
-                self.per_page,
-                order_by=self.order_by,
-                order_dir=self.order_dir,
-                **filters,
-            )
+        paged_query, total = expense_service.fetch_expenses_page_with_total(
+            self.page,
+            self.per_page,
+            order_by=self.order_by,
+            order_dir=self.order_dir,
+            **filters,
         )
+        items = list(paged_query)
         if not items:
             logger.info("Расходы не найдены для фильтров: %s", filters)
         logger.debug("Expense result rows=%d", len(items))
-        total = expense_service.build_expense_query(
-            order_by=self.order_by, order_dir=self.order_dir, **filters
-        ).count()
 
         # 3) обновляем модель и пагинатор
         self.set_model_class_and_items(Expense, items, total_count=total)

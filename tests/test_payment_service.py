@@ -35,7 +35,7 @@ def test_payment_service_filters_null_actual_payment_date(
         payment_kwargs={"actual_payment_date": date(2024, 5, 20)},
     )
 
-    query = payment_service.get_payments_page(
+    query, total = payment_service.fetch_payments_page_with_total(
         1,
         20,
         column_filters={"actual_payment_date": [CHOICE_NULL_TOKEN]},
@@ -43,8 +43,9 @@ def test_payment_service_filters_null_actual_payment_date(
     results = list(query)
 
     assert {payment.id for payment in results} == {unpaid.id}
+    assert total == 1
 
-    mixed_query = payment_service.get_payments_page(
+    mixed_query, mixed_total = payment_service.fetch_payments_page_with_total(
         1,
         20,
         column_filters={
@@ -56,6 +57,7 @@ def test_payment_service_filters_null_actual_payment_date(
     )
     mixed_results = list(mixed_query)
     assert {payment.id for payment in mixed_results} == {unpaid.id, paid.id}
+    assert mixed_total == 2
 
 
 @pytest.mark.usefixtures("db_transaction")

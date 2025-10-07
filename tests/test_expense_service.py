@@ -10,6 +10,7 @@ from database.db import db
 from database.models import Expense, Income
 from services.expense_service import (
     INCOME_TOTAL,
+    fetch_expenses_page_with_total,
     build_expense_query,
     update_expense,
     get_expense_amounts_by_deal_id,
@@ -63,6 +64,79 @@ def test_income_and_expense_sums(in_memory_db, make_policy_with_payment):
     expected_net = total_income - total_expense
     assert row1.net_income == expected_net
     assert row2.net_income == expected_net
+
+
+def test_fetch_expenses_page_with_total_paginates(in_memory_db, make_policy_with_payment):
+    """``fetch_expenses_page_with_total`` возвращает страницу и общее количество."""
+
+    _, _, policy, payment = make_policy_with_payment()
+    today = date.today()
+    exp1 = Expense.create(
+        payment=payment,
+        policy=policy,
+        amount=Decimal("10"),
+        expense_type="e1",
+        expense_date=today - timedelta(days=3),
+    )
+    exp2 = Expense.create(
+        payment=payment,
+        policy=policy,
+        amount=Decimal("20"),
+        expense_type="e2",
+        expense_date=today - timedelta(days=2),
+    )
+    exp3 = Expense.create(
+        payment=payment,
+        policy=policy,
+        amount=Decimal("30"),
+        expense_type="e3",
+        expense_date=today - timedelta(days=1),
+    )
+    exp4 = Expense.create(
+        payment=payment,
+        policy=policy,
+        amount=Decimal("40"),
+        expense_type="e4",
+        expense_date=today,
+    )
+
+    Expense.update(is_deleted=True).where(Expense.id == exp1.id).execute()
+
+    page1_query, total = fetch_expenses_page_with_total(
+        page=1,
+        per_page=2,
+        order_by="expense_date",
+        order_dir="desc",
+    )
+    page1 = list(page1_query)
+    assert [expense.id for expense in page1] == [exp4.id, exp3.id]
+    assert total == 3
+
+    page2_query, total_page2 = fetch_expenses_page_with_total(
+        page=2,
+        per_page=2,
+        order_by="expense_date",
+        order_dir="desc",
+    )
+    page2 = list(page2_query)
+    assert [expense.id for expense in page2] == [exp2.id]
+    assert total_page2 == 3
+
+    all_query, total_all = fetch_expenses_page_with_total(
+        page=1,
+        per_page=10,
+        order_by="expense_date",
+        order_dir="desc",
+        show_deleted=True,
+    )
+    all_expenses = list(all_query)
+    assert [expense.id for expense in all_expenses] == [
+        exp4.id,
+        exp3.id,
+        exp2.id,
+        exp1.id,
+    ]
+    assert total_all == 4
 
 
 @pytest.mark.parametrize(

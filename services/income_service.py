@@ -106,6 +106,81 @@ def mark_incomes_deleted(income_ids: list[int]) -> int:
     )
 
 
+def fetch_incomes_page_with_total(
+    page: int,
+    per_page: int,
+    order_by: str | Any = "received_date",
+    order_dir: str = "desc",
+    search_text: str = "",
+    show_deleted: bool = False,
+    include_received: bool = True,
+    received_date_range=None,
+    column_filters: dict | None = None,
+    *,
+    only_received: bool = False,
+    join_executor: bool | None = None,
+    **kwargs,
+):
+    """Получить страницу доходов и их общее количество."""
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "desc"
+    logger.debug(
+        "fetch_incomes_page_with_total filters=%s order=%s %s",
+        column_filters,
+        order_by,
+        normalized_order_dir,
+    )
+    if join_executor is None:
+        join_executor = (
+            isinstance(order_by, Field)
+            and getattr(order_by, "model", None) is Executor
+        )
+
+    base_query = build_income_query(
+        search_text=search_text,
+        show_deleted=show_deleted,
+        include_received=include_received,
+        received_date_range=received_date_range,
+        column_filters=column_filters,
+        only_received=only_received,
+        join_executor=join_executor,
+        **kwargs,
+    )
+    total = base_query.count()
+    logger.debug(
+        "\U0001F50E built income query. join_executor=%s order_by=%s order_dir=%s",
+        join_executor,
+        getattr(order_by, 'name', order_by),
+        normalized_order_dir,
+    )
+
+    # --- сортировка ---
+    if isinstance(order_by, str):
+        if hasattr(Income, order_by):
+            field = getattr(Income, order_by)
+        else:
+            field = Income.received_date
+    else:
+        field = order_by or Income.received_date
+
+    order_fields = []
+    if (
+        (join_executor or (column_filters and Executor.full_name in column_filters))
+        and not isinstance(db.obj, SqliteDatabase)
+    ):
+        order_fields.append(Income.id)
+    order_fields.append(
+        field.desc() if normalized_order_dir == "desc" else field.asc()
+    )
+    sorted_query = base_query.order_by(*order_fields)
+    logger.debug("\U0001F4DD final SQL: %s", sorted_query.sql())
+
+    offset = (page - 1) * per_page
+    paged_query = sorted_query.limit(per_page).offset(offset)
+    return paged_query, total
+
+
 def get_incomes_page(
     page: int,
     per_page: int,
@@ -122,22 +197,12 @@ def get_incomes_page(
     **kwargs,
 ):
     """Получить страницу доходов по фильтрам."""
-    normalized_order_dir = (order_dir or "").strip().lower()
-    if normalized_order_dir not in {"asc", "desc"}:
-        normalized_order_dir = "desc"
-    logger.debug(
-        "get_incomes_page filters=%s order=%s %s",
-        column_filters,
-        order_by,
-        normalized_order_dir,
-    )
-    if join_executor is None:
-        join_executor = (
-            isinstance(order_by, Field)
-            and getattr(order_by, "model", None) is Executor
-        )
 
-    query = build_income_query(
+    paged_query, _ = fetch_incomes_page_with_total(
+        page,
+        per_page,
+        order_by=order_by,
+        order_dir=order_dir,
         search_text=search_text,
         show_deleted=show_deleted,
         include_received=include_received,
@@ -147,36 +212,6 @@ def get_incomes_page(
         join_executor=join_executor,
         **kwargs,
     )
-    logger.debug(
-        "\U0001F50E built income query. join_executor=%s order_by=%s order_dir=%s",
-        join_executor,
-        getattr(order_by, 'name', order_by),
-        normalized_order_dir,
-    )
-
-    # --- сортировка ---
-    if isinstance(order_by, str):
-        if hasattr(Income, order_by):
-            field = getattr(Income, order_by)
-        else:
-            field = Income.received_date
-    else:
-        field = order_by
-
-    order_fields = []
-    if (
-        (join_executor or (column_filters and Executor.full_name in column_filters))
-        and not isinstance(db.obj, SqliteDatabase)
-    ):
-        order_fields.append(Income.id)
-    order_fields.append(
-        field.desc() if normalized_order_dir == "desc" else field.asc()
-    )
-    query = query.order_by(*order_fields)
-    logger.debug("\U0001F4DD final SQL: %s", query.sql())
-
-    offset = (page - 1) * per_page
-    paged_query = query.limit(per_page).offset(offset)
     return paged_query
 
 # Уведомления

@@ -12,9 +12,9 @@ from core.app_context import AppContext
 from database.models import Client, Income, Payment, Policy, Deal, Executor, DealExecutor
 from services.income_service import (
     build_income_query,
+    fetch_incomes_page_with_total,
     mark_income_deleted,
     mark_incomes_deleted,
-    get_incomes_page,
 )
 from ui.base.base_table_model import BaseTableModel
 from ui.base.base_table_view import BaseTableView
@@ -331,7 +331,7 @@ class IncomeTableView(BaseTableView):
             order_dir,
             self.page,
         )
-        query = get_incomes_page(
+        paged_query, total = fetch_incomes_page_with_total(
             self.page,
             self.per_page,
             order_by=order_field,
@@ -340,7 +340,15 @@ class IncomeTableView(BaseTableView):
             **filters,
         )
         items = list(
-            prefetch(query, Payment, Policy, Client, Deal, DealExecutor, Executor)
+            prefetch(
+                paged_query,
+                Payment,
+                Policy,
+                Client,
+                Deal,
+                DealExecutor,
+                Executor,
+            )
         )
         if not items:
             logger.warning(
@@ -391,8 +399,11 @@ class IncomeTableView(BaseTableView):
                 total_assignments,
             )
         logger.debug("Income result rows=%d", len(items))
-        total = build_income_query(join_executor=join_executor, **filters).count()
-        logger.debug("\U0001F4E6 Загружено доходов: %d", len(items))
+        logger.debug(
+            "\U0001F4E6 Загружено доходов: %d из %d",
+            len(items),
+            total,
+        )
 
         self.set_model_class_and_items(self.model_class, items, total_count=total)
 

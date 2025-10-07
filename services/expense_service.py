@@ -265,6 +265,45 @@ def update_expense(expense: Expense, **kwargs):
 # ──────────────────────── Постраничный вывод ───────────────────────
 
 
+def fetch_expenses_page_with_total(
+    page: int,
+    per_page: int,
+    *,
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int = None,
+    include_paid: bool = True,
+    expense_date_range=None,
+    column_filters: dict | None = None,
+    order_by: str | Field = Expense.expense_date,
+    order_dir: str = "desc",
+):
+    """Вернуть страницу расходов и их общее количество."""
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "desc"
+    logger.debug(
+        "fetch_expenses_page_with_total filters=%s order=%s %s",
+        column_filters,
+        order_by,
+        normalized_order_dir,
+    )
+    base_query = build_expense_query(
+        search_text=search_text,
+        show_deleted=show_deleted,
+        deal_id=deal_id,
+        include_paid=include_paid,
+        expense_date_range=expense_date_range,
+        column_filters=column_filters,
+        order_by=order_by,
+        order_dir=normalized_order_dir,
+    )
+    total = base_query.count()
+    offset = (page - 1) * per_page
+    paged_query = base_query.limit(per_page).offset(offset)
+    return paged_query, total
+
+
 def get_expenses_page(
     page: int,
     per_page: int,
@@ -278,33 +317,11 @@ def get_expenses_page(
     order_by: str | Field = Expense.expense_date,
     order_dir: str = "desc",
 ):
-    """Вернуть страницу расходов с фильтрами.
+    """Вернуть страницу расходов с фильтрами."""
 
-    Args:
-        page: Номер страницы.
-        per_page: Количество записей на странице.
-        search_text: Строка поиска по полисам и клиентам.
-        show_deleted: Учитывать удалённые записи.
-        deal_id: Идентификатор сделки для фильтра.
-        include_paid: Показывать оплаченные расходы.
-        expense_date_range: Период дат выплат (start, end).
-        column_filters: Фильтры по столбцам.
-        order_by: Поле сортировки.
-        order_dir: Направление сортировки ("asc" или "desc").
-
-    Returns:
-        ModelSelect: Выборка расходов.
-    """
-    normalized_order_dir = (order_dir or "").strip().lower()
-    if normalized_order_dir not in {"asc", "desc"}:
-        normalized_order_dir = "desc"
-    logger.debug(
-        "get_expenses_page filters=%s order=%s %s",
-        column_filters,
-        order_by,
-        normalized_order_dir,
-    )
-    query = build_expense_query(
+    paged_query, _ = fetch_expenses_page_with_total(
+        page,
+        per_page,
         search_text=search_text,
         show_deleted=show_deleted,
         deal_id=deal_id,
@@ -312,10 +329,8 @@ def get_expenses_page(
         expense_date_range=expense_date_range,
         column_filters=column_filters,
         order_by=order_by,
-        order_dir=normalized_order_dir,
+        order_dir=order_dir,
     )
-    offset = (page - 1) * per_page
-    paged_query = query.limit(per_page).offset(offset)
     return paged_query
 
 

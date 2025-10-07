@@ -384,7 +384,18 @@ def test_payment_controller_distinct_values_include_null(
         payment_kwargs={"actual_payment_date": date(2024, 5, 20)},
     )
 
-    controller = PaymentTableController(object(), model_class=Payment)
+    controller = PaymentTableController(
+        object(),
+        model_class=Payment,
+        service_kwargs_factory=lambda data: {
+            "search_text": data.get("search_text", ""),
+            "show_deleted": data.get("show_deleted", False),
+            "deal_id": data.get("deal_id"),
+            "include_paid": data.get("include_paid", True),
+            "column_filters": data.get("column_filters"),
+            "payment_date_range": data.get("payment_date_range"),
+        },
+    )
     controller.get_filters = lambda: {
         "search_text": "",
         "show_deleted": False,
@@ -1003,12 +1014,14 @@ def test_column_filter_passed_to_payment_service(
     captured_column_filters: list[dict | None] = []
     captured_sql: list[tuple[str, list | tuple]] = []
 
-    original_get_page = payment_table_view_module.get_payments_page
+    original_fetch_page = (
+        payment_table_view_module.fetch_payments_page_with_total
+    )
     original_build_query = payment_table_view_module.build_payment_query
 
-    def spy_get_payments_page(page, per_page, **kwargs):
+    def spy_fetch_payments_page(page, per_page, **kwargs):
         captured_column_filters.append(kwargs.get("column_filters"))
-        return original_get_page(page, per_page, **kwargs)
+        return original_fetch_page(page, per_page, **kwargs)
 
     def spy_build_payment_query(*args, **kwargs):
         query = original_build_query(*args, **kwargs)
@@ -1017,8 +1030,8 @@ def test_column_filter_passed_to_payment_service(
 
     monkeypatch.setattr(
         payment_table_view_module,
-        "get_payments_page",
-        spy_get_payments_page,
+        "fetch_payments_page_with_total",
+        spy_fetch_payments_page,
     )
     monkeypatch.setattr(
         payment_table_view_module,
