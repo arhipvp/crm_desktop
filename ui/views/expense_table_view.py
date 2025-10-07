@@ -305,6 +305,7 @@ class ExpenseTableView(BaseTableView):
         *,
         context: AppContext | None = None,
         deal_id=None,
+        autoload: bool = True,
         **kwargs,
     ):
         self._context = context
@@ -338,7 +339,8 @@ class ExpenseTableView(BaseTableView):
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.delete_callback = self.delete_selected
 
-        self.load_data()
+        if autoload:
+            self.load_data()
 
     def load_data(self):
         filters = self.get_filters()

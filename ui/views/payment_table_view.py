@@ -122,7 +122,14 @@ class PaymentTableView(BaseTableView):
         5: None,
     }
 
-    def __init__(self, parent=None, deal_id=None, **kwargs):
+    def __init__(
+        self,
+        parent=None,
+        deal_id=None,
+        *,
+        autoload: bool = True,
+        **kwargs,
+    ):
         self.deal_id = deal_id
         self.default_sort_column = 2
         self.current_sort_column = self.default_sort_column
@@ -183,7 +190,8 @@ class PaymentTableView(BaseTableView):
         self.button_row.insertWidget(self.button_row.count() - 1, self.mark_paid_btn)
 
         self.row_double_clicked.connect(self.open_detail)
-        self.load_data()
+        if autoload:
+            self.load_data()
 
     def _apply_filters(self, filters: dict) -> dict:
         filters.update(

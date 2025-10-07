@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from functools import partial
 
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtWidgets import (
@@ -258,8 +259,11 @@ class DealTabsMixin:
             styled_button("🤖 Из текста", tooltip="Распознать текст полиса")
         )
         btn_ai_text.clicked.connect(self._on_process_policy_text_ai)
-        pol_view = PolicyTableView(parent=self, deal_id=self.instance.id)
-        pol_view.load_data()
+        pol_view = PolicyTableView(
+            parent=self,
+            deal_id=self.instance.id,
+            autoload=False,
+        )
         pol_l.addWidget(pol_view)
         self.pol_view = pol_view
         pol_open = getattr(self, "cnt_policies_open", 0)
@@ -271,6 +275,9 @@ class DealTabsMixin:
             self.policy_tab_idx,
             [btn_pol, btn_import, btn_ai, btn_ai_text],
         )
+        pol_view.data_loaded.connect(
+            partial(self._on_tab_data_loaded, self.policy_tab_idx)
+        )
 
         # ---------- Платежи ---------------------------------------
         pay_tab = QWidget()
@@ -281,9 +288,11 @@ class DealTabsMixin:
         btn_pay.clicked.connect(self._on_add_payment)
         self._add_shortcut("Ctrl+Shift+P", self._on_add_payment)
         pay_view = PaymentTableView(
-            parent=self, deal_id=self.instance.id, can_restore=False
+            parent=self,
+            deal_id=self.instance.id,
+            can_restore=False,
+            autoload=False,
         )
-        pay_view.load_data()
         pay_l.addWidget(pay_view)
         self.pay_view = pay_view
         pay_open = getattr(self, "cnt_payments_open", 0)
@@ -292,6 +301,9 @@ class DealTabsMixin:
             pay_tab, f"Платежи {pay_open} ({pay_closed})"
         )
         self.register_tab_actions(self.payment_tab_idx, [btn_pay])
+        pay_view.data_loaded.connect(
+            partial(self._on_tab_data_loaded, self.payment_tab_idx)
+        )
 
         # ---------- Доходы ---------------------------------------
         income_tab = QWidget()
@@ -308,8 +320,11 @@ class DealTabsMixin:
         btn_income.setEnabled(has_payments)
         if not has_payments:
             btn_income.setToolTip("Нет доступных платежей для привязки")
-        income_view = IncomeTableView(parent=self, deal_id=self.instance.id)
-        income_view.load_data()
+        income_view = IncomeTableView(
+            parent=self,
+            deal_id=self.instance.id,
+            autoload=False,
+        )
         income_layout.addWidget(income_view)
         self.income_view = income_view
         inc_open = getattr(self, "cnt_income_open", 0)
@@ -318,6 +333,9 @@ class DealTabsMixin:
             income_tab, f"Доходы {inc_open} ({inc_closed})"
         )
         self.register_tab_actions(self.income_tab_idx, [btn_income])
+        income_view.data_loaded.connect(
+            partial(self._on_tab_data_loaded, self.income_tab_idx)
+        )
 
         # ---------- Расходы --------------------------------------
         expense_tab = QWidget()
@@ -327,8 +345,11 @@ class DealTabsMixin:
         )
         btn_expense.clicked.connect(self._on_add_expense)
         self._add_shortcut("Ctrl+Alt+X", self._on_add_expense)
-        expense_view = ExpenseTableView(parent=self, deal_id=self.instance.id)
-        expense_view.load_data()
+        expense_view = ExpenseTableView(
+            parent=self,
+            deal_id=self.instance.id,
+            autoload=False,
+        )
         expense_layout.addWidget(expense_view)
         self.expense_view = expense_view
         exp_open = getattr(self, "cnt_expense_open", 0)
@@ -337,6 +358,9 @@ class DealTabsMixin:
             expense_tab, f"Расходы {exp_open} ({exp_closed})"
         )
         self.register_tab_actions(self.expense_tab_idx, [btn_expense])
+        expense_view.data_loaded.connect(
+            partial(self._on_tab_data_loaded, self.expense_tab_idx)
+        )
 
         # ---------- Задачи ---------------------------------------
         task_tab = QWidget()
@@ -368,10 +392,22 @@ class DealTabsMixin:
             task_tab, f"Задачи {task_open} ({task_closed})"
         )
         self.register_tab_actions(self.task_tab_idx, [btn_add_task])
+        task_view.data_loaded.connect(
+            partial(self._on_tab_data_loaded, self.task_tab_idx)
+        )
 
         self.tabs.setCurrentIndex(min(current, self.tabs.count() - 1))
         if hasattr(self, "_rebuild_tab_actions"):
             self._rebuild_tab_actions(self.tabs.currentIndex())
+
+    def _on_tab_data_loaded(self, tab_index: int, *_):
+        if not hasattr(self, "tabs"):
+            return
+        if self.tabs.currentIndex() != tab_index:
+            return
+        self._init_kpi_panel()
+        if hasattr(self, "_apply_tab_actions"):
+            self._apply_tab_actions(tab_index)
 
     def _on_archive_note(self, entry_id: str) -> None:
         archived = deal_journal.archive_entry(self.instance, entry_id)

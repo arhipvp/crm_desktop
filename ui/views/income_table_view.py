@@ -257,6 +257,7 @@ class IncomeTableView(BaseTableView):
         *,
         context: AppContext | None = None,
         deal_id=None,
+        autoload: bool = True,
         **kwargs,
     ):
         self._context = context
@@ -299,7 +300,8 @@ class IncomeTableView(BaseTableView):
                     pass
                 act.triggered.connect(self._on_reset_filters)
                 break
-        self.load_data()
+        if autoload:
+            self.load_data()
 
     def load_data(self):
         filters = self.get_filters()
