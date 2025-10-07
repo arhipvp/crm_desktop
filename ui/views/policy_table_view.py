@@ -123,6 +123,7 @@ class PolicyTableView(BaseTableView):
         deal_id=None,
         controller: PolicyTableController | None = None,
         service=policy_app_service,
+        autoload: bool = True,
         **kwargs,
     ):
         self._context = context
@@ -173,7 +174,8 @@ class PolicyTableView(BaseTableView):
         self.button_row.insertWidget(idx, self.ai_btn)
         self.ai_btn.clicked.connect(self._on_ai_import)
 
-        self.load_data()
+        if autoload:
+            self.load_data()
 
     def create_table_model(
         self, items: Iterable[PolicyRowDTO], model_class
