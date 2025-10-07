@@ -17,7 +17,12 @@ from database.models import (
     Task,
 )
 from playhouse.shortcuts import prefetch
-from services.task_crud import build_task_query, get_tasks_page, mark_task_deleted
+from services.task_crud import (
+    build_task_query,
+    fetch_tasks_page_with_total,
+    get_tasks_page,
+    mark_task_deleted,
+)
 from services.task_notifications import notify_task
 from services.task_queue import queue_task
 from ui.base.base_table_model import BaseTableModel
@@ -193,6 +198,7 @@ class TaskTableView(BaseTableView):
         resizable_columns: bool = True,
         context: AppContext | None = None,
         get_tasks_page_func=get_tasks_page,
+        fetch_tasks_page_with_total_func=fetch_tasks_page_with_total,
         build_task_query_func=build_task_query,
         queue_task_func=queue_task,
         notify_task_func=notify_task,
@@ -206,6 +212,9 @@ class TaskTableView(BaseTableView):
         self._context = context
         self.deal_id = deal_id
         self._get_tasks_page = get_tasks_page_func or get_tasks_page
+        self._fetch_tasks_page_with_total = (
+            fetch_tasks_page_with_total_func or fetch_tasks_page_with_total
+        )
         self._build_task_query = build_task_query_func or build_task_query
         self._queue_task = queue_task_func or queue_task
         self._notify_task = notify_task_func or notify_task
@@ -377,7 +386,7 @@ class TaskTableView(BaseTableView):
         self.load_data()
 
     def load_data(self) -> None:
-        logger.debug("📥 Используется метод загрузки: get_tasks_page")
+        logger.debug("📥 Используется метод загрузки: fetch_tasks_page_with_total")
 
         filters = self.get_filters()
         column_filters = filters.get("column_filters")
@@ -397,46 +406,47 @@ class TaskTableView(BaseTableView):
         if self.deal_id:
             common_kwargs["deal_id"] = self.deal_id
 
-        items = self._get_tasks_page(
-            page=self.page,
-            per_page=self.per_page,
-            **common_kwargs,
-        )
-        total = self._build_task_query(**common_kwargs).count()
+        if self._fetch_tasks_page_with_total is not None:
+            items, total = self._fetch_tasks_page_with_total(
+                page=self.page,
+                per_page=self.per_page,
+                **common_kwargs,
+            )
+        else:
+            items = self._get_tasks_page(
+                page=self.page,
+                per_page=self.per_page,
+                **common_kwargs,
+            )
+            total = self._build_task_query(**common_kwargs).count()
 
         items = list(prefetch(items, Deal, Client, Policy, DealExecutor, Executor))
 
-        deals = {
-            task.deal
-            for task in items
-            if getattr(task, "deal", None) is not None
-        }
-        if deals:
-            deal_ids = [deal.id for deal in deals]
-            executors_by_deal: dict[int, list[DealExecutor]] = {
-                deal_id: [] for deal_id in deal_ids
-            }
-            deal_executors = (
-                DealExecutor.select(DealExecutor, Executor)
-                .join(Executor)
-                .where(DealExecutor.deal.in_(deal_ids))
-            )
-            total_assignments = 0
-            for deal_executor in deal_executors:
-                executors_by_deal[deal_executor.deal_id].append(deal_executor)
-                total_assignments += 1
-            for deal in deals:
-                assigned = executors_by_deal.get(deal.id, [])
-                setattr(deal, "executors_prefetch", assigned)
-                primary_executor = assigned[0].executor if assigned else None
+        processed_deal_ids: set[int] = set()
+        total_assignments = 0
+        for task in items:
+            deal = getattr(task, "deal", None)
+            if deal is None:
+                continue
+            executors_prefetch = list(getattr(deal, "executors_prefetch", []) or [])
+            setattr(deal, "executors_prefetch", executors_prefetch)
+            deal_id = getattr(deal, "id", None)
+            if deal_id is not None and deal_id not in processed_deal_ids:
+                processed_deal_ids.add(deal_id)
+                total_assignments += len(executors_prefetch)
+                primary_executor = (
+                    executors_prefetch[0].executor if executors_prefetch else None
+                )
                 setattr(deal, "_cached_executor", primary_executor)
-            for task in items:
-                deal = getattr(task, "deal", None)
-                if deal is not None:
-                    setattr(task, "_executor", getattr(deal, "_cached_executor", None))
+            if hasattr(deal, "_cached_executor"):
+                setattr(task, "_executor", getattr(deal, "_cached_executor"))
+            else:
+                setattr(task, "_executor", None)
+
+        if processed_deal_ids:
             logger.debug(
-                "👥 Подгружены исполнители для %d сделок (%d назначений) одним запросом",
-                len(deals),
+                "👥 Подгружены исполнители для %d сделок (%d назначений)",
+                len(processed_deal_ids),
                 total_assignments,
             )
         self.model = TaskTableModel(items, Task)

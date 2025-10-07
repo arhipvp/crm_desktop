@@ -293,6 +293,43 @@ def build_task_query(
     return query
 
 
+def fetch_tasks_page_with_total(
+    page: int,
+    per_page: int,
+    *,
+    sort_field: str = "due_date",
+    sort_order: str = "asc",
+    column_filters: dict[str, str] | None = None,
+    **filters,
+):
+    """Построить запрос страницы задач и вернуть его вместе с общим количеством."""
+    if sort_field not in ALLOWED_SORT_FIELDS and sort_field != "executor":
+        sort_field = "due_date"
+
+    logger.debug("🔽 Применяем сортировку: field=%s, order=%s", sort_field, sort_order)
+
+    base_query = build_task_query(
+        column_filters=column_filters, sort_field=sort_field, **filters
+    )
+
+    if sort_field == "executor":
+        order = (
+            Executor.full_name.asc()
+            if sort_order == "asc"
+            else Executor.full_name.desc()
+        )
+        ordered_query = base_query.distinct().order_by(order, Task.id.asc())
+    else:
+        field = ALLOWED_SORT_FIELDS.get(sort_field, Task.due_date)
+        order = field.asc() if sort_order == "asc" else field.desc()
+        ordered_query = base_query.order_by(order, Task.id.asc())
+
+    total = ordered_query.count()
+    offset = (page - 1) * per_page
+    paged_query = ordered_query.offset(offset).limit(per_page)
+    return paged_query, total
+
+
 def get_tasks_page(
     page: int,
     per_page: int,
@@ -302,32 +339,15 @@ def get_tasks_page(
     **filters,
 ):
     """Получить страницу задач."""
-    if sort_field not in ALLOWED_SORT_FIELDS and sort_field != "executor":
-        sort_field = "due_date"
-
-    logger.debug("🔽 Применяем сортировку: field=%s, order=%s", sort_field, sort_order)
-    sort_field = (
-        sort_field
-        if sort_field in ALLOWED_SORT_FIELDS or sort_field == "executor"
-        else "due_date"
+    paged_query, _total = fetch_tasks_page_with_total(
+        page,
+        per_page,
+        sort_field=sort_field,
+        sort_order=sort_order,
+        column_filters=column_filters,
+        **filters,
     )
-    offset = (page - 1) * per_page
-    logger.debug("column_filters=%s", column_filters)
-    query = build_task_query(
-        column_filters=column_filters, sort_field=sort_field, **filters
-    )
-    if sort_field == "executor":
-        order = (
-            Executor.full_name.asc()
-            if sort_order == "asc"
-            else Executor.full_name.desc()
-        )
-        query = query.distinct().order_by(order, Task.id.asc())
-    else:
-        field = ALLOWED_SORT_FIELDS.get(sort_field, Task.due_date)
-        order = field.asc() if sort_order == "asc" else field.desc()
-        query = query.order_by(order, Task.id.asc())
-    return query.offset(offset).limit(per_page)
+    return paged_query
 
 
 def get_pending_tasks_page(page: int, per_page: int):
