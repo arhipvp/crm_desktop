@@ -60,8 +60,9 @@
 - Переменная окружения `AI_DOCUMENT_PROMPT` настраивает системное сообщение для генерации заметок (см. `Settings.ai_document_prompt`)【F:config.py†L24-L24】【F:config.py†L56-L56】【F:services/ai_document_service.py†L26-L78】.
 
 ## dashboard_service
-- `get_basic_stats` возвращает количество клиентов, сделок, полисов и задач【F:services/dashboard_service.py†L9-L18】.
-- `count_assistant_tasks`, `count_sent_tasks`, `count_working_tasks` и `count_unconfirmed_tasks` дают сводные счётчики задач【F:services/dashboard_service.py†L20-L46】.
+- `get_dashboard_counters` выполняет один агрегирующий запрос и возвращает сгруппированные счётчики по сущностям и задачам【F:services/dashboard_service.py†L12-L55】.
+- `get_basic_stats` возвращает количество клиентов, сделок, полисов и задач【F:services/dashboard_service.py†L58-L60】.
+- `count_assistant_tasks`, `count_sent_tasks`, `count_working_tasks` и `count_unconfirmed_tasks` дают сводные счётчики задач【F:services/dashboard_service.py†L63-L89】.
 - `get_upcoming_deal_reminders` возвращает ближайшие напоминания по открытым сделкам【F:services/dashboard_service.py†L70-L88】.
 - `get_expiring_policies` показывает полисы с истекающим сроком действия【F:services/dashboard_service.py†L62-L69】.
 
