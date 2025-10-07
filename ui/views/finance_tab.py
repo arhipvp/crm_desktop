@@ -1,3 +1,5 @@
+from typing import Callable
+
 from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
 from core.app_context import AppContext
@@ -41,9 +43,37 @@ class FinanceTab(QWidget):
         self.tabs.addTab(self.income_view, "Доходы")
         self.tabs.addTab(self.expense_view, "Расходы")
 
-        self.tabs.setCurrentIndex(0)
-
-    def load_data(self):
+        self._loaded_tabs: dict[QWidget, bool] = {}
+        self._data_loaded_handlers: list[Callable[[int], None]] = []
         for view in (self.payment_view, self.income_view, self.expense_view):
-            if hasattr(view, "load_data"):
-                view.load_data()
+            self._loaded_tabs[view] = bool(getattr(view, "model", None))
+            data_loaded = getattr(view, "data_loaded", None)
+            connect = getattr(data_loaded, "connect", None)
+            if callable(connect):
+                handler = self._create_data_loaded_handler(view)
+                connect(handler)
+                self._data_loaded_handlers.append(handler)
+
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+        self.tabs.setCurrentIndex(0)
+        self._on_tab_changed(self.tabs.currentIndex())
+
+    def _create_data_loaded_handler(self, view: QWidget) -> Callable[[int], None]:
+        def _handler(_count: int) -> None:
+            self._loaded_tabs[view] = True
+
+        return _handler
+
+    def _on_tab_changed(self, index: int) -> None:
+        widget = self.tabs.widget(index)
+        if widget is None:
+            return
+        if widget not in self._loaded_tabs:
+            return
+        if self._loaded_tabs[widget]:
+            return
+        load_data = getattr(widget, "load_data", None)
+        if callable(load_data):
+            load_data()
+        else:
+            self._loaded_tabs[widget] = True
