@@ -17,6 +17,7 @@ from database.models import (
 )
 from services.income_service import (
     mark_incomes_deleted,
+    fetch_incomes_page_with_total,
     get_incomes_page,
     get_income_amounts_by_deal_id,
 )
@@ -71,7 +72,17 @@ def test_get_incomes_page_pagination_and_deleted(in_memory_db):
     # delete the oldest income
     mark_incomes_deleted([inc1.id])
 
-    page1 = list(
+    page1_query, total = fetch_incomes_page_with_total(
+        page=1,
+        per_page=2,
+        order_by="received_date",
+        order_dir="DeSc",
+    )
+    page1 = list(page1_query)
+    assert [i.id for i in page1] == [inc4.id, inc3.id]
+    assert total == 3
+
+    fallback_page1 = list(
         get_incomes_page(
             page=1,
             per_page=2,
@@ -79,28 +90,28 @@ def test_get_incomes_page_pagination_and_deleted(in_memory_db):
             order_dir="DeSc",
         )
     )
-    assert [i.id for i in page1] == [inc4.id, inc3.id]
+    assert [i.id for i in fallback_page1] == [inc.id for inc in page1]
 
-    page2 = list(
-        get_incomes_page(
-            page=2,
-            per_page=2,
-            order_by="received_date",
-            order_dir=" desc ",
-        )
+    page2_query, total_page2 = fetch_incomes_page_with_total(
+        page=2,
+        per_page=2,
+        order_by="received_date",
+        order_dir=" desc ",
     )
+    page2 = list(page2_query)
     assert [i.id for i in page2] == [inc2.id]
+    assert total_page2 == 3
 
-    all_incomes = list(
-        get_incomes_page(
-            page=1,
-            per_page=10,
-            order_by="received_date",
-            order_dir="desc",
-            show_deleted=True,
-        )
+    all_query, total_all = fetch_incomes_page_with_total(
+        page=1,
+        per_page=10,
+        order_by="received_date",
+        order_dir="desc",
+        show_deleted=True,
     )
+    all_incomes = list(all_query)
     assert [i.id for i in all_incomes] == [inc4.id, inc3.id, inc2.id, inc1.id]
+    assert total_all == 4
 
 
 def test_get_incomes_page_sort_by_executor_includes_income_id(in_memory_db):
@@ -121,7 +132,7 @@ def test_get_incomes_page_sort_by_executor_includes_income_id(in_memory_db):
     Income.create(payment=pay1, amount=1, received_date=today)
     Income.create(payment=pay2, amount=1, received_date=today)
 
-    query = get_incomes_page(
+    query, total = fetch_incomes_page_with_total(
         page=1,
         per_page=10,
         order_by=Executor.full_name,
@@ -133,6 +144,7 @@ def test_get_incomes_page_sort_by_executor_includes_income_id(in_memory_db):
         i.payment.policy.deal.executors[0].executor.full_name for i in incomes
     ]
     assert names == ["A", "B"]
+    assert total == 2
 
 
 @pytest.mark.parametrize(
@@ -152,18 +164,18 @@ def test_get_incomes_page_ignores_date_range_when_excluding_received(
     pending_income = Income.create(payment=payment, amount=50)
     Income.create(payment=payment, amount=75, received_date=today)
 
-    page = list(
-        get_incomes_page(
-            page=1,
-            per_page=10,
-            include_received=False,
-            received_date_range=received_date_range,
-            order_by="id",
-            order_dir="asc",
-        )
+    query, total = fetch_incomes_page_with_total(
+        page=1,
+        per_page=10,
+        include_received=False,
+        received_date_range=received_date_range,
+        order_by="id",
+        order_dir="asc",
     )
+    page = list(query)
 
     assert [income.id for income in page] == [pending_income.id]
+    assert total == 1
 
 
 def test_sum_column_ignores_pagination(in_memory_db):

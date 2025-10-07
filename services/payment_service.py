@@ -120,6 +120,51 @@ def get_payments_by_client_id(client_id: int) -> ModelSelect:
     )
 
 
+def fetch_payments_page_with_total(
+    page: int,
+    per_page: int,
+    search_text: str = "",
+    show_deleted: bool = False,
+    deal_id: int | None = None,
+    include_paid: bool = True,
+    column_filters: dict | None = None,
+    order_by: str | Field | None = Payment.payment_date,
+    order_dir: str = "asc",
+    payment_date_range: tuple[date | None, date | None] | None = None,
+) -> tuple[ModelSelect, int]:
+    """Получить страницу платежей и их общее количество."""
+    normalized_order_dir = (order_dir or "").strip().lower()
+    if normalized_order_dir not in {"asc", "desc"}:
+        normalized_order_dir = "asc"
+    base_query = build_payment_query(
+        search_text=search_text,
+        show_deleted=show_deleted,
+        deal_id=deal_id,
+        include_paid=include_paid,
+        column_filters=column_filters,
+        order_by=order_by,
+        order_dir=normalized_order_dir,
+        payment_date_range=payment_date_range,
+    )
+    total = base_query.count()
+    if not order_by:
+        order_field = Payment.payment_date
+    elif isinstance(order_by, str):
+        order_field = getattr(Payment, order_by, Payment.payment_date)
+    else:
+        order_field = order_by or Payment.payment_date
+    order_expr = (
+        order_field.desc()
+        if normalized_order_dir == "desc"
+        else order_field.asc()
+    )
+    offset = (page - 1) * per_page
+    paged_query = (
+        base_query.order_by(order_expr).offset(offset).limit(per_page)
+    )
+    return paged_query, total
+
+
 def get_payments_page(
     page: int,
     per_page: int,
@@ -133,32 +178,20 @@ def get_payments_page(
     payment_date_range: tuple[date | None, date | None] | None = None,
 ) -> ModelSelect:
     """Получить страницу платежей по заданным фильтрам."""
-    normalized_order_dir = (order_dir or "").strip().lower()
-    if normalized_order_dir not in {"asc", "desc"}:
-        normalized_order_dir = "asc"
-    query = build_payment_query(
+
+    paged_query, _ = fetch_payments_page_with_total(
+        page,
+        per_page,
         search_text=search_text,
         show_deleted=show_deleted,
         deal_id=deal_id,
         include_paid=include_paid,
         column_filters=column_filters,
         order_by=order_by,
-        order_dir=normalized_order_dir,
+        order_dir=order_dir,
         payment_date_range=payment_date_range,
     )
-    if not order_by:
-        order_field = Payment.payment_date
-    elif isinstance(order_by, str):
-        order_field = getattr(Payment, order_by, Payment.payment_date)
-    else:
-        order_field = order_by
-    order_expr = (
-        order_field.desc()
-        if normalized_order_dir == "desc"
-        else order_field.asc()
-    )
-    offset = (page - 1) * per_page
-    return query.order_by(order_expr).offset(offset).limit(per_page)
+    return paged_query
 
 
 def mark_payment_deleted(payment_id: int):

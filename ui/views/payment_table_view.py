@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QAbstractItemView, QMenu
 from database.models import Payment, Policy
 from services.payment_service import (
     build_payment_query,
-    get_payments_page,
+    fetch_payments_page_with_total,
     mark_payment_deleted,
     mark_payments_paid,
 )
@@ -27,8 +27,62 @@ from ui.views.payment_detail_view import PaymentDetailView
 
 
 class PaymentTableController(TableController):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        view,
+        *,
+        model_class,
+        service_kwargs_factory,
+        filter_func=None,
+    ) -> None:
+        self._service_kwargs_factory = service_kwargs_factory
+        self._last_total: int | None = None
+        super().__init__(
+            view,
+            model_class=model_class,
+            get_page_func=self._get_page,
+            get_total_func=self._get_total,
+            filter_func=filter_func,
+        )
+
+    def _prepare_kwargs(self, filters: dict[str, Any]) -> dict[str, Any]:
+        return self._service_kwargs_factory(dict(filters))
+
+    def _get_page(
+        self,
+        page: int,
+        per_page: int,
+        *,
+        order_by: Any | None = None,
+        order_dir: str = "asc",
+        **filters,
+    ):
+        kwargs = self._prepare_kwargs(filters)
+        paged_query, total = fetch_payments_page_with_total(
+            page,
+            per_page,
+            order_by=order_by,
+            order_dir=order_dir,
+            **kwargs,
+        )
+        self._last_total = total
+        return paged_query
+
+    def _get_total(self, *, order_by: Any | None = None, order_dir: str = "asc", **filters):
+        if self._last_total is not None:
+            total = self._last_total
+            self._last_total = None
+            return total
+
+        kwargs = self._prepare_kwargs(filters)
+        _, total = fetch_payments_page_with_total(
+            self.view.page,
+            self.view.per_page,
+            order_by=order_by,
+            order_dir=order_dir,
+            **kwargs,
+        )
+        return total
 
     def set_model_class_and_items(self, model_class, items, total_count=None):
         total_sum = sum(p.amount for p in items)
@@ -146,22 +200,13 @@ class PaymentTableView(BaseTableView):
                 "deal_id": filters.get("deal_id"),
                 "include_paid": bool(filters.get("include_paid", True)),
                 "column_filters": filters.get("column_filters"),
-                "order_by": filters.get("order_by"),
-                "order_dir": filters.get("order_dir", "asc"),
                 "payment_date_range": filters.get("payment_date_range"),
             }
 
         controller = PaymentTableController(
             self,
             model_class=Payment,
-            get_page_func=lambda page, per_page, **f: get_payments_page(
-                page,
-                per_page,
-                **_prepare_service_kwargs(f),
-            ),
-            get_total_func=lambda **f: build_payment_query(
-                **_prepare_service_kwargs(f)
-            ).count(),
+            service_kwargs_factory=_prepare_service_kwargs,
             filter_func=self._apply_filters,
         )
 
