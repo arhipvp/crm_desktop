@@ -56,7 +56,15 @@ class FinanceTab(QWidget):
 
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self.tabs.setCurrentIndex(0)
-        self._on_tab_changed(self.tabs.currentIndex())
+
+    def load_data(self) -> None:
+        index = self.tabs.currentIndex()
+        self._on_tab_changed(index)
+        widget = self.tabs.widget(index)
+        if widget is None:
+            return
+        if widget in self._loaded_tabs and not self._loaded_tabs[widget]:
+            self._loaded_tabs[widget] = True
 
     def _create_data_loaded_handler(self, view: QWidget) -> Callable[[int], None]:
         def _handler(_count: int) -> None:
