@@ -16,20 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.app_context import AppContext, get_app_context
-from services.task_crud import get_task_counts_by_deal_id
-from services.payment_service import (
-    get_payment_amounts_by_deal_id,
-    get_payment_counts_by_deal_id,
-)
-from services.policies import get_policy_counts_by_deal_id
-from services.income_service import (
-    get_income_amounts_by_deal_id,
-    get_income_counts_by_deal_id,
-)
-from services.expense_service import (
-    get_expense_amounts_by_deal_id,
-    get_expense_counts_by_deal_id,
-)
+from services.deal_metrics import get_deal_kpi_metrics
 from utils.screen_utils import get_scaled_size
 from utils.money import format_rub
 from ui.widgets.flow_layout import FlowLayout
@@ -264,15 +251,25 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self.net_profit_label = None
 
         deal_id = self.instance.id
-        pol_open, pol_closed = get_policy_counts_by_deal_id(deal_id)
-        pay_open, pay_closed = get_payment_counts_by_deal_id(deal_id)
-        inc_open, inc_closed = get_income_counts_by_deal_id(deal_id)
-        exp_open, exp_closed = get_expense_counts_by_deal_id(deal_id)
-        task_open, task_closed = get_task_counts_by_deal_id(deal_id)
+        metrics = get_deal_kpi_metrics(deal_id)
 
-        pay_expected, pay_received = get_payment_amounts_by_deal_id(deal_id)
-        inc_expected, inc_received = get_income_amounts_by_deal_id(deal_id)
-        exp_planned, exp_spent = get_expense_amounts_by_deal_id(deal_id)
+        pol_open = metrics["policies_open"]
+        pol_closed = metrics["policies_closed"]
+        pay_open = metrics["payments_open"]
+        pay_closed = metrics["payments_closed"]
+        inc_open = metrics["incomes_open"]
+        inc_closed = metrics["incomes_closed"]
+        exp_open = metrics["expenses_open"]
+        exp_closed = metrics["expenses_closed"]
+        task_open = metrics["tasks_open"]
+        task_closed = metrics["tasks_closed"]
+
+        pay_expected = metrics["payments_expected"]
+        pay_received = metrics["payments_received"]
+        inc_expected = metrics["incomes_expected"]
+        inc_received = metrics["incomes_received"]
+        exp_planned = metrics["expenses_planned"]
+        exp_spent = metrics["expenses_spent"]
 
         cnt_policies = pol_open + pol_closed
         cnt_payments = pay_open + pay_closed
@@ -310,11 +307,8 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self.net_profit_label.setTextFormat(Qt.RichText)
         self._apply_net_profit_style(net_profit)
 
-        from services import executor_service as es
-
-        ex = es.get_executor_for_deal(self.instance.id)
-        executor_name = ex.full_name if ex else "—"
-        if ex:
+        executor_name = metrics.get("executor_full_name")
+        if executor_name:
             executor_label_text = (
                 "Исполнитель: <span style='color:#d9534f;font-weight:bold'>"
                 f"{executor_name}</span>"
