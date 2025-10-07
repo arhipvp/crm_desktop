@@ -18,10 +18,7 @@ from PySide6.QtCharts import (
 
 from core.app_context import AppContext, get_app_context
 from services.dashboard_service import (
-    get_basic_stats,
-    count_sent_tasks,
-    count_working_tasks,
-    count_unconfirmed_tasks,
+    get_dashboard_counters,
     get_upcoming_tasks,
     get_expiring_policies,
     get_upcoming_deal_reminders,
@@ -87,7 +84,8 @@ class HomeTab(QWidget):
         self.update_stats()
 
     def update_stats(self):
-        stats = get_basic_stats()
+        counters = get_dashboard_counters()
+        stats = counters["entities"]
         html = (
             f"Клиентов: <b>{stats['clients']}</b><br>"
             f"Сделок: <b>{stats['deals']}</b><br>"
@@ -96,9 +94,10 @@ class HomeTab(QWidget):
         )
         self.info_label.setText(html)
 
-        sent_count = count_sent_tasks()
-        work_count = count_working_tasks()
-        confirm_count = count_unconfirmed_tasks()
+        task_counters = counters["tasks"]
+        sent_count = task_counters["sent"]
+        work_count = task_counters["working"]
+        confirm_count = task_counters["unconfirmed"]
         self.tg_tasks_label.setText(
             f"задач отправлено: <b>{sent_count}</b> штук<br>"
             f"задач в работе: <b>{work_count}</b> штук<br>"
