@@ -19,7 +19,6 @@ from core.app_context import AppContext, get_app_context
 from services.deal_metrics import get_deal_kpi_metrics
 from utils.screen_utils import get_scaled_size
 from utils.money import format_rub
-from ui.widgets.flow_layout import FlowLayout
 
 from .actions import DealActionsMixin
 from .tabs import DealTabsMixin
@@ -88,9 +87,9 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         left_layout.addWidget(self.create_folder_button)
 
         actions_panel = CollapsibleWidget("Действия", self.left_panel)
-        self.primary_actions_layout = FlowLayout()
+        self.primary_actions_layout = QVBoxLayout()
         self.primary_actions_layout.setContentsMargins(0, 0, 0, 0)
-        self.primary_actions_layout.setSpacing(6)
+        self.primary_actions_layout.setSpacing(12)
         actions_panel.setContentLayout(self.primary_actions_layout)
         left_layout.addWidget(actions_panel)
         self._update_files_panel()
@@ -176,34 +175,11 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
         self._rebuild_tab_actions(tab_index)
 
     def _rebuild_tab_actions(self, tab_index: int | None = None) -> None:
-        layout = getattr(self, "primary_actions_layout", None)
-        if layout is None:
+        group = getattr(self, "_tab_actions_group", None)
+        if group is None:
             return
 
-        static_widgets = set(getattr(self, "_static_action_widgets", ()))
-
-        # keep only widgets that are still part of the layout
-        self._tab_action_widgets = [
-            widget
-            for widget in self._tab_action_widgets
-            if widget is not None
-            and widget not in static_widgets
-            and layout.indexOf(widget) != -1
-        ]
-
-        for widget in list(self._tab_action_widgets):
-            if widget in static_widgets:
-                continue
-            idx = layout.indexOf(widget)
-            if idx != -1:
-                item = layout.takeAt(idx)
-                if item is not None:
-                    removed = item.widget()
-                    if removed is not None:
-                        removed.setParent(None)
-                        continue
-            widget.setParent(None)
-        self._tab_action_widgets.clear()
+        self._tab_action_widgets = []
 
         target_index = tab_index
         if target_index is None and hasattr(self, "tabs"):
@@ -234,11 +210,12 @@ class DealDetailView(DealTabsMixin, DealActionsMixin, QDialog):
             if not factory:
                 continue
             for widget in factory() or ():
-                if widget in static_widgets or widget in new_widgets:
+                if widget in new_widgets:
                     continue
-                layout.addWidget(widget)
                 new_widgets.append(widget)
 
+        group.set_actions(new_widgets)
+        group.setVisible(bool(new_widgets))
         self._tab_action_widgets = new_widgets
 
     def _init_kpi_panel(self):
