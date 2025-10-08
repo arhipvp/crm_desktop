@@ -1,12 +1,19 @@
 import base64
 import logging
 import re
+from collections.abc import Sequence
 from datetime import date, timedelta
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QDialog, QInputDialog, QMessageBox, QProgressDialog
+from PySide6.QtWidgets import (
+    QDialog,
+    QInputDialog,
+    QMessageBox,
+    QProgressDialog,
+    QWidget,
+)
 
 from database.models import Deal
 from services.clients import get_client_by_id
@@ -41,6 +48,7 @@ from ui.forms.income_form import IncomeForm
 from ui.forms.payment_form import PaymentForm
 from ui.forms.policy_form import PolicyForm
 from ui.forms.task_form import TaskForm
+from ui.widgets.action_group_widget import ActionGroupWidget
 
 from .dialogs import CloseDealDialog
 
@@ -63,21 +71,20 @@ class DealActionsMixin:
                 widget.setParent(None)
 
         self._tab_action_widgets.clear()
-        static_widgets: list = []
+        self._tab_actions_group: ActionGroupWidget | None = None
 
-        def register_static_button(button):
+        buttons: dict[str, QWidget] = {}
+
+        def prepare(button: QWidget) -> QWidget:
             button.setProperty("flow_fill_row", False)
-            primary_layout.addWidget(button)
-            static_widgets.append(button)
             return button
 
-        btn_edit = register_static_button(
-            styled_button("✏️ Редактировать", shortcut="Ctrl+E")
-        )
+        btn_edit = prepare(styled_button("✏️ Редактировать", shortcut="Ctrl+E"))
         btn_edit.clicked.connect(self._on_edit)
         self._add_shortcut("Ctrl+E", self._on_edit)
+        buttons["edit"] = btn_edit
 
-        btn_edit_client = register_static_button(
+        btn_edit_client = prepare(
             styled_button(
                 "📝 Клиент",
                 tooltip="Редактировать клиента",
@@ -86,14 +93,14 @@ class DealActionsMixin:
         )
         btn_edit_client.clicked.connect(self._on_edit_client)
         self._add_shortcut("Ctrl+Shift+K", self._on_edit_client)
+        buttons["edit_client"] = btn_edit_client
 
-        btn_folder = register_static_button(
-            styled_button("📂 Папка", shortcut="Ctrl+O")
-        )
+        btn_folder = prepare(styled_button("📂 Папка", shortcut="Ctrl+O"))
         btn_folder.clicked.connect(self._open_folder)
         self._add_shortcut("Ctrl+O", self._open_folder)
+        buttons["folder"] = btn_folder
 
-        btn_copy = register_static_button(
+        btn_copy = prepare(
             styled_button(
                 "📋",
                 tooltip="Скопировать путь к папке",
@@ -102,30 +109,29 @@ class DealActionsMixin:
         )
         btn_copy.clicked.connect(self._copy_folder_path)
         self._add_shortcut("Ctrl+Shift+C", self._copy_folder_path)
+        buttons["copy_path"] = btn_copy
 
-        self.btn_exec = register_static_button(
+        self.btn_exec = prepare(
             styled_button("👤 Исполнитель", shortcut="Ctrl+Shift+E")
         )
         self.btn_exec.clicked.connect(self._on_toggle_executor)
         self._add_shortcut("Ctrl+Shift+E", self._on_toggle_executor)
+        buttons["executor"] = self.btn_exec
 
-        btn_wa = register_static_button(
-            styled_button("💬 WhatsApp", shortcut="Ctrl+Shift+W")
-        )
+        btn_wa = prepare(styled_button("💬 WhatsApp", shortcut="Ctrl+Shift+W"))
         btn_wa.clicked.connect(self._open_whatsapp)
         self._add_shortcut("Ctrl+Shift+W", self._open_whatsapp)
+        buttons["whatsapp"] = btn_wa
 
-        btn_prev = register_static_button(
-            styled_button("◀ Назад", shortcut="Alt+Left")
-        )
+        btn_prev = prepare(styled_button("◀ Назад", shortcut="Alt+Left"))
         btn_prev.clicked.connect(self._on_prev_deal)
         self._add_shortcut("Alt+Left", self._on_prev_deal)
+        buttons["prev"] = btn_prev
 
-        btn_next = register_static_button(
-            styled_button("▶ Далее", shortcut="Alt+Right")
-        )
+        btn_next = prepare(styled_button("▶ Далее", shortcut="Alt+Right"))
         btn_next.clicked.connect(self._on_next_deal)
         self._add_shortcut("Alt+Right", self._on_next_deal)
+        buttons["next"] = btn_next
 
         has_prev = get_prev_deal(self.instance)
         has_next = get_next_deal(self.instance)
@@ -135,24 +141,65 @@ class DealActionsMixin:
         self.btn_next = btn_next
 
         if not self.instance.is_closed:
-            btn_delay = register_static_button(
+            btn_delay = prepare(
                 styled_button("⏳ Отложить", shortcut="Ctrl+Shift+N")
             )
             btn_delay.clicked.connect(self._on_delay_to_event)
             self._add_shortcut("Ctrl+Shift+N", self._on_delay_to_event)
+            buttons["delay"] = btn_delay
         else:
-            btn_reopen = register_static_button(
+            btn_reopen = prepare(
                 styled_button("🔓 Восстановить сделку", shortcut="Ctrl+Shift+O")
             )
             btn_reopen.clicked.connect(self._on_reopen_deal)
             self._add_shortcut("Ctrl+Shift+O", self._on_reopen_deal)
+            buttons["reopen"] = btn_reopen
 
+        btn_close: QWidget | None = None
         if not self.instance.is_closed:
-            btn_close = register_static_button(
+            btn_close = prepare(
                 styled_button("🔒 Закрыть сделку", shortcut="Ctrl+Shift+L")
             )
             btn_close.clicked.connect(self._on_close_deal)
             self._add_shortcut("Ctrl+Shift+L", self._on_close_deal)
+            buttons["close"] = btn_close
+
+        groups: list[tuple[str, list[QWidget]]] = [
+            (
+                "Карточка",
+                [
+                    buttons["edit"],
+                    buttons["edit_client"],
+                    buttons["folder"],
+                    buttons["copy_path"],
+                ],
+            ),
+            ("Коммуникации", [buttons["whatsapp"]]),
+            ("Навигация", [buttons["prev"], buttons["next"]]),
+        ]
+
+        status_buttons: list[QWidget] = [buttons["executor"]]
+        if not self.instance.is_closed:
+            status_buttons.append(buttons["delay"])
+            if btn_close is not None:
+                status_buttons.append(btn_close)
+        else:
+            status_buttons.append(buttons["reopen"])
+        groups.append(("Статус", status_buttons))
+
+        static_widgets: list[QWidget] = []
+        for title, widgets in groups:
+            group_widget = self._create_action_group(title, widgets)
+            if group_widget is not None:
+                static_widgets.append(group_widget)
+
+        self._tab_actions_group = self._create_action_group("Текущая вкладка", [])
+        if self._tab_actions_group is not None:
+            self._tab_actions_group.setVisible(False)
+            static_widgets.append(self._tab_actions_group)
+
+        primary_layout.addStretch()
+
         self._static_action_widgets = static_widgets
 
         self._update_exec_button()
@@ -169,6 +216,19 @@ class DealActionsMixin:
             self._rebuild_tab_actions(current_index)
         else:
             self._rebuild_tab_actions()
+
+    def _create_action_group(
+        self, title: str, widgets: Sequence[QWidget]
+    ) -> ActionGroupWidget | None:
+        primary_layout = getattr(self, "primary_actions_layout", None)
+        if primary_layout is None:
+            return None
+
+        group = ActionGroupWidget(title, self)
+        group.set_actions(widgets)
+        group.setVisible(bool(widgets))
+        primary_layout.addWidget(group)
+        return group
 
     def _add_shortcut(self, seq: str, callback):
         sc = QShortcut(QKeySequence(seq), self)
