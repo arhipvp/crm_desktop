@@ -12,6 +12,7 @@ class PolicyTableController(TableController):
 
     def __init__(self, view, service=policy_app_service, *, filter_func=None):
         self.service = service
+        self._pending_total: int | None = None
         super().__init__(
             view,
             model_class=PolicyRowDTO,
@@ -39,9 +40,19 @@ class PolicyTableController(TableController):
         return self.service.update_policy_field(policy_id, field, value)
 
     def _get_page(self, page: int, per_page: int, **filters):
-        return self.service.get_page(page, per_page, **filters)
+        policies, total = self.service.get_page_with_total(
+            page,
+            per_page,
+            **filters,
+        )
+        self._pending_total = total
+        return policies
 
     def _get_total(self, **filters):
+        if self._pending_total is not None:
+            total = self._pending_total
+            self._pending_total = None
+            return total
         return self.service.count(**filters)
 
     def _create_table_model(
