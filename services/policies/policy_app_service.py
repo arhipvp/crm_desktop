@@ -65,6 +65,24 @@ class PolicyAppService:
         order_dir: str = "asc",
         **filters: Any,
     ) -> list[PolicyRowDTO]:
+        policies, _ = self.get_page_with_total(
+            page,
+            per_page,
+            order_by=order_by,
+            order_dir=order_dir,
+            **filters,
+        )
+        return policies
+
+    def get_page_with_total(
+        self,
+        page: int,
+        per_page: int,
+        *,
+        order_by: Any | None = None,
+        order_dir: str = "asc",
+        **filters: Any,
+    ) -> tuple[list[PolicyRowDTO], int]:
         column_filters = filters.pop("column_filters", None)
         prepared_filters = self._prepare_column_filters(column_filters)
         order_field = self._resolve_order_field(order_by)
@@ -76,6 +94,7 @@ class PolicyAppService:
             order_by=order_field,
             **filters,
         )
+        total = query.count()
         if order_field is not None:
             ordering = (
                 order_field.desc()
@@ -86,7 +105,7 @@ class PolicyAppService:
         offset = max(page - 1, 0) * per_page
         policies = list(query.offset(offset).limit(per_page))
         attach_premium(policies)
-        return [PolicyRowDTO.from_model(policy) for policy in policies]
+        return [PolicyRowDTO.from_model(policy) for policy in policies], total
 
     def update_policy_field(self, policy_id: int, field: str, value: Any) -> PolicyRowDTO:
         """Обновить отдельное поле полиса и вернуть актуальные данные строки."""
