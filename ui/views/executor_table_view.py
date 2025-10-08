@@ -17,6 +17,9 @@ from ui.common.message_boxes import confirm, show_error
 from ui.forms.executor_form import ExecutorForm
 
 
+SHOW_INACTIVE_LABEL = "Показывать неактивных"
+
+
 class ExecutorTableController(TableController):
     def __init__(
         self,
@@ -41,6 +44,12 @@ class ExecutorTableController(TableController):
             "show_inactive": bool(filters.get("show_inactive", True)),
             "column_filters": column_filters,
         }
+
+    def get_filters(self) -> dict[str, Any]:
+        filters = super().get_filters()
+        filters["show_inactive"] = self.view.is_checked(SHOW_INACTIVE_LABEL)
+        filters.pop("show_deleted", None)
+        return filters
 
     def _get_page(
         self,
@@ -138,7 +147,7 @@ class ExecutorTableView(BaseTableView):
         self.current_sort_column = self.default_sort_column
         self.current_sort_order = Qt.AscendingOrder
 
-        checkbox_map = {"Показывать неактивных": lambda _state: self.load_data()}
+        checkbox_map = {SHOW_INACTIVE_LABEL: lambda _state: self.load_data()}
         controller = ExecutorTableController(
             self,
             get_page_func=get_executors_page_func,
@@ -155,25 +164,14 @@ class ExecutorTableView(BaseTableView):
         )
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         # Скрыть нерелевантный чекбокс "Показывать удалённые" для исполнителей
-        show_inactive_label = "Показывать неактивных"
         for label, box in self.checkboxes.items():
-            if label != show_inactive_label:
+            if label != SHOW_INACTIVE_LABEL:
                 box.setVisible(False)
         self.row_double_clicked.connect(self.edit_selected)
         self.table.horizontalHeader().sortIndicatorChanged.connect(
             self.on_sort_changed
         )
         self.load_data()
-
-    def get_filters(self) -> dict:
-        filters = super().get_filters()
-        filters.update(
-            {
-                "show_inactive": self.is_checked("Показывать неактивных"),
-            }
-        )
-        filters.pop("show_deleted", None)
-        return filters
 
     def on_sort_changed(self, column: int, order: Qt.SortOrder):
         self.current_sort_column = column
