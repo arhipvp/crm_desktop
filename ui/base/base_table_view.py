@@ -345,7 +345,8 @@ class BaseTableView(QWidget):
     # ------------------------------------------------------------------
     def focus_search(self) -> None:
         """Устанавливает фокус на поле поиска."""
-        self.search_edit.setFocus()
+        self.search_edit.setFocus(Qt.ShortcutFocusReason)
+        self.search_edit.selectAll()
 
     def get_search_text(self) -> str:
         """Возвращает текст из поля поиска."""
