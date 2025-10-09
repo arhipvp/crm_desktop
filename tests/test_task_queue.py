@@ -4,6 +4,8 @@ import pytest
 
 from database.models import Task
 from services.task_queue import (
+    get_all_deals_with_queued_tasks,
+    get_deals_with_queued_tasks,
     pop_all_by_deal,
     pop_next,
     pop_next_by_client,
@@ -105,3 +107,35 @@ def test_pop_all_by_deal_returns_all_and_marks_sent(make_task):
     assert [t.id for t in tasks] == [t1.id, t2.id]
     assert all(t.dispatch_state == SENT and t.tg_chat_id == 40 for t in tasks)
     assert pop_next_by_deal(chat_id=40, deal_id=deal.id) is None
+
+
+@pytest.mark.usefixtures("in_memory_db")
+def test_get_deals_with_queued_tasks_excludes_deleted_deals(make_task):
+    client, active_deal, _ = make_task(title="Active deal task")
+    _, deleted_deal, _ = make_task(
+        client=client,
+        deal_description="Deleted",
+        title="Deleted deal task",
+    )
+    deleted_deal.is_deleted = True
+    deleted_deal.save()
+
+    deals = get_deals_with_queued_tasks(client.id)
+
+    assert {deal.id for deal in deals} == {active_deal.id}
+
+
+@pytest.mark.usefixtures("in_memory_db")
+def test_get_all_deals_with_queued_tasks_excludes_deleted_deals(make_task):
+    client, active_deal, _ = make_task(title="Active task")
+    _, deleted_deal, _ = make_task(
+        client=client,
+        deal_description="Deleted",
+        title="Deleted task",
+    )
+    deleted_deal.is_deleted = True
+    deleted_deal.save()
+
+    deals = get_all_deals_with_queued_tasks()
+
+    assert {deal.id for deal in deals} == {active_deal.id}
