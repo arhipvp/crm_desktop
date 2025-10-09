@@ -104,3 +104,26 @@ def test_notify_task_resends_message(in_memory_db, monkeypatch):
 
     assert sent == {'task_id': task.id, 'tg_id': 99}
     assert Task.get_by_id(task.id).dispatch_state == SENT
+
+
+def test_notify_task_without_chat_returns_to_queue(in_memory_db, monkeypatch):
+    client = Client.create(name='C')
+    deal = Deal.create(client=client, description='D', start_date=datetime.date.today())
+    task = Task.create(
+        title='T',
+        due_date=datetime.date.today(),
+        deal=deal,
+        dispatch_state=SENT,
+    )
+
+    returned = {}
+
+    def fake_return_to_queue(task_id):
+        returned['task_id'] = task_id
+
+    monkeypatch.setattr('services.task_queue.return_to_queue', fake_return_to_queue)
+
+    tsvc.notify_task(task.id)
+
+    assert returned == {'task_id': task.id}
+    assert Task.get_by_id(task.id).dispatch_state == SENT
