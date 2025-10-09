@@ -7,7 +7,7 @@ from services.task_queue import (
     get_all_deals_with_queued_tasks,
     get_clients_with_queued_tasks,
     get_deals_with_queued_tasks,
-    get_clients_with_queued_tasks,
+    get_queued_tasks_by_deal,
     pop_all_by_deal,
     pop_next,
     pop_next_by_client,
@@ -193,3 +193,44 @@ def test_get_clients_with_queued_tasks_excludes_deleted_entities(
 
     assert client_ids == {deal_client.id, policy_client.id}
     assert len(clients) == 2
+
+
+@pytest.mark.usefixtures("in_memory_db")
+def test_get_queued_tasks_by_deal_excludes_deleted_policies(
+    make_task, make_policy_with_payment
+):
+    client, deal, deal_task = make_task(title="Deal task for deal")
+
+    _, _, active_policy, _ = make_policy_with_payment(
+        client=client,
+        deal=deal,
+        policy_kwargs={"policy_number": "ACTIVE"},
+    )
+    _, _, active_policy_task = make_task(
+        client=client,
+        policy=active_policy,
+        deal=None,
+        title="Active policy task",
+    )
+
+    _, _, deleted_policy, _ = make_policy_with_payment(
+        client=client,
+        deal=deal,
+        policy_kwargs={"policy_number": "DELETED"},
+    )
+    _, _, deleted_policy_task = make_task(
+        client=client,
+        policy=deleted_policy,
+        deal=None,
+        title="Deleted policy task",
+    )
+    deleted_policy.is_deleted = True
+    deleted_policy.save()
+
+    tasks = get_queued_tasks_by_deal(deal.id)
+
+    task_ids = {task.id for task in tasks}
+
+    assert deal_task.id in task_ids
+    assert active_policy_task.id in task_ids
+    assert deleted_policy_task.id not in task_ids

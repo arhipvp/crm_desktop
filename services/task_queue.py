@@ -200,7 +200,7 @@ def get_queued_tasks_by_deal(deal_id: int) -> list[Task]:
     """Вернуть задачи в очереди для указанной сделки."""
     policy_subq = (
         Policy.select(Policy.id)
-        .where(Policy.deal_id == deal_id)
+        .where((Policy.deal_id == deal_id) & (Policy.is_deleted == False))
     )
 
     base = (
