@@ -38,18 +38,26 @@ def queue_task(task_id: int):
 def get_clients_with_queued_tasks() -> list[Client]:
     """Вернуть уникальных клиентов с задачами в состоянии ``queued``."""
     deal_clients = (
-        Client.select()
+        Client.active()
         .distinct()
         .join(Deal)
         .join(Task)
-        .where((Task.dispatch_state == QUEUED) & (Task.is_deleted == False))
+        .where(
+            (Deal.is_deleted == False)
+            & (Task.dispatch_state == QUEUED)
+            & (Task.is_deleted == False)
+        )
     )
     policy_clients = (
-        Client.select()
+        Client.active()
         .distinct()
         .join(Policy)
         .join(Task)
-        .where((Task.dispatch_state == QUEUED) & (Task.is_deleted == False))
+        .where(
+            (Policy.is_deleted == False)
+            & (Task.dispatch_state == QUEUED)
+            & (Task.is_deleted == False)
+        )
     )
     return list(deal_clients.union(policy_clients))
 
