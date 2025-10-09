@@ -125,6 +125,7 @@ def get_deals_with_queued_tasks(client_id: int) -> list[Deal]:
         .where(
             (Task.dispatch_state == QUEUED)
             & (Task.is_deleted == False)
+            & (Deal.is_deleted == False)
             & (Deal.client_id == client_id)
         )
     )
@@ -137,7 +138,11 @@ def get_all_deals_with_queued_tasks() -> list[Deal]:
         Deal.select()
         .distinct()
         .join(Task)
-        .where((Task.dispatch_state == QUEUED) & (Task.is_deleted == False))
+        .where(
+            (Task.dispatch_state == QUEUED)
+            & (Task.is_deleted == False)
+            & (Deal.is_deleted == False)
+        )
     )
     return list(prefetch(base, Client))
 
