@@ -42,14 +42,24 @@ def get_clients_with_queued_tasks() -> list[Client]:
         .distinct()
         .join(Deal)
         .join(Task)
-        .where((Task.dispatch_state == QUEUED) & (Task.is_deleted == False))
+        .where(
+            (Task.dispatch_state == QUEUED)
+            & (Task.is_deleted == False)
+            & (Deal.is_deleted == False)
+            & (Client.is_deleted == False)
+        )
     )
     policy_clients = (
         Client.select()
         .distinct()
         .join(Policy)
         .join(Task)
-        .where((Task.dispatch_state == QUEUED) & (Task.is_deleted == False))
+        .where(
+            (Task.dispatch_state == QUEUED)
+            & (Task.is_deleted == False)
+            & (Policy.is_deleted == False)
+            & (Client.is_deleted == False)
+        )
     )
     return list(deal_clients.union(policy_clients))
 
