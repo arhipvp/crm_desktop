@@ -7,13 +7,37 @@ from services.task_queue import (
     get_all_deals_with_queued_tasks,
     get_clients_with_queued_tasks,
     get_deals_with_queued_tasks,
-    get_queued_tasks_by_deal,
+    get_clients_with_queued_tasks,
+    pop_task_by_id,
     pop_all_by_deal,
     pop_next,
     pop_next_by_client,
     pop_next_by_deal,
 )
 from services.task_states import QUEUED, SENT
+
+
+@pytest.mark.usefixtures("in_memory_db")
+def test_pop_task_by_id_returns_task_and_marks_sent(monkeypatch, make_task):
+    monkeypatch.setattr(
+        "services.task_queue.refresh_deal_drive_link",
+        lambda *_args, **_kwargs: None,
+    )
+
+    _, _, task = make_task()
+
+    result = pop_task_by_id(chat_id=50, task_id=task.id)
+
+    assert result is not None
+    assert result.id == task.id
+    assert result.dispatch_state == SENT
+    assert result.tg_chat_id == 50
+
+    stored = Task.get(Task.id == task.id)
+    assert stored.dispatch_state == SENT
+    assert stored.tg_chat_id == 50
+
+    assert pop_task_by_id(chat_id=50, task_id=task.id) is None
 
 
 @pytest.mark.usefixtures("in_memory_db")
