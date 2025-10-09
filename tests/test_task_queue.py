@@ -7,6 +7,7 @@ from services.task_queue import (
     get_all_deals_with_queued_tasks,
     get_clients_with_queued_tasks,
     get_deals_with_queued_tasks,
+    get_clients_with_queued_tasks,
     pop_all_by_deal,
     pop_next,
     pop_next_by_client,
