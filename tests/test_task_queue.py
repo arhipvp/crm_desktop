@@ -5,6 +5,7 @@ import pytest
 from database.models import Task
 from services.task_queue import (
     get_all_deals_with_queued_tasks,
+    get_clients_with_queued_tasks,
     get_deals_with_queued_tasks,
     get_clients_with_queued_tasks,
     pop_all_by_deal,
@@ -146,24 +147,49 @@ def test_get_all_deals_with_queued_tasks_excludes_deleted_deals(make_task):
 def test_get_clients_with_queued_tasks_excludes_deleted_entities(
     make_task, make_policy_with_payment
 ):
-    deleted_client, _, _ = make_task(client_name="Deleted client")
+    deal_client, _, _ = make_task(client_name="DealClient", title="Deal task")
+
+    policy_client, _, policy, _ = make_policy_with_payment(
+        client_kwargs={"name": "PolicyClient"},
+        policy_kwargs={"policy_number": "POL"},
+    )
+    make_task(
+        client=policy_client,
+        deal=None,
+        policy=policy,
+        title="Policy task",
+    )
+
+    deleted_client, _, _ = make_task(
+        client_name="DeletedClient",
+        title="Deleted client task",
+    )
     deleted_client.is_deleted = True
     deleted_client.save()
 
-    _, deleted_deal, _ = make_task(client_name="Client with deleted deal")
+    deleted_deal_client, deleted_deal, _ = make_task(
+        client_name="DeletedDealClient",
+        title="Deleted deal task",
+    )
     deleted_deal.is_deleted = True
     deleted_deal.save()
 
-    policy_client, _, deleted_policy, _ = make_policy_with_payment(
-        client_kwargs={"name": "Client with deleted policy"},
-        policy_kwargs={"policy_number": "DP"},
+    deleted_policy_client, _, deleted_policy, _ = make_policy_with_payment(
+        client_kwargs={"name": "DeletedPolicyClient"},
+        policy_kwargs={"policy_number": "DEL"},
+    )
+    make_task(
+        client=deleted_policy_client,
+        deal=None,
+        policy=deleted_policy,
+        title="Deleted policy task",
     )
     deleted_policy.is_deleted = True
     deleted_policy.save()
-    make_task(client=policy_client, deal=None, policy=deleted_policy, title="Policy task")
-
-    active_client, _, _ = make_task(client_name="Active client", title="Active task")
 
     clients = get_clients_with_queued_tasks()
 
-    assert {client.id for client in clients} == {active_client.id}
+    client_ids = {client.id for client in clients}
+
+    assert client_ids == {deal_client.id, policy_client.id}
+    assert len(clients) == 2

@@ -40,7 +40,7 @@
 - `assign_executor` очищает прежние привязки и создаёт новую запись с датой назначения【F:services/executor_service.py†L60-L66】.
 
 ## ai_consultant_service
-- `_gather_context` собирает сведения из последних записей клиентов, сделок, полисов и задач【F:services/ai_consultant_service.py†L10-L27】.
+- `_gather_context` собирает сведения из нескольких активных записей клиентов, сделок, полисов и задач, не гарантируя выборку именно «последних» элементов【F:services/ai_consultant_service.py†L10-L27】.
 - `ask_consultant` отправляет вопрос в OpenAI, добавляя контекст БД и выбранную модель【F:services/ai_consultant_service.py†L30-L63】.
 
 ## ai_policy_service
