@@ -20,6 +20,9 @@
 - `_check_duplicate_policy` предотвращает создание полиса с существующим номером, проверяя активные записи по нормализованному номеру【F:services/policies/policy_service.py†L117-L155】.
 - `add_policy` создаёт локальную папку полиса (синхронизация с Google Drive выполняется вручную), привязывает платежи и уведомляет исполнителя【F:services/policies/policy_service.py†L426-L592】.
 
+## policy_app_service
+- `mark_deleted` нормализует переданные идентификаторы (строки, модели, DTO) перед запросом к базе, принимая и объекты с атрибутом `id`【F:services/policies/policy_app_service.py†L188-L233】.
+
 ## payment_service
 - Полный набор CRUD‑операций: `add_payment`, `update_payment`, `mark_payment_deleted` и `restore_payment`【F:services/payment_service.py†L156-L203】【F:services/payment_service.py†L229-L295】【F:services/payment_service.py†L382-L419】.
 - `get_payments_page` предоставляет постраничный вывод с фильтрами и сортировкой через `apply_payment_filters` и `build_payment_query`【F:services/payment_service.py†L120-L153】【F:services/payment_service.py†L422-L476】.
