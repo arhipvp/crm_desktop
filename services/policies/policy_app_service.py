@@ -187,14 +187,15 @@ class PolicyAppService:
         return values
 
     def mark_deleted(
-        self, policy_ids: Sequence[int], *, gateway: DriveGateway | None = None
+        self, policy_ids: Sequence[object], *, gateway: DriveGateway | None = None
     ) -> list[int]:
-        if not policy_ids:
+        normalized_ids = self._normalize_policy_ids(policy_ids)
+        if not normalized_ids:
             return []
         active_ids = [
             row.id
             for row in Policy.select(Policy.id)
-            .where((Policy.id.in_(policy_ids)) & (Policy.is_deleted == False))
+            .where((Policy.id.in_(normalized_ids)) & (Policy.is_deleted == False))
         ]
         if not active_ids:
             return []
@@ -203,12 +204,13 @@ class PolicyAppService:
         return active_ids
 
     def get_policies_by_ids(
-        self, policy_ids: Sequence[int], *, as_dto: bool = False
+        self, policy_ids: Sequence[object], *, as_dto: bool = False
     ) -> dict[int, Policy | PolicyRowDTO]:
         """Получить полисы по списку идентификаторов за один запрос.
 
         Args:
-            policy_ids: Последовательность идентификаторов полисов.
+            policy_ids: Последовательность идентификаторов полисов или объектов
+                с атрибутом ``id``.
             as_dto: Если ``True``, вернуть DTO вместо моделей.
 
         Returns:
@@ -216,23 +218,7 @@ class PolicyAppService:
             отсутствующих в базе идентификаторов значения отсутствуют.
         """
 
-        if not policy_ids:
-            return {}
-
-        unique_ids: list[int] = []
-        seen: set[int] = set()
-        for policy_id in policy_ids:
-            if policy_id is None:
-                continue
-            try:
-                normalized = int(policy_id)
-            except (TypeError, ValueError):
-                continue
-            if normalized in seen:
-                continue
-            seen.add(normalized)
-            unique_ids.append(normalized)
-
+        unique_ids = self._normalize_policy_ids(policy_ids)
         if not unique_ids:
             return {}
 
@@ -246,6 +232,38 @@ class PolicyAppService:
             }
 
         return {policy.id: policy for policy in policies}
+
+    @staticmethod
+    def _normalize_policy_ids(policy_ids: Sequence[object]) -> list[int]:
+        """Привести входные идентификаторы к уникальному списку ``int``."""
+
+        unique_ids: list[int] = []
+        seen: set[int] = set()
+
+        for value in policy_ids:
+            candidate = value
+            if isinstance(candidate, PolicyRowDTO):
+                candidate = candidate.id
+            elif isinstance(candidate, Policy):
+                candidate = candidate.id
+            elif hasattr(candidate, "id"):
+                candidate = getattr(candidate, "id")
+
+            if candidate is None:
+                continue
+
+            try:
+                normalized = int(candidate)
+            except (TypeError, ValueError):
+                continue
+
+            if normalized in seen:
+                continue
+
+            seen.add(normalized)
+            unique_ids.append(normalized)
+
+        return unique_ids
 
     def _prepare_column_filters(self, column_filters):
         if not column_filters:

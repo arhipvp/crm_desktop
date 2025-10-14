@@ -91,3 +91,27 @@ def test_policy_table_controller_reuses_total_from_page_request():
     controller._get_total()
     assert controller._pending_total is None
     assert controller.service.count_calls == 1
+
+
+def test_policy_app_service_mark_deleted_accepts_dto(in_memory_db, tmp_path):
+    service = PolicyAppService()
+    client = Client.create(name="DTO client")
+    policy = Policy.create(
+        client=client,
+        policy_number="POL-DTO",
+        start_date=date.today(),
+    )
+    dto = PolicyRowDTO.from_model(policy)
+
+    class DummyGateway:
+        def __init__(self, root):
+            self.local_root = root
+
+        def rename_drive_folder(self, file_id, new_name):  # pragma: no cover - no drive
+            return None
+
+    deleted_ids = service.mark_deleted([dto], gateway=DummyGateway(tmp_path))
+
+    assert deleted_ids == [policy.id]
+    updated_policy = Policy.get_by_id(policy.id)
+    assert updated_policy.is_deleted is True
