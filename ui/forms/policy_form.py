@@ -499,19 +499,21 @@ class PolicyForm(BaseEditForm):
         vbox.addWidget(self.payments_table)
 
         if self.instance:
-            existing = (
-                Payment.active()
-                .where(Payment.policy == self.instance)
-                .order_by(Payment.payment_date)
-            )
-            for p in existing:
-                self.add_payment_row(
-                    {
-                        "payment_date": p.payment_date,
-                        "amount": float(p.amount),
-                        "actual_payment_date": p.actual_payment_date,
-                    }
+            policy_id = getattr(self.instance, "id", None)
+            if policy_id is not None:
+                existing = (
+                    Payment.active()
+                    .where(Payment.policy_id == policy_id)
+                    .order_by(Payment.payment_date)
                 )
+                for p in existing:
+                    self.add_payment_row(
+                        {
+                            "payment_date": p.payment_date,
+                            "amount": float(p.amount),
+                            "actual_payment_date": p.actual_payment_date,
+                        }
+                    )
 
         hlayout = QHBoxLayout()
         self.pay_date_edit = QDateEdit()
