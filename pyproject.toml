@@ -72,7 +72,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["database", "services", "telegram_bot", "ui", "utils", "resources"]
+packages = ["core", "database", "infrastructure", "resources", "services", "telegram_bot", "ui", "utils"]
 
 [tool.ruff]
 line-length = 88
