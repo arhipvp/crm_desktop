@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir -r telegram_requirements.txt
 
 # Copy application source
 COPY database/ ./database/
+COPY core/ ./core/
+COPY infrastructure/ ./infrastructure/
 COPY services/ ./services/
 COPY telegram_bot/ ./telegram_bot/
 COPY utils/ ./utils/
