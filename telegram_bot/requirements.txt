@@ -6,4 +6,5 @@ psycopg2-binary>=2.9
 google-api-python-client
 google-auth
 google-auth-oauthlib
+python-dateutil==2.9.0.post0
 # PySide6, OpenAI, pandas, numpy и пр. не требуются для телеграм-бота
