@@ -5,20 +5,27 @@ Telegram‑бот для очереди задач CRM_desktop.
 Теперь поддерживает приём документов и фотографий в ответ на сообщение сделки — файл сохраняется в папку сделки на диске.
 """
 
-from database.init import init_from_env
+from pathlib import Path
 
 import os
 import re
+import sys
 import datetime as _dt
-from utils.time_utils import now_str
 import tempfile
 import logging
-from utils.logging_config import setup_logging
-from dotenv import load_dotenv
-from pathlib import Path
 from html import escape
+
+# ───────────── настройка PYTHONPATH ─────────────
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from dotenv import load_dotenv
+from utils.time_utils import now_str
+from utils.logging_config import setup_logging
 from services.validators import normalize_number
 from services import deal_journal
+from database.init import init_from_env
 from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -34,6 +41,7 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+
 
 
 def _parse_float(text: str) -> float | None:
