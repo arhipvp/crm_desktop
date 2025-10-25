@@ -310,7 +310,9 @@ class ExpenseTableView(BaseTableView):
     ):
         self._context = context
         checkbox_map = {
-            "Показывать выплаченные": self.load_data,
+            # используем безопасный обработчик, чтобы избежать
+            # вызова load_data до завершения инициализации
+            "Показывать выплаченные": self._on_filter_controls_changed,
         }
         self.deal_id = deal_id
         controller = ExpenseTableController(self)
