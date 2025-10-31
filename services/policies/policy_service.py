@@ -623,7 +623,7 @@ def add_policy(
 
 
 def update_policy(
-    policy: Policy,
+    policy: Policy | object,
     *,
     first_payment_paid: bool = False,
     payments: list[dict] | None = None,
@@ -633,7 +633,7 @@ def update_policy(
     """Обновить поля полиса и, при необходимости, добавить платежи.
 
     Args:
-        policy: Изменяемый полис.
+        policy: Изменяемый полис или объект с ``id``.
         first_payment_paid: Отметить ли первый платёж как оплаченный.
         payments: Список платежей для объединения.
         **kwargs: Новые значения полей.
@@ -641,6 +641,22 @@ def update_policy(
     Returns:
         Policy: Обновлённый полис.
     """
+    if not isinstance(policy, Policy):
+        policy_id = getattr(policy, "id", None)
+        if policy_id is None:
+            raise TypeError(
+                "update_policy ожидает модель Policy или объект с атрибутом 'id'"
+            )
+        db_policy = Policy.select().where(Policy.id == policy_id).get_or_none()
+        if db_policy is None:
+            raise ValueError(f"Полис id={policy_id} не найден")
+        logger.debug(
+            "update_policy: преобразован объект %s в Policy id=%s",
+            type(policy).__name__,
+            db_policy.id,
+        )
+        policy = db_policy
+
     allowed_fields = {
         "policy_number",
         "insurance_type",
