@@ -8,7 +8,7 @@ import pytest
 from config import Settings
 from database.db import db
 from database.models import Client, Policy, Payment, Deal
-from services.policies import policy_service as ps, ai_policy_service
+from services.policies import policy_service as ps, ai_policy_service, PolicyRowDTO
 from services.policies.ai_policy_service import _chat
 from services.payment_service import add_payment
 
@@ -195,6 +195,31 @@ def test_contractor_dash_clears(
     ps.update_policy(policy, contractor='—', gateway=fake_drive_gateway)
     policy_db = Policy.get_by_id(policy.id)
     assert policy_db.contractor is None
+
+
+def test_update_policy_accepts_dto(
+    in_memory_db, policy_folder_patches, fake_drive_gateway
+):
+    client = Client.create(name='C')
+    start = datetime.date(2024, 1, 1)
+    end = datetime.date(2025, 1, 1)
+    policy = ps.add_policy(
+        client=client,
+        policy_number='P',
+        start_date=start,
+        end_date=end,
+        gateway=fake_drive_gateway,
+    )
+
+    dto = PolicyRowDTO.from_model(policy)
+    updated = ps.update_policy(
+        dto,
+        note='updated via dto',
+        gateway=fake_drive_gateway,
+    )
+
+    assert updated.note == 'updated via dto'
+    assert Policy.get_by_id(policy.id).note == 'updated via dto'
 
 
 def test_update_policy_logs_simple_values(
